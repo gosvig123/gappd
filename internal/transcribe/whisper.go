@@ -39,7 +39,7 @@ func TranscribeFile(audioPath, modelPath string) ([]Segment, error) {
 }
 
 func findWhisperBinary() (string, error) {
-	for _, name := range []string{"whisper-cpp", "whisper", "main"} {
+	for _, name := range []string{"whisper-cli", "whisper-cpp", "whisper", "main"} {
 		if path, err := exec.LookPath(name); err == nil {
 			return path, nil
 		}

@@ -134,7 +134,9 @@ func postProcess(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, audio
 	}
 
 	transcript := formatTranscript(dbSegments)
-	fmt.Println("● Enhancing with AI...")
+	fmt.Println("\n── Transcript ──────────────────────────")
+	fmt.Println(transcript)
+	fmt.Println("── Enhancing with AI... ─────────────────")
 	extraction, summary, err := pipeline.Run(cmdContext(), transcript, "")
 	if err != nil {
 		meeting.Transcript = &transcript
@@ -148,8 +150,12 @@ func postProcess(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, audio
 	meeting.EndedAt = &now
 	store.UpdateMeeting(meeting)
 
-	fmt.Println("\n" + summary)
-	fmt.Printf("\n● %d action items. Meeting saved: %s\n", len(extraction.ActionItems), meeting.ID)
+	fmt.Println("\n── Notes ───────────────────────────────")
+	fmt.Println(summary)
+	if len(extraction.ActionItems) > 0 {
+		fmt.Printf("\n● %d action items extracted.\n", len(extraction.ActionItems))
+	}
+	fmt.Printf("● Saved: %s\n", meeting.ID)
 	return nil
 }
 

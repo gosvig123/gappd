@@ -123,11 +123,21 @@ func showMeeting(store *db.DB, id string) error {
 		return fmt.Errorf("meeting not found: %w", err)
 	}
 	fmt.Printf("# %s\n", meeting.Title)
-	fmt.Printf("Date: %s\n\n", meeting.StartedAt)
+	fmt.Printf("Date: %s\n", meeting.StartedAt)
+	if meeting.EndedAt != nil {
+		fmt.Printf("Ended: %s\n", *meeting.EndedAt)
+	}
+
+	if meeting.Transcript != nil {
+		fmt.Println("\n── Transcript ──────────────────────")
+		fmt.Println(*meeting.Transcript)
+	}
+
 	if meeting.Summary != nil {
+		fmt.Println("── Notes ───────────────────────────")
 		fmt.Println(*meeting.Summary)
 	} else {
-		fmt.Println("No summary yet. Run `grn enhance " + id + "`")
+		fmt.Println("\nNo notes yet. Run `grn enhance " + id + "`")
 	}
 	return nil
 }
