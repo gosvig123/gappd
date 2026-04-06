@@ -6,11 +6,20 @@ LDFLAGS   := -s -w -X $(MODULE)/internal/version.Version=$(VERSION)
 DB_PATH   := ~/.grn/db.sqlite
 SCHEMA    := ./internal/storage/schema.sql
 
-.PHONY: build run dev db-init db-reset clean
+.PHONY: build build-capture run dev db-init db-reset clean install-capture
 
-build:
+build: build-capture
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/grn
+
+build-capture:
+	@bash capture-helper/build.sh
+
+install-capture: build-capture
+	@mkdir -p ~/.grn/GrnCapture.app/Contents/MacOS
+	cp $(BUILD_DIR)/GrnCapture.app/Contents/Info.plist ~/.grn/GrnCapture.app/Contents/
+	cp $(BUILD_DIR)/GrnCapture.app/Contents/MacOS/grn-capture ~/.grn/GrnCapture.app/Contents/MacOS/
+	@echo "Installed to ~/.grn/GrnCapture.app"
 
 run: build
 	$(BUILD_DIR)/$(BINARY)

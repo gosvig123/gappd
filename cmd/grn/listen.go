@@ -11,7 +11,6 @@ import (
 	"github.com/grn-dev/grn/internal/ai"
 	"github.com/grn-dev/grn/internal/capture"
 	"github.com/grn-dev/grn/internal/db"
-	"github.com/grn-dev/grn/internal/transcribe"
 	"github.com/spf13/cobra"
 )
 
@@ -19,17 +18,20 @@ func listenCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
 	var modelPath string
+	var mode string
 
 	cmd := &cobra.Command{
 		Use:   "listen",
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, modelPath)
+			m := capture.CaptureMode(mode)
+			return runListen(deviceIdx, title, modelPath, m)
 		},
 	}
-	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index (see grn devices)")
+	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
 	cmd.Flags().StringVarP(&title, "title", "t", "", "Session title")
 	cmd.Flags().StringVarP(&modelPath, "model", "m", "", "Whisper model path")
+	cmd.Flags().StringVar(&mode, "mode", "mic", "Capture mode: mic, system, both")
 	return cmd
 }
 
@@ -50,7 +52,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title, modelPath string) error {
+func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode) error {
 	_, store, pipeline, err := loadDeps()
 	if err != nil {
 		return err
@@ -64,23 +66,19 @@ func runListen(deviceIdx int, title, modelPath string) error {
 		title = time.Now().Format("2006-01-02 15:04 recording")
 	}
 
-	sessionDir, audioPath, err := createSession(title)
-	if err != nil {
-		return err
-	}
-
-	meeting, err := startMeeting(store, title, audioPath)
+	sessionDir := createSessionDir(title)
+	meeting, err := startMeeting(store, title, sessionDir)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
-	fmt.Printf("  device: [%d], model: %s\n\n", deviceIdx, modelPath)
+	fmt.Printf("  mode: %s, device: [%d]\n\n", mode, deviceIdx)
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	recorder := capture.NewRecorder(deviceIdx, audioPath)
+	recorder := capture.NewRecorder(mode, sessionDir, deviceIdx)
 	if err := recorder.Start(ctx); err != nil {
 		return err
 	}
@@ -92,26 +90,23 @@ func runListen(deviceIdx int, title, modelPath string) error {
 	duration := time.Since(parseTime(meeting.StartedAt))
 	fmt.Printf("● Recorded %s\n", duration.Truncate(time.Second))
 
-	return postProcess(store, pipeline, meeting, audioPath, modelPath)
+	return postProcess(store, pipeline, meeting, recorder, modelPath)
 }
 
-func createSession(title string) (string, string, error) {
+func createSessionDir(title string) string {
 	ts := time.Now().Format("2006-01-02T1504")
 	dirName := fmt.Sprintf("%s-%s", ts, sanitize(title))
-	sessionDir := filepath.Join(grnDir(), "sessions", dirName)
-	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
-		return "", "", fmt.Errorf("create session dir: %w", err)
-	}
-	audioPath := filepath.Join(sessionDir, "audio.wav")
-	return sessionDir, audioPath, nil
+	dir := filepath.Join(grnDir(), "sessions", dirName)
+	os.MkdirAll(dir, 0o755)
+	return dir
 }
 
-func startMeeting(store *db.DB, title, audioPath string) (*db.Meeting, error) {
+func startMeeting(store *db.DB, title, sessionDir string) (*db.Meeting, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	meeting := &db.Meeting{
 		Title:     title,
 		StartedAt: now,
-		AudioPath: &audioPath,
+		AudioPath: &sessionDir,
 		Source:    "listen",
 	}
 	if err := store.CreateMeeting(meeting); err != nil {
@@ -120,22 +115,45 @@ func startMeeting(store *db.DB, title, audioPath string) (*db.Meeting, error) {
 	return meeting, nil
 }
 
-func postProcess(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, audioPath, modelPath string) error {
-	fmt.Println("● Transcribing...")
-	segments, err := transcribe.TranscribeFile(audioPath, modelPath)
-	if err != nil {
-		return savePartial(store, meeting, err)
+func postProcess(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, recorder *capture.Recorder, modelPath string) error {
+	allSegments := transcribeStreams(recorder, meeting.ID, modelPath)
+	if len(allSegments) == 0 {
+		return savePartial(store, meeting, fmt.Errorf("no audio to transcribe"))
 	}
-	fmt.Printf("● Got %d segments\n", len(segments))
 
-	dbSegments := toDBSegments(meeting.ID, segments)
-	if err := store.InsertSegments(dbSegments); err != nil {
+	fmt.Printf("● Got %d segments\n", len(allSegments))
+	if err := store.InsertSegments(allSegments); err != nil {
 		return fmt.Errorf("save segments: %w", err)
 	}
 
-	transcript := formatTranscript(dbSegments)
+	transcript := formatTranscript(allSegments)
 	fmt.Println("\n── Transcript ──────────────────────────")
 	fmt.Println(transcript)
+
+	return enhanceAndSave(store, pipeline, meeting, transcript)
+}
+
+func transcribeStreams(recorder *capture.Recorder, meetingID, modelPath string) []db.Segment {
+	var all []db.Segment
+	for _, src := range []struct{ path, speaker string }{
+		{recorder.MicPath(), "You"},
+		{recorder.SystemPath(), "Other"},
+	} {
+		if !fileExists(src.path) {
+			continue
+		}
+		fmt.Printf("● Transcribing %s audio...\n", src.speaker)
+		segs, err := transcribeAs(src.path, modelPath, src.speaker)
+		if err != nil {
+			fmt.Printf("  warning: %s transcription failed: %v\n", src.speaker, err)
+			continue
+		}
+		all = append(all, toDBSegments(meetingID, segs)...)
+	}
+	return all
+}
+
+func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, transcript string) error {
 	fmt.Println("── Enhancing with AI... ─────────────────")
 	extraction, summary, err := pipeline.Run(cmdContext(), transcript, "")
 	if err != nil {
@@ -159,46 +177,4 @@ func postProcess(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, audio
 	return nil
 }
 
-func savePartial(store *db.DB, meeting *db.Meeting, origErr error) error {
-	now := time.Now().UTC().Format(time.RFC3339)
-	meeting.EndedAt = &now
-	store.UpdateMeeting(meeting)
-	return fmt.Errorf("transcription failed (audio saved): %w", origErr)
-}
 
-func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
-	out := make([]db.Segment, len(segs))
-	for i, s := range segs {
-		out[i] = db.Segment{
-			MeetingID: meetingID,
-			Start:     s.Start,
-			End:       s.End,
-			Text:      s.Text,
-			Speaker:   s.Speaker,
-		}
-	}
-	return out
-}
-
-func sanitize(s string) string {
-	out := make([]byte, 0, len(s))
-	for _, b := range []byte(s) {
-		if (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' {
-			out = append(out, b)
-		} else if b >= 'A' && b <= 'Z' {
-			out = append(out, b+32)
-		} else if b == ' ' {
-			out = append(out, '-')
-		}
-	}
-	return string(out)
-}
-
-func defaultModelPath() string {
-	return filepath.Join(grnDir(), "models", "ggml-base.en.bin")
-}
-
-func parseTime(s string) time.Time {
-	t, _ := time.Parse(time.RFC3339, s)
-	return t
-}
