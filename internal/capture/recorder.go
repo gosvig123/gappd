@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"syscall"
+	"time"
 )
 
 type CaptureMode string
@@ -27,7 +29,7 @@ func NewRecorder(mode CaptureMode, outputDir string, deviceIdx int) *Recorder {
 	return &Recorder{mode: mode, outputDir: outputDir, deviceIdx: deviceIdx}
 }
 
-func (r *Recorder) Start(ctx context.Context) error {
+func (r *Recorder) Start(_ context.Context) error {
 	bin, err := findCaptureBinary()
 	if err != nil {
 		return err
@@ -37,9 +39,10 @@ func (r *Recorder) Start(ctx context.Context) error {
 		"--output-dir", r.outputDir,
 		"--device", fmt.Sprintf("%d", r.deviceIdx),
 	}
-	r.cmd = exec.CommandContext(ctx, bin, args...)
+	r.cmd = exec.Command(bin, args...)
 	r.cmd.Stdout = os.Stdout
 	r.cmd.Stderr = os.Stderr
+	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := r.cmd.Start(); err != nil {
 		return fmt.Errorf("start capture: %w", err)
 	}
@@ -50,8 +53,16 @@ func (r *Recorder) Stop() error {
 	if r.cmd == nil || r.cmd.Process == nil {
 		return nil
 	}
-	r.cmd.Process.Signal(os.Interrupt)
-	return r.cmd.Wait()
+	syscall.Kill(r.cmd.Process.Pid, syscall.SIGINT)
+	done := make(chan error, 1)
+	go func() { done <- r.cmd.Wait() }()
+	select {
+	case <-done:
+		return nil
+	case <-time.After(5 * time.Second):
+		r.cmd.Process.Kill()
+		return fmt.Errorf("capture process did not exit cleanly")
+	}
 }
 
 func (r *Recorder) MicPath() string {
