@@ -68,14 +68,52 @@ func printUsage() {
 }
 
 func listDevices() {
-    let devices = AVCaptureDevice.DiscoverySession(
-        deviceTypes: [.microphone, .external],
-        mediaType: .audio,
-        position: .unspecified
-    ).devices
-    for (i, device) in devices.enumerated() {
-        let current = device.uniqueID == AVCaptureDevice.default(for: .audio)?.uniqueID ? " (default)" : ""
-        print("  [\(i)] \(device.localizedName)\(current)")
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDevices,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size)
+    let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+    var ids = [AudioDeviceID](repeating: 0, count: count)
+    AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids)
+
+    var defaultID: AudioDeviceID = 0
+    var defAddr = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDefaultInputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var defSize = UInt32(MemoryLayout<AudioDeviceID>.size)
+    AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &defAddr, 0, nil, &defSize, &defaultID)
+
+    var idx = 0
+    for id in ids {
+        var inputAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var inputSize: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &inputAddr, 0, nil, &inputSize) == noErr, inputSize > 0 else { continue }
+        let bufList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
+        defer { bufList.deallocate() }
+        guard AudioObjectGetPropertyData(id, &inputAddr, 0, nil, &inputSize, bufList) == noErr else { continue }
+        guard bufList.pointee.mNumberBuffers > 0 else { continue }
+
+        var nameAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceNameCFString,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var name: CFString = "" as CFString
+        var nameSize = UInt32(MemoryLayout<CFString>.size)
+        AudioObjectGetPropertyData(id, &nameAddr, 0, nil, &nameSize, &name)
+
+        let def = id == defaultID ? " (default)" : ""
+        print("  [\(idx)] \(name)\(def)")
+        idx += 1
     }
 }
 
@@ -158,62 +196,18 @@ class MicRecorder {
 
     init(sampleRate: Double, deviceIndex: Int?) {
         self.sampleRate = sampleRate
-        if let idx = deviceIndex {
-            setInputDevice(index: idx)
-        }
+        self.requestedDevice = deviceIndex
     }
-
-    private func setInputDevice(index: Int) {
-        let devices = AVCaptureDevice.DiscoverySession(
-            deviceTypes: [.microphone, .external],
-            mediaType: .audio,
-            position: .unspecified
-        ).devices
-        guard index < devices.count else { return }
-
-        let device = devices[index]
-        if let audioID = audioDeviceID(for: device.uniqueID) {
-            var deviceID = audioID
-            let size = UInt32(MemoryLayout<AudioDeviceID>.size)
-            let status = AudioUnitSetProperty(
-                engine.inputNode.audioUnit!,
-                kAudioOutputUnitProperty_CurrentDevice,
-                kAudioUnitScope_Global, 0,
-                &deviceID, size
-            )
-            if status != noErr {
-                print("Warning: could not set input device (error \(status))")
-            }
-        }
-    }
-
-    private func audioDeviceID(for uid: String) -> AudioDeviceID? {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var cfUID: CFString = uid as CFString
-        var deviceID: AudioDeviceID = 0
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address, UInt32(MemoryLayout<CFString>.size), &cfUID,
-            &size, &deviceID
-        )
-        return status == noErr ? deviceID : nil
-    }
+    private let requestedDevice: Int?
 
     func start(outputPath: String) throws {
         let inputNode = engine.inputNode
         let hwFormat = inputNode.outputFormat(forBus: 0)
         let hwRate = UInt32(hwFormat.sampleRate)
+        let hwCh = UInt16(hwFormat.channelCount)
+        print("  mic hw: \(hwRate)Hz \(hwCh)ch")
 
-        writer = try WAVWriter(
-            path: outputPath,
-            sampleRate: hwRate,
-            channels: UInt16(hwFormat.channelCount)
-        )
+        writer = try WAVWriter(path: outputPath, sampleRate: hwRate, channels: hwCh)
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
             self?.writer?.write(pcmBuffer: buffer)
