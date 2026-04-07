@@ -11,23 +11,24 @@ sample_rate = 16000
 channels = 1
 
 [transcription]
-# "whisper-local" (default) or "cloud"
+# Transcription engine. Currently supported: "whisper-local"
 engine = "whisper-local"
 # Model name: "base.en", "small.en", "medium.en", "large-v3"
 model = "base.en"
 language = "en"
-# Required for cloud transcription engines
+# Reserved for future non-local transcription engines
 # api_key = ""
 # endpoint = ""
 
 [ai]
-# Default: Ollama running locally — no API key needed.
-# Alternatives: "openai", "anthropic"
+# AI provider. Currently supported: "ollama"
 provider = "ollama"
+# Ollama model name
 model = "llama3.1:8b"
+# Ollama HTTP endpoint
 endpoint = "http://localhost:11434"
 temperature = 0.3
-# Required for cloud AI providers
+# Reserved for future providers
 # api_key = ""
 
 [ci]

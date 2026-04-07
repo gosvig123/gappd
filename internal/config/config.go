@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -53,9 +55,13 @@ type Config struct {
 	Integrations  Integrations  `toml:"integrations"`
 }
 
-func defaults() Config {
+func defaults() (Config, error) {
+	dir, err := grnDir()
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
-		DBPath: filepath.Join(grnDir(), "db.sqlite"),
+		DBPath: filepath.Join(dir, "db.sqlite"),
 		Audio: Audio{
 			Backend:    "screencapturekit",
 			SampleRate: 16000,
@@ -77,30 +83,119 @@ func defaults() Config {
 			PollInterval: "15m",
 			Reminders:    true,
 		},
-	}
+	}, nil
 }
 
 func Load() (Config, error) {
-	cfg := defaults()
+	cfg, err := defaults()
+	if err != nil {
+		return Config{}, err
+	}
 
-	path := filepath.Join(grnDir(), "config.toml")
+	dir, err := grnDir()
+	if err != nil {
+		return Config{}, err
+	}
+	path := filepath.Join(dir, "config.toml")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if err := validate(&cfg); err != nil {
+			return Config{}, err
+		}
 		return cfg, nil
+	} else if err != nil {
+		return Config{}, fmt.Errorf("stat config: %w", err)
 	}
 
 	meta, err := toml.DecodeFile(path, &cfg)
 	if err != nil {
 		return Config{}, err
 	}
-
-	for _, key := range meta.Undecoded() {
-		fmt.Fprintf(os.Stderr, "warning: unknown config key %q in %s\n", key, path)
+	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
+		keys := make([]string, 0, len(undecoded))
+		for _, key := range undecoded {
+			keys = append(keys, key.String())
+		}
+		return Config{}, fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
 	}
-
+	if err := validate(&cfg); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
-func grnDir() string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".grn")
+func validate(cfg *Config) error {
+	cfg.DBPath = strings.TrimSpace(cfg.DBPath)
+	cfg.Audio.Backend = strings.TrimSpace(cfg.Audio.Backend)
+	cfg.Transcription.Engine = strings.ToLower(strings.TrimSpace(cfg.Transcription.Engine))
+	cfg.Transcription.Model = strings.TrimSpace(cfg.Transcription.Model)
+	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
+	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
+	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
+	cfg.CI.PollInterval = strings.TrimSpace(cfg.CI.PollInterval)
+
+	if cfg.DBPath == "" {
+		return fmt.Errorf("config db_path must not be empty")
+	}
+	path, err := normalizeDBPath(cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	cfg.DBPath = path
+	if cfg.Audio.Backend == "" {
+		return fmt.Errorf("config audio.backend must not be empty")
+	}
+	if cfg.Audio.SampleRate <= 0 {
+		return fmt.Errorf("config audio.sample_rate must be greater than 0")
+	}
+	if cfg.Audio.Channels <= 0 {
+		return fmt.Errorf("config audio.channels must be greater than 0")
+	}
+	if cfg.Transcription.Engine != "whisper-local" {
+		return fmt.Errorf("unsupported transcription engine %q (only %q is implemented)", cfg.Transcription.Engine, "whisper-local")
+	}
+	if cfg.Transcription.Model == "" {
+		return fmt.Errorf("config transcription.model must not be empty")
+	}
+	if cfg.AI.Provider != "ollama" {
+		return fmt.Errorf("unsupported AI provider %q (only %q is implemented)", cfg.AI.Provider, "ollama")
+	}
+	if cfg.AI.Model == "" {
+		return fmt.Errorf("config ai.model must not be empty")
+	}
+	if cfg.AI.Endpoint == "" {
+		return fmt.Errorf("config ai.endpoint must not be empty")
+	}
+	if cfg.AI.Temp < 0 || cfg.AI.Temp > 2 {
+		return fmt.Errorf("config ai.temperature must be between 0 and 2")
+	}
+	if cfg.CI.PollInterval != "" {
+		if _, err := time.ParseDuration(cfg.CI.PollInterval); err != nil {
+			return fmt.Errorf("config ci.poll_interval invalid: %w", err)
+		}
+	}
+	return nil
+}
+
+func normalizeDBPath(path string) (string, error) {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("resolve home directory for db_path: %w", err)
+		}
+		if path == "~" {
+			return filepath.Clean(home), nil
+		}
+		path = filepath.Join(home, path[2:])
+	} else if strings.HasPrefix(path, "~") {
+		return "", fmt.Errorf("config db_path %q uses unsupported home shorthand", path)
+	}
+	return filepath.Clean(path), nil
+}
+
+func grnDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+	return filepath.Join(home, ".grn"), nil
 }

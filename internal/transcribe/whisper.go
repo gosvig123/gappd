@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 )
 
@@ -25,6 +26,8 @@ type whisperSegment struct {
 	} `json:"timestamps"`
 	Text string `json:"text"`
 }
+
+var whisperTimestampPattern = regexp.MustCompile(`^\d{2}:\d{2}:\d{2},\d{3}$`)
 
 func TranscribeFile(audioPath, modelPath string) ([]Segment, error) {
 	bin, err := findWhisperBinary()
@@ -79,10 +82,21 @@ func parseWhisperJSON(data []byte) ([]Segment, error) {
 	}
 
 	segments := make([]Segment, 0, len(wo.Transcription))
-	for _, ws := range wo.Transcription {
+	for i, ws := range wo.Transcription {
+		start, err := parseTimestamp(ws.Timestamps.From)
+		if err != nil {
+			return nil, fmt.Errorf("parse whisper segment %d start timestamp: %w", i, err)
+		}
+		end, err := parseTimestamp(ws.Timestamps.To)
+		if err != nil {
+			return nil, fmt.Errorf("parse whisper segment %d end timestamp: %w", i, err)
+		}
+		if end < start {
+			return nil, fmt.Errorf("parse whisper segment %d: end timestamp %q before start %q", i, ws.Timestamps.To, ws.Timestamps.From)
+		}
 		segments = append(segments, Segment{
-			Start:   parseTimestamp(ws.Timestamps.From),
-			End:     parseTimestamp(ws.Timestamps.To),
+			Start:   start,
+			End:     end,
 			Text:    strings.TrimSpace(ws.Text),
 			Speaker: "You",
 		})
@@ -99,9 +113,18 @@ func findJSONStart(data []byte) int {
 	return -1
 }
 
-func parseTimestamp(ts string) float64 {
+func parseTimestamp(ts string) (float64, error) {
 	ts = strings.TrimSpace(ts)
+	if !whisperTimestampPattern.MatchString(ts) {
+		return 0, fmt.Errorf("invalid timestamp format: %q", ts)
+	}
+
 	var h, m, s, ms int
-	fmt.Sscanf(ts, "%d:%d:%d,%d", &h, &m, &s, &ms)
-	return float64(h)*3600 + float64(m)*60 + float64(s) + float64(ms)/1000
+	if _, err := fmt.Sscanf(ts, "%02d:%02d:%02d,%03d", &h, &m, &s, &ms); err != nil {
+		return 0, fmt.Errorf("parse timestamp %q: %w", ts, err)
+	}
+	if m > 59 || s > 59 {
+		return 0, fmt.Errorf("invalid timestamp value: %q", ts)
+	}
+	return float64(h)*3600 + float64(m)*60 + float64(s) + float64(ms)/1000, nil
 }

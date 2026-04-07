@@ -2,10 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -61,13 +63,19 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode)
 	defer store.Close()
 
 	if modelPath == "" {
-		modelPath = defaultModelPath()
+		modelPath, err = defaultModelPath()
+		if err != nil {
+			return err
+		}
 	}
 	if title == "" {
 		title = time.Now().Format("2006-01-02 15:04 recording")
 	}
 
-	sessionDir := createSessionDir(title)
+	sessionDir, err := createSessionDir(title)
+	if err != nil {
+		return err
+	}
 	meeting, err := startMeeting(store, title, sessionDir)
 	if err != nil {
 		return err
@@ -84,25 +92,44 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode)
 		return err
 	}
 
-	<-ctx.Done()
-	fmt.Println("\n● Stopping...")
-	if err := recorder.Stop(); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: capture did not exit cleanly: %v\n", err)
-		fmt.Fprintf(os.Stderr, "  audio files may be incomplete\n")
+	select {
+	case <-ctx.Done():
+		fmt.Println("\n● Stopping...")
+		if err := recorder.Stop(); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: capture did not exit cleanly: %v\n", err)
+			fmt.Fprintf(os.Stderr, "  audio files may be incomplete\n")
+		}
+	case err := <-recorder.Done():
+		if err != nil {
+			return fmt.Errorf("capture stopped unexpectedly: %w", err)
+		}
+		return fmt.Errorf("capture stopped unexpectedly")
 	}
 
-	duration := time.Since(parseTime(meeting.StartedAt))
-	fmt.Printf("● Recorded %s\n", duration.Truncate(time.Second))
+	startedAt, err := parseTime(meeting.StartedAt)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not parse start time: %v\n", err)
+		fmt.Println("● Recorded")
+	} else {
+		duration := time.Since(startedAt)
+		fmt.Printf("● Recorded %s\n", duration.Truncate(time.Second))
+	}
 
 	return postProcess(store, pipeline, meeting, recorder, modelPath)
 }
 
-func createSessionDir(title string) string {
+func createSessionDir(title string) (string, error) {
 	ts := time.Now().Format("2006-01-02T1504")
 	dirName := fmt.Sprintf("%s-%s", ts, sanitize(title))
-	dir := filepath.Join(grnDir(), "sessions", dirName)
-	os.MkdirAll(dir, 0o755)
-	return dir
+	baseDir, err := grnDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve grn dir for session path: %w", err)
+	}
+	dir := filepath.Join(baseDir, "sessions", dirName)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create session dir: %w", err)
+	}
+	return dir, nil
 }
 
 func startMeeting(store *db.DB, title, sessionDir string) (*db.Meeting, error) {
@@ -163,7 +190,39 @@ func transcribeStreams(recorder *capture.Recorder, meetingID, modelPath string) 
 	if len(all) == 0 && len(errs) > 0 {
 		return nil, fmt.Errorf("transcription failed: %s", strings.Join(errs, "; "))
 	}
+	sortSegmentsChronologically(all)
 	return all, nil
+}
+
+func sortSegmentsChronologically(segments []db.Segment) {
+	indexed := make([]struct {
+		segment db.Segment
+		index   int
+	}, len(segments))
+	for i, segment := range segments {
+		indexed[i] = struct {
+			segment db.Segment
+			index   int
+		}{segment: segment, index: i}
+	}
+	sort.Slice(indexed, func(i, j int) bool {
+		a, b := indexed[i], indexed[j]
+		switch {
+		case a.segment.Start != b.segment.Start:
+			return a.segment.Start < b.segment.Start
+		case a.segment.End != b.segment.End:
+			return a.segment.End < b.segment.End
+		case a.segment.Speaker != b.segment.Speaker:
+			return a.segment.Speaker < b.segment.Speaker
+		case a.segment.Text != b.segment.Text:
+			return a.segment.Text < b.segment.Text
+		default:
+			return a.index < b.index
+		}
+	})
+	for i, segment := range indexed {
+		segments[i] = segment.segment
+	}
 }
 
 func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, transcript string) error {
@@ -171,7 +230,12 @@ func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, tr
 	extraction, summary, err := pipeline.Run(cmdContext(), transcript, "")
 	if err != nil {
 		meeting.Transcript = &transcript
-		store.UpdateMeeting(meeting)
+		if updateErr := store.UpdateMeeting(meeting); updateErr != nil {
+			return errors.Join(
+				fmt.Errorf("enhance failed: %w", err),
+				fmt.Errorf("save transcript: %w", updateErr),
+			)
+		}
 		return fmt.Errorf("enhance failed (transcript saved): %w", err)
 	}
 
@@ -179,7 +243,9 @@ func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, tr
 	meeting.Summary = &summary
 	now := time.Now().UTC().Format(time.RFC3339)
 	meeting.EndedAt = &now
-	store.UpdateMeeting(meeting)
+	if err := store.UpdateMeeting(meeting); err != nil {
+		return fmt.Errorf("update meeting: %w", err)
+	}
 
 	fmt.Println("\n── Notes ───────────────────────────────")
 	fmt.Println(summary)
