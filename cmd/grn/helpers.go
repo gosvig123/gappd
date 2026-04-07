@@ -1,43 +1,55 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/grn-dev/grn/internal/db"
 	"github.com/grn-dev/grn/internal/transcribe"
 )
 
 func sanitize(s string) string {
-	out := make([]byte, 0, len(s))
-	for _, b := range []byte(s) {
-		if (b >= 'a' && b <= 'z') || (b >= '0' && b <= '9') || b == '-' {
-			out = append(out, b)
-		} else if b >= 'A' && b <= 'Z' {
-			out = append(out, b+32)
-		} else if b == ' ' {
-			out = append(out, '-')
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r), unicode.IsDigit(r):
+			b.WriteRune(unicode.ToLower(r))
+		case r == ' ', r == '_':
+			b.WriteRune('-')
+		case r == '-':
+			b.WriteRune(r)
 		}
 	}
-	return string(out)
+	return b.String()
 }
 
-func defaultModelPath() string {
-	return filepath.Join(grnDir(), "models", "ggml-base.en.bin")
+func defaultModelPath() (string, error) {
+	dir, err := grnDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve grn dir for model path: %w", err)
+	}
+	return filepath.Join(dir, "models", "ggml-base.en.bin"), nil
 }
 
-func parseTime(s string) time.Time {
-	t, _ := time.Parse(time.RFC3339, s)
-	return t
+func parseTime(s string) (time.Time, error) {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse time %q: %w", s, err)
+	}
+	return t, nil
 }
 
-func transcribeAs(audioPath, modelPath, speaker string) ([]transcribe.Segment, error) {
+func transcribeAs(ctx context.Context, audioPath, modelPath, speaker string) ([]transcribe.Segment, error) {
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("whisper model not found at %s (download with: grn setup)", modelPath)
 	}
-	segs, err := transcribe.TranscribeFile(audioPath, modelPath)
+	segs, err := transcribe.TranscribeFile(ctx, audioPath, modelPath)
 	if err != nil {
 		return nil, err
 	}
@@ -50,9 +62,15 @@ func transcribeAs(audioPath, modelPath, speaker string) ([]transcribe.Segment, e
 func savePartial(store *db.DB, meeting *db.Meeting, origErr error) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	meeting.EndedAt = &now
-	store.UpdateMeeting(meeting)
-	if meeting.AudioPath != nil {
+	updateErr := store.UpdateMeeting(meeting)
+	if updateErr == nil && meeting.AudioPath != nil {
 		fmt.Printf("  session saved (audio may be incomplete — check %s)\n", *meeting.AudioPath)
+	}
+	if updateErr != nil {
+		return errors.Join(
+			fmt.Errorf("transcription failed: %w", origErr),
+			fmt.Errorf("save partial meeting: %w", updateErr),
+		)
 	}
 	return fmt.Errorf("transcription failed: %w", origErr)
 }

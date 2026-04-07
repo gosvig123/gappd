@@ -30,7 +30,10 @@ func NewRecorder(mode CaptureMode, outputDir string, deviceIdx int) *Recorder {
 	return &Recorder{mode: mode, outputDir: outputDir, deviceIdx: deviceIdx}
 }
 
-func (r *Recorder) Start(_ context.Context) error {
+func (r *Recorder) Start(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	bin, err := findCaptureBinary()
 	if err != nil {
 		return err
@@ -57,25 +60,44 @@ func (r *Recorder) Start(_ context.Context) error {
 			return fmt.Errorf("permission denied — check System Settings → Privacy & Security")
 		}
 		return fmt.Errorf("capture process failed to start: %v", err)
+	case <-ctx.Done():
+		_ = r.stopProcessGroup(syscall.SIGINT)
+		<-errCh
+		return ctx.Err()
 	case <-time.After(500 * time.Millisecond):
 		r.waitCh = errCh
 	}
 	return nil
 }
 
+func (r *Recorder) Done() <-chan error {
+	return r.waitCh
+}
+
 func (r *Recorder) Stop() error {
-	if r.cmd == nil || r.cmd.Process == nil {
+	if r.cmd == nil || r.cmd.Process == nil || r.waitCh == nil {
 		return nil
 	}
-	syscall.Kill(r.cmd.Process.Pid, syscall.SIGINT)
+	select {
+	case err := <-r.waitCh:
+		return err
+	default:
+	}
+	if err := r.stopProcessGroup(syscall.SIGINT); err != nil && err != syscall.ESRCH {
+		return fmt.Errorf("signal capture process group: %w", err)
+	}
 	select {
 	case err := <-r.waitCh:
 		return err
 	case <-time.After(5 * time.Second):
-		r.cmd.Process.Kill()
-		<-r.waitCh // drain
+		_ = r.stopProcessGroup(syscall.SIGKILL)
+		<-r.waitCh
 		return fmt.Errorf("capture process did not exit cleanly")
 	}
+}
+
+func (r *Recorder) stopProcessGroup(sig syscall.Signal) error {
+	return syscall.Kill(-r.cmd.Process.Pid, sig)
 }
 
 func (r *Recorder) MicPath() string {
