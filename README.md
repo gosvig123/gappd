@@ -95,40 +95,19 @@ Config lives at `~/.grn/config.toml`. Unknown keys are rejected.
 ```toml
 db_path = "~/.grn/db.sqlite"
 
-[audio]
-backend = "screencapturekit"
-sample_rate = 16000
-channels = 1
-
-[transcription]
-engine = "whisper-local"
-model = "base.en"
-language = "en"
-
 [ai]
 provider = "ollama"
 model = "llama3.1:8b"
 endpoint = "http://localhost:11434"
 temperature = 0.3
-
-[ci]
-enabled = false
-poll_interval = "15m"
-reminders = true
-watched_repos = []
-
-[integrations]
-github_token = ""
 ```
 
 Current validation rules to be aware of:
 
 - `db_path` must be set; `~` and `~/...` are expanded
-- `transcription.engine` must be `whisper-local`
 - `ai.provider` must be `ollama`
 - `ai.model` and `ai.endpoint` must be non-empty
 - `ai.temperature` must be between `0` and `2`
-- `ci.poll_interval` must be a valid Go duration if set
 
 See `config.example.toml` for the full example, including optional commented fields.
 

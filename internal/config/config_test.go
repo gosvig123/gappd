@@ -20,12 +20,6 @@ func TestLoadReturnsDefaultsWhenConfigMissing(t *testing.T) {
 	if cfg.DBPath != wantDBPath {
 		t.Fatalf("cfg.DBPath = %q, want %q", cfg.DBPath, wantDBPath)
 	}
-	if cfg.Audio.Backend != "screencapturekit" {
-		t.Fatalf("cfg.Audio.Backend = %q, want %q", cfg.Audio.Backend, "screencapturekit")
-	}
-	if cfg.Transcription.Engine != "whisper-local" {
-		t.Fatalf("cfg.Transcription.Engine = %q, want %q", cfg.Transcription.Engine, "whisper-local")
-	}
 	if cfg.AI.Provider != "ollama" {
 		t.Fatalf("cfg.AI.Provider = %q, want %q", cfg.AI.Provider, "ollama")
 	}

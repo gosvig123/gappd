@@ -4,22 +4,6 @@
 # Path to the SQLite database file
 db_path = "~/.grn/db.sqlite"
 
-[audio]
-# Audio capture backend. macOS: "screencapturekit"
-backend = "screencapturekit"
-sample_rate = 16000
-channels = 1
-
-[transcription]
-# Transcription engine. Currently supported: "whisper-local"
-engine = "whisper-local"
-# Model name: "base.en", "small.en", "medium.en", "large-v3"
-model = "base.en"
-language = "en"
-# Reserved for future non-local transcription engines
-# api_key = ""
-# endpoint = ""
-
 [ai]
 # AI provider. Currently supported: "ollama"
 provider = "ollama"
@@ -28,25 +12,3 @@ model = "llama3.1:8b"
 # Ollama HTTP endpoint
 endpoint = "http://localhost:11434"
 temperature = 0.3
-# Reserved for future providers
-# api_key = ""
-
-[ci]
-# Enable CI pipeline monitoring
-enabled = false
-# How often to poll for CI status (e.g. "5m", "15m", "1h")
-poll_interval = "15m"
-# Show reminders for long-running pipelines
-reminders = true
-# Repositories to watch (e.g. ["owner/repo1", "owner/repo2"])
-watched_repos = []
-# Shell command to run for desktop notifications (e.g. "notify-send")
-# notify_command = ""
-
-[integrations]
-# GitHub personal access token
-github_token = ""
-# Calendar URL for meeting integration (iCal format)
-# calendar_url = ""
-# Slack bot token
-# slack_token = ""
