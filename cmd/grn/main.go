@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/grn-dev/grn/internal/ai"
 	"github.com/grn-dev/grn/internal/config"
@@ -40,14 +41,17 @@ func loadDeps() (config.Config, *db.DB, *ai.Pipeline, error) {
 	if err != nil {
 		return cfg, nil, nil, err
 	}
-	provider := ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model)
+	provider, err := ai.NewProvider(cfg.AI)
+	if err != nil {
+		return cfg, nil, nil, err
+	}
 	pipeline := ai.NewPipeline(provider, cfg.AI.Temp)
 	return cfg, store, pipeline, nil
 }
 
 func openDB(cfg config.Config) (*db.DB, error) {
-	if err := os.MkdirAll(grnDir(), 0o755); err != nil {
-		return nil, fmt.Errorf("create grn dir: %w", err)
+	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create db dir: %w", err)
 	}
 	store, err := db.Open(cfg.DBPath)
 	if err != nil {
@@ -60,9 +64,12 @@ func openDB(cfg config.Config) (*db.DB, error) {
 	return store, nil
 }
 
-func grnDir() string {
-	home, _ := os.UserHomeDir()
-	return home + "/.grn"
+func grnDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home directory: %w", err)
+	}
+	return filepath.Join(home, ".grn"), nil
 }
 
 func cmdContext() context.Context {
@@ -78,11 +85,15 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Print("Checking Ollama... ")
-			provider := ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model)
+			fmt.Printf("Checking AI provider (%s)... ", cfg.AI.Provider)
+			provider, err := ai.NewProvider(cfg.AI)
+			if err != nil {
+				fmt.Println("✗")
+				return err
+			}
 			if err := provider.Available(); err != nil {
 				fmt.Println("✗")
-				return fmt.Errorf("ollama not reachable: %w", err)
+				return fmt.Errorf("%s not reachable: %w", cfg.AI.Provider, err)
 			}
 			fmt.Println("✓ connected to", cfg.AI.Endpoint)
 			fmt.Println("  model:", cfg.AI.Model)

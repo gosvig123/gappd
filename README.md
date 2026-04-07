@@ -1,194 +1,122 @@
-# grn — Meeting Intelligence for the Terminal
+# grn — Meeting intelligence from the terminal
 
-Capture system audio during meetings, transcribe and summarize with AI,
-extract action items, and track them to completion — all from your terminal.
+`grn` records meeting audio, transcribes it locally, stores transcripts in SQLite,
+and can run Ollama-based summarization and extraction over saved meetings.
 
-```
-┌─────────────────────────────────────────────────────┐
-│  System Audio ──► Transcribe ──► AI Summary         │
-│                                    │                │
-│                              Action Items           │
-│                                    │                │
-│                          CI Pipeline (track)        │
-│                                    │                │
-│                        TUI Dashboard / CLI          │
-└─────────────────────────────────────────────────────┘
-```
+## Current surface area
 
-## Features
+- Terminal CLI only
+- Local SQLite database at `~/.grn/db.sqlite` by default
+- Local transcription via `whisper-local`
+- AI provider support: `ollama`
+- Meeting capture, listing, search, display, and post-processing commands
+- Basic action-item and CI placeholder commands are present in the CLI
 
-- **Live capture** — record system audio (ScreenCaptureKit/PulseAudio)
-- **Transcription** — Whisper.cpp local or cloud (Deepgram, AssemblyAI)
-- **AI summaries** — OpenAI, Claude, or Ollama (configurable)
-- **Action items** — auto-extracted, assigned, tracked
-- **CI pipeline** — cron engine polls repos, APIs, sends reminders
-- **TUI dashboard** — rich bubbletea interface for browsing everything
-- **JSON output** — pipe-friendly `--json` flag on all commands
-- **Local-first** — SQLite at `~/.grn/db.sqlite`, no cloud required
+## Requirements
 
-## Architecture
+- Go `1.25.0` (from `go.mod`)
+- Ollama running locally if you want AI summaries/extraction
+- On macOS, the capture helper for `grn listen`
 
-```
-cmd/grn/          ─── CLI entrypoint + subcommands
-internal/
-├── audio/        ─── platform capture (macOS/Linux)
-├── transcribe/   ─── whisper.cpp / cloud API adapters
-├── ai/           ─── summary + extraction (multi-provider)
-├── meeting/      ─── domain: meetings, segments, search
-├── action/       ─── domain: action items, status tracking
-├── ci/           ─── pipeline engine, cron scheduler, checks
-├── store/        ─── SQLite repository layer
-├── config/       ─── TOML config loader
-└── tui/          ─── bubbletea views (dashboard, detail, etc.)
-```
-
-## Tech Stack
-
-| Layer         | Choice                              |
-|---------------|-------------------------------------|
-| Language      | Go                                  |
-| TUI           | bubbletea (charmbracelet)           |
-| Database      | SQLite via modernc.org/sqlite       |
-| Audio (macOS) | ScreenCaptureKit (cgo bridge)       |
-| Audio (Linux) | PulseAudio                          |
-| Transcription | Whisper.cpp / Deepgram / AssemblyAI |
-| AI            | OpenAI / Claude / Ollama            |
-| Config        | TOML (~/.grn/config.toml)           |
-
-## Installation
+## Install
 
 ```bash
-# From source
-git clone https://github.com/yourorg/grn.git
+git clone https://github.com/grn-dev/grn.git
 cd grn
-go build -o grn ./cmd/grn
-mv grn /usr/local/bin/
-
-# Or with go install
-go install github.com/yourorg/grn/cmd/grn@latest
+make build
+make install
 ```
 
-Requires Go 1.22+. No CGO needed (pure-Go SQLite driver).
+This builds `./build/grn` and installs `grn` to `/usr/local/bin/grn`.
 
-### macOS audio capture (ScreenCaptureKit)
+### macOS capture helper
 
-The capture helper must be built and installed separately (requires Xcode command-line tools):
+`grn listen` uses the ScreenCaptureKit helper on macOS. Build and install it with:
 
 ```bash
 make install-capture
 ```
 
-This compiles `GrnCapture.app`, signs it, and copies it to `~/.grn/GrnCapture.app`.
-The `grn listen` command locates the helper there automatically.
+That installs `GrnCapture.app` to `~/.grn/GrnCapture.app`.
 
-## CLI Commands
-
-### `grn`
-
-Launch the TUI dashboard. Browse meetings, action items, and CI status.
+## Commands
 
 ```bash
-grn                # open dashboard
-grn --json         # dump recent meetings as JSON
+grn setup
+grn devices
+grn listen [--device N] [--title TITLE] [--model /path/to/model.bin] [--mode mic|system|both]
+grn meetings
+grn show <meeting-id>
+grn search <query>
+grn enhance <meeting-id> [--notes "rough notes"]
+grn summarize <meeting-id>
+grn actions list
+grn actions done <id>
+grn ci status
+grn ci run
 ```
 
-### `grn listen`
+Notes:
 
-Capture system audio and transcribe a live meeting.
+- `grn` by itself does not launch a dashboard.
+- There is no global `--json` output mode.
+- `grn summarize` is an alias for running the AI pipeline on an existing meeting.
+- `grn listen` stops with `Ctrl+C`.
+- If no model path is provided to `grn listen`, it looks for a Whisper model at `~/.grn/models/ggml-base.en.bin`.
 
-```bash
-grn listen                       # start capture, auto-detect audio
-grn listen --title "Sprint Plan" # set meeting title upfront
-grn listen --provider deepgram   # use specific transcription provider
-```
+## Quick start
 
-Press `q` or `Ctrl+C` to stop. Triggers summarization automatically.
+1. Copy the example config:
 
-### `grn meetings` / `grn show <id>` / `grn search <query>`
+   ```bash
+   mkdir -p ~/.grn
+   cp config.example.toml ~/.grn/config.toml
+   ```
 
-```bash
-grn meetings                          # recent meetings (table view)
-grn meetings --since 7d --json        # last 7 days, JSON output
-grn show 42                           # transcript + summary + actions
-grn show 42 --transcript              # full transcript only
-grn search "deployment timeline"       # full-text search
-grn search "auth" --since 30d --json  # filtered search
-```
+2. Make sure Ollama is running and the configured model is available.
 
-### `grn actions`
+3. Run setup:
 
-```bash
-grn actions                      # list open items
-grn actions --all --assignee bob # include completed, filter by person
-grn actions done 7               # mark item #7 complete
-grn actions edit 7 --due 2026-04-10
-```
+   ```bash
+   grn setup
+   ```
 
-### `grn summarize <id>`
+4. List devices and start a recording:
 
-Re-run AI summarization (e.g., after changing provider).
-
-```bash
-grn summarize 42 --provider ollama --model llama3
-```
-
-### `grn ci`
-
-```bash
-grn ci status               # pipeline state, next runs
-grn ci run                  # trigger all checks now
-grn ci run --check git      # run specific check only
-grn ci add <repo-url>       # watch a git repo for action completion
-grn ci add --type jira KEY  # watch a Jira ticket
-```
+   ```bash
+   grn devices
+   grn listen --title "Sprint planning"
+   ```
 
 ## Configuration
 
-Config lives at `~/.grn/config.toml`:
+Config lives at `~/.grn/config.toml`. Unknown keys are rejected.
 
 ```toml
-[general]
 db_path = "~/.grn/db.sqlite"
-default_provider = "openai"
-
-[audio]
-backend = "screencapture"  # "screencapture" (macOS) or "pulseaudio" (Linux)
-
-[transcription]
-provider = "whisper"       # "whisper", "deepgram", "assemblyai"
-whisper_model = "base.en"
 
 [ai]
-provider = "openai"        # "openai", "claude", "ollama"
-model = "gpt-4o"
-api_key_env = "OPENAI_API_KEY"
-
-[ai.ollama]
+provider = "ollama"
+model = "llama3.1:8b"
 endpoint = "http://localhost:11434"
-model = "llama3"
-
-[ci]
-enabled = true
-interval = "30m"           # check frequency
-
-[ci.notifications]
-slack_webhook = ""
-desktop = true
+temperature = 0.3
 ```
 
-Env vars override config: `GRN_AI_PROVIDER`, `GRN_AI_API_KEY`, `GRN_TRANSCRIPTION_PROVIDER`.
+Current validation rules to be aware of:
+
+- `db_path` must be set; `~` and `~/...` are expanded
+- `ai.provider` must be `ollama`
+- `ai.model` and `ai.endpoint` must be non-empty
+- `ai.temperature` must be between `0` and `2`
+
+See `config.example.toml` for the full example, including optional commented fields.
 
 ## Development
 
 ```bash
-git clone https://github.com/yourorg/grn.git && cd grn
-go mod tidy && go build ./... && go test ./...
-go run ./cmd/grn              # TUI
-go run ./cmd/grn listen       # start recording
+go test ./...
+go build ./cmd/grn
 ```
-
-Rules: max 200 lines/file, no comments unless explaining *why*,
-strong typing, zero duplication, `--json` on every command.
 
 ## License
 

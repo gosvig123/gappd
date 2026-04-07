@@ -5,15 +5,22 @@ VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "d
 LDFLAGS   := -s -w -X $(MODULE)/internal/version.Version=$(VERSION)
 DB_PATH   := ~/.grn/db.sqlite
 SCHEMA    := ./internal/db/schema.sql
+UNAME_S   := $(shell uname -s)
 
-.PHONY: build build-capture run dev db-init db-reset clean install-capture install
+.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install
 
-build: build-capture
+build:
 	@mkdir -p $(BUILD_DIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/grn
 
-build-capture:
+build-capture: ensure-macos
 	@bash capture-helper/build.sh
+
+ensure-macos:
+	@if [ "$(UNAME_S)" != "Darwin" ]; then \
+		echo "capture-helper targets are only supported on macOS"; \
+		exit 1; \
+	fi
 
 install-capture: build-capture
 	@echo "Installing GrnCapture.app to ~/.grn/..."
@@ -22,7 +29,7 @@ install-capture: build-capture
 	@cp -R $(BUILD_DIR)/GrnCapture.app $(HOME)/.grn/GrnCapture.app
 	@echo "Done. grn-capture installed at ~/.grn/GrnCapture.app"
 
-install: install-capture
+install: build
 	@echo "Installing grn binary to /usr/local/bin/..."
 	install -m 755 $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
 	@echo "Done. Run: grn"
