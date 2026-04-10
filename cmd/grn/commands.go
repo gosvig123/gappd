@@ -44,7 +44,7 @@ func runEnhance(store *db.DB, pipeline *ai.Pipeline, id, notes string) error {
 		return fmt.Errorf("get meeting: %w", err)
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
-	setMeetingStatus(meeting, db.MeetingStatusProcessing, now, nil)
+	setMeetingProcessingStatus(meeting, db.ProcessingStatusProcessing, now, nil)
 	if err := store.UpdateMeeting(meeting); err != nil {
 		return fmt.Errorf("mark meeting processing: %w", err)
 	}
@@ -53,7 +53,7 @@ func runEnhance(store *db.DB, pipeline *ai.Pipeline, id, notes string) error {
 	extraction, summary, err := pipeline.Run(cmdContext(), transcript, notes)
 	if err != nil {
 		now = time.Now().UTC().Format(time.RFC3339)
-		setMeetingStatus(meeting, db.MeetingStatusFailed, now, err)
+		setMeetingProcessingStatus(meeting, db.ProcessingStatusFailed, now, err)
 		if updateErr := store.UpdateMeeting(meeting); updateErr != nil {
 			return fmt.Errorf("pipeline: %w", errors.Join(err, fmt.Errorf("update meeting: %w", updateErr)))
 		}
@@ -67,7 +67,7 @@ func runEnhance(store *db.DB, pipeline *ai.Pipeline, id, notes string) error {
 	meeting.Transcript = &transcript
 	meeting.Summary = &summary
 	now = time.Now().UTC().Format(time.RFC3339)
-	setMeetingStatus(meeting, db.MeetingStatusCompleted, now, nil)
+	setMeetingProcessingStatus(meeting, db.ProcessingStatusCompleted, now, nil)
 	if err := store.UpdateMeeting(meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}
@@ -111,15 +111,16 @@ func listMeetings(store *db.DB) error {
 	}
 	for _, m := range meetings {
 		status := "○"
-		switch m.Status {
-		case db.MeetingStatusCompleted:
+		state := meetingState(m)
+		switch state {
+		case appMeetingStateCompleted:
 			status = "●"
-		case db.MeetingStatusFailed:
+		case appMeetingStateFailed:
 			status = "!"
-		case db.MeetingStatusProcessing:
+		case appMeetingStateProcessing:
 			status = "..."
 		}
-		fmt.Printf("  %s %s  %s  %s (%s)\n", status, m.ID[:8], m.StartedAt[:10], m.Title, m.Status)
+		fmt.Printf("  %s %s  %s  %s (capture: %s, processing: %s)\n", status, m.ID[:8], m.StartedAt[:10], m.Title, m.CaptureStatus, m.ProcessingStatus)
 	}
 	return nil
 }
@@ -150,9 +151,13 @@ func showMeeting(store *db.DB, id string) error {
 	if meeting.EndedAt != nil {
 		fmt.Printf("Ended: %s\n", *meeting.EndedAt)
 	}
-	fmt.Printf("Status: %s\n", meeting.Status)
-	if meeting.FailureMessage != nil {
-		fmt.Printf("Failure: %s\n", *meeting.FailureMessage)
+	fmt.Printf("Capture: %s\n", meeting.CaptureStatus)
+	if meeting.CaptureFailureMessage != nil {
+		fmt.Printf("Capture failure: %s\n", *meeting.CaptureFailureMessage)
+	}
+	fmt.Printf("Processing: %s\n", meeting.ProcessingStatus)
+	if meeting.ProcessingFailureMessage != nil {
+		fmt.Printf("Processing failure: %s\n", *meeting.ProcessingFailureMessage)
 	}
 
 	if meeting.Transcript != nil {

@@ -28,7 +28,7 @@ func listenCmd() *cobra.Command {
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := capture.CaptureMode(mode)
-			return runListen(deviceIdx, title, modelPath, m)
+			return runListen(deviceIdx, title, modelPath, m, false)
 		},
 	}
 	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
@@ -55,7 +55,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode) error {
+func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode, suppressProcessingFailure bool) error {
 	_, store, pipeline, err := loadDeps()
 	if err != nil {
 		return err
@@ -117,15 +117,29 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode)
 
 	endedAt := time.Now().UTC().Format(time.RFC3339)
 	meeting.EndedAt = &endedAt
-	setMeetingStatus(meeting, db.MeetingStatusProcessing, endedAt, nil)
+	if !hasCapturedAudio(recorder) {
+		captureErr := fmt.Errorf("no audio captured")
+		setMeetingCaptureStatus(meeting, db.CaptureStatusFailed, endedAt, captureErr)
+		if err := store.UpdateMeeting(meeting); err != nil {
+			return fmt.Errorf("mark meeting capture failed: %w", err)
+		}
+		return captureErr
+	}
+	setMeetingCaptureStatus(meeting, db.CaptureStatusCaptured, endedAt, nil)
+	setMeetingProcessingStatus(meeting, db.ProcessingStatusProcessing, endedAt, nil)
 	if err := store.UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("mark meeting processing: %w", err)
+		return fmt.Errorf("mark meeting captured: %w", err)
 	}
 
 	postCtx, postCancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer postCancel()
 
-	return postProcess(postCtx, store, pipeline, meeting, recorder, modelPath)
+	err = postProcess(postCtx, store, pipeline, meeting, recorder, modelPath)
+	if err != nil && suppressProcessingFailure {
+		fmt.Fprintf(os.Stderr, "warning: post-processing failed after capture: %v\n", err)
+		return nil
+	}
+	return err
 }
 
 func createSessionDir(title string) (string, error) {
@@ -145,12 +159,14 @@ func createSessionDir(title string) (string, error) {
 func startMeeting(store *db.DB, title, sessionDir string) (*db.Meeting, error) {
 	now := time.Now().UTC().Format(time.RFC3339)
 	meeting := &db.Meeting{
-		Title:           title,
-		StartedAt:       now,
-		Status:          db.MeetingStatusRecording,
-		StatusUpdatedAt: now,
-		AudioPath:       &sessionDir,
-		Source:          "listen",
+		Title:                     title,
+		StartedAt:                 now,
+		CaptureStatus:             db.CaptureStatusRecording,
+		CaptureStatusUpdatedAt:    now,
+		ProcessingStatus:          db.ProcessingStatusNotStarted,
+		ProcessingStatusUpdatedAt: now,
+		AudioPath:                 &sessionDir,
+		Source:                    "listen",
 	}
 	if err := store.CreateMeeting(meeting); err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
@@ -161,10 +177,10 @@ func startMeeting(store *db.DB, title, sessionDir string) (*db.Meeting, error) {
 func postProcess(ctx context.Context, store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, recorder *capture.Recorder, modelPath string) error {
 	allSegments, transcribeErr := transcribeStreams(ctx, recorder, meeting.ID, modelPath)
 	if transcribeErr != nil {
-		return savePartial(store, meeting, transcribeErr)
+		return saveProcessingFailure(store, meeting, transcribeErr)
 	}
 	if len(allSegments) == 0 {
-		return savePartial(store, meeting, fmt.Errorf("no audio to transcribe"))
+		return saveProcessingFailure(store, meeting, fmt.Errorf("no audio to transcribe"))
 	}
 
 	fmt.Printf("● Got %d segments\n", len(allSegments))
@@ -243,7 +259,7 @@ func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, tr
 	if err != nil {
 		meeting.Transcript = &transcript
 		now := time.Now().UTC().Format(time.RFC3339)
-		setMeetingStatus(meeting, db.MeetingStatusFailed, now, err)
+		setMeetingProcessingStatus(meeting, db.ProcessingStatusFailed, now, err)
 		if updateErr := store.UpdateMeeting(meeting); updateErr != nil {
 			return errors.Join(
 				fmt.Errorf("enhance failed: %w", err),
@@ -256,7 +272,7 @@ func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, tr
 	meeting.Transcript = &transcript
 	meeting.Summary = &summary
 	now := time.Now().UTC().Format(time.RFC3339)
-	setMeetingStatus(meeting, db.MeetingStatusCompleted, now, nil)
+	setMeetingProcessingStatus(meeting, db.ProcessingStatusCompleted, now, nil)
 	if err := store.UpdateMeeting(meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}
@@ -269,5 +285,3 @@ func enhanceAndSave(store *db.DB, pipeline *ai.Pipeline, meeting *db.Meeting, tr
 	fmt.Printf("● Saved: %s\n", meeting.ID)
 	return nil
 }
-
-

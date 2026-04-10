@@ -17,16 +17,18 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	}
 
 	meeting := &db.Meeting{
-		ID:              "meeting-1",
-		Title:           "Customer call",
-		StartedAt:       "2026-04-10T12:00:00Z",
-		Status:          db.MeetingStatusFailed,
-		StatusUpdatedAt: "2026-04-10T12:45:00Z",
-		Tags:            "[]",
-		Source:          "listen",
+		ID:                        "meeting-1",
+		Title:                     "Customer call",
+		StartedAt:                 "2026-04-10T12:00:00Z",
+		CaptureStatus:             db.CaptureStatusCaptured,
+		CaptureStatusUpdatedAt:    "2026-04-10T12:30:00Z",
+		ProcessingStatus:          db.ProcessingStatusFailed,
+		ProcessingStatusUpdatedAt: "2026-04-10T12:45:00Z",
+		Tags:                      "[]",
+		Source:                    "listen",
 	}
 	failure := "summary generation failed"
-	meeting.FailureMessage = &failure
+	meeting.ProcessingFailureMessage = &failure
 	if err := store.CreateMeeting(meeting); err != nil {
 		t.Fatalf("CreateMeeting() error = %v", err)
 	}
@@ -38,14 +40,17 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("appMeetingDetailFor() error = %v", err)
 	}
-	if detail.Status.State != db.MeetingStatusFailed {
-		t.Fatalf("status.state = %q, want %q", detail.Status.State, db.MeetingStatusFailed)
+	if detail.Status.State != appMeetingStateFailed {
+		t.Fatalf("status.state = %q, want %q", detail.Status.State, appMeetingStateFailed)
 	}
-	if detail.Status.UpdatedAt != meeting.StatusUpdatedAt {
-		t.Fatalf("status.updatedAt = %q, want %q", detail.Status.UpdatedAt, meeting.StatusUpdatedAt)
+	if detail.Status.UpdatedAt != meeting.ProcessingStatusUpdatedAt {
+		t.Fatalf("status.updatedAt = %q, want %q", detail.Status.UpdatedAt, meeting.ProcessingStatusUpdatedAt)
 	}
-	if detail.Status.FailureMessage == nil || *detail.Status.FailureMessage != failure {
-		t.Fatalf("status.failureMessage = %v, want %q", detail.Status.FailureMessage, failure)
+	if detail.Status.Processing.FailureMessage == nil || *detail.Status.Processing.FailureMessage != failure {
+		t.Fatalf("status.processing.failureMessage = %v, want %q", detail.Status.Processing.FailureMessage, failure)
+	}
+	if detail.Status.Processing.State != string(db.ProcessingStatusFailed) {
+		t.Fatalf("status.processing.state = %q, want %q", detail.Status.Processing.State, db.ProcessingStatusFailed)
 	}
 	if detail.TranscriptText == "" {
 		t.Fatal("transcriptText = empty, want fallback transcript from segments")

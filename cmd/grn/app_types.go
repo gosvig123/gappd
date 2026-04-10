@@ -16,9 +16,26 @@ type appMeetingsResponse struct {
 }
 
 type appMeetingStatus struct {
-	State          db.MeetingStatus `json:"state"`
-	UpdatedAt      string           `json:"updatedAt"`
-	FailureMessage *string          `json:"failureMessage,omitempty"`
+	State      appMeetingState      `json:"state"`
+	UpdatedAt  string               `json:"updatedAt"`
+	Capture    appMeetingStatusInfo `json:"capture"`
+	Processing appMeetingStatusInfo `json:"processing"`
+}
+
+type appMeetingState string
+
+const (
+	appMeetingStateRecording  appMeetingState = "recording"
+	appMeetingStateCaptured   appMeetingState = "captured"
+	appMeetingStateProcessing appMeetingState = "processing"
+	appMeetingStateCompleted  appMeetingState = "completed"
+	appMeetingStateFailed     appMeetingState = "failed"
+)
+
+type appMeetingStatusInfo struct {
+	State          string  `json:"state"`
+	UpdatedAt      string  `json:"updatedAt"`
+	FailureMessage *string `json:"failureMessage,omitempty"`
 }
 
 type appMeetingListItem struct {
@@ -54,9 +71,40 @@ type appMeetingSegment struct {
 }
 
 func appMeetingStatusFor(meeting db.Meeting) appMeetingStatus {
+	state := meetingState(meeting)
+	updatedAt := meeting.CaptureStatusUpdatedAt
+	if meeting.ProcessingStatus == db.ProcessingStatusFailed || state == appMeetingStateProcessing || state == appMeetingStateCompleted {
+		updatedAt = meeting.ProcessingStatusUpdatedAt
+	}
 	return appMeetingStatus{
-		State:          meeting.Status,
-		UpdatedAt:      meeting.StatusUpdatedAt,
-		FailureMessage: meeting.FailureMessage,
+		State:     state,
+		UpdatedAt: updatedAt,
+		Capture: appMeetingStatusInfo{
+			State:          string(meeting.CaptureStatus),
+			UpdatedAt:      meeting.CaptureStatusUpdatedAt,
+			FailureMessage: meeting.CaptureFailureMessage,
+		},
+		Processing: appMeetingStatusInfo{
+			State:          string(meeting.ProcessingStatus),
+			UpdatedAt:      meeting.ProcessingStatusUpdatedAt,
+			FailureMessage: meeting.ProcessingFailureMessage,
+		},
+	}
+}
+
+func meetingState(meeting db.Meeting) appMeetingState {
+	switch {
+	case meeting.CaptureStatus == db.CaptureStatusFailed:
+		return appMeetingStateFailed
+	case meeting.CaptureStatus == db.CaptureStatusRecording:
+		return appMeetingStateRecording
+	case meeting.ProcessingStatus == db.ProcessingStatusFailed:
+		return appMeetingStateFailed
+	case meeting.ProcessingStatus == db.ProcessingStatusProcessing:
+		return appMeetingStateProcessing
+	case meeting.ProcessingStatus == db.ProcessingStatusCompleted:
+		return appMeetingStateCompleted
+	default:
+		return appMeetingStateCaptured
 	}
 }

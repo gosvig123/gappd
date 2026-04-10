@@ -69,7 +69,7 @@ func appRecordStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, modelPath, capture.CaptureMode(mode))
+			return runListen(deviceIdx, title, modelPath, capture.CaptureMode(mode), true)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
