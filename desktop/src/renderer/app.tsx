@@ -11,6 +11,21 @@ function meetingStatusLabel(state: MeetingStatus['state']): string {
   switch (state) {
     case 'recording':
       return 'Recording'
+    case 'captured':
+      return 'Captured'
+    case 'processing':
+      return 'Processing'
+    case 'completed':
+      return 'Completed'
+    case 'failed':
+      return 'Failed'
+  }
+}
+
+function processingStatusLabel(state: MeetingStatus['processing']['state']): string {
+  switch (state) {
+    case 'not_started':
+      return 'Not started'
     case 'processing':
       return 'Processing'
     case 'completed':
@@ -237,7 +252,8 @@ export function App() {
                     <div className="meeting-title">{meeting.title}</div>
                     <div className="meeting-meta">{new Date(meeting.startedAt).toLocaleString()}</div>
                     <div className="meeting-flags">
-                      <span>{meetingStatusLabel(meeting.status.state)}</span>
+                      <span>Capture: {meetingStatusLabel(meeting.status.capture.state)}</span>
+                      <span>AI: {processingStatusLabel(meeting.status.processing.state)}</span>
                       <span>{artifactLabel(meeting.hasTranscript, 'Transcript', 'No transcript')}</span>
                       <span>{artifactLabel(meeting.hasSummary, 'AI summary', 'No summary')}</span>
                     </div>
@@ -255,12 +271,19 @@ export function App() {
                       <h1>{selectedMeeting.title}</h1>
                       <p>{new Date(selectedMeeting.startedAt).toLocaleString()}</p>
                       {selectedStatus ? (
-                        <p>
-                          {meetingStatusLabel(selectedStatus.state)} · updated{' '}
-                          {new Date(selectedStatus.updatedAt).toLocaleString()}
-                        </p>
+                        <>
+                          <p>
+                            Capture {meetingStatusLabel(selectedStatus.capture.state)} · updated{' '}
+                            {new Date(selectedStatus.capture.updatedAt).toLocaleString()}
+                          </p>
+                          <p>
+                            AI {processingStatusLabel(selectedStatus.processing.state)} · updated{' '}
+                            {new Date(selectedStatus.processing.updatedAt).toLocaleString()}
+                          </p>
+                        </>
                       ) : null}
-                      {selectedStatus?.failureMessage ? <p>{selectedStatus.failureMessage}</p> : null}
+                      {selectedStatus?.capture.failureMessage ? <p>{selectedStatus.capture.failureMessage}</p> : null}
+                      {selectedStatus?.processing.failureMessage ? <p>{selectedStatus.processing.failureMessage}</p> : null}
                     </div>
                   </div>
                   <div className="detail-grid">

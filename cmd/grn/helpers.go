@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/grn-dev/grn/internal/capture"
 	"github.com/grn-dev/grn/internal/db"
 	"github.com/grn-dev/grn/internal/transcribe"
 )
@@ -59,22 +60,32 @@ func transcribeAs(ctx context.Context, audioPath, modelPath, speaker string) ([]
 	return segs, nil
 }
 
-func setMeetingStatus(meeting *db.Meeting, status db.MeetingStatus, updatedAt string, err error) {
-	meeting.Status = status
-	meeting.StatusUpdatedAt = updatedAt
-	meeting.FailureMessage = nil
+func setMeetingCaptureStatus(meeting *db.Meeting, status db.CaptureStatus, updatedAt string, err error) {
+	meeting.CaptureStatus = status
+	meeting.CaptureStatusUpdatedAt = updatedAt
+	meeting.CaptureFailureMessage = nil
 	if err != nil {
 		message := err.Error()
-		meeting.FailureMessage = &message
+		meeting.CaptureFailureMessage = &message
 	}
 }
 
-func savePartial(store *db.DB, meeting *db.Meeting, origErr error) error {
+func setMeetingProcessingStatus(meeting *db.Meeting, status db.ProcessingStatus, updatedAt string, err error) {
+	meeting.ProcessingStatus = status
+	meeting.ProcessingStatusUpdatedAt = updatedAt
+	meeting.ProcessingFailureMessage = nil
+	if err != nil {
+		message := err.Error()
+		meeting.ProcessingFailureMessage = &message
+	}
+}
+
+func saveProcessingFailure(store *db.DB, meeting *db.Meeting, origErr error) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	if meeting.EndedAt == nil {
 		meeting.EndedAt = &now
 	}
-	setMeetingStatus(meeting, db.MeetingStatusFailed, now, origErr)
+	setMeetingProcessingStatus(meeting, db.ProcessingStatusFailed, now, origErr)
 	updateErr := store.UpdateMeeting(meeting)
 	if updateErr == nil && meeting.AudioPath != nil {
 		fmt.Printf("  session saved (audio may be incomplete — check %s)\n", *meeting.AudioPath)
@@ -105,4 +116,8 @@ func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Size() > 44
+}
+
+func hasCapturedAudio(recorder *capture.Recorder) bool {
+	return fileExists(recorder.MicPath()) || fileExists(recorder.SystemPath())
 }

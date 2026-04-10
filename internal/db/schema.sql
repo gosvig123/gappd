@@ -16,6 +16,14 @@ CREATE TABLE IF NOT EXISTS meetings (
                CHECK (status IN ('recording', 'processing', 'completed', 'failed')),
     status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     failure_message TEXT,
+    capture_status TEXT NOT NULL DEFAULT 'recording'
+               CHECK (capture_status IN ('recording', 'captured', 'failed')),
+    capture_status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    capture_failure_message TEXT,
+    processing_status TEXT NOT NULL DEFAULT 'not_started'
+               CHECK (processing_status IN ('not_started', 'processing', 'completed', 'failed')),
+    processing_status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    processing_failure_message TEXT,
     audio_path TEXT,
     transcript TEXT,
     summary    TEXT,

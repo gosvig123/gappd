@@ -11,10 +11,22 @@ type Device = {
   name: string
 }
 
+type CaptureStatus = 'recording' | 'captured' | 'failed'
+type ProcessingStatus = 'not_started' | 'processing' | 'completed' | 'failed'
+
 type MeetingStatus = {
-  state: 'recording' | 'processing' | 'completed' | 'failed'
+  state: 'recording' | 'captured' | 'processing' | 'completed' | 'failed'
   updatedAt: string
-  failureMessage?: string
+  capture: {
+    state: CaptureStatus
+    updatedAt: string
+    failureMessage?: string
+  }
+  processing: {
+    state: ProcessingStatus
+    updatedAt: string
+    failureMessage?: string
+  }
 }
 
 type MeetingListItem = {
