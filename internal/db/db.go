@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"fmt"
@@ -12,6 +13,8 @@ type DB struct {
 	Conn *sql.DB
 }
 
+const initBusyTimeoutMS = 5000
+
 func Open(path string) (*DB, error) {
 	conn, err := sql.Open("sqlite", path)
 	if err != nil {
@@ -21,27 +24,52 @@ func Open(path string) (*DB, error) {
 }
 
 func (d *DB) Init() error {
-	columns, err := d.tableColumns("meetings")
+	ctx := context.Background()
+	conn, err := d.Conn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire init connection: %w", err)
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout = %d", initBusyTimeoutMS)); err != nil {
+		return fmt.Errorf("set busy timeout: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+		return fmt.Errorf("begin init tx: %w", err)
+	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		_, _ = conn.ExecContext(ctx, "ROLLBACK")
+	}()
+
+	columns, err := tableColumns(ctx, conn, "meetings")
 	if err != nil {
 		return err
 	}
 	if len(columns) > 0 {
-		if err := d.upgradeMeetingsLifecycle(); err != nil {
+		if err := d.upgradeMeetingsLifecycle(ctx, conn); err != nil {
 			return err
 		}
 	}
-	_, err = d.Conn.Exec(schema)
+	_, err = conn.ExecContext(ctx, schema)
 	if err != nil {
 		return fmt.Errorf("init schema: %w", err)
 	}
-	if _, err := d.Conn.Exec(`INSERT INTO meetings_fts(meetings_fts) VALUES ('rebuild')`); err != nil {
+	if _, err := conn.ExecContext(ctx, `INSERT INTO meetings_fts(meetings_fts) VALUES ('rebuild')`); err != nil {
 		return fmt.Errorf("rebuild meetings fts: %w", err)
 	}
+	if _, err := conn.ExecContext(ctx, "COMMIT"); err != nil {
+		return fmt.Errorf("commit init tx: %w", err)
+	}
+	committed = true
 	return nil
 }
 
-func (d *DB) upgradeMeetingsLifecycle() error {
-	columns, err := d.tableColumns("meetings")
+func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error {
+	columns, err := tableColumns(ctx, conn, "meetings")
 	if err != nil {
 		return err
 	}
@@ -55,55 +83,55 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	needsProcessingFailureBackfill := !columns["processing_failure_message"]
 
 	if needsStatusBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN status TEXT NOT NULL DEFAULT 'recording' CHECK (status IN ('recording', 'processing', 'completed', 'failed'))`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN status TEXT NOT NULL DEFAULT 'recording' CHECK (status IN ('recording', 'processing', 'completed', 'failed'))`)
 		if err != nil {
 			return fmt.Errorf("add meetings.status: %w", err)
 		}
 	}
 	if needsStatusUpdatedAtBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN status_updated_at TEXT NOT NULL DEFAULT ''`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN status_updated_at TEXT NOT NULL DEFAULT ''`)
 		if err != nil {
 			return fmt.Errorf("add meetings.status_updated_at: %w", err)
 		}
 	}
 	if !columns["failure_message"] {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN failure_message TEXT`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN failure_message TEXT`)
 		if err != nil {
 			return fmt.Errorf("add meetings.failure_message: %w", err)
 		}
 	}
 	if needsCaptureStatusBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN capture_status TEXT NOT NULL DEFAULT 'recording' CHECK (capture_status IN ('recording', 'captured', 'failed'))`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN capture_status TEXT NOT NULL DEFAULT 'recording' CHECK (capture_status IN ('recording', 'captured', 'failed'))`)
 		if err != nil {
 			return fmt.Errorf("add meetings.capture_status: %w", err)
 		}
 	}
 	if needsCaptureStatusUpdatedAtBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN capture_status_updated_at TEXT NOT NULL DEFAULT ''`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN capture_status_updated_at TEXT NOT NULL DEFAULT ''`)
 		if err != nil {
 			return fmt.Errorf("add meetings.capture_status_updated_at: %w", err)
 		}
 	}
 	if needsCaptureFailureBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN capture_failure_message TEXT`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN capture_failure_message TEXT`)
 		if err != nil {
 			return fmt.Errorf("add meetings.capture_failure_message: %w", err)
 		}
 	}
 	if needsProcessingStatusBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN processing_status TEXT NOT NULL DEFAULT 'not_started' CHECK (processing_status IN ('not_started', 'processing', 'completed', 'failed'))`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN processing_status TEXT NOT NULL DEFAULT 'not_started' CHECK (processing_status IN ('not_started', 'processing', 'completed', 'failed'))`)
 		if err != nil {
 			return fmt.Errorf("add meetings.processing_status: %w", err)
 		}
 	}
 	if needsProcessingStatusUpdatedAtBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN processing_status_updated_at TEXT NOT NULL DEFAULT ''`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN processing_status_updated_at TEXT NOT NULL DEFAULT ''`)
 		if err != nil {
 			return fmt.Errorf("add meetings.processing_status_updated_at: %w", err)
 		}
 	}
 	if needsProcessingFailureBackfill {
-		_, err = d.Conn.Exec(`ALTER TABLE meetings ADD COLUMN processing_failure_message TEXT`)
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN processing_failure_message TEXT`)
 		if err != nil {
 			return fmt.Errorf("add meetings.processing_failure_message: %w", err)
 		}
@@ -119,7 +147,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsStatusBackfill {
 		statusQuery += ` WHERE status IS NULL OR status = ''`
 	}
-	if _, err := d.Conn.Exec(statusQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, statusQuery); err != nil {
 		return fmt.Errorf("backfill meetings.status: %w", err)
 	}
 
@@ -131,7 +159,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsStatusUpdatedAtBackfill {
 		statusUpdatedAtQuery += ` WHERE status_updated_at IS NULL OR status_updated_at = ''`
 	}
-	if _, err := d.Conn.Exec(statusUpdatedAtQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, statusUpdatedAtQuery); err != nil {
 		return fmt.Errorf("backfill meetings.status_updated_at: %w", err)
 	}
 
@@ -150,7 +178,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsCaptureStatusBackfill {
 		captureStatusQuery += ` WHERE capture_status IS NULL OR capture_status = '' OR (capture_status = 'recording' AND status <> 'recording')`
 	}
-	if _, err := d.Conn.Exec(captureStatusQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, captureStatusQuery); err != nil {
 		return fmt.Errorf("backfill meetings.capture_status: %w", err)
 	}
 
@@ -164,7 +192,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsCaptureStatusUpdatedAtBackfill {
 		captureUpdatedAtQuery += ` WHERE capture_status_updated_at IS NULL OR capture_status_updated_at = ''`
 	}
-	if _, err := d.Conn.Exec(captureUpdatedAtQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, captureUpdatedAtQuery); err != nil {
 		return fmt.Errorf("backfill meetings.capture_status_updated_at: %w", err)
 	}
 
@@ -176,7 +204,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsCaptureFailureBackfill {
 		captureFailureQuery += ` WHERE capture_failure_message IS NULL OR capture_failure_message = ''`
 	}
-	if _, err := d.Conn.Exec(captureFailureQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, captureFailureQuery); err != nil {
 		return fmt.Errorf("backfill meetings.capture_failure_message: %w", err)
 	}
 
@@ -190,7 +218,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsProcessingStatusBackfill {
 		processingStatusQuery += ` WHERE processing_status IS NULL OR processing_status = '' OR (processing_status = 'not_started' AND status IN ('processing', 'completed', 'failed'))`
 	}
-	if _, err := d.Conn.Exec(processingStatusQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, processingStatusQuery); err != nil {
 		return fmt.Errorf("backfill meetings.processing_status: %w", err)
 	}
 
@@ -204,7 +232,7 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsProcessingStatusUpdatedAtBackfill {
 		processingUpdatedAtQuery += ` WHERE processing_status_updated_at IS NULL OR processing_status_updated_at = ''`
 	}
-	if _, err := d.Conn.Exec(processingUpdatedAtQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, processingUpdatedAtQuery); err != nil {
 		return fmt.Errorf("backfill meetings.processing_status_updated_at: %w", err)
 	}
 
@@ -216,14 +244,22 @@ func (d *DB) upgradeMeetingsLifecycle() error {
 	if !needsProcessingFailureBackfill {
 		processingFailureQuery += ` WHERE processing_failure_message IS NULL OR processing_failure_message = ''`
 	}
-	if _, err := d.Conn.Exec(processingFailureQuery); err != nil {
+	if _, err := conn.ExecContext(ctx, processingFailureQuery); err != nil {
 		return fmt.Errorf("backfill meetings.processing_failure_message: %w", err)
 	}
 	return nil
 }
 
 func (d *DB) tableColumns(name string) (map[string]bool, error) {
-	rows, err := d.Conn.Query(`PRAGMA table_info(` + name + `)`)
+	return tableColumns(context.Background(), d.Conn, name)
+}
+
+type tableInfoQueryer interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func tableColumns(ctx context.Context, queryer tableInfoQueryer, name string) (map[string]bool, error) {
+	rows, err := queryer.QueryContext(ctx, `PRAGMA table_info(`+name+`)`)
 	if err != nil {
 		return nil, fmt.Errorf("table info %s: %w", name, err)
 	}
