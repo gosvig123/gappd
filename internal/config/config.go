@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ type AI struct {
 	Model    string  `toml:"model"`
 	Endpoint string  `toml:"endpoint"`
 	Temp     float64 `toml:"temperature"`
+	Managed  bool    `toml:"managed"`
 }
 
 type Config struct {
@@ -43,11 +45,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	dir, err := grnDir()
+	path, err := configPath()
 	if err != nil {
 		return Config{}, err
 	}
-	path := filepath.Join(dir, "config.toml")
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		if err := validate(&cfg); err != nil {
 			return Config{}, err
@@ -72,6 +73,29 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+func DefaultAI() (AI, error) {
+	cfg, err := defaults()
+	if err != nil {
+		return AI{}, err
+	}
+	return cfg.AI, nil
+}
+
+func Save(cfg Config) error {
+	if err := validate(&cfg); err != nil {
+		return err
+	}
+	path, err := configPath()
+	if err != nil {
+		return err
+	}
+	data, err := encode(cfg)
+	if err != nil {
+		return err
+	}
+	return writeConfig(path, data)
 }
 
 func validate(cfg *Config) error {
@@ -103,6 +127,37 @@ func validate(cfg *Config) error {
 	return nil
 }
 
+func encode(cfg Config) ([]byte, error) {
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).Encode(cfg); err != nil {
+		return nil, fmt.Errorf("encode config: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func writeConfig(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "config-*.toml")
+	if err != nil {
+		return fmt.Errorf("create temp config: %w", err)
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return fmt.Errorf("write temp config: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp config: %w", err)
+	}
+	if err := os.Rename(name, path); err != nil {
+		return fmt.Errorf("replace config: %w", err)
+	}
+	return nil
+}
+
 func normalizeDBPath(path string) (string, error) {
 	if path == "~" || strings.HasPrefix(path, "~/") {
 		home, err := os.UserHomeDir()
@@ -125,4 +180,12 @@ func grnDir() (string, error) {
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
 	return filepath.Join(home, ".grn"), nil
+}
+
+func configPath() (string, error) {
+	dir, err := grnDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.toml"), nil
 }

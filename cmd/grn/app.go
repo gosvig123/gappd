@@ -13,7 +13,7 @@ func appCmd() *cobra.Command {
 		Use:   "app",
 		Short: "Machine-readable commands for the desktop app",
 	}
-	cmd.AddCommand(appDevicesCmd(), appMeetingsCmd(), appRecordCmd())
+	cmd.AddCommand(appConfigCmd(), appDevicesCmd(), appMeetingsCmd(), appRecordCmd())
 	return cmd
 }
 
