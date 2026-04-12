@@ -7,6 +7,18 @@ import (
 	"github.com/grn-dev/grn/internal/db"
 )
 
+type appConfigResponse struct {
+	AI appAIConfig `json:"ai"`
+}
+
+type appAIConfig struct {
+	Provider    string  `json:"provider"`
+	Model       string  `json:"model"`
+	Endpoint    string  `json:"endpoint"`
+	Temperature float64 `json:"temperature"`
+	Managed     bool    `json:"managed"`
+}
+
 type appDevicesResponse struct {
 	Devices []captureDevice `json:"devices"`
 }
