@@ -1,62 +1,16 @@
 import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { app } from 'electron'
+import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem, MeetingStatus } from '../shared/contracts'
 import { getRecordingState, setRecordingState, type RecordingState } from './state'
-
-export type Device = {
-  index: number
-  name: string
-}
 
 export type CaptureStatus = 'recording' | 'captured' | 'failed'
 export type ProcessingStatus = 'not_started' | 'processing' | 'completed' | 'failed'
 
-export type MeetingStatus = {
-  state: 'recording' | 'captured' | 'processing' | 'completed' | 'failed'
-  updatedAt: string
-  capture: {
-    state: CaptureStatus
-    updatedAt: string
-    failureMessage?: string
-  }
-  processing: {
-    state: ProcessingStatus
-    updatedAt: string
-    failureMessage?: string
-  }
-}
-
-export type MeetingListItem = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  hasTranscript: boolean
-  hasSummary: boolean
-}
-
-export type MeetingSegment = {
-  startSec: number
-  endSec: number
-  speaker: string
-  text: string
-}
-
-export type MeetingDetail = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  transcriptText?: string
-  summary?: string
-  segments: MeetingSegment[]
-}
-
 type DevicesResponse = { devices: Device[] }
 type MeetingsResponse = { meetings: MeetingListItem[] }
 type MeetingResponse = { meeting: MeetingDetail }
+type LocalAIConfigResponse = { ai: LocalAIConfig }
 type RecordingProtocolEvent = {
   type: 'recording.started' | 'recording.stopping' | 'recording.processing' | 'recording.completed' | 'recording.failed'
   meetingId: string
@@ -87,6 +41,30 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 export async function showMeeting(id: string): Promise<MeetingDetail> {
   const result = await runJSON<MeetingResponse>(['app', 'meetings', 'show', id, '--json'])
   return result.meeting
+}
+
+export async function getLocalAIConfig(): Promise<LocalAIConfig> {
+  const result = await runJSON<LocalAIConfigResponse>(['app', 'config', 'show', '--json'])
+  return result.ai
+}
+
+export async function saveManagedLocalAIConfig(input: {
+  endpoint: string
+  model: string
+  temperature?: number
+}): Promise<LocalAIConfig> {
+  const args = [
+    'app',
+    'config',
+    'use-managed-ollama',
+    '--endpoint',
+    input.endpoint,
+    '--model',
+    input.model,
+  ]
+  if (typeof input.temperature === 'number') args.push('--temperature', String(input.temperature))
+  const result = await runJSON<LocalAIConfigResponse>(args)
+  return result.ai
 }
 
 export function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): void {
@@ -204,7 +182,7 @@ function runCommand(args: string[]): Promise<string> {
   })
 }
 
-function childEnv(): NodeJS.ProcessEnv {
+export function childEnv(): NodeJS.ProcessEnv {
   const pathParts = [
     process.env.PATH ?? '',
     '/opt/homebrew/bin',
