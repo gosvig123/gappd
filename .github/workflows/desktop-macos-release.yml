@@ -63,6 +63,30 @@ jobs:
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
 
+      - name: Preflight signing identity
+        run: |
+          CERT_PATH="$RUNNER_TEMP/grn-macos-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/grn-macos-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+
+          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null; then
+            echo "Expected signing identity not found in imported certificate: $APPLE_SIGNING_IDENTITY" >&2
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH" >&2 || true
+            exit 1
+          fi
+
+          echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+        env:
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
       - name: Download Go modules
         run: go mod download
 
@@ -78,10 +102,30 @@ jobs:
         run: npm run verify:mac-release
         working-directory: desktop
 
+      - name: Verify release artifacts exist
+        run: |
+          shopt -s nullglob
+          app_paths=(desktop/dist/mac*/Grn.app)
+          dmg_paths=(desktop/dist/*.dmg)
+
+          if [ ${#app_paths[@]} -eq 0 ]; then
+            echo "No packaged app found at desktop/dist/mac*/Grn.app" >&2
+            exit 1
+          fi
+
+          if [ ${#dmg_paths[@]} -eq 0 ]; then
+            echo "No DMG found at desktop/dist/*.dmg" >&2
+            exit 1
+          fi
+
+          printf 'Found app bundle: %s\n' "${app_paths[@]}"
+          printf 'Found DMG: %s\n' "${dmg_paths[@]}"
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: grn-desktop-macos
+          if-no-files-found: error
           path: |
             desktop/dist/*.dmg
             desktop/dist/mac*/**
