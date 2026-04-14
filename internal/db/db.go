@@ -34,6 +34,9 @@ func (d *DB) Init() error {
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout = %d", initBusyTimeoutMS)); err != nil {
 		return fmt.Errorf("set busy timeout: %w", err)
 	}
+	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
+		return fmt.Errorf("enable foreign keys: %w", err)
+	}
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		return fmt.Errorf("begin init tx: %w", err)
 	}
@@ -65,6 +68,9 @@ func (d *DB) Init() error {
 		return fmt.Errorf("commit init tx: %w", err)
 	}
 	committed = true
+	if _, err := conn.ExecContext(ctx, "PRAGMA journal_mode = WAL"); err != nil {
+		return fmt.Errorf("set wal mode: %w", err)
+	}
 	return nil
 }
 
