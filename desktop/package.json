@@ -15,6 +15,7 @@
     "prepare:whisper": "node ./scripts/prepare-whisper-bundle.mjs",
     "dist": "npm run prepare:ollama && npm run prepare:whisper && npm run build && electron-builder --config electron-builder.config.cjs",
     "dist:dir": "npm run prepare:ollama && npm run prepare:whisper && npm run build && electron-builder --config electron-builder.config.cjs --mac dir",
+    "install:mac": "rm -rf /Applications/Grn.app && ditto release/mac-arm64/Grn.app /Applications/Grn.app && echo 'Installed to /Applications/Grn.app'",
     "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {

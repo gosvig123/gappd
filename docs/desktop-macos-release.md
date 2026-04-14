@@ -22,6 +22,7 @@
 ## Local packaging
 
 - `npm run dist:dir` still works without Apple secrets
+- Packaged app output now lands under `desktop/release/`; renderer assets stay in `desktop/dist/`
 - Local builds ad-hoc sign nested bundled executables so the packaged app remains runnable for smoke checks
 - Release notarization submits and staples the `.app`; later verification validates that same `.app` instead of assuming the `.dmg` was notarized too
 - Notarization and Gatekeeper assessment stay gated behind release env vars
