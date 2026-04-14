@@ -105,16 +105,16 @@ jobs:
       - name: Verify release artifacts exist
         run: |
           shopt -s nullglob
-          app_paths=(desktop/dist/mac*/Grn.app)
-          dmg_paths=(desktop/dist/*.dmg)
+          app_paths=(desktop/release/mac*/Grn.app)
+          dmg_paths=(desktop/release/*.dmg)
 
           if [ ${#app_paths[@]} -eq 0 ]; then
-            echo "No packaged app found at desktop/dist/mac*/Grn.app" >&2
+            echo "No packaged app found at desktop/release/mac*/Grn.app" >&2
             exit 1
           fi
 
           if [ ${#dmg_paths[@]} -eq 0 ]; then
-            echo "No DMG found at desktop/dist/*.dmg" >&2
+            echo "No DMG found at desktop/release/*.dmg" >&2
             exit 1
           fi
 
@@ -127,5 +127,5 @@ jobs:
           name: grn-desktop-macos
           if-no-files-found: error
           path: |
-            desktop/dist/*.dmg
-            desktop/dist/mac*/**
+            desktop/release/*.dmg
+            desktop/release/mac*/**

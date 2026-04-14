@@ -4,6 +4,9 @@ const hooks = require('./scripts/electron-builder-hooks.cjs')
 module.exports = {
   appId: 'dev.grn.desktop',
   productName: 'Grn',
+  directories: {
+    output: 'release',
+  },
   files: ['dist/**', 'dist-electron/**'],
   extraResources: [
     { from: '../build/grn', to: 'bin/grn' },

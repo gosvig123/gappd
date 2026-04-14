@@ -4,7 +4,7 @@ const os = require('node:os')
 const path = require('node:path')
 
 const desktopRoot = path.resolve(__dirname, '..')
-const distRoot = path.join(desktopRoot, 'dist')
+const distRoot = path.join(desktopRoot, 'release')
 const entitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.plist')
 const inheritEntitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.inherit.plist')
 const nestedCodeLayout = [
