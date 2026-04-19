@@ -154,7 +154,7 @@ async function managedOllamaReadiness(): Promise<ManagedReadiness> {
   return { running, ownershipMismatch: healthy && !running }
 }
 async function managedOllamaOwnershipError(): Promise<Error> {
-  const detail = `Granola needs 127.0.0.1:${MANAGED_OLLAMA_PORT} for its managed runtime. Stop the other Ollama process manually, then retry Local AI setup.`
+  const detail = `Gappd needs 127.0.0.1:${MANAGED_OLLAMA_PORT} for its managed runtime. Stop the other Ollama process manually, then retry Local AI setup.`
   const pid = await managedOllamaListenerPid()
   const rawDetail = await managedOllamaListenerSummary()
   const ownershipConflict = pid === null ? undefined : { pid, port: MANAGED_OLLAMA_PORT, summary: rawDetail, stopCommand: `kill ${pid}` }
@@ -198,8 +198,8 @@ function localAIMessage(context: ManagedStatusContext): string {
   if (context.configured && context.running && !context.modelAvailable) return `Managed Ollama is running, but model ${context.config?.model || MANAGED_OLLAMA_MODEL} is missing. Run setup to pull it again.`
   if (context.configured && context.running) return 'Managed Ollama is running'
   if (context.configured) return 'Managed Ollama is configured but stopped'
-  if (context.config && !context.config.managed) return context.running ? 'Desktop is configured for external Ollama while the managed runtime is running. Run setup to switch to the managed runtime.' : 'Desktop is configured for external Ollama. Run setup to switch to the managed runtime.'
-  if (context.running) return 'Managed Ollama is running but setup has not switched desktop to it yet.'
+  if (context.config && !context.config.managed) return context.running ? 'Gappd is configured for external Ollama while the managed runtime is running. Run setup to switch to the managed runtime.' : 'Gappd is configured for external Ollama. Run setup to switch to the managed runtime.'
+  if (context.running) return 'Managed Ollama is running but setup has not switched Gappd to it yet.'
   return 'Managed Ollama is ready for setup'
 }
 function localAIPhase(context: ManagedStatusContext): LocalAIStatus['phase'] {

@@ -27,44 +27,71 @@ export function AppSidebar({ onboarding, recording, view, onViewChange }: AppSid
   const summary = errorView ? null : statusSummary(onboarding)
   return (
     <aside className="sidebar">
-      <div>
+      <div className="sidebar-header">
+        <div className="sidebar-caption">Workspace</div>
         <div className="brand">Gappd</div>
         <div className="subtitle">Desktop meeting recorder</div>
       </div>
 
       {onboarding.phase === 'ready' ? (
-        <nav className="nav">
-          <button className={view === 'record' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('record')}>
-            Record
-          </button>
-          <button className={view === 'meetings' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('meetings')}>
-            Meetings
-          </button>
-          <button className={view === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('settings')}>
-            Settings
-          </button>
-        </nav>
+        <div className="sidebar-section">
+          <div className="sidebar-nav-label">Navigation</div>
+          <nav className="nav">
+            <button className={view === 'record' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('record')} aria-current={view === 'record' ? 'page' : undefined}>
+              <strong>Record</strong>
+              <span>Start, stop, and monitor capture.</span>
+            </button>
+            <button className={view === 'meetings' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('meetings')} aria-current={view === 'meetings' ? 'page' : undefined}>
+              <strong>Meetings</strong>
+              <span>Review summaries and transcripts.</span>
+            </button>
+            <button className={view === 'settings' ? 'nav-btn active' : 'nav-btn'} onClick={() => onViewChange('settings')} aria-current={view === 'settings' ? 'page' : undefined}>
+              <strong>Settings</strong>
+              <span>Check local AI runtime health.</span>
+            </button>
+          </nav>
+        </div>
       ) : (
-        <nav className="nav">
-          <button className="nav-btn active">Setup</button>
-        </nav>
+        <div className="sidebar-section">
+          <div className="sidebar-nav-label">Navigation</div>
+          <nav className="nav">
+            <div className="nav-btn active nav-current" aria-current="page">
+              <strong>Setup</strong>
+              <span>Finish local AI before recording.</span>
+            </div>
+          </nav>
+        </div>
       )}
 
       <div className="status-card">
-        <div className="label">Local AI</div>
-        <div className={`status-pill ${onboardingStatusTone(onboarding.phase)}`}>{onboardingPhaseLabel(onboarding.phase)}</div>
-        {onboarding.model ? <div className="muted">{onboarding.model}</div> : null}
-        {summary ? <div className="muted">{summary}</div> : null}
-        {onboarding.phase === 'ready' && onboarding.endpoint ? <div className="muted">{onboarding.endpoint}</div> : null}
+        <div className="sidebar-card-head">
+          <div>
+            <div className="label">Local AI</div>
+            <div className="sidebar-summary">Managed runtime status and model details.</div>
+          </div>
+          <div className={`status-pill ${onboardingStatusTone(onboarding.phase)}`}>{onboardingPhaseLabel(onboarding.phase)}</div>
+        </div>
+        <div className="sidebar-card-body sidebar-meta">
+          {onboarding.model ? <div className="muted">{onboarding.model}</div> : null}
+          {summary ? <div className="muted">{summary}</div> : null}
+          {onboarding.phase === 'ready' && onboarding.endpoint ? <div className="muted">{onboarding.endpoint}</div> : null}
+        </div>
         {errorView ? <div className="error-text">{errorView.compact}</div> : null}
       </div>
 
       {onboarding.phase === 'ready' ? (
         <div className="status-card">
-          <div className="label">Recorder</div>
-          <div className={`status-pill ${recording.status}`}>{recording.status}</div>
-          {recording.title ? <div className="muted">{recording.title}</div> : null}
-          {recording.meetingId ? <div className="muted">{recording.meetingId}</div> : null}
+          <div className="sidebar-card-head">
+            <div>
+              <div className="label">Recorder</div>
+              <div className="sidebar-summary">Current capture session and handoff state.</div>
+            </div>
+            <div className={`status-pill ${recording.status}`}>{recording.status}</div>
+          </div>
+          <div className="sidebar-card-body sidebar-meta">
+            {recording.title ? <div className="muted">{recording.title}</div> : <div className="muted">No meeting is active.</div>}
+            {recording.meetingId ? <div className="muted">{recording.meetingId}</div> : null}
+          </div>
           {recording.error ? <div className="error-text">{recording.error}</div> : null}
         </div>
       ) : null}

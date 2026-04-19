@@ -21,6 +21,8 @@ export function App() {
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null)
   const selectedMeetingIdRef = useRef<string | null>(null)
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
+  const [selectedMeetingLoading, setSelectedMeetingLoading] = useState(false)
+  const [selectedMeetingError, setSelectedMeetingError] = useState<string | null>(null)
   const [recording, setRecording] = useState<RecordingState>({ status: 'idle' })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +38,12 @@ export function App() {
     selectedMeetingIdRef.current = id
     setSelectedMeetingId(id)
   }
+
+  function isPermissionDeniedState(state: string): boolean {
+    const normalized = state.trim().toLowerCase()
+    return normalized.includes('denied') || normalized.includes('restricted')
+  }
+
   async function refreshMeetings(preferredMeetingId?: string | null) {
     const items = await window.gappd.meetings.list()
     setMeetings(items)
@@ -43,13 +51,36 @@ export function App() {
     if (!nextId) {
       applySelectedMeetingId(null)
       setSelectedMeeting(null)
+      setSelectedMeetingLoading(false)
+      setSelectedMeetingError(null)
       return
     }
-    applySelectedMeetingId(items.some((meeting) => meeting.id === nextId) ? nextId : items[0]?.id ?? null)
+    const resolvedMeetingId = items.some((meeting) => meeting.id === nextId) ? nextId : items[0]?.id ?? null
+    if (!resolvedMeetingId) {
+      applySelectedMeetingId(null)
+      setSelectedMeeting(null)
+      setSelectedMeetingLoading(false)
+      setSelectedMeetingError(null)
+      return
+    }
+    await loadMeeting(resolvedMeetingId)
   }
   async function loadMeeting(id: string) {
     applySelectedMeetingId(id)
-    setSelectedMeeting(await window.gappd.meetings.show(id))
+    setSelectedMeeting(null)
+    setSelectedMeetingLoading(true)
+    setSelectedMeetingError(null)
+    try {
+      const meeting = await window.gappd.meetings.show(id)
+      if (selectedMeetingIdRef.current === id) setSelectedMeeting(meeting)
+    } catch (err) {
+      if (selectedMeetingIdRef.current === id) {
+        setSelectedMeetingError(err instanceof Error ? err.message : String(err))
+        setSelectedMeeting(null)
+      }
+    } finally {
+      if (selectedMeetingIdRef.current === id) setSelectedMeetingLoading(false)
+    }
   }
   async function loadAppData() {
     const [deviceList, meetingList, recordingState] = await Promise.all([
@@ -62,8 +93,14 @@ export function App() {
     setRecording(recordingState)
     if (deviceList[0]) setDevice(deviceList[0].index)
     const initialMeetingId = recordingState.meetingId ?? meetingList[0]?.id ?? null
-    applySelectedMeetingId(initialMeetingId)
-    setSelectedMeeting(initialMeetingId ? await window.gappd.meetings.show(initialMeetingId) : null)
+    if (!initialMeetingId) {
+      applySelectedMeetingId(null)
+      setSelectedMeeting(null)
+      setSelectedMeetingLoading(false)
+      setSelectedMeetingError(null)
+      return
+    }
+    await loadMeeting(initialMeetingId)
   }
   async function loadSettingsStatus() {
     setSettingsLoading(true)
@@ -106,7 +143,6 @@ export function App() {
       if (state.meetingId) applySelectedMeetingId(state.meetingId)
       if (meetingId) {
         await refreshMeetings(meetingId)
-        if (!disposed) await loadMeeting(meetingId)
         return
       }
       if (state.status === 'idle' || state.status === 'error') await refreshMeetings()
@@ -131,8 +167,12 @@ export function App() {
   const isPermissionError = isPermissionErrorMessage(bannerError)
 
   function capturePermissionError(permissions: Awaited<ReturnType<typeof window.gappd.system.requestCapturePermissions>>): string | null {
-    const microphoneDenied = permissions.microphone !== 'granted'
-    const screenDenied = permissions.screen !== 'granted'
+    const microphoneDenied = isPermissionDeniedState(permissions.microphone)
+    const screenDenied = isPermissionDeniedState(permissions.screen)
+    const microphoneGranted = permissions.microphone === 'granted'
+    const screenGranted = permissions.screen === 'granted'
+    const permissionCheckFailed = !microphoneGranted && !microphoneDenied || !screenGranted && !screenDenied
+    if (permissionCheckFailed) return 'Could not confirm microphone and screen recording permissions. Try again, then check System Settings if the problem continues.'
     if (microphoneDenied && screenDenied) return 'Microphone and Screen Recording access denied. Enable GappdCapture in System Settings to record.'
     if (microphoneDenied) return 'Microphone access denied. Enable GappdCapture in System Settings to record.'
     if (screenDenied) return 'Screen Recording access required. Enable GappdCapture in System Settings to capture system audio.'
@@ -165,9 +205,9 @@ export function App() {
   async function handleOpenPermissionsSettings() {
     try {
       const permissions = await window.gappd.system.requestCapturePermissions()
-      const target = permissions.microphone !== 'granted'
+      const target = isPermissionDeniedState(permissions.microphone)
         ? 'microphone'
-        : permissions.screen !== 'granted'
+        : isPermissionDeniedState(permissions.screen)
           ? 'screen-recording'
           : permissionTarget(bannerError)
       await window.gappd.system.openPermissionsSettings(target)
@@ -209,7 +249,7 @@ export function App() {
         ) : view === 'record' ? (
           <RecordView title={title} device={device} devices={devices} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
         ) : view === 'meetings' ? (
-          <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} />
+          <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} />
         ) : (
           <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />
         )}

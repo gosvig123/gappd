@@ -31,10 +31,10 @@ const PULL_STAGE_VIEWS: Record<NonNullable<OnboardingStatus['pullStage']>, Onboa
 const ERROR_VIEWS: Record<NonNullable<OnboardingStatus['errorKind']>, Omit<OnboardingErrorView, 'debugDetail' | 'ownershipHelp'>> = {
   pull_timeout: { title: 'Model download timed out.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download timed out.' },
   pull_network: { title: 'Model download interrupted.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download interrupted.' },
-  pull_blob_host_network: { title: 'Granola could not reach the model download host.', detail: 'Check VPN, firewall, or network filtering on this Mac, then retry Local AI setup.', compact: 'Model host unavailable.' },
+  pull_blob_host_network: { title: 'Gappd could not reach the model download host.', detail: 'Check VPN, firewall, or network filtering on this Mac, then retry Local AI setup.', compact: 'Model host unavailable.' },
   disk_space: { title: 'Not enough disk space for the model.', detail: 'Free some space on this Mac, then retry Local AI setup.', compact: 'Need more disk space.' },
-  permission: { title: 'Granola could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' },
-  ownership_mismatch: { title: "Another Ollama process is using Granola's local port.", detail: 'Granola needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.' },
+  permission: { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' },
+  ownership_mismatch: { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.' },
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },
 }
 
@@ -128,7 +128,8 @@ function onboardingPullStageView(status: Pick<OnboardingStatus, 'phase' | 'messa
 
 function structuredErrorView(status: Pick<OnboardingStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'>): OnboardingErrorView {
   const view = ERROR_VIEWS[status.errorKind!]
-  return { ...view, detail: status.errorDetail || view.detail, errorDetail: status.errorDetail, debugDetail: cleanDebugDetail(status.debugDetail), ownershipHelp: status.errorKind === 'ownership_mismatch' ? buildOwnershipHelp(status.ownershipConflict) : undefined }
+  const errorDetail = status.errorDetail || (status.errorKind === 'runtime' ? cleanErrorText(status.error) : undefined)
+  return { ...view, detail: errorDetail || view.detail, errorDetail, debugDetail: cleanDebugDetail(status.debugDetail), ownershipHelp: status.errorKind === 'ownership_mismatch' ? buildOwnershipHelp(status.ownershipConflict) : undefined }
 }
 
 function legacyErrorView(error: string | undefined): OnboardingErrorView | null {
@@ -136,8 +137,8 @@ function legacyErrorView(error: string | undefined): OnboardingErrorView | null 
   if (!text) return null
   if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Model download interrupted.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download interrupted.' }
   if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space for the model.', detail: 'Free some space on this Mac, then retry Local AI setup.', compact: 'Need more disk space.' }
-  if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Granola could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
-  if (matchesText(text, ['another ollama process', 'app-owned runtime', '127.0.0.1:11435', 'address already in use'])) return { title: "Another Ollama process is using Granola's local port.", detail: 'Granola needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.', ownershipHelp: buildOwnershipHelp(undefined) }
+  if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
+  if (matchesText(text, ['another ollama process', 'app-owned runtime', '127.0.0.1:11435', 'address already in use'])) return { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.', ownershipHelp: buildOwnershipHelp(undefined) }
   return matchesText(text, ['spawn', 'listen', 'whisper']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
 }
 
