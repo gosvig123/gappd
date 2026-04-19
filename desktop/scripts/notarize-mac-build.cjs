@@ -14,7 +14,7 @@ const {
 async function main() {
   if (process.platform !== 'darwin') return
   if (!shouldNotarize()) {
-    console.log('Skipping notarization because GRN_ENABLE_NOTARIZATION is not set')
+    console.log('Skipping notarization because GAPPD_ENABLE_NOTARIZATION is not set')
     return
   }
   const appPath = process.argv[2] ? path.resolve(process.argv[2]) : await defaultAppPath()

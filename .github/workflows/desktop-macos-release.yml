@@ -17,8 +17,8 @@ jobs:
       CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
       CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      GRN_ENABLE_NOTARIZATION: '1'
-      GRN_REQUIRE_GATEKEEPER: '1'
+      GAPPD_ENABLE_NOTARIZATION: '1'
+      GAPPD_REQUIRE_GATEKEEPER: '1'
 
     steps:
       - name: Check out repository
@@ -50,14 +50,14 @@ jobs:
 
       - name: Write signing certificate
         run: |
-          CERT_PATH="$RUNNER_TEMP/grn-macos-signing.p12"
+          CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
           python3 - <<'PY'
           import base64
           import os
           from pathlib import Path
 
           cert = os.environ['APPLE_CERTIFICATE_P12_BASE64']
-          Path(os.environ['RUNNER_TEMP'], 'grn-macos-signing.p12').write_bytes(base64.b64decode(cert))
+          Path(os.environ['RUNNER_TEMP'], 'gappd-macos-signing.p12').write_bytes(base64.b64decode(cert))
           PY
           echo "CSC_LINK=$CERT_PATH" >> "$GITHUB_ENV"
         env:
@@ -65,8 +65,8 @@ jobs:
 
       - name: Preflight signing identity
         run: |
-          CERT_PATH="$RUNNER_TEMP/grn-macos-signing.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/grn-macos-signing.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/gappd-macos-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(uuidgen)"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
@@ -105,11 +105,11 @@ jobs:
       - name: Verify release artifacts exist
         run: |
           shopt -s nullglob
-          app_paths=(desktop/release/mac*/Grn.app)
+          app_paths=(desktop/release/mac*/Gappd.app)
           dmg_paths=(desktop/release/*.dmg)
 
           if [ ${#app_paths[@]} -eq 0 ]; then
-            echo "No packaged app found at desktop/release/mac*/Grn.app" >&2
+            echo "No packaged app found at desktop/release/mac*/Gappd.app" >&2
             exit 1
           fi
 
@@ -124,7 +124,7 @@ jobs:
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: grn-desktop-macos
+          name: gappd-desktop-macos
           if-no-files-found: error
           path: |
             desktop/release/*.dmg

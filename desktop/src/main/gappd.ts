@@ -25,18 +25,18 @@ type RecordingProtocolEvent = {
 let recordingChild: ReturnType<typeof spawn> | null = null
 
 export function resolveCaptureBinary(): string {
-  const override = process.env.GRN_CAPTURE_HELPER_PATH
+  const override = process.env.GAPPD_CAPTURE_HELPER_PATH
   if (override) return override
-  if (app.isPackaged) return path.join(process.resourcesPath, 'GrnCapture.app', 'Contents', 'MacOS', 'grn-capture')
-  return path.resolve(__dirname, '../../..', 'build', 'GrnCapture.app', 'Contents', 'MacOS', 'grn-capture')
+  if (app.isPackaged) return path.join(process.resourcesPath, 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture')
+  return path.resolve(__dirname, '../../..', 'build', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture')
 }
 
 export function requestCapturePermissions(): Promise<{ microphone: string; screen: string }> {
   return new Promise((resolve) => {
     const bin = resolveCaptureBinary()
-    const tmpFile = path.join(os.tmpdir(), `grn-perms-${Date.now()}.json`)
+    const tmpFile = path.join(os.tmpdir(), `gappd-perms-${Date.now()}.json`)
     const child = spawn(bin, ['--request-permissions', '--output', tmpFile], {
-      env: childEnv({ GRN_CAPTURE_HELPER_PATH: bin }),
+      env: childEnv({ GAPPD_CAPTURE_HELPER_PATH: bin }),
       stdio: ['ignore', 'ignore', 'ignore'],
     })
     child.on('close', () => {
@@ -52,11 +52,11 @@ export function requestCapturePermissions(): Promise<{ microphone: string; scree
   })
 }
 
-export function resolveGrnBinary(): string {
-  const override = process.env.GRN_BINARY_PATH
+export function resolveGappdBinary(): string {
+  const override = process.env.GAPPD_BINARY_PATH
   if (override) return override
-  if (app.isPackaged) return path.join(process.resourcesPath, 'bin', 'grn')
-  return path.resolve(__dirname, '../../..', 'build', 'grn')
+  if (app.isPackaged) return path.join(process.resourcesPath, 'bin', 'gappd')
+  return path.resolve(__dirname, '../../..', 'build', 'gappd')
 }
 
 export async function getDevices(): Promise<Device[]> {
@@ -109,10 +109,10 @@ export function startRecording(input: { title: string; device: number; mode: str
   let sawTerminalEvent = false
   let sawProtocolEvent = false
   let protocolError: string | null = null
-  const child = spawn(resolveGrnBinary(), args, {
+  const child = spawn(resolveGappdBinary(), args, {
     env: childEnv({
-      GRN_WHISPER_BIN: whisper.binaryPath,
-      GRN_CAPTURE_HELPER_PATH: resolveCaptureBinary(),
+      GAPPD_WHISPER_BIN: whisper.binaryPath,
+      GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(),
     }),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
@@ -189,8 +189,8 @@ export async function runJSON<T>(args: string[]): Promise<T> {
 
 function runCommand(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveGrnBinary(), args, {
-      env: childEnv({ GRN_CAPTURE_HELPER_PATH: resolveCaptureBinary() }),
+    const child = spawn(resolveGappdBinary(), args, {
+      env: childEnv({ GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary() }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
@@ -211,7 +211,7 @@ function runCommand(args: string[]): Promise<string> {
         resolve(stdout)
         return
       }
-      reject(new Error(stderr || stdout || `grn exited with code ${code}`))
+      reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
     })
   })
 }

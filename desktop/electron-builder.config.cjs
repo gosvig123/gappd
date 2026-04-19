@@ -2,15 +2,15 @@ const hooks = require('./scripts/electron-builder-hooks.cjs')
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
-  appId: 'dev.grn.desktop',
-  productName: 'Grn',
+  appId: 'dev.gappd.desktop',
+  productName: 'Gappd',
   directories: {
     output: 'release',
   },
   files: ['dist/**', 'dist-electron/**'],
   extraResources: [
-    { from: '../build/grn', to: 'bin/grn' },
-    { from: '../build/GrnCapture.app', to: 'GrnCapture.app' },
+    { from: '../build/gappd', to: 'bin/gappd' },
+    { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
     { from: 'resources/ollama/ollama', to: 'ollama/ollama' },
     { from: 'resources/whisper/whisper-cli', to: 'whisper/whisper-cli' },
   ],

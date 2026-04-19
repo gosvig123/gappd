@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>dev.grn.capture</string>
+    <string>dev.gappd.capture</string>
     <key>CFBundleName</key>
-    <string>GrnCapture</string>
+    <string>GappdCapture</string>
     <key>CFBundleExecutable</key>
-    <string>grn-capture</string>
+    <string>gappd-capture</string>
     <key>CFBundleVersion</key>
     <string>1.0</string>
     <key>CFBundleShortVersionString</key>
@@ -19,10 +19,10 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSAudioCaptureUsageDescription</key>
-    <string>grn captures system audio to transcribe your meetings</string>
+    <string>gappd captures system audio to transcribe your meetings</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>grn captures your microphone to transcribe your voice</string>
+    <string>gappd captures your microphone to transcribe your voice</string>
     <key>NSScreenCaptureUsageDescription</key>
-    <string>grn uses screen capture to access system audio for meeting transcription</string>
+    <string>gappd uses screen capture to access system audio for meeting transcription</string>
 </dict>
 </plist>

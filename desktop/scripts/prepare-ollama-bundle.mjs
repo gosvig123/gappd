@@ -56,7 +56,7 @@ async function downloadArchive(targetUrl) {
 }
 
 async function extractBinary() {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'grn-ollama-'))
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gappd-ollama-'))
   try {
     const result = spawnSync('tar', ['-xzf', archivePath, '-C', tempDir], { stdio: 'pipe' })
     if (result.status !== 0) throw new Error(result.stderr.toString() || 'Failed to extract Ollama archive')

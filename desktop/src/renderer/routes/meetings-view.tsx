@@ -1,7 +1,7 @@
 import { artifactLabel, meetingStatusLabel, processingStatusLabel } from '../components/meeting-status'
 
-type MeetingListItem = Awaited<ReturnType<typeof window.grn.meetings.list>>[number]
-type MeetingDetail = Awaited<ReturnType<typeof window.grn.meetings.show>>
+type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
+type MeetingDetail = Awaited<ReturnType<typeof window.gappd.meetings.show>>
 
 type MeetingsViewProps = {
   meetings: MeetingListItem[]

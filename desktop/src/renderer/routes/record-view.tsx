@@ -1,4 +1,4 @@
-type Device = Awaited<ReturnType<typeof window.grn.system.getDevices>>[number]
+type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
 
 type RecordViewProps = {
   title: string
@@ -18,7 +18,7 @@ export function RecordView({ title, device, devices, canStart, canStop, onTitleC
       <div className="panel-header">
         <div>
           <h1>Record</h1>
-          <p>Start and stop meeting recording using the existing grn backend.</p>
+          <p>Start and stop meeting recording using the existing gappd backend.</p>
         </div>
       </div>
 

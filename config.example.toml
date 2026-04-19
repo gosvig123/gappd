@@ -1,8 +1,8 @@
-# grn configuration — local-first by default
-# Copy to ~/.grn/config.toml and edit values.
+# gappd configuration — local-first by default
+# Copy to ~/.gappd/config.toml and edit values.
 
 # Path to the SQLite database file
-db_path = "~/.grn/db.sqlite"
+db_path = "~/.gappd/db.sqlite"
 
 [ai]
 # AI provider. Currently supported: "ollama"

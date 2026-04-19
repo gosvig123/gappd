@@ -116,7 +116,7 @@ func (r *Recorder) SystemPath() string {
 }
 
 func findCaptureBinary() (string, error) {
-	if override := strings.TrimSpace(os.Getenv("GRN_CAPTURE_HELPER_PATH")); override != "" {
+	if override := strings.TrimSpace(os.Getenv("GAPPD_CAPTURE_HELPER_PATH")); override != "" {
 		if _, err := os.Stat(override); err == nil {
 			return override, nil
 		}
@@ -126,8 +126,8 @@ func findCaptureBinary() (string, error) {
 	home, _ := os.UserHomeDir()
 	paths := bundleCaptureCandidates()
 	paths = append(paths,
-		filepath.Join(home, ".grn", "GrnCapture.app", "Contents", "MacOS", "grn-capture"),
-		"./build/GrnCapture.app/Contents/MacOS/grn-capture",
+		filepath.Join(home, ".gappd", "GappdCapture.app", "Contents", "MacOS", "gappd-capture"),
+		"./build/GappdCapture.app/Contents/MacOS/gappd-capture",
 	)
 	for _, p := range paths {
 		if p == "" {
@@ -137,7 +137,7 @@ func findCaptureBinary() (string, error) {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("grn-capture not found (set GRN_CAPTURE_HELPER_PATH or run: make build-capture)")
+	return "", fmt.Errorf("gappd-capture not found (set GAPPD_CAPTURE_HELPER_PATH or run: make build-capture)")
 }
 
 func bundleCaptureCandidates() []string {
@@ -151,8 +151,8 @@ func bundleCaptureCandidates() []string {
 	}
 	exeDir := filepath.Dir(exePath)
 	return []string{
-		filepath.Clean(filepath.Join(exeDir, "GrnCapture.app", "Contents", "MacOS", "grn-capture")),
-		filepath.Clean(filepath.Join(exeDir, "..", "GrnCapture.app", "Contents", "MacOS", "grn-capture")),
-		filepath.Clean(filepath.Join(exeDir, "..", "Resources", "GrnCapture.app", "Contents", "MacOS", "grn-capture")),
+		filepath.Clean(filepath.Join(exeDir, "GappdCapture.app", "Contents", "MacOS", "gappd-capture")),
+		filepath.Clean(filepath.Join(exeDir, "..", "GappdCapture.app", "Contents", "MacOS", "gappd-capture")),
+		filepath.Clean(filepath.Join(exeDir, "..", "Resources", "GappdCapture.app", "Contents", "MacOS", "gappd-capture")),
 	}
 }

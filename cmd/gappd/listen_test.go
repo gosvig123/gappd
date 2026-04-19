@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 func TestFailMeetingCapturePersistsFailureAndEmitsMeetingID(t *testing.T) {

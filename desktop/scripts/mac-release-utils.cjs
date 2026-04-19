@@ -8,11 +8,11 @@ const distRoot = path.join(desktopRoot, 'release')
 const entitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.plist')
 const inheritEntitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.inherit.plist')
 const nestedCodeLayout = [
-  { label: 'grn binary', relativePath: ['Contents', 'Resources', 'bin', 'grn'], executable: true },
+  { label: 'gappd binary', relativePath: ['Contents', 'Resources', 'bin', 'gappd'], executable: true },
   { label: 'Ollama binary', relativePath: ['Contents', 'Resources', 'ollama', 'ollama'], executable: true },
   { label: 'Whisper binary', relativePath: ['Contents', 'Resources', 'whisper', 'whisper-cli'], executable: true },
-  { label: 'capture helper app', relativePath: ['Contents', 'Resources', 'GrnCapture.app'], executable: false },
-  { label: 'capture helper binary', relativePath: ['Contents', 'Resources', 'GrnCapture.app', 'Contents', 'MacOS', 'grn-capture'], executable: true },
+  { label: 'capture helper app', relativePath: ['Contents', 'Resources', 'GappdCapture.app'], executable: false },
+  { label: 'capture helper binary', relativePath: ['Contents', 'Resources', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'], executable: true },
 ]
 
 async function resolveAppPath(appOutDir, productName) {
@@ -24,7 +24,7 @@ async function resolveAppPath(appOutDir, productName) {
   throw new Error(`No packaged app found in ${appOutDir}`)
 }
 
-async function defaultAppPath(productName = 'Grn') {
+async function defaultAppPath(productName = 'Gappd') {
   const candidateDirs = ['mac', 'mac-arm64', 'mac-universal', 'mac-x64']
   for (const dirName of candidateDirs) {
     const appPath = path.join(distRoot, dirName, `${productName}.app`)
@@ -74,7 +74,7 @@ function isReleaseSigning(identity) {
 }
 
 function shouldNotarize() {
-  return process.env.GRN_ENABLE_NOTARIZATION === '1'
+  return process.env.GAPPD_ENABLE_NOTARIZATION === '1'
 }
 
 function notarizationCredentials() {
@@ -125,7 +125,7 @@ function validateStaple(targetPath) {
 }
 
 async function zipAppForNotary(appPath) {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'grn-notary-'))
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gappd-notary-'))
   const zipPath = path.join(tempDir, `${path.basename(appPath, '.app')}.zip`)
   run('ditto', ['-c', '-k', '--keepParent', appPath, zipPath])
   return { tempDir, zipPath }

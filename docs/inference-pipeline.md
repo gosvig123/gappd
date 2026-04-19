@@ -13,15 +13,15 @@ Cloud providers (OpenAI, Claude, Deepgram) are an upgrade path, not the default.
 | Ollama | LLM inference (localhost:11434) | [ollama.com](https://ollama.com) |
 | whisper.cpp | Speech-to-text | Bundled binary or user-built |
 
-### First-Run: `grn setup`
+### First-Run: `gappd setup`
 
 ```
-$ grn setup
+$ gappd setup
 ✓ Ollama found at localhost:11434
 ✓ Pulling llama3.1:8b... done (4.7GB)
-✓ whisper.cpp binary found at ~/.grn/bin/whisper
-✓ Config written to ~/.grn/config.toml
-Ready. Run `grn listen` to start.
+✓ whisper.cpp binary found at ~/.gappd/bin/whisper
+✓ Config written to ~/.gappd/config.toml
+Ready. Run `gappd listen` to start.
 ```
 
 Detect Ollama → pull model → locate whisper binary → write config. Idempotent.
@@ -83,7 +83,7 @@ Stage 1 runs per chunk → N partial JSONs → deterministic Go merge
 | **32GB** | `llama3.1:70b-q4` | 8K | Best quality, slower |
 | 32GB (alt) | `mixtral:8x7b` | 32K | Good balance of speed and quality |
 
-Default targets 8GB. `grn setup` detects available RAM and suggests a model.
+Default targets 8GB. `gappd setup` detects available RAM and suggests a model.
 
 ## Provider Interface
 
@@ -121,9 +121,9 @@ Templates are prompt suffixes injected into the Stage 2 SYSTEM message.
 
 ### Custom Templates
 
-Drop a `.txt` file in `~/.grn/templates/retro.txt`. Use `grn listen --template retro`
+Drop a `.txt` file in `~/.gappd/templates/retro.txt`. Use `gappd listen --template retro`
 or set `default_template = "retro"` in config. Files contain only output format
-instructions — grn wraps them into the full Stage 2 prompt.
+instructions — gappd wraps them into the full Stage 2 prompt.
 
 ## Output Parsing
 
@@ -144,13 +144,13 @@ Extracted actions become DB records linked to the meeting. Pure Go, no LLM.
 | Scenario | Detection | Response |
 |---|---|---|
 | Ollama not running | TCP connect fails | "Start with `ollama serve`." |
-| Model not pulled | 404 from API | "Run `grn setup` or `ollama pull llama3.1:8b`." |
+| Model not pulled | 404 from API | "Run `gappd setup` or `ollama pull llama3.1:8b`." |
 | Inference timeout | 5min/3min limit | Retry once, then save transcript for later. |
 | Invalid JSON | Unmarshal error | Retry with temperature=0. Max 2 retries. |
 | OOM / crash | Connection reset | "Model too large. Try a smaller model." |
 | Transcript too large | Exceeds context | Auto-chunk into 15-min windows. |
 
-Transcripts and audio are always preserved. Re-run with `grn enhance <meeting-id>`.
+Transcripts and audio are always preserved. Re-run with `gappd enhance <meeting-id>`.
 
 ## Future
 

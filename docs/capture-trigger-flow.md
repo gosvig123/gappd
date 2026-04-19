@@ -1,17 +1,17 @@
 # Capture Trigger & Audio Flow
 
-How `grn listen` actually works, end to end.
+How `gappd listen` actually works, end to end.
 
 ## Trigger Model
 
-Manual. User runs `grn listen`, audio starts. User presses `q`, audio stops.
+Manual. User runs `gappd listen`, audio starts. User presses `q`, audio stops.
 
 ```
-$ grn listen                    # capture all system audio + mic
-$ grn listen --app zoom         # capture only Zoom's audio + mic
-$ grn listen --no-mic           # system audio only
-$ grn listen --mic-only         # mic only (in-person meeting)
-$ grn listen --title "Sprint"   # pre-set meeting title
+$ gappd listen                    # capture all system audio + mic
+$ gappd listen --app zoom         # capture only Zoom's audio + mic
+$ gappd listen --no-mic           # system audio only
+$ gappd listen --mic-only         # mic only (in-person meeting)
+$ gappd listen --title "Sprint"   # pre-set meeting title
 ```
 
 No auto-detection of meetings in v1. No calendar integration.
@@ -64,7 +64,7 @@ System: float32 @ 48kHz stereo → downmix to mono → resample 16kHz
 ```
 
 **TCC permission:** First run triggers macOS Screen Recording permission
-dialog. grn should detect denial and show instructions.
+dialog. gappd should detect denial and show instructions.
 
 **Fallback chain:**
 1. `audiorec` (SCK + malgo) — default
@@ -139,9 +139,9 @@ processes chunks as they arrive regardless of source.
 ### Architecture: whisper-server as child process
 
 ```
-grn listen
+gappd listen
   │
-  ├─▶ spawn: whisper-server --model ~/.grn/models/ggml-base.en.bin
+  ├─▶ spawn: whisper-server --model ~/.gappd/models/ggml-base.en.bin
   │          --port 8765 --host 127.0.0.1
   │
   ├─▶ start mic capture goroutine
@@ -167,7 +167,7 @@ grn listen
 ```
 
 **Why server mode over Go bindings:**
-- No CGo in grn itself — pure Go binary
+- No CGo in gappd itself — pure Go binary
 - Model loaded once, reused across all chunks
 - Clean HTTP boundary — easy to swap for cloud STT later
 - whisper-server ships with whisper.cpp
@@ -257,7 +257,7 @@ you take that?", "As the PM I think...". We rely on this for v1.
 ## Session State Machine
 
 ```
-                grn listen
+                gappd listen
                     │
                     ▼
              ┌──────────┐
@@ -291,14 +291,14 @@ you take that?", "As the PM I think...". We rely on this for v1.
 ```
 
 DB meeting row tracks state: `recording → processing → complete`.
-If grn crashes during CAPTURE, next launch detects orphaned
+If gappd crashes during CAPTURE, next launch detects orphaned
 `recording` rows and offers to recover/enhance the partial transcript.
 
 ## What Gets Stored
 
 | Data | When | Where | Retained |
 |---|---|---|---|
-| Raw PCM audio | During capture | `~/.grn/sessions/{id}/` | 30 days (configurable) |
+| Raw PCM audio | During capture | `~/.gappd/sessions/{id}/` | 30 days (configurable) |
 | Audio file | N/A (raw files are the audio) | See above | See above |
 | Transcript segments | As they arrive | SQLite | Yes |
 | Raw whisper JSON | Per chunk | Nowhere | No |

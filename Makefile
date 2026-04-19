@@ -1,9 +1,9 @@
-BINARY    := grn
+BINARY    := gappd
 BUILD_DIR := ./build
 MODULE    := $(shell grep '^module' go.mod 2>/dev/null | awk '{print $$2}')
 VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS   := -s -w -X $(MODULE)/internal/version.Version=$(VERSION)
-DB_PATH   := ~/.grn/db.sqlite
+DB_PATH   := ~/.gappd/db.sqlite
 SCHEMA    := ./internal/db/schema.sql
 UNAME_S   := $(shell uname -s)
 
@@ -11,7 +11,7 @@ UNAME_S   := $(shell uname -s)
 
 build:
 	@mkdir -p $(BUILD_DIR)
-	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/grn
+	go build -ldflags "$(LDFLAGS)" -o $(BUILD_DIR)/$(BINARY) ./cmd/gappd
 
 build-capture: ensure-macos
 	@bash capture-helper/build.sh
@@ -23,26 +23,26 @@ ensure-macos:
 	fi
 
 install-capture: build-capture
-	@echo "Installing GrnCapture.app to ~/.grn/..."
-	@mkdir -p $(HOME)/.grn
-	@rm -rf $(HOME)/.grn/GrnCapture.app
-	@cp -R $(BUILD_DIR)/GrnCapture.app $(HOME)/.grn/GrnCapture.app
-	@echo "Done. grn-capture installed at ~/.grn/GrnCapture.app"
+	@echo "Installing GappdCapture.app to ~/.gappd/..."
+	@mkdir -p $(HOME)/.gappd
+	@rm -rf $(HOME)/.gappd/GappdCapture.app
+	@cp -R $(BUILD_DIR)/GappdCapture.app $(HOME)/.gappd/GappdCapture.app
+	@echo "Done. gappd-capture installed at ~/.gappd/GappdCapture.app"
 
 install: build
-	@echo "Installing grn binary to /usr/local/bin/..."
+	@echo "Installing gappd binary to /usr/local/bin/..."
 	install -m 755 $(BUILD_DIR)/$(BINARY) /usr/local/bin/$(BINARY)
-	@echo "Done. Run: grn"
+	@echo "Done. Run: gappd"
 
 run: build
 	$(BUILD_DIR)/$(BINARY)
 
 dev:
 	@which watchexec > /dev/null 2>&1 || { echo "install watchexec: cargo install watchexec-cli"; exit 1; }
-	watchexec -r -e go -- go run ./cmd/grn
+	watchexec -r -e go -- go run ./cmd/gappd
 
 db-init:
-	@mkdir -p ~/.grn
+	@mkdir -p ~/.gappd
 	sqlite3 $(DB_PATH) < $(SCHEMA)
 	@echo "database initialised at $(DB_PATH)"
 

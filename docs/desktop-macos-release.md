@@ -2,8 +2,8 @@
 
 ## What ships in the app bundle
 
-- `build/grn` is bundled into `Contents/Resources/bin/grn`
-- `build/GrnCapture.app` is bundled into `Contents/Resources/GrnCapture.app`
+- `build/gappd` is bundled into `Contents/Resources/bin/gappd`
+- `build/GappdCapture.app` is bundled into `Contents/Resources/GappdCapture.app`
 - Bundled runtimes stay repo-owned: `ollama/ollama` and `whisper/whisper-cli`
 
 ## What still downloads on first run
@@ -17,11 +17,13 @@
 - `APPLE_CERTIFICATE_PASSWORD`: password for the `.p12`
 - `APPLE_SIGNING_IDENTITY`: full codesign identity name
 - `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`: notarization credentials
-- `GRN_ENABLE_NOTARIZATION=1`, `GRN_REQUIRE_GATEKEEPER=1`: release-only verification toggles used by CI
+- `GAPPD_ENABLE_NOTARIZATION=1`, `GAPPD_REQUIRE_GATEKEEPER=1`: release-only verification toggles used by CI
 
 ## Local packaging
 
-- `npm run dist:dir` still works without Apple secrets
+- `pnpm dev` at the repo root is only a convenience wrapper for starting the desktop app during development.
+- This repo is not a pnpm workspace; install dependencies and run release packaging for `desktop` with npm.
+- From the repo root, run `npm --prefix ./desktop run dist:dir`; it still works without Apple secrets
 - Packaged app output now lands under `desktop/release/`; renderer assets stay in `desktop/dist/`
 - Local builds ad-hoc sign nested bundled executables so the packaged app remains runnable for smoke checks
 - Release notarization submits and staples the `.app`; later verification validates that same `.app` instead of assuming the `.dmg` was notarized too

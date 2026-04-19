@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/grn-dev/grn/internal/config"
+	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/spf13/cobra"
 )
 

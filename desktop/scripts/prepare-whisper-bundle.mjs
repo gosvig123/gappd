@@ -74,7 +74,7 @@ async function downloadArchive(targetUrl) {
 }
 
 async function buildBinary() {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'grn-whisper-'))
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gappd-whisper-'))
   try {
     runCommand('tar', ['-xzf', archivePath, '-C', tempDir, '--strip-components=1'], 'Failed to extract Whisper source archive')
     const buildDir = path.join(tempDir, 'build')

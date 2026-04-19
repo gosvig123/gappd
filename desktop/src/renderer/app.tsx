@@ -7,10 +7,10 @@ import { MeetingsView } from './routes/meetings-view'
 import { OnboardingView } from './routes/onboarding-view'
 import { RecordView } from './routes/record-view'
 import { SettingsView } from './routes/settings-view'
-type RecordingState = Awaited<ReturnType<typeof window.grn.recording.getStatus>>
-type Device = Awaited<ReturnType<typeof window.grn.system.getDevices>>[number]
-type MeetingListItem = Awaited<ReturnType<typeof window.grn.meetings.list>>[number]
-type MeetingDetail = Awaited<ReturnType<typeof window.grn.meetings.show>>
+type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus>>
+type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
+type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
+type MeetingDetail = Awaited<ReturnType<typeof window.gappd.meetings.show>>
 type View = 'record' | 'meetings' | 'settings'
 const localAI = getLocalAIContract()
 
@@ -37,7 +37,7 @@ export function App() {
     setSelectedMeetingId(id)
   }
   async function refreshMeetings(preferredMeetingId?: string | null) {
-    const items = await window.grn.meetings.list()
+    const items = await window.gappd.meetings.list()
     setMeetings(items)
     const nextId = preferredMeetingId ?? selectedMeetingIdRef.current ?? items[0]?.id ?? null
     if (!nextId) {
@@ -49,13 +49,13 @@ export function App() {
   }
   async function loadMeeting(id: string) {
     applySelectedMeetingId(id)
-    setSelectedMeeting(await window.grn.meetings.show(id))
+    setSelectedMeeting(await window.gappd.meetings.show(id))
   }
   async function loadAppData() {
     const [deviceList, meetingList, recordingState] = await Promise.all([
-      window.grn.system.getDevices(),
-      window.grn.meetings.list(),
-      window.grn.recording.getStatus(),
+      window.gappd.system.getDevices(),
+      window.gappd.meetings.list(),
+      window.gappd.recording.getStatus(),
     ])
     setDevices(deviceList)
     setMeetings(meetingList)
@@ -63,7 +63,7 @@ export function App() {
     if (deviceList[0]) setDevice(deviceList[0].index)
     const initialMeetingId = recordingState.meetingId ?? meetingList[0]?.id ?? null
     applySelectedMeetingId(initialMeetingId)
-    setSelectedMeeting(initialMeetingId ? await window.grn.meetings.show(initialMeetingId) : null)
+    setSelectedMeeting(initialMeetingId ? await window.gappd.meetings.show(initialMeetingId) : null)
   }
   async function loadSettingsStatus() {
     setSettingsLoading(true)
@@ -99,7 +99,7 @@ export function App() {
   useEffect(() => {
     if (onboarding?.phase !== 'ready') return
     let disposed = false
-    const dispose = window.grn.recording.onStatusChanged(async (state) => {
+    const dispose = window.gappd.recording.onStatusChanged(async (state) => {
       if (disposed) return
       setRecording(state)
       const meetingId = state.meetingId ?? selectedMeetingIdRef.current
@@ -130,25 +130,25 @@ export function App() {
   const bannerError = error ?? recording.error ?? null
   const isPermissionError = isPermissionErrorMessage(bannerError)
 
-  function capturePermissionError(permissions: Awaited<ReturnType<typeof window.grn.system.requestCapturePermissions>>): string | null {
+  function capturePermissionError(permissions: Awaited<ReturnType<typeof window.gappd.system.requestCapturePermissions>>): string | null {
     const microphoneDenied = permissions.microphone !== 'granted'
     const screenDenied = permissions.screen !== 'granted'
-    if (microphoneDenied && screenDenied) return 'Microphone and Screen Recording access denied. Enable GrnCapture in System Settings to record.'
-    if (microphoneDenied) return 'Microphone access denied. Enable GrnCapture in System Settings to record.'
-    if (screenDenied) return 'Screen Recording access required. Enable GrnCapture in System Settings to capture system audio.'
+    if (microphoneDenied && screenDenied) return 'Microphone and Screen Recording access denied. Enable GappdCapture in System Settings to record.'
+    if (microphoneDenied) return 'Microphone access denied. Enable GappdCapture in System Settings to record.'
+    if (screenDenied) return 'Screen Recording access required. Enable GappdCapture in System Settings to capture system audio.'
     return null
   }
 
   async function handleStart() {
     try {
       setError(null)
-      const permissions = await window.grn.system.requestCapturePermissions()
+      const permissions = await window.gappd.system.requestCapturePermissions()
       const permissionError = capturePermissionError(permissions)
       if (permissionError) {
         setError(permissionError)
         return
       }
-      await window.grn.recording.start({ title: title.trim() || new Date().toLocaleString(), device, mode: 'both' })
+      await window.gappd.recording.start({ title: title.trim() || new Date().toLocaleString(), device, mode: 'both' })
       setView('record')
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -157,20 +157,20 @@ export function App() {
   async function handleStop() {
     try {
       setError(null)
-      await window.grn.recording.stop()
+      await window.gappd.recording.stop()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
   }
   async function handleOpenPermissionsSettings() {
     try {
-      const permissions = await window.grn.system.requestCapturePermissions()
+      const permissions = await window.gappd.system.requestCapturePermissions()
       const target = permissions.microphone !== 'granted'
         ? 'microphone'
         : permissions.screen !== 'granted'
           ? 'screen-recording'
           : permissionTarget(bannerError)
-      await window.grn.system.openPermissionsSettings(target)
+      await window.gappd.system.openPermissionsSettings(target)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -198,7 +198,7 @@ export function App() {
     }
   }
 
-  if (loading || !onboarding) return <div className="screen-center">Loading Grn…</div>
+  if (loading || !onboarding) return <div className="screen-center">Loading Gappd…</div>
 
   return (
     <div className="app-shell">

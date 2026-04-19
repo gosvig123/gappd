@@ -53,10 +53,10 @@ func parseArgs() -> Config {
 
 func printUsage() {
     let usage = """
-    grn-capture: Record mic and/or system audio
+    gappd-capture: Record mic and/or system audio
 
     Usage:
-      grn-capture --mode <mic|system|both> --output-dir <path> [options]
+      gappd-capture --mode <mic|system|both> --output-dir <path> [options]
 
     Options:
       --mode <mic|system|both>  Capture mode (default: both)
@@ -444,11 +444,11 @@ func checkMicPermission() {
         AVCaptureDevice.requestAccess(for: .audio) { _ in sema.signal() }
         sema.wait()
         if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
-            stderrPrint("error: Microphone access denied.\n  Grant permission: System Settings → Privacy & Security → Microphone → enable GrnCapture")
+            stderrPrint("error: Microphone access denied.\n  Grant permission: System Settings → Privacy & Security → Microphone → enable GappdCapture")
             exit(126)
         }
     case .denied, .restricted:
-        stderrPrint("error: Microphone access denied.\n  Grant permission: System Settings → Privacy & Security → Microphone → enable GrnCapture")
+        stderrPrint("error: Microphone access denied.\n  Grant permission: System Settings → Privacy & Security → Microphone → enable GappdCapture")
         exit(126)
     @unknown default:
         return
@@ -459,7 +459,7 @@ func checkScreenRecordingPermission() {
     if #available(macOS 15.0, *) {
         if !CGPreflightScreenCaptureAccess() {
             _ = CGRequestScreenCaptureAccess()
-            stderrPrint("error: Screen Recording access required for system audio capture.\n  A System Settings window should have opened — enable GrnCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GrnCapture")
+            stderrPrint("error: Screen Recording access required for system audio capture.\n  A System Settings window should have opened — enable GappdCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
             exit(126)
         }
     } else {
@@ -475,7 +475,7 @@ func checkScreenRecordingPermission() {
         }
         sema.wait()
         if denied {
-            stderrPrint("error: Screen Recording access required for system audio capture.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GrnCapture")
+            stderrPrint("error: Screen Recording access required for system audio capture.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
             exit(126)
         }
     }

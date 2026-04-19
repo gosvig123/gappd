@@ -6,13 +6,13 @@ import { fileURLToPath } from 'node:url'
 const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const repoRoot = path.resolve(desktopRoot, '..')
 const buildDir = path.join(repoRoot, 'build')
-const grnBinaryPath = path.join(buildDir, 'grn')
-const captureAppPath = path.join(buildDir, 'GrnCapture.app')
+const gappdBinaryPath = path.join(buildDir, 'gappd')
+const captureAppPath = path.join(buildDir, 'GappdCapture.app')
 const workflow = process.argv[2] || 'build'
 const makeTargets = process.platform === 'darwin' ? ['build', 'build-capture'] : ['build']
 
 runMake(makeTargets)
-await requirePath(grnBinaryPath, `Native grn binary missing at ${grnBinaryPath} after \`make ${makeTargets.join(' ')}\`.`)
+await requirePath(gappdBinaryPath, `Native gappd binary missing at ${gappdBinaryPath} after \`make ${makeTargets.join(' ')}\`.`)
 runBinaryCheck()
 
 if (process.platform === 'darwin') {
@@ -26,10 +26,10 @@ function runMake(targets) {
 }
 
 function runBinaryCheck() {
-  const result = spawnSync(grnBinaryPath, ['app', 'config', 'show', '--json'], { cwd: repoRoot, stdio: 'pipe' })
+  const result = spawnSync(gappdBinaryPath, ['app', 'config', 'show', '--json'], { cwd: repoRoot, stdio: 'pipe' })
   if (!result.error && result.status === 0) return
   throw new Error(
-    `${label(workflow)} native verification failed for \`${path.relative(repoRoot, grnBinaryPath)} app config show --json\`. ` +
+    `${label(workflow)} native verification failed for \`${path.relative(repoRoot, gappdBinaryPath)} app config show --json\`. ` +
       `Desktop would otherwise launch with a stale or broken binary.\n${commandOutput(result)}`.trim(),
   )
 }

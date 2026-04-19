@@ -9,7 +9,7 @@ transcript. But nothing can regenerate the audio.
 Current plan holds audio in a memory ring buffer and discards it after
 whisper processes each chunk. This means:
 
-- If grn crashes → unprocessed audio is lost
+- If gappd crashes → unprocessed audio is lost
 - If meeting app crashes → last buffered chunk is lost
 - If whisper is slow/stuck → audio backs up in memory, may OOM
 - If power goes out → everything in memory is gone
@@ -23,7 +23,7 @@ This is not optional. It's the safety net for everything else.
 
 ```
 ┌──────────────┐     ┌──────────────────────┐
-│ Mic stream   │────▶│ ~/.grn/sessions/     │
+│ Mic stream   │────▶│ ~/.gappd/sessions/     │
 │              │     │   {id}/mic.raw        │
 └──────────────┘     └──────────┬────────────┘
                                 │
@@ -35,7 +35,7 @@ This is not optional. It's the safety net for everything else.
                      └──────────────────┘
 
 ┌──────────────┐     ┌──────────────────────┐
-│ System stream│────▶│ ~/.grn/sessions/     │
+│ System stream│────▶│ ~/.gappd/sessions/     │
 │              │     │   {id}/system.raw     │
 └──────────────┘     └──────────┬────────────┘
                                 │
@@ -57,7 +57,7 @@ simple `io.Writer` append — near zero overhead.
 ## Session Directory
 
 ```
-~/.grn/sessions/
+~/.gappd/sessions/
 └── 2026-04-06T1000-sprint-planning/
     ├── mic.raw              # raw PCM, 16kHz mono s16le
     ├── system.raw           # raw PCM, 16kHz mono s16le
@@ -100,14 +100,14 @@ bracket needed, each line is independent, survives partial writes.
 
 ## Recovery Scenarios
 
-### grn crashes during capture
+### gappd crashes during capture
 
 ```
-$ grn listen
+$ gappd listen
 ... recording ...
 [crash / kill -9 / power loss]
 
-$ grn listen          # next launch
+$ gappd listen          # next launch
 ⚠ Found incomplete session: "Sprint Planning" (Apr 6, 32 min recorded)
   Audio files intact: mic.raw (30.7 MB), system.raw (30.7 MB)
   Transcript: 847 segments (covers first 28 min)
@@ -119,7 +119,7 @@ $ grn listen          # next launch
 ```
 
 Recovery flow:
-1. Scan `~/.grn/sessions/` for `status: "recording"` in meta.json
+1. Scan `~/.gappd/sessions/` for `status: "recording"` in meta.json
 2. Audio files are intact — raw append-only files survive crashes
 3. transcript.jsonl has everything whisper completed before the crash
 4. User chooses: re-transcribe the raw audio files (best quality)
@@ -133,7 +133,7 @@ The raw files are the source of truth, not the transcript.
 ### Whisper falls behind real-time
 
 Audio still streams to disk at full speed. Whisper processes chunks
-as fast as it can. When the meeting ends, grn continues processing
+as fast as it can. When the meeting ends, gappd continues processing
 remaining chunks from the disk files rather than memory.
 
 ```
@@ -142,7 +142,7 @@ meeting ends
      ├─ audio files: complete (all 45 min)
      ├─ transcript: partial (whisper processed 38 min so far)
      │
-     └─ grn continues: reads remaining audio from disk files
+     └─ gappd continues: reads remaining audio from disk files
         feeds to whisper until fully transcribed
         then runs enhance pipeline
 ```
@@ -152,10 +152,10 @@ No audio is lost. Whisper just catches up.
 ### Re-process a past session
 
 ```
-$ grn retranscribe 42              # re-run whisper on meeting #42
-$ grn retranscribe 42 --model large-v3  # use a better model
-$ grn enhance 42                   # re-run LLM stages only
-$ grn enhance 42 --template 1on1  # different template
+$ gappd retranscribe 42              # re-run whisper on meeting #42
+$ gappd retranscribe 42 --model large-v3  # use a better model
+$ gappd enhance 42                   # re-run LLM stages only
+$ gappd enhance 42 --template 1on1  # different template
 ```
 
 Audio files make everything replayable. Change whisper model,
@@ -186,13 +186,13 @@ Set to `30d` to keep audio for re-transcription with better models.
 Transcripts and notes are kept forever (tiny).
 
 ```
-$ grn cleanup
+$ gappd cleanup
 Deleted 12 sessions older than 30 days.
 Freed 2.8 GB.
 Transcripts and notes preserved.
 ```
 
-Cleanup runs automatically on `grn listen` startup (non-blocking).
+Cleanup runs automatically on `gappd listen` startup (non-blocking).
 
 ## What This Changes
 
@@ -204,5 +204,5 @@ Previous plan → revised:
 | Audio on disk | Opt-in (`retain = true`) | **Always** — append-only raw files |
 | Crash recovery | "detect orphaned rows" (vague) | Concrete: scan sessions dir, offer re-transcribe |
 | Whisper behind | Audio lost if buffer overflows | Catches up from disk after meeting |
-| Re-processing | Not possible | `grn retranscribe` / `grn enhance` |
+| Re-processing | Not possible | `gappd retranscribe` / `gappd enhance` |
 | Storage cost | ~0 | ~230 MB/hr, auto-cleanup after 30d |

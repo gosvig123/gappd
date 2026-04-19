@@ -1,6 +1,6 @@
-# agent.md — grn
+# agent.md — gappd
 
-## What is grn?
+## What is gappd?
 
 Meeting intelligence from the terminal. Record meeting audio, transcribe locally,
 store transcripts in SQLite, and run Ollama-based summarisation/extraction.
@@ -12,7 +12,7 @@ store transcripts in SQLite, and run Ollama-based summarisation/extraction.
 | Language | Go 1.25 |
 | CLI | `spf13/cobra` |
 | Database | SQLite via `modernc.org/sqlite` (pure Go), WAL mode, FTS5 for search |
-| Config | TOML (`~/.grn/config.toml`), parsed with `BurntSushi/toml` |
+| Config | TOML (`~/.gappd/config.toml`), parsed with `BurntSushi/toml` |
 | AI | Ollama (local LLM inference), pipeline-based prompts |
 | Transcription | Local whisper binary (`whisper-local`) |
 | Audio capture | macOS ScreenCaptureKit helper (Swift, `capture-helper/`) |
@@ -21,7 +21,7 @@ store transcripts in SQLite, and run Ollama-based summarisation/extraction.
 ## Project layout
 
 ```
-cmd/grn/           CLI entry point & command definitions
+cmd/gappd/           CLI entry point & command definitions
   main.go          root command, setup, search, actions, ci sub-commands
   commands.go      enhance, meetings, show, summarize commands
   listen.go        listen (record) & devices commands
@@ -54,21 +54,21 @@ docs/              Design docs (architecture, capture, inference, resilience)
 ## Key commands
 
 ```
-grn setup              Interactive first-run configuration
-grn listen             Record & transcribe a meeting (mic/system/both)
-grn devices            List audio devices
-grn meetings           List stored meetings
-grn show <id>          Display a meeting transcript + summary
-grn search <query>     FTS5 full-text search over meetings
-grn enhance <id>       Run AI extraction pipeline on a transcript
-grn summarize <id>     Generate an AI summary
-grn actions            Action item management
-grn ci                 CI check stubs
+gappd setup              Interactive first-run configuration
+gappd listen             Record & transcribe a meeting (mic/system/both)
+gappd devices            List audio devices
+gappd meetings           List stored meetings
+gappd show <id>          Display a meeting transcript + summary
+gappd search <query>     FTS5 full-text search over meetings
+gappd enhance <id>       Run AI extraction pipeline on a transcript
+gappd summarize <id>     Generate an AI summary
+gappd actions            Action item management
+gappd ci                 CI check stubs
 ```
 
 ## Database
 
-- Default path: `~/.grn/db.sqlite`
+- Default path: `~/.gappd/db.sqlite`
 - Schema in `internal/db/schema.sql`
 - Tables: `meetings`, `segments`, `action_items`, `participants`, `ci_checks`, `templates`, `migrations`
 - FTS5 virtual table `meetings_fts` on `title, transcript, summary` with insert/update/delete triggers
@@ -77,12 +77,18 @@ grn ci                 CI check stubs
 ## Build & test
 
 ```bash
-make build          # → ./build/grn
-make install        # → /usr/local/bin/grn
+make build          # → ./build/gappd
+make install        # → /usr/local/bin/gappd
 make dev            # watchexec live reload
 make db-reset       # drop + recreate local DB
 go test ./...       # run all tests
 ```
+
+## Contributor workflow note
+
+- `pnpm dev` at the repo root is only a convenience shim into `desktop` dev.
+- Do not treat this repo as a pnpm workspace.
+- `desktop` dependency installation and packaging/release commands remain npm-based.
 
 ## Conventions
 

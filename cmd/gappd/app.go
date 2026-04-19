@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/grn-dev/grn/internal/capture"
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/capture"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
 
