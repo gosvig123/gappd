@@ -5,7 +5,7 @@ import path from 'node:path'
 import { app } from 'electron'
 import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem, MeetingStatus } from '../shared/contracts'
 import { getRecordingState, setRecordingState, type RecordingState } from './state'
-import { getManagedWhisperPaths } from './whisper'
+import { getValidatedManagedWhisperPaths } from './whisper'
 
 export type CaptureStatus = 'recording' | 'captured' | 'failed'
 export type ProcessingStatus = 'not_started' | 'processing' | 'completed' | 'failed'
@@ -98,10 +98,10 @@ export async function saveManagedLocalAIConfig(input: {
   return result.ai
 }
 
-export function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): void {
+export async function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
 
-  const whisper = getManagedWhisperPaths()
+  const whisper = await getValidatedManagedWhisperPaths()
   const args = ['app', 'record', 'start', '--title', input.title, '--device', String(input.device), '--mode', input.mode, '--model', whisper.modelPath]
 
   let stderr = ''

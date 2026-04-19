@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { createReadStream, createWriteStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, createWriteStream } from 'node:fs'
 import { access, mkdir, rename, rm, stat } from 'node:fs/promises'
 import { once } from 'node:events'
 import path from 'node:path'
@@ -30,11 +30,11 @@ export function resolveManagedWhisperModelPath(): string {
   return path.join(app.getPath('userData'), MANAGED_WHISPER_MODELS_DIRNAME, MANAGED_WHISPER_MODEL)
 }
 
-export function getManagedWhisperPaths(): { binaryPath: string; modelPath: string } {
+export async function getValidatedManagedWhisperPaths(): Promise<{ binaryPath: string; modelPath: string }> {
   const binaryPath = resolveBundledWhisperBinary()
+  if (!(await bundledWhisperAvailable())) throw new Error(missingBundledWhisperMessage(binaryPath))
   const modelPath = resolveManagedWhisperModelPath()
-  if (!isExecutableFileSync(binaryPath)) throw new Error(missingBundledWhisperMessage(binaryPath))
-  if (!existsSync(modelPath)) throw new Error(`Managed Whisper model missing at ${modelPath}. Run Local AI setup before starting a recording.`)
+  if (!(await managedWhisperModelAvailable())) throw new Error(missingManagedWhisperModelMessage())
   return { binaryPath, modelPath }
 }
 
@@ -109,18 +109,13 @@ export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperB
     : `Bundled Whisper binary missing at ${binaryPath}. Run \`npm run prepare:whisper\` before launching the desktop app.`
 }
 
+export function missingManagedWhisperModelMessage(): string {
+  return 'Bundled speech model is missing. Run setup to download it again.'
+}
+
 async function isExecutableFile(filePath: string): Promise<boolean> {
   try {
     const info = await stat(filePath)
-    return info.isFile() && (info.mode & 0o111) !== 0
-  } catch {
-    return false
-  }
-}
-
-function isExecutableFileSync(filePath: string): boolean {
-  try {
-    const info = statSync(filePath)
     return info.isFile() && (info.mode & 0o111) !== 0
   } catch {
     return false
