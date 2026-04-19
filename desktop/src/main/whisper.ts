@@ -105,7 +105,7 @@ function downloadProgress(total: number, written: number): WhisperProgressUpdate
 
 export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperBinary()): string {
   return app.isPackaged
-    ? 'Bundled Whisper runtime files are missing from this app. Reinstall Granola. If the problem continues, the app bundle may be corrupted.'
+    ? 'Bundled Whisper runtime files are missing from this app. Reinstall Gappd. If the problem continues, the app bundle may be corrupted.'
     : `Bundled Whisper binary missing at ${binaryPath}. Run \`npm run prepare:whisper\` before launching the desktop app.`
 }
 

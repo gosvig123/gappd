@@ -24,9 +24,9 @@
 .setup-callout,
 .setup-rail .metric-card,
 .status-note {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--shell-border);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--shell-surface-soft);
 }
 
 .setup-card,
@@ -45,7 +45,7 @@
   font-size: 14px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #bfdbfe;
+  color: var(--shell-accent-text);
 }
 
 .setup-callout h2,
@@ -89,8 +89,8 @@
 .metric-card {
   padding: 14px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--shell-surface-soft);
+  border: 1px solid var(--shell-border);
 }
 
 .metric-card .label {
@@ -116,7 +116,7 @@
 }
 
 .progress-copy {
-  color: #cbd5e1;
+  color: var(--shell-text-soft);
 }
 
 .progress-track {
@@ -124,7 +124,7 @@
   height: 10px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--shell-border);
 }
 
 .progress-track.indeterminate {
@@ -134,19 +134,19 @@
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #2563eb, #60a5fa);
+  background: linear-gradient(90deg, var(--shell-accent-start), var(--shell-accent-end));
   transition: width 160ms ease;
 }
 
 .progress-fill.indeterminate {
   width: 32%;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2), #60a5fa, rgba(191, 219, 254, 0.72));
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2), var(--shell-accent-end), rgba(191, 219, 254, 0.72));
   animation: setup-progress-indeterminate 1.4s ease-in-out infinite;
 }
 
 .action-copy,
 .status-note {
-  color: #cbd5e1;
+  color: var(--shell-text-soft);
 }
 
 .action-copy {
@@ -156,7 +156,7 @@
 
 .settings-stack ul {
   padding-left: 18px;
-  color: #cbd5e1;
+  color: var(--shell-text-soft);
 }
 
 .setup-progress-detail,
@@ -172,13 +172,13 @@
 
 .technical-details {
   margin-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--shell-border);
   padding-top: 8px;
 }
 
 .technical-details summary {
   cursor: pointer;
-  color: #cbd5e1;
+  color: var(--shell-text-soft);
   font-size: 13px;
 }
 
@@ -186,7 +186,7 @@
   margin: 8px 0 0;
   white-space: pre-wrap;
   word-break: break-word;
-  color: #fecaca;
+  color: var(--shell-danger-text);
   font: inherit;
 }
 

@@ -34,6 +34,20 @@ export function processingStatusLabel(state: MeetingStatus['processing']['state'
   }
 }
 
+export function meetingStatusTone(state: MeetingStatus['state']): 'recording' | 'processing' | 'idle' | 'error' {
+  switch (state) {
+    case 'recording':
+      return 'recording'
+    case 'processing':
+      return 'processing'
+    case 'failed':
+      return 'error'
+    case 'captured':
+    case 'completed':
+      return 'idle'
+  }
+}
+
 export function artifactLabel(ready: boolean, present: string, missing: string): string {
   return ready ? present : missing
 }
