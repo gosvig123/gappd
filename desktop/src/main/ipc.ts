@@ -19,8 +19,8 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     })
     ipcMain.handle('meetings:list', () => listMeetings())
     ipcMain.handle('meetings:show', (_event, id: string) => showMeeting(id))
-    ipcMain.handle('recording:start', (_event, input) => {
-      startRecording(input)
+    ipcMain.handle('recording:start', async (_event, input) => {
+      await startRecording(input)
       return getRecordingState()
     })
     ipcMain.handle('recording:stop', () => {
