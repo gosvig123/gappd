@@ -1,11 +1,11 @@
-# grn Architecture
+# gappd Architecture
 
 ## Directory Structure
 
 ```
-grn/
+gappd/
 ├── cmd/
-│   └── grn/              # CLI entrypoint, cobra commands
+│   └── gappd/              # CLI entrypoint, cobra commands
 ├── internal/
 │   ├── db/               # SQLite schema, migrations, queries
 │   ├── capture/          # System audio capture (macOS)
@@ -44,7 +44,7 @@ grn/
 
 ## Component Responsibilities
 
-### `cmd/grn`
+### `cmd/gappd`
 Entry point. Cobra root command with subcommands: `record`, `list`, `show`,
 `actions`, `ci`, `config`, `export`. Parses flags, loads config, delegates.
 
@@ -77,7 +77,7 @@ Bubbletea app with screen-based navigation. Shared layout with header,
 content area, status bar. Each screen is a `tea.Model`.
 
 ### `internal/config`
-Loads `~/.grn/config.toml`, merges with defaults and env vars.
+Loads `~/.gappd/config.toml`, merges with defaults and env vars.
 Validates required fields. Exposes typed `Config` struct.
 
 ## CI Pipeline Design
@@ -158,7 +158,7 @@ Global: `?` help, `q` back/quit, `tab` cycle focus, `:` command mode.
 
 ## Configuration
 
-`~/.grn/config.toml`:
+`~/.gappd/config.toml`:
 
 ```toml
 [audio]
@@ -196,4 +196,4 @@ api_token = ""
 slack_webhook = ""
 ```
 
-Env var override pattern: `GRN_AI_API_KEY` overrides `ai.api_key`.
+Env var override pattern: `GAPPD_AI_API_KEY` overrides `ai.api_key`.

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grn-dev/grn/internal/ai"
-	"github.com/grn-dev/grn/internal/capture"
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/capture"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -183,9 +183,9 @@ func failMeetingCapture(store *db.DB, meeting *db.Meeting, captureErr error, emi
 func createSessionDir(title string) (string, error) {
 	ts := time.Now().Format("2006-01-02T1504")
 	dirName := fmt.Sprintf("%s-%s", ts, sanitize(title))
-	baseDir, err := grnDir()
+	baseDir, err := gappdDir()
 	if err != nil {
-		return "", fmt.Errorf("resolve grn dir for session path: %w", err)
+		return "", fmt.Errorf("resolve gappd dir for session path: %w", err)
 	}
 	dir := filepath.Join(baseDir, "sessions", dirName)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

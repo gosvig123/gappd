@@ -6,7 +6,7 @@ declare global {
   type MeetingStatus = SharedMeetingStatus
 
   interface Window {
-    grn: {
+    gappd: {
       system: {
         getDevices(): Promise<Device[]>
         requestCapturePermissions(): Promise<{ microphone: string; screen: string }>

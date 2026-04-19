@@ -46,7 +46,7 @@ func TestFindWhisperBinaryUsesEnvOverride(t *testing.T) {
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	t.Setenv("GRN_WHISPER_BIN", bin)
+	t.Setenv("GAPPD_WHISPER_BIN", bin)
 	t.Setenv("PATH", "")
 
 	got, err := findWhisperBinary()
@@ -59,7 +59,7 @@ func TestFindWhisperBinaryUsesEnvOverride(t *testing.T) {
 }
 
 func TestFindWhisperBinaryRejectsInvalidEnvOverride(t *testing.T) {
-	t.Setenv("GRN_WHISPER_BIN", filepath.Join(t.TempDir(), "missing-whisper"))
+	t.Setenv("GAPPD_WHISPER_BIN", filepath.Join(t.TempDir(), "missing-whisper"))
 	t.Setenv("PATH", "")
 
 	_, err := findWhisperBinary()
@@ -76,7 +76,7 @@ func TestFindWhisperBinaryRejectsNonExecutableEnvOverride(t *testing.T) {
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	t.Setenv("GRN_WHISPER_BIN", bin)
+	t.Setenv("GAPPD_WHISPER_BIN", bin)
 	t.Setenv("PATH", "")
 
 	_, err := findWhisperBinary()
@@ -94,7 +94,7 @@ func TestFindWhisperBinaryFallsBackToPath(t *testing.T) {
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
-	t.Setenv("GRN_WHISPER_BIN", "")
+	t.Setenv("GAPPD_WHISPER_BIN", "")
 	t.Setenv("PATH", dir)
 
 	got, err := findWhisperBinary()

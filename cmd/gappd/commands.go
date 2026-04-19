@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grn-dev/grn/internal/ai"
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -106,7 +106,7 @@ func listMeetings(store *db.DB) error {
 		return err
 	}
 	if len(meetings) == 0 {
-		fmt.Println("No meetings yet. Run `grn listen` to record one.")
+		fmt.Println("No meetings yet. Run `gappd listen` to record one.")
 		return nil
 	}
 	for _, m := range meetings {
@@ -169,7 +169,7 @@ func showMeeting(store *db.DB, id string) error {
 		fmt.Println("── Notes ───────────────────────────")
 		fmt.Println(*meeting.Summary)
 	} else {
-		fmt.Println("\nNo notes yet. Run `grn enhance " + id + "`")
+		fmt.Println("\nNo notes yet. Run `gappd enhance " + id + "`")
 	}
 	return nil
 }

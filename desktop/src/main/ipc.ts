@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
-import { getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './grn'
+import { getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
 import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
 import { getRecordingState, onRecordingStateChange } from './state'
 

@@ -1,6 +1,6 @@
 import { buildOwnershipHelp, type LocalAIOwnershipHelp } from './local-ai-ownership'
 
-type LocalAIContract = Pick<typeof window.grn, 'onboarding' | 'settings'>
+type LocalAIContract = Pick<typeof window.gappd, 'onboarding' | 'settings'>
 
 export type OnboardingStatus = Awaited<ReturnType<LocalAIContract['onboarding']['getStatus']>>
 export type LocalAIStatus = Awaited<ReturnType<LocalAIContract['settings']['getLocalAIStatus']>>
@@ -51,7 +51,7 @@ const GENERIC_PHASE_MESSAGES: Record<OnboardingStatus['phase'], string[]> = {
 const STATUS_DELIMITERS = [' -- ', ' - ', ' | ', ': ']
 
 export function getLocalAIContract(): LocalAIContract {
-  return window.grn
+  return window.gappd
 }
 
 export function onboardingPhaseLabel(phase: OnboardingStatus['phase']): string {

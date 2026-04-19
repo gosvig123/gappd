@@ -12,7 +12,7 @@ node_modules/
 # Go
 vendor/
 
-# grn runtime data (never commit user data)
+# gappd runtime data (never commit user data)
 *.sqlite
 *.sqlite-journal
 *.sqlite-wal
@@ -34,7 +34,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
-/grn
+/gappd
 # Desktop Ollama artifacts
 desktop/.cache/ollama/
 desktop/resources/ollama/ollama

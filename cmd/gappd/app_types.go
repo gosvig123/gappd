@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 type appConfigResponse struct {

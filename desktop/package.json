@@ -1,9 +1,9 @@
 {
-  "name": "grn-desktop",
+  "name": "gappd-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Desktop app for grn",
-  "author": "grn",
+  "description": "Desktop app for gappd",
+  "author": "gappd",
   "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "npm run prepare:ollama && npm run prepare:whisper && npm run native:prepare -- dev && concurrently -k \"vite\" \"tsup --config tsup.config.ts --watch\" \"wait-on tcp:5173 dist-electron/main/main.js && VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .\"",
@@ -15,7 +15,7 @@
     "prepare:whisper": "node ./scripts/prepare-whisper-bundle.mjs",
     "dist": "npm run prepare:ollama && npm run prepare:whisper && npm run build && electron-builder --config electron-builder.config.cjs",
     "dist:dir": "npm run prepare:ollama && npm run prepare:whisper && npm run build && electron-builder --config electron-builder.config.cjs --mac dir",
-    "install:mac": "rm -rf /Applications/Grn.app && ditto release/mac-arm64/Grn.app /Applications/Grn.app && echo 'Installed to /Applications/Grn.app'",
+    "install:mac": "rm -rf /Applications/Gappd.app && ditto release/mac-arm64/Gappd.app /Applications/Gappd.app && echo 'Installed to /Applications/Gappd.app'",
     "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {

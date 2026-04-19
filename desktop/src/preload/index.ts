@@ -38,10 +38,10 @@ const api = {
   },
 }
 
-contextBridge.exposeInMainWorld('grn', api)
+contextBridge.exposeInMainWorld('gappd', api)
 
 declare global {
   interface Window {
-    grn: typeof api
+    gappd: typeof api
   }
 }

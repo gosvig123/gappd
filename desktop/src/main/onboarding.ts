@@ -1,6 +1,6 @@
 import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, type OnboardingStatus } from '../shared/contracts'
 import { MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_MODEL } from '../shared/bundled-ollama'
-import { getLocalAIConfig, saveManagedLocalAIConfig } from './grn'
+import { getLocalAIConfig, saveManagedLocalAIConfig } from './gappd'
 import { toOnboardingErrorState } from './onboarding-error-state'
 import {
   ensureManagedOllamaRunning,

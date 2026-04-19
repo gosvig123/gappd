@@ -1,4 +1,4 @@
-module github.com/grn-dev/grn
+module github.com/gappd-dev/gappd
 
 go 1.25.0
 

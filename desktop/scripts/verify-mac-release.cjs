@@ -16,7 +16,7 @@ async function main() {
   const targets = await verifyRequiredNestedCode(appPath)
   verifyCodeSignature(appPath)
   for (const target of targets) verifyCodeSignature(target.path)
-  if (process.env.GRN_REQUIRE_GATEKEEPER === '1') assessGatekeeper(appPath)
+  if (process.env.GAPPD_REQUIRE_GATEKEEPER === '1') assessGatekeeper(appPath)
   if (shouldNotarize()) validateStaple(appPath)
   console.log(`Verified macOS release at ${appPath}`)
 }

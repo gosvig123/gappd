@@ -10,9 +10,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/grn-dev/grn/internal/capture"
-	"github.com/grn-dev/grn/internal/db"
-	"github.com/grn-dev/grn/internal/transcribe"
+	"github.com/gappd-dev/gappd/internal/capture"
+	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 func sanitize(s string) string {
@@ -31,9 +31,9 @@ func sanitize(s string) string {
 }
 
 func defaultModelPath() (string, error) {
-	dir, err := grnDir()
+	dir, err := gappdDir()
 	if err != nil {
-		return "", fmt.Errorf("resolve grn dir for model path: %w", err)
+		return "", fmt.Errorf("resolve gappd dir for model path: %w", err)
 	}
 	return filepath.Join(dir, "models", "ggml-base.en.bin"), nil
 }
@@ -63,7 +63,7 @@ func transcribeAs(ctx context.Context, audioPath, modelPath, speaker string) ([]
 func whisperModelNotFoundError(modelPath string) error {
 	defaultPath, err := defaultModelPath()
 	if err == nil && modelPath == defaultPath {
-		return fmt.Errorf("whisper model not found at %s (run: grn setup or pass --model)", modelPath)
+		return fmt.Errorf("whisper model not found at %s (run: gappd setup or pass --model)", modelPath)
 	}
 	return fmt.Errorf("whisper model not found at %s", modelPath)
 }

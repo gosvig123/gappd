@@ -24,7 +24,7 @@ type Config struct {
 }
 
 func defaults() (Config, error) {
-	dir, err := grnDir()
+	dir, err := gappdDir()
 	if err != nil {
 		return Config{}, err
 	}
@@ -174,16 +174,16 @@ func normalizeDBPath(path string) (string, error) {
 	return filepath.Clean(path), nil
 }
 
-func grnDir() (string, error) {
+func gappdDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
-	return filepath.Join(home, ".grn"), nil
+	return filepath.Join(home, ".gappd"), nil
 }
 
 func configPath() (string, error) {
-	dir, err := grnDir()
+	dir, err := gappdDir()
 	if err != nil {
 		return "", err
 	}

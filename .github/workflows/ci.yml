@@ -26,4 +26,4 @@ jobs:
       - name: Build CLI
         run: |
           mkdir -p ./build
-          go build -o ./build/grn ./cmd/grn
+          go build -o ./build/gappd ./cmd/gappd

@@ -8,7 +8,7 @@ import (
 )
 
 func TestInitWaitsForLockedLegacyDB(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "grn.db")
+	dbPath := filepath.Join(t.TempDir(), "gappd.db")
 	seedLegacyMeetingsDB(t, dbPath)
 
 	locker := openFileDB(t, dbPath)

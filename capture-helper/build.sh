@@ -3,9 +3,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
-APP_DIR="${BUILD_DIR}/GrnCapture.app/Contents"
+APP_DIR="${BUILD_DIR}/GappdCapture.app/Contents"
 
-rm -rf "${BUILD_DIR}/GrnCapture.app"
+rm -rf "${BUILD_DIR}/GappdCapture.app"
 mkdir -p "${APP_DIR}/MacOS"
 cp "${SCRIPT_DIR}/Info.plist" "${APP_DIR}/Info.plist"
 
@@ -16,9 +16,9 @@ swiftc \
     -framework CoreMedia \
     -framework CoreAudio \
     "${SCRIPT_DIR}/main.swift" \
-    -o "${APP_DIR}/MacOS/grn-capture"
+    -o "${APP_DIR}/MacOS/gappd-capture"
 
-codesign --force --sign - --deep "${BUILD_DIR}/GrnCapture.app"
+codesign --force --sign - --deep "${BUILD_DIR}/GappdCapture.app"
 
-echo "Built: ${BUILD_DIR}/GrnCapture.app"
-echo "Run:   ${APP_DIR}/MacOS/grn-capture --help"
+echo "Built: ${BUILD_DIR}/GappdCapture.app"
+echo "Run:   ${APP_DIR}/MacOS/gappd-capture --help"

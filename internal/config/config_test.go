@@ -16,7 +16,7 @@ func TestLoadReturnsDefaultsWhenConfigMissing(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	wantDBPath := filepath.Join(home, ".grn", "db.sqlite")
+	wantDBPath := filepath.Join(home, ".gappd", "db.sqlite")
 	if cfg.DBPath != wantDBPath {
 		t.Fatalf("cfg.DBPath = %q, want %q", cfg.DBPath, wantDBPath)
 	}
@@ -29,7 +29,7 @@ func TestLoadRejectsUnknownKeys(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	configDir := filepath.Join(home, ".grn")
+	configDir := filepath.Join(home, ".gappd")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
@@ -54,12 +54,12 @@ func TestLoadExpandsTildeDBPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	configDir := filepath.Join(home, ".grn")
+	configDir := filepath.Join(home, ".gappd")
 	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll returned error: %v", err)
 	}
 	path := filepath.Join(configDir, "config.toml")
-	if err := os.WriteFile(path, []byte("db_path = \"~/.grn/custom.sqlite\"\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("db_path = \"~/.gappd/custom.sqlite\"\n"), 0o644); err != nil {
 		t.Fatalf("WriteFile returned error: %v", err)
 	}
 
@@ -68,7 +68,7 @@ func TestLoadExpandsTildeDBPath(t *testing.T) {
 		t.Fatalf("Load returned error: %v", err)
 	}
 
-	want := filepath.Join(home, ".grn", "custom.sqlite")
+	want := filepath.Join(home, ".gappd", "custom.sqlite")
 	if cfg.DBPath != want {
 		t.Fatalf("cfg.DBPath = %q, want %q", cfg.DBPath, want)
 	}

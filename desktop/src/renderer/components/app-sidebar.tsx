@@ -1,6 +1,6 @@
 import { onboardingErrorView, onboardingMessageView, onboardingPhaseLabel, onboardingStatusTone, type OnboardingStatus } from './local-ai-contract'
 
-type RecordingState = Awaited<ReturnType<typeof window.grn.recording.getStatus>>
+type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus>>
 type View = 'record' | 'meetings' | 'settings'
 
 type AppSidebarProps = {
@@ -28,7 +28,7 @@ export function AppSidebar({ onboarding, recording, view, onViewChange }: AppSid
   return (
     <aside className="sidebar">
       <div>
-        <div className="brand">Grn</div>
+        <div className="brand">Gappd</div>
         <div className="subtitle">Desktop meeting recorder</div>
       </div>
 

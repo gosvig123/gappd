@@ -5,7 +5,7 @@ import { app } from 'electron'
 import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus } from '../shared/contracts'
 import { BUNDLED_OLLAMA_BINARY_NAME, BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME, BUNDLED_OLLAMA_RELEASE, MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_HOST_VALUE, MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODELS_DIRNAME, MANAGED_OLLAMA_PORT } from '../shared/bundled-ollama'
 import { lastLines } from '../shared/subprocess-output'
-import { childEnv } from './grn'
+import { childEnv } from './gappd'
 import { type OnboardingErrorState, toOnboardingErrorState } from './onboarding-error-state'
 import { pullModelFromOllamaApi, type PullProgressUpdate } from './ollama-pull'
 

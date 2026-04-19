@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/grn-dev/grn/internal/ai"
-	"github.com/grn-dev/grn/internal/config"
-	"github.com/grn-dev/grn/internal/db"
+	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/config"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -22,7 +22,7 @@ func main() {
 
 func rootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:   "grn",
+		Use:   "gappd",
 		Short: "Terminal-based meeting intelligence",
 	}
 	root.AddCommand(
@@ -74,12 +74,12 @@ func openDB(cfg config.Config) (*db.DB, error) {
 	return store, nil
 }
 
-func grnDir() (string, error) {
+func gappdDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
-	return filepath.Join(home, ".grn"), nil
+	return filepath.Join(home, ".gappd"), nil
 }
 
 func cmdContext() context.Context {
@@ -95,7 +95,7 @@ func writeJSON(v any) error {
 func setupCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "setup",
-		Short: "Check dependencies and initialize grn",
+		Short: "Check dependencies and initialize gappd",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load()
 			if err != nil {
@@ -122,7 +122,7 @@ func setupCmd() *cobra.Command {
 			}
 			store.Close()
 			fmt.Println("✓", cfg.DBPath)
-			fmt.Println("\nReady. Run `grn listen` to start.")
+			fmt.Println("\nReady. Run `gappd listen` to start.")
 			return nil
 		},
 	}

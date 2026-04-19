@@ -31,7 +31,7 @@ Key design decisions Granola makes:
 5. **Post-meeting enhancement**: LLM merges rough user notes + transcript
 6. Uses **CoreAudio Process Taps** (macOS 14.2+) for system audio capture
 
-## How grn Should Do It
+## How gappd Should Do It
 
 ### Design Principles
 
@@ -176,7 +176,7 @@ type Transcriber interface {
 
 ### Phase 3: Enhancement
 
-Happens after meeting ends (or on-demand via `grn summarize`):
+Happens after meeting ends (or on-demand via `gappd summarize`):
 
 ```go
 type EnhanceInput struct {
@@ -200,11 +200,11 @@ Returns structured output parsed into `EnhanceOutput`.
 ### Session Lifecycle
 
 ```
-User runs: grn listen [--app zoom]
+User runs: gappd listen [--app zoom]
 
 1. INIT
    ├─ Detect OS + available backends
-   ├─ Load config (~/.grn/config.toml)
+   ├─ Load config (~/.gappd/config.toml)
    ├─ Open SQLite, create meeting row (status: "recording")
    └─ Show TUI recording screen (elapsed time, audio levels)
 
@@ -221,7 +221,7 @@ User runs: grn listen [--app zoom]
    ├─ Cleanup OS resources (unload PA modules, stop SCK stream)
    ├─ Flush remaining audio to transcriber
    ├─ Update meeting row (status: "processing", ended_at)
-   └─ If audio retention enabled: save WAV to ~/.grn/audio/
+   └─ If audio retention enabled: save WAV to ~/.gappd/audio/
 
 4. ENHANCE (automatic post-meeting)
    ├─ Collect full transcript from DB
@@ -284,7 +284,7 @@ lower resource usage. But it requires knowing which app to target.
 | Transcription API down | Buffer audio, retry, fall back to local Whisper |
 | Whisper OOM | Drop to smaller model automatically |
 | Meeting app quits mid-capture | Detect silence > 30s, prompt to stop |
-| grn crashes during capture | On next launch, recover in-progress meeting from DB |
+| gappd crashes during capture | On next launch, recover in-progress meeting from DB |
 | Disk full | Warn when < 500MB free, stop audio retention |
 
 ### Privacy & Storage
