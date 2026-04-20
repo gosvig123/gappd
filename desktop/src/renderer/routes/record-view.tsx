@@ -4,6 +4,7 @@ type RecordViewProps = {
   title: string
   device: number
   devices: Device[]
+  recordingStatus: string
   canStart: boolean
   canStop: boolean
   onTitleChange: (value: string) => void
@@ -19,52 +20,53 @@ function recordStatus(canStart: boolean, canStop: boolean, devices: Device[]): {
   return { tone: 'processing', title: 'Recorder busy', detail: 'Finish the current handoff before starting another session.' }
 }
 
-function RecordHeader({ tone, title, detail }: { tone: string; title: string; detail: string }) {
-  return (
-    <>
-      <div className="record-hero"><div className="record-hero-copy"><div className="record-kicker">Capture</div><div><h1>Record</h1><p>Start and stop meeting recording using the existing gappd backend.</p></div></div><div className={`status-pill ${tone}`}>{title}</div></div>
-      <div className="record-callout"><p>{detail}</p></div>
-    </>
-  )
-}
-
 function RecordFields({ title, device, devices, onTitleChange, onDeviceChange }: Pick<RecordViewProps, 'title' | 'device' | 'devices' | 'onTitleChange' | 'onDeviceChange'>) {
   return (
-    <div className="form-grid">
-      <label><span>Title</span><input value={title} onChange={(e) => onTitleChange(e.target.value)} placeholder="Sprint planning" /></label>
-      <label><span>Device</span><select value={device} onChange={(e) => onDeviceChange(Number(e.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>[{item.index}] {item.name}</option>)}</select></label>
+    <div className="record-fields">
+      <label><span>Meeting title</span><input value={title} onChange={(e) => onTitleChange(e.target.value)} placeholder="Sprint planning" /></label>
+      <label><span>Audio input</span><select value={device} onChange={(e) => onDeviceChange(Number(e.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>[{item.index}] {item.name}</option>)}</select></label>
     </div>
   )
 }
 
-function RecordRail({ title, selectedDevice, devices }: { title: string; selectedDevice: Device | undefined; devices: Device[] }) {
+function RecordSummary({ title, selectedDevice, devices }: { title: string; selectedDevice: Device | undefined; devices: Device[] }) {
   return (
-    <aside className="record-rail">
-      <div className="record-rail-card"><div className="meeting-section-label">Session snapshot</div><div className="record-stats"><div className="record-stat"><span>Input</span><strong>{selectedDevice ? selectedDevice.name : 'No device selected'}</strong></div><div className="record-stat"><span>Fallback title</span><strong>{title.trim() || 'Current date and time'}</strong></div><div className="record-stat"><span>Devices available</span><strong>{devices.length}</strong></div></div></div>
-      <div className="record-rail-card"><div className="meeting-section-label">Before you start</div><ul className="record-checklist"><li>Choose the correct system capture device.</li><li>Leave the title blank to use the current timestamp.</li><li>Stop once the meeting ends so processing can finish.</li></ul></div>
-    </aside>
+    <div className="record-summary">
+      <div className="record-stat"><span>Input</span><strong>{selectedDevice ? selectedDevice.name : 'No device selected'}</strong></div>
+      <div className="record-stat"><span>Fallback title</span><strong>{title.trim() || 'Current date and time'}</strong></div>
+      <div className="record-stat"><span>Devices</span><strong>{devices.length}</strong></div>
+    </div>
   )
 }
 
-export function RecordView({ title, device, devices, canStart, canStop, onTitleChange, onDeviceChange, onStart, onStop }: RecordViewProps) {
+export function RecordView({ title, device, devices, recordingStatus, canStart, canStop, onTitleChange, onDeviceChange, onStart, onStop }: RecordViewProps) {
   const status = recordStatus(canStart, canStop, devices)
   const selectedDevice = devices.find((item) => item.index === device)
   return (
     <section className="panel panel-large">
-      <div className="record-shell">
-        <div className="record-form">
-          <RecordHeader tone={status.tone} title={status.title} detail={status.detail} />
-          <RecordFields title={title} device={device} devices={devices} onTitleChange={onTitleChange} onDeviceChange={onDeviceChange} />
-          <div className="actions-row">
-            <button className="primary" onClick={onStart} disabled={!canStart}>
-              Start recording
-            </button>
-            <button className="secondary" onClick={onStop} disabled={!canStop}>
-              Stop recording
-            </button>
-          </div>
+      <div className="panel-header">
+        <div>
+          <h1>Record</h1>
+          <p>Start and stop meeting capture with the current local setup.</p>
         </div>
-        <RecordRail title={title} selectedDevice={selectedDevice} devices={devices} />
+        <div className={`status-pill ${status.tone}`}>{status.title}</div>
+      </div>
+      <div className="record-stack">
+        <p className="record-intro">{status.detail}</p>
+        <RecordFields title={title} device={device} devices={devices} onTitleChange={onTitleChange} onDeviceChange={onDeviceChange} />
+        <div className="actions-row">
+          <button className="primary" onClick={onStart} disabled={!canStart}>
+            Start recording
+          </button>
+          <button className="secondary" onClick={onStop} disabled={!canStop}>
+            Stop recording
+          </button>
+        </div>
+        <div className="record-state-line">
+          <span className="label">Status</span>
+          <strong>{recordingStatus}</strong>
+        </div>
+        <RecordSummary title={title} selectedDevice={selectedDevice} devices={devices} />
       </div>
     </section>
   )

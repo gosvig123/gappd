@@ -242,12 +242,12 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <AppSidebar onboarding={onboarding} recording={recording} view={view} onViewChange={setView} />
+      <AppSidebar onboarding={onboarding} view={view} onViewChange={setView} />
       <main className="main-grid">
         {onboarding.phase !== 'ready' ? (
           <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} />
         ) : view === 'record' ? (
-          <RecordView title={title} device={device} devices={devices} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
+          <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
         ) : view === 'meetings' ? (
           <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} />
         ) : (
