@@ -20,14 +20,13 @@ function dateLabel(value: string): string {
 
 function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem; selected: boolean; onSelect: (id: string) => void }) {
   const statusLabel = meetingStatusLabel(meeting.status.state)
+  const artifactState = meeting.hasSummary || meeting.hasTranscript ? 'Ready' : 'Pending'
   return (
     <button className={selected ? 'meeting-row selected' : 'meeting-row'} onClick={() => onSelect(meeting.id)} aria-pressed={selected}>
       <div className="meeting-row-top"><div className="meeting-row-body"><div className="meeting-title">{meeting.title}</div><div className="meeting-meta">{dateLabel(meeting.startedAt)}</div></div><div className={`status-pill ${meetingStatusTone(meeting.status.state)}`}>{statusLabel}</div></div>
-      <div className="meeting-flags">
-        <span className="meeting-tag">Capture · {meetingStatusLabel(meeting.status.capture.state)}</span>
-        <span className="meeting-tag">AI · {processingStatusLabel(meeting.status.processing.state)}</span>
-        <span className="meeting-tag">{artifactLabel(meeting.hasTranscript, 'Transcript ready', 'No transcript')}</span>
-        <span className="meeting-tag">{artifactLabel(meeting.hasSummary, 'Summary ready', 'No summary')}</span>
+      <div className="meeting-row-summary">
+        <span>{artifactState}</span>
+        <span>{meeting.hasSummary ? 'Summary available' : 'No summary yet'}</span>
       </div>
     </button>
   )
@@ -58,7 +57,7 @@ function MeetingPipeline({ selectedStatus }: { selectedStatus: MeetingDetail['st
 function MeetingsListPanel({ meetings, selectedMeetingId, onRefresh, onSelectMeeting }: Pick<MeetingsViewProps, 'meetings' | 'selectedMeetingId' | 'onRefresh' | 'onSelectMeeting'>) {
   return (
     <section className="panel list-panel">
-      <div className="panel-header compact"><div><h1>Meetings</h1><p>{meetings.length} saved</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div>
+      <div className="panel-header compact"><div><h1>Meetings</h1><p>{meetings.length} saved sessions</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div>
       <div className="meeting-list">{meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === selectedMeetingId} onSelect={onSelectMeeting} />)}{meetings.length === 0 ? <div className="empty-state">No meetings yet.</div> : null}</div>
     </section>
   )
@@ -69,8 +68,10 @@ function MeetingDetailPanel({ selectedMeetingId, selectedMeeting, selectedMeetin
   if (selectedMeetingError) return <section className="panel detail-panel"><div className="detail-surface detail-alert">{selectedMeetingError}</div></section>
   if (!selectedMeetingId || !selectedMeeting) return <section className="panel detail-panel"><div className="empty-state">Select a meeting to view details.</div></section>
   const selectedStatus = selectedMeeting.status
+  const hasTranscript = Boolean(transcript)
+  const hasSummary = Boolean(selectedMeeting.summary)
   return (
-    <section className="panel detail-panel"><div className="panel-header"><div className="meeting-detail-title"><div className="meeting-section-label">Meeting detail</div><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Review the saved output, confirm capture finished cleanly, and inspect AI processing results.</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div><div className="detail-grid"><MeetingDetailMeta selectedMeeting={selectedMeeting} selectedStatus={selectedStatus} />{selectedStatus ? <MeetingPipeline selectedStatus={selectedStatus} /> : null}<MeetingFailureState message={selectedStatus?.capture.failureMessage} /><MeetingFailureState message={selectedStatus?.processing.failureMessage} /><div className="detail-surface detail-block"><div className="meeting-section-label">AI summary</div><pre>{selectedMeeting.summary || 'No AI summary yet.'}</pre></div><div className="detail-surface detail-block"><div className="meeting-section-label">Transcript</div><pre>{transcript || 'No transcript yet.'}</pre></div></div></section>
+    <section className="panel detail-panel"><div className="panel-header"><div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Review the saved output and inspect capture and AI processing details.</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div><div className="detail-grid"><MeetingDetailMeta selectedMeeting={selectedMeeting} selectedStatus={selectedStatus} />{selectedStatus ? <MeetingPipeline selectedStatus={selectedStatus} /> : null}<MeetingFailureState message={selectedStatus?.capture.failureMessage} /><MeetingFailureState message={selectedStatus?.processing.failureMessage} /><div className="detail-surface detail-block"><div className="meeting-section-label">Artifacts</div><div className="meeting-flags"><span className="meeting-tag">{artifactLabel(hasTranscript, 'Transcript ready', 'No transcript')}</span><span className="meeting-tag">{artifactLabel(hasSummary, 'Summary ready', 'No summary')}</span></div></div><div className="detail-surface detail-block"><div className="meeting-section-label">AI summary</div><pre>{selectedMeeting.summary || 'No AI summary yet.'}</pre></div><div className="detail-surface detail-block"><div className="meeting-section-label">Transcript</div><pre>{transcript || 'No transcript yet.'}</pre></div></div></section>
   )
 }
 

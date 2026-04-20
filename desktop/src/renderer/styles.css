@@ -57,7 +57,7 @@ button {
   padding: 24px 18px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
   background: rgba(5, 10, 24, 0.58);
   backdrop-filter: blur(20px);
 }
@@ -74,12 +74,9 @@ button {
 
 .sidebar-header,
 .sidebar-section,
-.sidebar-card-head,
-.sidebar-card-body,
-.record-shell,
-.record-form,
-.record-rail,
-.record-checklist,
+.record-stack,
+.record-fields,
+.record-summary,
 .meeting-row-top,
 .meeting-row-body,
 .detail-meta-grid,
@@ -89,11 +86,9 @@ button {
 
 .sidebar-header,
 .sidebar-section,
-.sidebar-card-body,
-.record-shell,
-.record-form,
-.record-rail,
-.record-checklist,
+.record-stack,
+.record-fields,
+.record-summary,
 .meeting-row-body,
 .detail-surface {
   gap: 12px;
@@ -107,30 +102,12 @@ button {
   gap: 8px;
 }
 
-.sidebar-card-head {
-  grid-template-columns: 1fr auto;
-  align-items: start;
-  gap: 12px;
-}
-
 .sidebar-caption,
-.record-kicker,
 .meeting-section-label {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--shell-accent-text);
-}
-
-.sidebar-summary {
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--shell-text-soft);
-}
-
-.sidebar-meta {
-  display: grid;
-  gap: 6px;
 }
 
 .sidebar-nav-label {
@@ -183,17 +160,11 @@ button {
   cursor: default;
 }
 
-.status-card, .panel {
+.panel {
   border: 1px solid var(--shell-border);
   background: var(--shell-surface);
   border-radius: 20px;
   box-shadow: 0 18px 36px rgba(2, 6, 23, 0.2);
-}
-
-.status-card {
-  padding: 16px 15px;
-  display: grid;
-  gap: 12px;
 }
 
 .status-pill {
@@ -218,7 +189,7 @@ button {
   display: grid;
   gap: 20px;
   padding: 24px;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 320px 1fr;
   align-content: start;
 }
 
@@ -251,12 +222,6 @@ button {
 .detail-copy {
   margin: 0;
   line-height: 1.55;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
 }
 
 label {
@@ -310,11 +275,11 @@ input, select {
 }
 
 .meeting-row {
-  padding: 14px 15px;
+  padding: 16px;
   border-radius: 16px;
   text-align: left;
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .meeting-row.selected {
@@ -328,12 +293,17 @@ input, select {
   gap: 10px;
 }
 
-.meeting-flags {
+.meeting-flags,
+.meeting-row-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   font-size: 12px;
   color: var(--shell-text-soft);
+}
+
+.meeting-row-summary span {
+  color: var(--shell-text-muted);
 }
 
 .meeting-tag,
@@ -410,56 +380,32 @@ input, select {
   gap: 10px;
 }
 
-.record-shell {
-  grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.9fr);
-  align-items: start;
-  gap: 20px;
+.record-intro {
+  margin: 0;
+  color: var(--shell-text-soft);
 }
 
-.record-form {
-  gap: 18px;
+.record-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.record-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: start;
-}
-
-.record-hero-copy {
-  display: grid;
-  gap: 6px;
-}
-
-.record-callout,
-.record-rail-card {
+.record-summary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 16px;
   border: 1px solid var(--shell-border);
   border-radius: 18px;
   background: var(--shell-surface-soft);
 }
 
-.record-callout {
-  padding: 16px;
-}
-
-.record-callout p {
-  margin: 0;
-}
-
-.record-rail-card {
-  padding: 16px;
-}
-
-.record-stats {
-  display: grid;
+.record-state-line {
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  align-items: center;
 }
 
-.record-checklist {
-  padding-left: 18px;
-  margin: 0;
-  color: var(--shell-text-soft);
+.record-state-line strong {
+  text-transform: capitalize;
 }
 
 pre {
@@ -506,12 +452,9 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .record-shell,
+  .record-fields,
+  .record-summary,
   .detail-meta-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form-grid {
     grid-template-columns: 1fr;
   }
 }
