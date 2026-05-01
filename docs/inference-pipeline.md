@@ -31,7 +31,7 @@ Detect Ollama → pull model → locate whisper binary → write config. Idempot
 Post-meeting, after transcription completes:
 
 ```
-Transcript → [EXTRACT] → JSON → [SYNTHESIZE] → Markdown → [Parse Actions] → DB
+Transcript → [EXTRACT] → JSON → [SYNTHESIZE] → Markdown → DB
                                       ↑
                           User Notes + Template
 ```
@@ -130,14 +130,7 @@ instructions — gappd wraps them into the full Stage 2 prompt.
 **Stage 1:** Ollama `format: "json"` guarantees valid JSON. Unmarshal into typed
 struct. On failure, retry once with stricter prompt.
 
-**Stage 2:** Markdown stored as-is. Deterministic parser extracts action items:
-
-```
-Pattern:  - [ ] <task> (@owner, due: <date>)
-Regex:    ^- \[ \] (.+?)(?:\s*\(@(\w+))?(?:,\s*due:\s*(.+?)\))?$
-```
-
-Extracted actions become DB records linked to the meeting. Pure Go, no LLM.
+**Stage 2:** Markdown is stored as the meeting summary.
 
 ## Error Handling
 

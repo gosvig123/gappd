@@ -285,8 +285,8 @@ you take that?", "As the PM I think...". We rely on this for v1.
                   │
                   ▼
              ┌──────────┐
-             │   DONE   │  show summary, offer to edit,
-             │          │  prompt for CI setup
+             │   DONE   │  show summary, offer to edit;
+             │          │  actions may appear in AI output only
              └──────────┘
 ```
 
@@ -304,7 +304,7 @@ If gappd crashes during CAPTURE, next launch detects orphaned
 | Raw whisper JSON | Per chunk | Nowhere | No |
 | Stage 1 extraction | Post-meeting | SQLite (`meetings.extraction`) | Yes |
 | Stage 2 notes | Post-meeting | SQLite (`meetings.summary`) | Yes |
-| Action items | Post-meeting | SQLite (`action_items`) | Yes |
+| Action items | Post-meeting | AI output on meeting row; no `action_items` table or CLI persistence yet | With stored extraction/summary |
 
 ## Future: Linux Support
 

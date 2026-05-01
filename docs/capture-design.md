@@ -228,16 +228,14 @@ User runs: gappd listen [--app zoom]
    ├─ Prompt user for rough notes (optional, editor opens)
    ├─ Send to LLM with selected template
    ├─ Parse structured output
-   ├─ Store summary, action items, participants
+   ├─ Store summary and raw extraction on the meeting row
    ├─ Update meeting row (status: "complete")
    └─ Show summary in TUI, offer to edit
 
-5. CI SETUP (optional, prompted)
-   ├─ For each action item:
-   │   ├─ "Watch git for commits?" → create git_watch check
-   │   ├─ "Link to Jira ticket?" → create jira_poll check
-   │   └─ "Set reminder?" → create reminder check
-   └─ CI daemon picks up new checks on next tick
+5. ACTIONS (AI output only)
+   ├─ The enhancer may extract action items in its structured output
+   ├─ Current schema has no separate action_items table
+   └─ No CLI persistence or CI setup is implemented for actions yet
 ```
 
 ### Chunk Strategy

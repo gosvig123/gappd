@@ -22,7 +22,7 @@ store transcripts in SQLite, and run Ollama-based summarisation/extraction.
 
 ```
 cmd/gappd/           CLI entry point & command definitions
-  main.go          root command, setup, search, actions, ci sub-commands
+  main.go          root command and setup command
   commands.go      enhance, meetings, show, summarize commands
   listen.go        listen (record) & devices commands
   helpers.go       shared CLI helpers (loadDeps, formatTranscript, etc.)
@@ -39,7 +39,8 @@ internal/
   config/          TOML config loading
     config.go      Config struct & Load()
   db/              SQLite storage
-    db.go          DB connection & migrations
+    db.go          DB connection and schema init
+    meetings_migration.go  Legacy meeting lifecycle upgrade helpers
     schema.go      Programmatic schema init
     schema.sql     Full DDL (tables, FTS, triggers, indexes)
     meetings.go    Meeting CRUD
@@ -59,18 +60,15 @@ gappd listen             Record & transcribe a meeting (mic/system/both)
 gappd devices            List audio devices
 gappd meetings           List stored meetings
 gappd show <id>          Display a meeting transcript + summary
-gappd search <query>     FTS5 full-text search over meetings
 gappd enhance <id>       Run AI extraction pipeline on a transcript
 gappd summarize <id>     Generate an AI summary
-gappd actions            Action item management
-gappd ci                 CI check stubs
 ```
 
 ## Database
 
 - Default path: `~/.gappd/db.sqlite`
 - Schema in `internal/db/schema.sql`
-- Tables: `meetings`, `segments`, `action_items`, `participants`, `ci_checks`, `templates`, `migrations`
+- Tables: `meetings`, `segments`, `migrations`
 - FTS5 virtual table `meetings_fts` on `title, transcript, summary` with insert/update/delete triggers
 - All timestamps are ISO 8601 UTC strings
 
@@ -86,7 +84,7 @@ go test ./...       # run all tests
 
 ## Contributor workflow note
 
-- `pnpm dev` at the repo root is only a convenience shim into `desktop` dev.
+- Use `npm run dev` from `desktop/` for desktop development.
 - Do not treat this repo as a pnpm workspace.
 - `desktop` dependency installation and packaging/release commands remain npm-based.
 
@@ -97,6 +95,6 @@ go test ./...       # run all tests
 - **Config**: all runtime config flows through `config.Config`; no globals
 - **AI provider**: new providers implement `ai.InferenceProvider` interface
 - **SQL**: use parameterised queries, never string-interpolate user input
-- **Schema changes**: add migration entry to `migrations` table; keep `schema.sql` as source of truth
+- **Schema changes**: keep `internal/db/schema.sql` as source of truth
 - **Tests**: place `_test.go` next to the code; use table-driven tests where sensible
 - **Commits**: small, focused; one logical change per commit

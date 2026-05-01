@@ -21,7 +21,7 @@
 
 ## Local packaging
 
-- `pnpm dev` at the repo root is only a convenience wrapper for starting the desktop app during development.
+- Use `npm run dev` from `desktop/` for desktop development.
 - This repo is not a pnpm workspace; install dependencies and run release packaging for `desktop` with npm.
 - From the repo root, run `npm --prefix ./desktop run dist:dir`; it still works without Apple secrets
 - Packaged app output now lands under `desktop/release/`; renderer assets stay in `desktop/dist/`

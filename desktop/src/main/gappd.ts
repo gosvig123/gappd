@@ -3,19 +3,16 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { app } from 'electron'
-import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem, MeetingStatus } from '../shared/contracts'
+import { RECORDING_PROTOCOL_EVENT_TYPES, type Device, type LocalAIConfig, type MeetingDetail, type MeetingListItem, type MeetingStatus, type RecordingProtocolEventType } from '../shared/contracts'
 import { getRecordingState, setRecordingState, type RecordingState } from './state'
 import { getValidatedManagedWhisperPaths } from './whisper'
-
-export type CaptureStatus = 'recording' | 'captured' | 'failed'
-export type ProcessingStatus = 'not_started' | 'processing' | 'completed' | 'failed'
 
 type DevicesResponse = { devices: Device[] }
 type MeetingsResponse = { meetings: MeetingListItem[] }
 type MeetingResponse = { meeting: MeetingDetail }
 type LocalAIConfigResponse = { ai: LocalAIConfig }
 type RecordingProtocolEvent = {
-  type: 'recording.started' | 'recording.stopping' | 'recording.processing' | 'recording.completed' | 'recording.failed'
+  type: RecordingProtocolEventType
   meetingId: string
   title: string
   status: MeetingStatus
@@ -245,17 +242,12 @@ function parseRecordingProtocolEvent(line: string): RecordingProtocolEvent | nul
   }
 }
 
-function isProtocolEventType(value: string): value is RecordingProtocolEvent['type'] {
-  return [
-    'recording.started',
-    'recording.stopping',
-    'recording.processing',
-    'recording.completed',
-    'recording.failed',
-  ].includes(value)
+function isProtocolEventType(value: string): value is RecordingProtocolEventType {
+  const eventTypes: readonly string[] = RECORDING_PROTOCOL_EVENT_TYPES
+  return eventTypes.includes(value)
 }
 
-function isTerminalProtocolEvent(type: RecordingProtocolEvent['type']): boolean {
+function isTerminalProtocolEvent(type: RecordingProtocolEventType): boolean {
   return type === 'recording.completed' || type === 'recording.failed'
 }
 

@@ -128,7 +128,7 @@ func listMeetings(store *db.DB) error {
 func showCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "show [meeting-id]",
-		Short: "Display transcript, summary, and actions for a meeting",
+		Short: "Display transcript and summary for a meeting",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, store, _, err := loadDeps()

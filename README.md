@@ -9,8 +9,7 @@ and can run Ollama-based summarization and extraction over saved meetings.
 - Local SQLite database at `~/.gappd/db.sqlite` by default
 - Local transcription via `whisper-local`
 - AI provider support: `ollama`
-- Meeting capture, listing, search, display, and post-processing commands
-- Basic action-item and CI placeholder commands are present in the CLI
+- Meeting capture, listing, display, and post-processing commands
 
 ## Requirements
 
@@ -47,13 +46,8 @@ gappd devices
 gappd listen [--device N] [--title TITLE] [--model /path/to/model.bin] [--mode mic|system|both]
 gappd meetings
 gappd show <meeting-id>
-gappd search <query>
 gappd enhance <meeting-id> [--notes "rough notes"]
 gappd summarize <meeting-id>
-gappd actions list
-gappd actions done <id>
-gappd ci status
-gappd ci run
 ```
 
 Notes:
@@ -120,7 +114,7 @@ go build ./cmd/gappd
 
 Desktop note:
 
-- `pnpm dev` from the repo root is only a convenience wrapper for `desktop` development.
+- Use `npm run dev` from `desktop/` for desktop development.
 - This repo is not a pnpm workspace.
 - For `desktop` dependency install and packaging/release commands, keep using `npm` inside `desktop/`.
 
