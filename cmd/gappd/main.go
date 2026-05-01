@@ -27,7 +27,6 @@ func rootCmd() *cobra.Command {
 	}
 	root.AddCommand(
 		listenCmd(), devicesCmd(), meetingsCmd(), showCmd(),
-		searchCmd(), actionsCmd(), ciCmd(),
 		summarizeCmd(), setupCmd(), enhanceCmd(), appCmd(),
 	)
 	return root
@@ -126,30 +125,4 @@ func setupCmd() *cobra.Command {
 			return nil
 		},
 	}
-}
-
-func searchCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "search [query]",
-		Short: "Full-text search across transcripts and summaries",
-		Args:  cobra.MinimumNArgs(1),
-	}
-}
-
-func actionsCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "actions", Short: "Manage action items"}
-	cmd.AddCommand(
-		&cobra.Command{Use: "list", Short: "List open action items"},
-		&cobra.Command{Use: "done [id]", Short: "Mark complete", Args: cobra.ExactArgs(1)},
-	)
-	return cmd
-}
-
-func ciCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "ci", Short: "CI pipeline for action tracking"}
-	cmd.AddCommand(
-		&cobra.Command{Use: "status", Short: "Show CI pipeline status"},
-		&cobra.Command{Use: "run", Short: "Trigger a CI check cycle now"},
-	)
-	return cmd
 }
