@@ -1,4 +1,5 @@
-import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, MeetingStatus as SharedMeetingStatus, OnboardingStatus, RecordingState } from '../shared/contracts'
+import type { MeetingStatus as SharedMeetingStatus } from '../shared/contracts'
+import type { GappdApi } from '../shared/ipc-contract'
 
 export {}
 
@@ -6,32 +7,6 @@ declare global {
   type MeetingStatus = SharedMeetingStatus
 
   interface Window {
-    gappd: {
-      system: {
-        getDevices(): Promise<Device[]>
-        requestCapturePermissions(): Promise<{ microphone: string; screen: string }>
-        openPermissionsSettings(target?: 'microphone' | 'screen-recording'): Promise<void>
-      }
-      meetings: {
-        list(): Promise<MeetingListItem[]>
-        show(id: string): Promise<MeetingDetail>
-      }
-      recording: {
-        start(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<RecordingState>
-        stop(): Promise<RecordingState>
-        getStatus(): Promise<RecordingState>
-        onStatusChanged(listener: (state: RecordingState) => void): () => void
-      }
-      onboarding: {
-        getStatus(): Promise<OnboardingStatus>
-        start(): Promise<OnboardingStatus>
-        retry(): Promise<OnboardingStatus>
-        onStatusChanged(listener: (state: OnboardingStatus) => void): () => void
-      }
-      settings: {
-        getLocalAIStatus(): Promise<LocalAIStatus>
-        repairLocalAI(): Promise<LocalAIStatus>
-      }
-    }
+    gappd: GappdApi
   }
 }
