@@ -1,47 +1,40 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState } from '../shared/contracts'
+import { IPC_CHANNELS, IPC_EVENTS, type GappdApi, type OnboardingStatus, type RecordingState } from '../shared/ipc-contract'
 
-const api = {
+const api: GappdApi = {
   system: {
-    getDevices: (): Promise<Device[]> => ipcRenderer.invoke('system:getDevices'),
-    requestCapturePermissions: (): Promise<{ microphone: string; screen: string }> => ipcRenderer.invoke('system:requestCapturePermissions'),
-    openPermissionsSettings: (target?: 'microphone' | 'screen-recording'): Promise<void> => ipcRenderer.invoke('system:openPermissionsSettings', target),
+    getDevices: () => ipcRenderer.invoke(IPC_CHANNELS.system.getDevices),
+    requestCapturePermissions: () => ipcRenderer.invoke(IPC_CHANNELS.system.requestCapturePermissions),
+    openPermissionsSettings: (target) => ipcRenderer.invoke(IPC_CHANNELS.system.openPermissionsSettings, target),
   },
   meetings: {
-    list: (): Promise<MeetingListItem[]> => ipcRenderer.invoke('meetings:list'),
-    show: (id: string): Promise<MeetingDetail> => ipcRenderer.invoke('meetings:show', id),
+    list: () => ipcRenderer.invoke(IPC_CHANNELS.meetings.list),
+    show: (id) => ipcRenderer.invoke(IPC_CHANNELS.meetings.show, id),
   },
   recording: {
-    start: (input: { title: string; device: number; mode: string; modelPath?: string }): Promise<RecordingState> =>
-      ipcRenderer.invoke('recording:start', input),
-    stop: (): Promise<RecordingState> => ipcRenderer.invoke('recording:stop'),
-    getStatus: (): Promise<RecordingState> => ipcRenderer.invoke('recording:getStatus'),
-    onStatusChanged: (listener: (state: RecordingState) => void): (() => void) => {
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.recording.start, input),
+    stop: () => ipcRenderer.invoke(IPC_CHANNELS.recording.stop),
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.recording.getStatus),
+    onStatusChanged: (listener) => {
       const wrapped = (_event: Electron.IpcRendererEvent, state: RecordingState) => listener(state)
-      ipcRenderer.on('recording:status-changed', wrapped)
-      return () => ipcRenderer.removeListener('recording:status-changed', wrapped)
+      ipcRenderer.on(IPC_EVENTS.recording.statusChanged, wrapped)
+      return () => ipcRenderer.removeListener(IPC_EVENTS.recording.statusChanged, wrapped)
     },
   },
   onboarding: {
-    getStatus: (): Promise<OnboardingStatus> => ipcRenderer.invoke('onboarding:getStatus'),
-    start: (): Promise<OnboardingStatus> => ipcRenderer.invoke('onboarding:start'),
-    retry: (): Promise<OnboardingStatus> => ipcRenderer.invoke('onboarding:retry'),
-    onStatusChanged: (listener: (state: OnboardingStatus) => void): (() => void) => {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.getStatus),
+    start: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.start),
+    retry: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.retry),
+    onStatusChanged: (listener) => {
       const wrapped = (_event: Electron.IpcRendererEvent, state: OnboardingStatus) => listener(state)
-      ipcRenderer.on('onboarding:status-changed', wrapped)
-      return () => ipcRenderer.removeListener('onboarding:status-changed', wrapped)
+      ipcRenderer.on(IPC_EVENTS.onboarding.statusChanged, wrapped)
+      return () => ipcRenderer.removeListener(IPC_EVENTS.onboarding.statusChanged, wrapped)
     },
   },
   settings: {
-    getLocalAIStatus: (): Promise<LocalAIStatus> => ipcRenderer.invoke('settings:getLocalAIStatus'),
-    repairLocalAI: (): Promise<LocalAIStatus> => ipcRenderer.invoke('settings:repairLocalAI'),
+    getLocalAIStatus: () => ipcRenderer.invoke(IPC_CHANNELS.settings.getLocalAIStatus),
+    repairLocalAI: () => ipcRenderer.invoke(IPC_CHANNELS.settings.repairLocalAI),
   },
 }
 
 contextBridge.exposeInMainWorld('gappd', api)
-
-declare global {
-  interface Window {
-    gappd: typeof api
-  }
-}
