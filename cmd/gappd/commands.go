@@ -109,18 +109,8 @@ func listMeetings(store *db.DB) error {
 		fmt.Println("No meetings yet. Run `gappd listen` to record one.")
 		return nil
 	}
-	for _, m := range meetings {
-		status := "○"
-		state := meetingState(m)
-		switch state {
-		case appMeetingStateCompleted:
-			status = "●"
-		case appMeetingStateFailed:
-			status = "!"
-		case appMeetingStateProcessing:
-			status = "..."
-		}
-		fmt.Printf("  %s %s  %s  %s (capture: %s, processing: %s)\n", status, m.ID[:8], m.StartedAt[:10], m.Title, m.CaptureStatus, m.ProcessingStatus)
+	for _, view := range buildMeetingListViews(meetings) {
+		fmt.Println(renderMeetingListLine(view))
 	}
 	return nil
 }
@@ -142,35 +132,11 @@ func showCmd() *cobra.Command {
 }
 
 func showMeeting(store *db.DB, id string) error {
-	meeting, err := store.GetMeeting(id)
+	view, err := buildMeetingDetailView(store, id)
 	if err != nil {
 		return fmt.Errorf("meeting not found: %w", err)
 	}
-	fmt.Printf("# %s\n", meeting.Title)
-	fmt.Printf("Date: %s\n", meeting.StartedAt)
-	if meeting.EndedAt != nil {
-		fmt.Printf("Ended: %s\n", *meeting.EndedAt)
-	}
-	fmt.Printf("Capture: %s\n", meeting.CaptureStatus)
-	if meeting.CaptureFailureMessage != nil {
-		fmt.Printf("Capture failure: %s\n", *meeting.CaptureFailureMessage)
-	}
-	fmt.Printf("Processing: %s\n", meeting.ProcessingStatus)
-	if meeting.ProcessingFailureMessage != nil {
-		fmt.Printf("Processing failure: %s\n", *meeting.ProcessingFailureMessage)
-	}
-
-	if meeting.Transcript != nil {
-		fmt.Println("\n── Transcript ──────────────────────")
-		fmt.Println(*meeting.Transcript)
-	}
-
-	if meeting.Summary != nil {
-		fmt.Println("── Notes ───────────────────────────")
-		fmt.Println(*meeting.Summary)
-	} else {
-		fmt.Println("\nNo notes yet. Run `gappd enhance " + id + "`")
-	}
+	fmt.Print(renderMeetingDetail(view))
 	return nil
 }
 

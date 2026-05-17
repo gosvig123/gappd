@@ -97,19 +97,7 @@ func appMeetingsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			items := make([]appMeetingListItem, 0, len(meetings))
-			for _, meeting := range meetings {
-				items = append(items, appMeetingListItem{
-					ID:            meeting.ID,
-					Title:         meeting.Title,
-					StartedAt:     meeting.StartedAt,
-					EndedAt:       meeting.EndedAt,
-					Status:        appMeetingStatusFor(meeting),
-					HasTranscript: meeting.Transcript != nil,
-					HasSummary:    meeting.Summary != nil,
-				})
-			}
-			return writeJSON(appMeetingsResponse{Meetings: items})
+			return writeJSON(appMeetingsResponse{Meetings: buildMeetingListViews(meetings)})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
@@ -143,41 +131,5 @@ func appMeetingsShowCmd() *cobra.Command {
 }
 
 func appMeetingDetailFor(store *db.DB, id string) (appMeetingDetail, error) {
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return appMeetingDetail{}, err
-	}
-	segments, err := store.GetSegments(id)
-	if err != nil {
-		return appMeetingDetail{}, err
-	}
-	transcriptText := ""
-	if meeting.Transcript != nil {
-		transcriptText = *meeting.Transcript
-	} else if len(segments) > 0 {
-		transcriptText = formatTranscript(segments)
-	}
-	summary := ""
-	if meeting.Summary != nil {
-		summary = *meeting.Summary
-	}
-	outSegments := make([]appMeetingSegment, 0, len(segments))
-	for _, segment := range segments {
-		outSegments = append(outSegments, appMeetingSegment{
-			StartSec: segment.Start,
-			EndSec:   segment.End,
-			Speaker:  segment.Speaker,
-			Text:     segment.Text,
-		})
-	}
-	return appMeetingDetail{
-		ID:             meeting.ID,
-		Title:          meeting.Title,
-		StartedAt:      meeting.StartedAt,
-		EndedAt:        meeting.EndedAt,
-		Status:         appMeetingStatusFor(*meeting),
-		TranscriptText: transcriptText,
-		Summary:        summary,
-		Segments:       outSegments,
-	}, nil
+	return buildMeetingDetailView(store, id)
 }
