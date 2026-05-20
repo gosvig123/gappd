@@ -11,7 +11,7 @@ type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus
 type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
 type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
 type MeetingDetail = Awaited<ReturnType<typeof window.gappd.meetings.show>>
-type View = 'record' | 'meetings' | 'settings'
+type View = 'setup' | 'record' | 'meetings' | 'settings'
 const localAI = getLocalAIContract()
 
 export function App() {
@@ -163,6 +163,7 @@ export function App() {
   const canStart = devices.length > 0 && recording.status === 'idle'
   const canStop = ['recording', 'stopping', 'processing'].includes(recording.status)
   const transcript = useMemo(() => selectedMeeting?.transcriptText ?? '', [selectedMeeting])
+  const recentMeeting = meetings.find((meeting) => meeting.id === selectedMeetingId) ?? meetings[0] ?? null
   const bannerError = error ?? recording.error ?? null
   const isPermissionError = isPermissionErrorMessage(bannerError)
 
@@ -238,21 +239,28 @@ export function App() {
     }
   }
 
+  function openMeeting(id: string) {
+    void loadMeeting(id)
+    setView('meetings')
+  }
+
   if (loading || !onboarding) return <div className="screen-center">Loading Gappd…</div>
+
+  const activeView = onboarding.phase === 'ready' ? view : 'setup'
 
   return (
     <div className="app-shell">
-      <AppSidebar onboarding={onboarding} view={view} onViewChange={setView} />
+      <AppSidebar onboarding={onboarding} view={activeView} onViewChange={setView} />
       <main className="app-main">
         {onboarding.phase === 'ready' ? (
           <PermissionBanner error={bannerError} isPermissionError={isPermissionError} onRetry={() => void handleStart()} onOpenSettings={() => void handleOpenPermissionsSettings()} />
         ) : null}
         <div className="main-grid">
-          {onboarding.phase !== 'ready' ? (
-            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} />
-          ) : view === 'record' ? (
-            <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
-          ) : view === 'meetings' ? (
+          {activeView === 'setup' ? (
+            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setView('record')} />
+          ) : activeView === 'record' ? (
+            <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} recentMeeting={recentMeeting} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} onOpenMeeting={openMeeting} />
+          ) : activeView === 'meetings' ? (
             <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} onRecordFirst={() => setView('record')} />
           ) : (
             <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />

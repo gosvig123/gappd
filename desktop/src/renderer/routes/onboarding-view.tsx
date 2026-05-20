@@ -14,6 +14,7 @@ type OnboardingViewProps = {
   busy: boolean
   onStart: () => void
   onRetry: () => void
+  onContinue: () => void
 }
 
 type SetupActionsProps = {
@@ -126,7 +127,7 @@ function SetupPlanRail({ status }: Pick<OnboardingViewProps, 'status'>) {
   )
 }
 
-export function OnboardingView({ status, busy, onStart, onRetry }: OnboardingViewProps) {
+export function OnboardingView({ status, busy, onStart, onRetry, onContinue }: OnboardingViewProps) {
   const copy = phaseCopy(status)
   const errorView = onboardingErrorView(status)
   const isReady = status.phase === 'ready'
@@ -140,7 +141,11 @@ export function OnboardingView({ status, busy, onStart, onRetry }: OnboardingVie
         <div className="setup-panel setup-primary">
           <div className="setup-callout"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></div>
           <SetupProgressCard status={status} copy={copy} />
-          <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isReady && !isError} onAction={action} onRetry={onRetry} />
+          {isReady ? (
+            <div className="actions-row"><button className="primary" onClick={onContinue}>Go to Record</button></div>
+          ) : (
+            <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
+          )}
           {errorView ? <LocalAIErrorBanner errorView={errorView} /> : null}
         </div>
         <SetupPlanRail status={status} />

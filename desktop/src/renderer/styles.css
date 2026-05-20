@@ -140,6 +140,11 @@ button {
   box-shadow: inset 0 1px 0 rgba(191, 219, 254, 0.08);
 }
 
+.nav-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .nav-current {
   cursor: default;
 }
@@ -385,6 +390,30 @@ input, select {
   border: 1px solid var(--shell-border);
   border-radius: 18px;
   background: var(--shell-surface-soft);
+}
+
+.record-meeting-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--shell-border);
+  border-radius: 18px;
+  background: rgba(96, 165, 250, 0.08);
+}
+
+.record-meeting-head,
+.record-meeting-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.record-meeting-meta {
+  justify-content: flex-start;
+  color: var(--shell-text-muted);
+  font-size: 13px;
 }
 
 .record-state-line {
