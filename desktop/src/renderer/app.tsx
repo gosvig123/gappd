@@ -11,7 +11,7 @@ type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus
 type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
 type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
 type MeetingDetail = Awaited<ReturnType<typeof window.gappd.meetings.show>>
-type View = 'setup' | 'record' | 'meetings' | 'settings'
+type View = 'record' | 'meetings' | 'settings'
 const localAI = getLocalAIContract()
 
 export function App() {
@@ -246,7 +246,7 @@ export function App() {
 
   if (loading || !onboarding) return <div className="screen-center">Loading Gappd…</div>
 
-  const activeView = onboarding.phase === 'ready' ? view : 'setup'
+  const activeView = onboarding.phase === 'ready' ? view : 'settings'
 
   return (
     <div className="app-shell">
@@ -256,14 +256,14 @@ export function App() {
           <PermissionBanner error={bannerError} isPermissionError={isPermissionError} onRetry={() => void handleStart()} onOpenSettings={() => void handleOpenPermissionsSettings()} />
         ) : null}
         <div className="main-grid">
-          {activeView === 'setup' ? (
-            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setView('record')} />
-          ) : activeView === 'record' ? (
+          {activeView === 'record' ? (
             <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} recentMeeting={recentMeeting} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} onOpenMeeting={openMeeting} />
           ) : activeView === 'meetings' ? (
             <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} onRecordFirst={() => setView('record')} />
-          ) : (
+          ) : onboarding.phase === 'ready' ? (
             <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />
+          ) : (
+            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setView('record')} />
           )}
         </div>
       </main>
