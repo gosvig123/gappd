@@ -34,6 +34,12 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Local agent artifacts
+/.pi-question-decisions.md
+/context.md
+/false
+
 /gappd
 # Desktop Ollama artifacts
 desktop/.cache/ollama/
