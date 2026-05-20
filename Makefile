@@ -10,7 +10,7 @@ UNAME_S   := $(shell uname -s)
 
 export MACOSX_DEPLOYMENT_TARGET ?= 13.0
 
-.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install
+.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install desktop-install desktop-preflight desktop-prepare desktop-bootstrap desktop-typecheck desktop-dev desktop-build desktop-dist-dir
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -44,6 +44,34 @@ run: build
 dev:
 	@which watchexec > /dev/null 2>&1 || { echo "install watchexec: cargo install watchexec-cli"; exit 1; }
 	watchexec -r -e go -- go run ./cmd/gappd
+
+desktop-install:
+	npm --prefix ./desktop ci
+
+desktop-preflight:
+	npm --prefix ./desktop run preflight:macos
+
+desktop-prepare:
+	npm --prefix ./desktop run prepare:ollama
+	npm --prefix ./desktop run prepare:whisper
+	npm --prefix ./desktop run native:prepare -- build
+
+desktop-bootstrap:
+	$(MAKE) desktop-install
+	$(MAKE) desktop-preflight
+	$(MAKE) desktop-prepare
+
+desktop-typecheck:
+	npm --prefix ./desktop run typecheck
+
+desktop-dev:
+	npm --prefix ./desktop run dev
+
+desktop-build:
+	npm --prefix ./desktop run build
+
+desktop-dist-dir:
+	npm --prefix ./desktop run dist:dir
 
 db-init:
 	@mkdir -p ~/.gappd

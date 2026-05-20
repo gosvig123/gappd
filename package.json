@@ -1,6 +1,14 @@
 {
   "private": true,
   "scripts": {
-    "dev": "npm --prefix ./desktop run dev"
+    "dev": "npm --prefix ./desktop run dev",
+    "desktop:install": "npm --prefix ./desktop ci",
+    "desktop:preflight": "npm --prefix ./desktop run preflight:macos",
+    "desktop:prepare": "npm --prefix ./desktop run prepare:ollama && npm --prefix ./desktop run prepare:whisper && npm --prefix ./desktop run native:prepare -- build",
+    "desktop:bootstrap": "npm run desktop:install && npm run desktop:preflight && npm run desktop:prepare",
+    "desktop:typecheck": "npm --prefix ./desktop run typecheck",
+    "desktop:dev": "npm --prefix ./desktop run dev",
+    "desktop:build": "npm --prefix ./desktop run build",
+    "desktop:dist:dir": "npm --prefix ./desktop run dist:dir"
   }
 }

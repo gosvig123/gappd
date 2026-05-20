@@ -10,6 +10,8 @@
     "build": "npm run build:renderer && npm run native:prepare -- build && npm run build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsup --config tsup.config.ts",
+    "typecheck": "tsc --noEmit",
+    "preflight:macos": "node ./scripts/preflight-macos.mjs",
     "native:prepare": "node ./scripts/ensure-native-artifacts.mjs",
     "prepare:ollama": "node ./scripts/prepare-ollama-bundle.mjs",
     "prepare:whisper": "node ./scripts/prepare-whisper-bundle.mjs",
