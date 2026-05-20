@@ -68,7 +68,7 @@ button {
   letter-spacing: -0.04em;
 }
 
-.subtitle, .muted, .meeting-meta, .label, .panel-header p {
+.muted, .meeting-meta, .label, .panel-header p {
   color: var(--shell-text-muted);
 }
 
@@ -110,13 +110,6 @@ button {
   color: var(--shell-accent-text);
 }
 
-.sidebar-nav-label {
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.78);
-}
-
 .nav {
   display: grid;
   gap: 6px;
@@ -141,19 +134,10 @@ button {
   font-weight: 600;
 }
 
-.nav-btn span {
-  font-size: 12px;
-  color: var(--shell-text-muted);
-}
-
 .nav-btn.active {
   background: linear-gradient(180deg, rgba(96, 165, 250, 0.2), rgba(30, 41, 59, 0.52));
   border-color: rgba(96, 165, 250, 0.45);
   box-shadow: inset 0 1px 0 rgba(191, 219, 254, 0.08);
-}
-
-.nav-btn.active span {
-  color: #dbeafe;
 }
 
 .nav-current {
@@ -185,10 +169,16 @@ button {
 .status-pill.idle { background: rgba(52, 211, 153, 0.18); color: #a7f3d0; }
 .status-pill.error { background: rgba(239, 68, 68, 0.22); color: var(--shell-danger-text); }
 
-.main-grid {
+.app-main {
   display: grid;
   gap: 20px;
   padding: 24px;
+  align-content: start;
+}
+
+.main-grid {
+  display: grid;
+  gap: 20px;
   grid-template-columns: 320px 1fr;
   align-content: start;
 }
@@ -422,9 +412,19 @@ pre {
 .empty-state {
   color: var(--shell-text-muted);
   display: grid;
+  gap: 12px;
   place-items: center;
   min-height: 180px;
+  padding: 18px;
   text-align: center;
+}
+
+.empty-state strong {
+  color: var(--shell-text);
+}
+
+details.detail-surface summary {
+  cursor: pointer;
 }
 
 .banner.error, .error-text {

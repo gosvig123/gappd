@@ -243,19 +243,21 @@ export function App() {
   return (
     <div className="app-shell">
       <AppSidebar onboarding={onboarding} view={view} onViewChange={setView} />
-      <main className="main-grid">
-        {onboarding.phase !== 'ready' ? (
-          <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} />
-        ) : view === 'record' ? (
-          <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
-        ) : view === 'meetings' ? (
-          <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} />
-        ) : (
-          <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />
-        )}
+      <main className="app-main">
         {onboarding.phase === 'ready' ? (
           <PermissionBanner error={bannerError} isPermissionError={isPermissionError} onRetry={() => void handleStart()} onOpenSettings={() => void handleOpenPermissionsSettings()} />
         ) : null}
+        <div className="main-grid">
+          {onboarding.phase !== 'ready' ? (
+            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} />
+          ) : view === 'record' ? (
+            <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} />
+          ) : view === 'meetings' ? (
+            <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} onRecordFirst={() => setView('record')} />
+          ) : (
+            <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />
+          )}
+        </div>
       </main>
     </div>
   )

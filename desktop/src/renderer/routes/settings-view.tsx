@@ -21,8 +21,8 @@ export function SettingsView({ status, loading, busy, onRepair }: SettingsViewPr
     <section className="panel panel-large settings-stack">
       <div className="panel-header">
         <div>
-          <h1>Settings</h1>
-          <p>Local AI runtime on this Mac.</p>
+          <h1>Local AI</h1>
+          <p>Runtime health on this Mac.</p>
         </div>
         <div className={`status-pill ${status ? onboardingStatusTone(status.phase) : 'processing'}`}>
           {loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}

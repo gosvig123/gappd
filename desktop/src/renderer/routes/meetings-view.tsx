@@ -12,6 +12,7 @@ type MeetingsViewProps = {
   transcript: string
   onRefresh: () => void
   onSelectMeeting: (id: string) => void
+  onRecordFirst: () => void
 }
 
 function dateLabel(value: string): string {
@@ -54,11 +55,41 @@ function MeetingPipeline({ selectedStatus }: { selectedStatus: MeetingDetail['st
   )
 }
 
-function MeetingsListPanel({ meetings, selectedMeetingId, onRefresh, onSelectMeeting }: Pick<MeetingsViewProps, 'meetings' | 'selectedMeetingId' | 'onRefresh' | 'onSelectMeeting'>) {
+function MeetingArtifacts({ hasTranscript, hasSummary }: { hasTranscript: boolean; hasSummary: boolean }) {
+  return (
+    <div className="detail-surface detail-block">
+      <div className="meeting-section-label">Artifacts</div>
+      <div className="meeting-flags"><span className="meeting-tag">{artifactLabel(hasTranscript, 'Transcript ready', 'No transcript')}</span><span className="meeting-tag">{artifactLabel(hasSummary, 'Summary ready', 'No summary')}</span></div>
+    </div>
+  )
+}
+
+function MeetingDiagnostics({ selectedMeeting, selectedStatus, hasTranscript, hasSummary }: { selectedMeeting: MeetingDetail; selectedStatus: MeetingDetail['status'] | undefined; hasTranscript: boolean; hasSummary: boolean }) {
+  return (
+    <details className="detail-surface detail-block">
+      <summary className="meeting-section-label">Diagnostics</summary>
+      <MeetingDetailMeta selectedMeeting={selectedMeeting} selectedStatus={selectedStatus} />
+      {selectedStatus ? <MeetingPipeline selectedStatus={selectedStatus} /> : null}
+      <MeetingArtifacts hasTranscript={hasTranscript} hasSummary={hasSummary} />
+    </details>
+  )
+}
+
+function MeetingsEmptyState({ onRecordFirst }: { onRecordFirst: () => void }) {
+  return (
+    <div className="empty-state">
+      <strong>No meetings yet.</strong>
+      <span>Record first meeting to create summary and transcript.</span>
+      <button className="primary" onClick={onRecordFirst}>Record first meeting</button>
+    </div>
+  )
+}
+
+function MeetingsListPanel({ meetings, selectedMeetingId, onRefresh, onSelectMeeting, onRecordFirst }: Pick<MeetingsViewProps, 'meetings' | 'selectedMeetingId' | 'onRefresh' | 'onSelectMeeting' | 'onRecordFirst'>) {
   return (
     <section className="panel list-panel">
       <div className="panel-header compact"><div><h1>Meetings</h1><p>{meetings.length} saved sessions</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div>
-      <div className="meeting-list">{meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === selectedMeetingId} onSelect={onSelectMeeting} />)}{meetings.length === 0 ? <div className="empty-state">No meetings yet.</div> : null}</div>
+      <div className="meeting-list">{meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === selectedMeetingId} onSelect={onSelectMeeting} />)}{meetings.length === 0 ? <MeetingsEmptyState onRecordFirst={onRecordFirst} /> : null}</div>
     </section>
   )
 }
@@ -71,14 +102,14 @@ function MeetingDetailPanel({ selectedMeetingId, selectedMeeting, selectedMeetin
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
   return (
-    <section className="panel detail-panel"><div className="panel-header"><div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Review the saved output and inspect capture and AI processing details.</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div><div className="detail-grid"><MeetingDetailMeta selectedMeeting={selectedMeeting} selectedStatus={selectedStatus} />{selectedStatus ? <MeetingPipeline selectedStatus={selectedStatus} /> : null}<MeetingFailureState message={selectedStatus?.capture.failureMessage} /><MeetingFailureState message={selectedStatus?.processing.failureMessage} /><div className="detail-surface detail-block"><div className="meeting-section-label">Artifacts</div><div className="meeting-flags"><span className="meeting-tag">{artifactLabel(hasTranscript, 'Transcript ready', 'No transcript')}</span><span className="meeting-tag">{artifactLabel(hasSummary, 'Summary ready', 'No summary')}</span></div></div><div className="detail-surface detail-block"><div className="meeting-section-label">AI summary</div><pre>{selectedMeeting.summary || 'No AI summary yet.'}</pre></div><div className="detail-surface detail-block"><div className="meeting-section-label">Transcript</div><pre>{transcript || 'No transcript yet.'}</pre></div></div></section>
+    <section className="panel detail-panel"><div className="panel-header"><div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Review summary and transcript.</p></div><button className="secondary" onClick={onRefresh}>Refresh</button></div><div className="detail-grid"><div className="detail-surface detail-block"><div className="meeting-section-label">AI summary</div><pre>{selectedMeeting.summary || 'No AI summary yet.'}</pre></div><div className="detail-surface detail-block"><div className="meeting-section-label">Transcript</div><pre>{transcript || 'No transcript yet.'}</pre></div><MeetingFailureState message={selectedStatus?.capture.failureMessage} /><MeetingFailureState message={selectedStatus?.processing.failureMessage} /><MeetingDiagnostics selectedMeeting={selectedMeeting} selectedStatus={selectedStatus} hasTranscript={hasTranscript} hasSummary={hasSummary} /></div></section>
   )
 }
 
-export function MeetingsView({ meetings, selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript, onRefresh, onSelectMeeting }: MeetingsViewProps) {
+export function MeetingsView({ meetings, selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript, onRefresh, onSelectMeeting, onRecordFirst }: MeetingsViewProps) {
   return (
     <>
-      <MeetingsListPanel meetings={meetings} selectedMeetingId={selectedMeetingId} onRefresh={onRefresh} onSelectMeeting={onSelectMeeting} />
+      <MeetingsListPanel meetings={meetings} selectedMeetingId={selectedMeetingId} onRefresh={onRefresh} onSelectMeeting={onSelectMeeting} onRecordFirst={onRecordFirst} />
       <MeetingDetailPanel selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={onRefresh} />
     </>
   )
