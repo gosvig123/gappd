@@ -76,7 +76,6 @@ button {
 .sidebar-section,
 .record-stack,
 .record-fields,
-.record-summary,
 .meeting-row-top,
 .meeting-row-body,
 .detail-meta-grid,
@@ -88,7 +87,6 @@ button {
 .sidebar-section,
 .record-stack,
 .record-fields,
-.record-summary,
 .meeting-row-body,
 .detail-surface {
   gap: 12px;
@@ -302,8 +300,7 @@ input, select {
 }
 
 .meeting-tag,
-.detail-stat,
-.record-stat {
+.detail-stat {
   border: 1px solid var(--shell-border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
@@ -328,22 +325,19 @@ input, select {
   gap: 10px;
 }
 
-.detail-stat,
-.record-stat {
+.detail-stat {
   display: grid;
   gap: 4px;
   border-radius: 16px;
   padding: 12px 14px;
 }
 
-.detail-stat span,
-.record-stat span {
+.detail-stat span {
   font-size: 12px;
   color: var(--shell-text-muted);
 }
 
-.detail-stat strong,
-.record-stat strong {
+.detail-stat strong {
   font-size: 14px;
 }
 
@@ -384,21 +378,85 @@ input, select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.record-summary {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.record-control-card,
+.record-meeting-card {
+  display: grid;
+  gap: 14px;
   padding: 16px;
   border: 1px solid var(--shell-border);
   border-radius: 18px;
   background: var(--shell-surface-soft);
 }
 
-.record-meeting-card {
+.record-control-card {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.record-flow-steps {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record-flow-steps li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
   border: 1px solid var(--shell-border);
-  border-radius: 18px;
+  border-radius: 16px;
+  color: var(--shell-text-muted);
+  background: var(--shell-surface-soft);
+}
+
+.record-flow-steps span {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--shell-border);
+  color: var(--shell-text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.record-flow-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.record-flow-copy em {
+  color: var(--shell-text-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.record-flow-steps .current,
+.record-flow-steps .complete {
+  color: var(--shell-text);
+  border-color: rgba(96, 165, 250, 0.35);
+}
+
+.record-flow-steps .complete span {
+  background: rgba(52, 211, 153, 0.18);
+  color: #a7f3d0;
+}
+
+.record-flow-steps .neutral {
+  color: var(--shell-text-soft);
+}
+
+.record-meeting-card {
   background: rgba(96, 165, 250, 0.08);
+}
+
+.record-meeting-card p {
+  margin: 0;
+  color: var(--shell-text-soft);
 }
 
 .record-meeting-head,
@@ -482,7 +540,7 @@ details.detail-surface summary {
   }
 
   .record-fields,
-  .record-summary,
+  .record-flow-steps,
   .detail-meta-grid {
     grid-template-columns: 1fr;
   }
