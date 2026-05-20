@@ -1,23 +1,96 @@
-# gappd — Meeting intelligence from the terminal
+# gappd — Meeting intelligence from your Mac
 
 `gappd` records meeting audio, transcribes it locally, stores transcripts in SQLite,
 and can run Ollama-based summarization and extraction over saved meetings.
 
 ## Current surface area
 
-- Terminal CLI only
+- Desktop app for macOS
+- Terminal CLI
 - Local SQLite database at `~/.gappd/db.sqlite` by default
-- Local transcription via `whisper-local`
+- Local transcription via bundled desktop Whisper runtime or CLI `whisper-local`
 - AI provider support: `ollama`
 - Meeting capture, listing, display, and post-processing commands
 
-## Requirements
+## Desktop macOS fresh-clone setup
 
-- Go `1.25.0` (from `go.mod`)
-- Ollama running locally if you want AI summaries/extraction
-- On macOS, the capture helper for `gappd listen`
+Prerequisites:
 
-## Install
+- macOS `14+` with network access to GitHub for Ollama/Whisper runtime downloads
+- Node.js `22.12.0+` and npm
+- Go `1.25+`
+- Xcode Command Line Tools, including `swiftc`, `codesign`, `lipo`, and `xcrun`
+- `cmake`
+- `tar`
+
+From repo root:
+
+```bash
+git clone https://github.com/gappd-dev/gappd.git
+cd gappd
+make desktop-bootstrap
+make desktop-dev
+```
+
+Equivalent npm path from repo root:
+
+```bash
+npm run desktop:bootstrap
+npm run desktop:dev
+```
+
+What bootstrap does:
+
+1. Installs desktop npm dependencies with `npm --prefix ./desktop ci`.
+2. Runs macOS prerequisite checks.
+3. Downloads Ollama into `desktop/resources/ollama/`.
+4. Downloads/builds Whisper into `desktop/resources/whisper/`.
+5. Builds native Go and capture-helper artifacts into `build/`.
+
+Generated artifacts are intentionally ignored by git. Fresh clones rebuild or download
+these paths:
+
+- `build/gappd`
+- `build/GappdCapture.app`
+- `desktop/resources/ollama/ollama`
+- `desktop/resources/whisper/whisper-cli`
+- `desktop/.cache/ollama/`
+- `desktop/.cache/whisper/`
+- `desktop/dist*` and `desktop/release/`
+
+There are no unpublished local package dependencies required for clone setup: no
+npm `file:`, `link:`, or `workspace:` dependencies, and no Go `replace` directives.
+Native/runtime artifacts are generated or downloaded by bootstrap scripts.
+
+## Desktop commands from repo root
+
+```bash
+make desktop-install     # npm ci in ./desktop
+make desktop-preflight   # check macOS toolchain prerequisites
+make desktop-prepare     # prepare runtime/native artifacts
+make desktop-bootstrap   # install + preflight + prepare
+make desktop-typecheck   # TypeScript check
+make desktop-dev         # start Vite, Electron main build, and Electron
+make desktop-build       # build renderer, native artifacts, and Electron main
+make desktop-dist-dir    # package unpacked macOS app directory
+```
+
+npm equivalents:
+
+```bash
+npm run desktop:install
+npm run desktop:preflight
+npm run desktop:prepare
+npm run desktop:bootstrap
+npm run desktop:typecheck
+npm run desktop:dev
+npm run desktop:build
+npm run desktop:dist:dir
+```
+
+`npm run dev` remains a shorthand for `npm run desktop:dev`.
+
+## CLI install
 
 ```bash
 git clone https://github.com/gappd-dev/gappd.git
@@ -28,7 +101,7 @@ make install
 
 This builds `./build/gappd` and installs `gappd` to `/usr/local/bin/gappd`.
 
-### macOS capture helper
+### macOS capture helper for CLI
 
 `gappd listen` uses the ScreenCaptureKit helper on macOS. Build and install it with:
 
@@ -38,7 +111,16 @@ make install-capture
 
 That installs `GappdCapture.app` to `~/.gappd/GappdCapture.app`.
 
-## Commands
+### CLI runtime requirements
+
+The CLI does not bundle Whisper or Ollama. For `gappd listen` and AI commands,
+provide these separately:
+
+- Whisper CLI binary in `PATH`, or set `GAPPD_WHISPER_BIN`
+- Whisper model at `~/.gappd/models/ggml-base.en.bin`, or pass `--model`
+- Ollama running locally with configured model available, for example `llama3.1:8b`
+
+## CLI commands
 
 ```bash
 gappd setup
@@ -58,9 +140,9 @@ Notes:
 - `gappd listen` stops with `Ctrl+C`.
 - If no model path is provided to `gappd listen`, it looks for a Whisper model at `~/.gappd/models/ggml-base.en.bin`.
 
-## Quick start
+## CLI quick start
 
-1. Copy the example config:
+1. Optional: copy the example config. If this file is missing, `gappd` uses built-in defaults.
 
    ```bash
    mkdir -p ~/.gappd
@@ -68,6 +150,11 @@ Notes:
    ```
 
 2. Make sure Ollama is running and the configured model is available.
+
+   ```bash
+   ollama serve
+   ollama pull llama3.1:8b
+   ```
 
 3. Run setup:
 
@@ -96,7 +183,7 @@ endpoint = "http://localhost:11434"
 temperature = 0.3
 ```
 
-Current validation rules to be aware of:
+Current validation rules:
 
 - `db_path` must be set; `~` and `~/...` are expanded
 - `ai.provider` must be `ollama`
@@ -105,18 +192,16 @@ Current validation rules to be aware of:
 
 See `config.example.toml` for the full example, including optional commented fields.
 
-## Development
+## Development checks
 
 ```bash
 go test ./...
 go build ./cmd/gappd
+cd desktop && npx tsc --noEmit
 ```
 
-Desktop note:
-
-- Use `npm run dev` from `desktop/` for desktop development.
-- This repo is not a pnpm workspace.
-- For `desktop` dependency install and packaging/release commands, keep using `npm` inside `desktop/`.
+This repo is not an npm workspace. Root npm scripts delegate into `./desktop` with
+`npm --prefix ./desktop ...`.
 
 ## License
 
