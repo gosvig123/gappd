@@ -1,16 +1,25 @@
+import { meetingStatusLabel, meetingStatusTone, processingStatusLabel } from '../components/meeting-status'
+
 type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
+type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
 
 type RecordViewProps = {
   title: string
   device: number
   devices: Device[]
   recordingStatus: string
+  recentMeeting: MeetingListItem | null
   canStart: boolean
   canStop: boolean
   onTitleChange: (value: string) => void
   onDeviceChange: (value: number) => void
   onStart: () => void
   onStop: () => void
+  onOpenMeeting: (id: string) => void
+}
+
+function dateLabel(value: string): string {
+  return new Date(value).toLocaleString()
 }
 
 function recordStatus(canStart: boolean, canStop: boolean, devices: Device[]): { tone: string; title: string; detail: string } {
@@ -39,7 +48,28 @@ function RecordSummary({ title, selectedDevice, devices }: { title: string; sele
   )
 }
 
-export function RecordView({ title, device, devices, recordingStatus, canStart, canStop, onTitleChange, onDeviceChange, onStart, onStop }: RecordViewProps) {
+function MeetingStatusCard({ meeting, onOpenMeeting }: { meeting: MeetingListItem | null; onOpenMeeting: (id: string) => void }) {
+  if (!meeting) {
+    return <div className="record-meeting-card"><strong>No recent meeting yet</strong><span>Record a meeting to see processing and results here.</span></div>
+  }
+  return (
+    <div className="record-meeting-card">
+      <div className="record-meeting-head">
+        <div><span className="label">Current / recent meeting</span><strong>{meeting.title}</strong></div>
+        <div className={`status-pill ${meetingStatusTone(meeting.status.state)}`}>{meetingStatusLabel(meeting.status.state)}</div>
+      </div>
+      <div className="record-meeting-meta">
+        <span>{dateLabel(meeting.startedAt)}</span>
+        <span>AI {processingStatusLabel(meeting.status.processing.state)}</span>
+        <span>{meeting.hasSummary ? 'Summary ready' : 'Summary pending'}</span>
+        <span>{meeting.hasTranscript ? 'Transcript ready' : 'Transcript pending'}</span>
+      </div>
+      <button className="secondary" onClick={() => onOpenMeeting(meeting.id)}>Open in Meetings</button>
+    </div>
+  )
+}
+
+export function RecordView({ title, device, devices, recordingStatus, recentMeeting, canStart, canStop, onTitleChange, onDeviceChange, onStart, onStop, onOpenMeeting }: RecordViewProps) {
   const status = recordStatus(canStart, canStop, devices)
   const selectedDevice = devices.find((item) => item.index === device)
   return (
@@ -53,6 +83,7 @@ export function RecordView({ title, device, devices, recordingStatus, canStart, 
       </div>
       <div className="record-stack">
         <p className="record-intro">{status.detail}</p>
+        <MeetingStatusCard meeting={recentMeeting} onOpenMeeting={onOpenMeeting} />
         <RecordFields title={title} device={device} devices={devices} onTitleChange={onTitleChange} onDeviceChange={onDeviceChange} />
         <div className="actions-row">
           <button className="primary" onClick={onStart} disabled={!canStart}>
