@@ -94,8 +94,8 @@ npm run desktop:dist:dir
 
 Desktop startup checks the continuous release manifest at
 `https://github.com/gosvig123/gappd/releases/download/main-latest/latest.json`.
-If the manifest version is newer than the packaged app version, the header shows
-a manual update button that opens the `main-latest` release page in the browser.
+If the manifest version is newer than the packaged app version, a floating update
+control opens the `main-latest` release page in the browser.
 Offline or failed checks are ignored so the app remains usable.
 
 Pushes to `main` publish macOS arm64 DMGs to the moving `main-latest` release.

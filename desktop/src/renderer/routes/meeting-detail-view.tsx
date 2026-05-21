@@ -8,6 +8,8 @@ const READING_COLLAPSE_RATIO = 0.4
 const READING_OVERFLOW_PADDING = 1
 const READING_MORE_LABEL = 'Read more'
 const READING_LESS_LABEL = 'Show less'
+const SHOW_TRANSCRIPT_LABEL = 'Show transcript'
+const HIDE_TRANSCRIPT_LABEL = 'Hide transcript'
 
 type MeetingDetailPanelProps = {
   selectedMeetingId: string | null
@@ -15,7 +17,6 @@ type MeetingDetailPanelProps = {
   selectedMeetingLoading: boolean
   selectedMeetingError: string | null
   transcript: string
-  onRefresh: () => void
 }
 
 function dateLabel(value: string): string {
@@ -75,6 +76,20 @@ function ReadingCard({ title, value, emptyText, primary }: { title: string; valu
   )
 }
 
+function TranscriptCard({ value, defaultOpen }: { value: string; defaultOpen: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  useEffect(() => setOpen(defaultOpen), [defaultOpen, value])
+  return (
+    <div className="detail-surface detail-block reading-card transcript-card">
+      <div className="reading-card-header">
+        <div className="meeting-section-label">Transcript</div>
+        <Button className="compact-action" onClick={() => setOpen((current) => !current)} aria-expanded={open}>{open ? HIDE_TRANSCRIPT_LABEL : SHOW_TRANSCRIPT_LABEL}</Button>
+      </div>
+      {open ? <div className="reading-text transcript-text">{value || 'No transcript yet.'}</div> : <div className="reading-placeholder">Transcript hidden. Show transcript for full context.</div>}
+    </div>
+  )
+}
+
 function DetailShell({ children }: { children: ReactNode }) {
   return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel>
 }
@@ -116,20 +131,19 @@ function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { se
   )
 }
 
-function SelectedMeetingDetail({ selectedMeeting, transcript, onRefresh }: { selectedMeeting: MeetingDetail; transcript: string; onRefresh: () => void }) {
+function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
   return (
     <Panel className="detail-panel">
       <div className="panel-header">
-        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Read summary first. Transcript follows for full context.</p></div>
-        <Button onClick={onRefresh}>Refresh</Button>
+        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Analysis and transcript for selected meeting.</p></div>
       </div>
       <div className="detail-grid detail-reading-stack">
-        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary />
-        <ReadingCard title="Transcript" value={transcript} emptyText="No transcript yet." />
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
+        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary />
+        <TranscriptCard value={transcript} defaultOpen={!hasSummary} />
         <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} />
       </div>
     </Panel>
@@ -137,9 +151,9 @@ function SelectedMeetingDetail({ selectedMeeting, transcript, onRefresh }: { sel
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
-  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript, onRefresh } = props
+  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript } = props
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><div className="detail-surface detail-alert">{selectedMeetingError}</div></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onRefresh={onRefresh} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
 }

@@ -1,5 +1,6 @@
 import '../components/local-ai.css'
 
+import { Button, StatusPill } from '../components/ui'
 import { onboardingErrorView, onboardingPhaseLabel, onboardingStatusTone, type LocalAIStatus } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 
@@ -10,6 +11,15 @@ type SettingsViewProps = {
   onRepair: () => void
 }
 
+const SETTINGS_METRICS: Array<{ label: string; value: (status: LocalAIStatus | null) => string }> = [
+  { label: 'Supported', value: (status) => flagLabel(status, 'supported') },
+  { label: 'Configured', value: (status) => flagLabel(status, 'configured') },
+  { label: 'Bundled', value: (status) => flagLabel(status, 'bundled') },
+  { label: 'Running', value: (status) => flagLabel(status, 'running') },
+  { label: 'Model', value: (status) => status?.model || 'Unknown' },
+  { label: 'Endpoint', value: (status) => status?.endpoint || 'Unknown' },
+]
+
 function flagLabel(status: LocalAIStatus | null, key: 'supported' | 'configured' | 'bundled' | 'running'): string {
   if (!status) return 'Unknown'
   return status[key] ? 'Yes' : 'No'
@@ -18,52 +28,23 @@ function flagLabel(status: LocalAIStatus | null, key: 'supported' | 'configured'
 export function SettingsView({ status, loading, busy, onRepair }: SettingsViewProps) {
   const errorView = onboardingErrorView(status)
   return (
-    <section className="panel panel-large settings-stack">
+    <section className="settings-stack settings-stack-plain">
       <div className="panel-header">
-        <div>
-          <h1>Local AI</h1>
-          <p>Runtime health on this Mac.</p>
-        </div>
-        <div className={`status-pill ${status ? onboardingStatusTone(status.phase) : 'processing'}`}>
-          {loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}
-        </div>
+        <div><h1>Local AI</h1><p>Runtime health on this Mac.</p></div>
+        <StatusPill tone={status ? onboardingStatusTone(status.phase) : 'processing'}>{loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}</StatusPill>
       </div>
-
       <div className="settings-grid">
-        <div className="metric-card">
-          <div className="label">Supported</div>
-          <div className="value">{flagLabel(status, 'supported')}</div>
-        </div>
-        <div className="metric-card">
-          <div className="label">Configured</div>
-          <div className="value">{flagLabel(status, 'configured')}</div>
-        </div>
-        <div className="metric-card">
-          <div className="label">Bundled</div>
-          <div className="value">{flagLabel(status, 'bundled')}</div>
-        </div>
-        <div className="metric-card">
-          <div className="label">Running</div>
-          <div className="value">{flagLabel(status, 'running')}</div>
-        </div>
-        <div className="metric-card">
-          <div className="label">Model</div>
-          <div className="value">{status?.model || 'Unknown'}</div>
-        </div>
-        <div className="metric-card">
-          <div className="label">Endpoint</div>
-          <div className="value">{status?.endpoint || 'Unknown'}</div>
-        </div>
+        {SETTINGS_METRICS.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value(status)} />)}
       </div>
-
       <div className="status-note">{status?.message || 'Check local AI status and repair the managed runtime if needed.'}</div>
       {errorView ? <LocalAIErrorBanner errorView={errorView} /> : null}
-
       <div className="actions-row">
-        <button className="ui-button ui-button-primary" onClick={onRepair} disabled={loading || busy || Boolean(status && !status.canRepair)}>
-          {busy ? 'Repairing...' : 'Repair local AI'}
-        </button>
+        <Button variant="primary" onClick={onRepair} disabled={loading || busy || !status || !status.canRepair}>{busy ? 'Repairing...' : 'Repair local AI'}</Button>
       </div>
     </section>
   )
+}
+
+function MetricCard({ label, value }: { label: string; value: string }) {
+  return <div className="metric-card"><div className="label">{label}</div><div className="value">{value}</div></div>
 }

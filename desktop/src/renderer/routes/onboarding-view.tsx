@@ -122,7 +122,7 @@ function SetupPlanRail({ status }: Pick<OnboardingViewProps, 'status'>) {
           <div key={metric.label} className="metric-card"><div className="label">{metric.label}</div><div className="value">{metric.value}</div></div>
         ))}
       </div>
-      <div className="status-note">After setup, Record and Meetings unlock. Settings keeps a repair action for the local runtime.</div>
+      <div className="status-note">After setup, Dashboard unlocks. Settings keeps a repair action for the local runtime.</div>
     </aside>
   )
 }
@@ -142,7 +142,7 @@ export function OnboardingView({ status, busy, onStart, onRetry, onContinue }: O
           <div className="setup-callout"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></div>
           <SetupProgressCard status={status} copy={copy} />
           {isReady ? (
-            <div className="actions-row"><button className="ui-button ui-button-primary" onClick={onContinue}>Go to Today</button></div>
+            <div className="actions-row"><button className="ui-button ui-button-primary" onClick={onContinue}>Go to Dashboard</button></div>
           ) : (
             <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
           )}
