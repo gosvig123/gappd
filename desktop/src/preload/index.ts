@@ -35,6 +35,10 @@ const api: GappdApi = {
     getLocalAIStatus: () => ipcRenderer.invoke(IPC_CHANNELS.settings.getLocalAIStatus),
     repairLocalAI: () => ipcRenderer.invoke(IPC_CHANNELS.settings.repairLocalAI),
   },
+  update: {
+    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.update.getStatus),
+    openUpdatePage: () => ipcRenderer.invoke(IPC_CHANNELS.update.openUpdatePage),
+  },
 }
 
 contextBridge.exposeInMainWorld('gappd', api)

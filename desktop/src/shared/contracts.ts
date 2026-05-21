@@ -141,3 +141,7 @@ export type LocalAIStatus = OnboardingStatus & {
   running: boolean
   canRepair: boolean
 }
+
+export type UpdateStatus =
+  | { available: false; currentVersion: string; latestVersion?: string }
+  | { available: true; currentVersion: string; latestVersion: string; releaseUrl: string; name?: string }

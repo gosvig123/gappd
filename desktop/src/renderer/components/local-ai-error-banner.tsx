@@ -27,7 +27,7 @@ export function LocalAIErrorBanner({ errorView }: LocalAIErrorBannerProps) {
           {errorView.ownershipHelp.summary ? <div className="setup-error-summary">Detected listener: {errorView.ownershipHelp.summary}</div> : null}
           <pre className="setup-error-instructions">{errorView.ownershipHelp.instructions}</pre>
           <div className="actions-row">
-            <button className="secondary" onClick={() => copyInstructions(errorView.ownershipHelp!.instructions)}>Copy stop instructions</button>
+            <button className="ui-button ui-button-secondary" onClick={() => copyInstructions(errorView.ownershipHelp!.instructions)}>Copy stop instructions</button>
           </div>
         </div>
       ) : null}

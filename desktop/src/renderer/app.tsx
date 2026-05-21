@@ -5,17 +5,19 @@ import { isPermissionErrorMessage, permissionTarget } from './components/meeting
 import { PermissionBanner } from './components/permission-banner'
 import { MeetingsView } from './routes/meetings-view'
 import { OnboardingView } from './routes/onboarding-view'
-import { RecordView } from './routes/record-view'
+import { TodayView } from './routes/today-view'
 import { SettingsView } from './routes/settings-view'
+import { VIEW_MEETINGS, VIEW_SETTINGS, VIEW_TODAY, type View } from './views'
 type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus>>
 type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
 type MeetingListItem = Awaited<ReturnType<typeof window.gappd.meetings.list>>[number]
 type MeetingDetail = Awaited<ReturnType<typeof window.gappd.meetings.show>>
-type View = 'record' | 'meetings' | 'settings'
+type UpdateStatus = Awaited<ReturnType<typeof window.gappd.update.getStatus>>
+const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = ['recording', 'stopping', 'processing']
 const localAI = getLocalAIContract()
 
 export function App() {
-  const [view, setView] = useState<View>('record')
+  const [view, setView] = useState<View>(VIEW_TODAY)
   const [devices, setDevices] = useState<Device[]>([])
   const [meetings, setMeetings] = useState<MeetingListItem[]>([])
   const [selectedMeetingId, setSelectedMeetingId] = useState<string | null>(null)
@@ -33,6 +35,7 @@ export function App() {
   const [settingsStatus, setSettingsStatus] = useState<LocalAIStatus | null>(null)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [settingsBusy, setSettingsBusy] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null)
 
   function applySelectedMeetingId(id: string | null) {
     selectedMeetingIdRef.current = id
@@ -157,13 +160,27 @@ export function App() {
   }, [onboarding?.phase])
 
   useEffect(() => {
-    if (onboarding?.phase === 'ready' && view === 'settings') void loadSettingsStatus()
+    if (onboarding?.phase === 'ready' && view === VIEW_SETTINGS) void loadSettingsStatus()
   }, [onboarding?.phase, view])
 
+  useEffect(() => {
+    let disposed = false
+    window.gappd.update.getStatus()
+      .then((status) => {
+        if (!disposed) setUpdateStatus(status.available ? status : null)
+      })
+      .catch(() => {
+        if (!disposed) setUpdateStatus(null)
+      })
+    return () => {
+      disposed = true
+    }
+  }, [])
+
   const canStart = devices.length > 0 && recording.status === 'idle'
-  const canStop = ['recording', 'stopping', 'processing'].includes(recording.status)
+  const canStop = STOPPABLE_RECORDING_STATUSES.includes(recording.status)
   const transcript = useMemo(() => selectedMeeting?.transcriptText ?? '', [selectedMeeting])
-  const recentMeeting = meetings.find((meeting) => meeting.id === selectedMeetingId) ?? meetings[0] ?? null
+  const latestMeeting = meetings[0] ?? null
   const bannerError = error ?? recording.error ?? null
   const isPermissionError = isPermissionErrorMessage(bannerError)
 
@@ -190,7 +207,7 @@ export function App() {
         return
       }
       await window.gappd.recording.start({ title: title.trim() || new Date().toLocaleString(), device, mode: 'both' })
-      setView('record')
+      setView(VIEW_TODAY)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }
@@ -238,32 +255,40 @@ export function App() {
       setSettingsBusy(false)
     }
   }
+  async function handleOpenUpdate() {
+    if (!updateStatus?.available) return
+    try {
+      await window.gappd.update.openUpdatePage()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   function openMeeting(id: string) {
     void loadMeeting(id)
-    setView('meetings')
+    setView(VIEW_MEETINGS)
   }
 
   if (loading || !onboarding) return <div className="screen-center">Loading Gappd…</div>
 
-  const activeView = onboarding.phase === 'ready' ? view : 'settings'
+  const activeView = onboarding.phase === 'ready' ? view : VIEW_SETTINGS
 
   return (
     <div className="app-shell">
-      <AppSidebar onboarding={onboarding} view={activeView} onViewChange={setView} />
+      <AppSidebar onboarding={onboarding} view={activeView} updateStatus={updateStatus} onViewChange={setView} onOpenUpdate={() => void handleOpenUpdate()} />
       <main className="app-main">
         {onboarding.phase === 'ready' ? (
           <PermissionBanner error={bannerError} isPermissionError={isPermissionError} onRetry={() => void handleStart()} onOpenSettings={() => void handleOpenPermissionsSettings()} />
         ) : null}
-        <div className="main-grid">
-          {activeView === 'record' ? (
-            <RecordView title={title} device={device} devices={devices} recordingStatus={recording.status} recentMeeting={recentMeeting} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} onOpenMeeting={openMeeting} />
-          ) : activeView === 'meetings' ? (
-            <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} onRecordFirst={() => setView('record')} />
+        <div className={activeView === VIEW_TODAY ? 'main-grid today-grid' : 'main-grid'}>
+          {activeView === VIEW_TODAY ? (
+            <TodayView title={title} device={device} devices={devices} meetings={meetings} recordingStatus={recording.status} latestMeeting={latestMeeting} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} onOpenMeeting={openMeeting} />
+          ) : activeView === VIEW_MEETINGS ? (
+            <MeetingsView meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} onRefresh={() => void refreshMeetings()} onSelectMeeting={(id) => void loadMeeting(id)} onRecordFirst={() => setView(VIEW_TODAY)} />
           ) : onboarding.phase === 'ready' ? (
             <SettingsView status={settingsStatus} loading={settingsLoading} busy={settingsBusy} onRepair={() => void handleRepairLocalAI()} />
           ) : (
-            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setView('record')} />
+            <OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setView(VIEW_TODAY)} />
           )}
         </div>
       </main>

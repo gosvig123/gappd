@@ -1,0 +1,193 @@
+.meeting-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--color-text-soft);
+}
+
+.meeting-tag,
+.detail-stat {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-soft);
+  padding: 5px 9px;
+}
+
+.meeting-detail-title {
+  display: grid;
+  gap: 8px;
+}
+
+.meeting-detail-summary,
+.detail-reading-stack {
+  max-width: 82ch;
+}
+
+.detail-reading-stack {
+  min-height: 0;
+  width: 100%;
+}
+
+.detail-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detail-stat {
+  display: grid;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.detail-stat span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.detail-stat strong {
+  font-size: 14px;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 18px;
+}
+
+.reading-card {
+  gap: 14px;
+  --reading-fade-color: var(--color-surface-soft);
+}
+
+.primary-reading-card {
+  --reading-fade-color: var(--color-accent-tint);
+  background: var(--color-accent-tint);
+  border-color: var(--color-accent-border);
+}
+
+.reading-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reading-text {
+  position: relative;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text-soft);
+  line-height: 1.65;
+  font-size: 14px;
+}
+
+.reading-text.collapsed {
+  max-height: 40vh;
+  overflow: hidden;
+}
+
+.reading-text.collapsed::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 48px;
+  background: linear-gradient(180deg, transparent, var(--reading-fade-color));
+  pointer-events: none;
+}
+
+.reading-toggle {
+  justify-self: start;
+}
+
+.primary-reading-card .reading-text {
+  color: var(--color-text);
+  font-size: 15px;
+}
+
+.detail-surface {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-soft);
+}
+
+.detail-alert {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+}
+
+.detail-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-panel > .detail-reading-stack,
+.detail-panel > .detail-grid {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.detail-block,
+.diagnostic-section {
+  display: grid;
+  gap: 10px;
+}
+
+.diagnostics-panel {
+  color: var(--color-text-muted);
+  background: var(--surface-translucent);
+}
+
+.diagnostics-panel summary {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-soft);
+}
+
+.diagnostics-panel summary span {
+  color: var(--color-accent);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.diagnostics-panel summary small,
+.diagnostic-section p {
+  color: var(--color-text-muted);
+}
+
+.diagnostic-section p {
+  margin: 0;
+  line-height: var(--line-height-base);
+}
+
+@media (max-width: 900px) {
+  .detail-panel,
+  .detail-panel > .detail-reading-stack,
+  .detail-panel > .detail-grid {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 720px) {
+  .reading-card-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .detail-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}

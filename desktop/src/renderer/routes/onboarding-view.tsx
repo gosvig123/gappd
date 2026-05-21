@@ -81,8 +81,8 @@ function SetupActions({ busy, isReady, label, hint, showRetry, onAction, onRetry
   return (
     <>
       <div className="actions-row">
-        <button className="primary" onClick={onAction} disabled={busy || isReady}>{label}</button>
-        {showRetry ? <button className="secondary" onClick={onRetry} disabled={busy}>Retry</button> : null}
+        <button className="ui-button ui-button-primary" onClick={onAction} disabled={busy || isReady}>{label}</button>
+        {showRetry ? <button className="ui-button ui-button-secondary" onClick={onRetry} disabled={busy}>Retry</button> : null}
       </div>
       {hint ? <div className="action-copy">{hint}</div> : null}
     </>
@@ -142,7 +142,7 @@ export function OnboardingView({ status, busy, onStart, onRetry, onContinue }: O
           <div className="setup-callout"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></div>
           <SetupProgressCard status={status} copy={copy} />
           {isReady ? (
-            <div className="actions-row"><button className="primary" onClick={onContinue}>Go to Record</button></div>
+            <div className="actions-row"><button className="ui-button ui-button-primary" onClick={onContinue}>Go to Today</button></div>
           ) : (
             <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
           )}

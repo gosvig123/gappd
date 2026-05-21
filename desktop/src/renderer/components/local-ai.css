@@ -37,12 +37,13 @@
 .setup-callout {
   gap: 12px;
   padding: 24px;
-  border-color: rgba(96, 165, 250, 0.18);
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.16), rgba(15, 23, 42, 0.28));
+  border-color: var(--color-accent-border);
+  background: var(--color-accent-tint);
 }
 
 .setup-callout strong {
-  font-size: 14px;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--shell-accent-text);
@@ -99,7 +100,7 @@
 
 .metric-card .value {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
   word-break: break-word;
 }
 
@@ -128,19 +129,19 @@
 }
 
 .progress-track.indeterminate {
-  background: rgba(37, 99, 235, 0.12);
+  background: var(--color-accent-tint);
 }
 
 .progress-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--shell-accent-start), var(--shell-accent-end));
+  background: var(--color-accent-strong);
   transition: width 160ms ease;
 }
 
 .progress-fill.indeterminate {
   width: 32%;
-  background: linear-gradient(90deg, rgba(37, 99, 235, 0.2), var(--shell-accent-end), rgba(191, 219, 254, 0.72));
+  background: var(--color-accent);
   animation: setup-progress-indeterminate 1.4s ease-in-out infinite;
 }
 
@@ -151,7 +152,7 @@
 
 .action-copy {
   margin-top: -8px;
-  font-size: 14px;
+  font-size: var(--font-size-base);
 }
 
 .settings-stack ul {
@@ -167,7 +168,7 @@
 
 .setup-progress-headline,
 .setup-error-banner strong {
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .technical-details {

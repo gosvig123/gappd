@@ -6,7 +6,7 @@
 
 .setup-error-summary {
   color: var(--shell-text);
-  font-weight: 600;
+  font-weight: var(--font-weight-semibold);
 }
 
 .setup-error-instructions {
