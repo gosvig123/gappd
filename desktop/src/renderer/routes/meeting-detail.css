@@ -1,8 +1,8 @@
 .meeting-flags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
+  gap: 6px;
+  font-size: 11px;
   color: var(--color-text-soft);
 }
 
@@ -11,12 +11,12 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-surface-soft);
-  padding: 5px 9px;
+  padding: 4px 8px;
 }
 
 .meeting-detail-title {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .meeting-detail-summary,
@@ -32,32 +32,35 @@
 .detail-meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .detail-stat {
+  min-width: 0;
   display: grid;
-  gap: 4px;
-  border-radius: 12px;
-  padding: 12px 14px;
+  gap: 3px;
+  border-radius: 9px;
+  padding: 9px 10px;
 }
 
 .detail-stat span {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-muted);
 }
 
 .detail-stat strong {
-  font-size: 14px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .detail-grid {
   display: grid;
-  gap: 18px;
+  gap: 10px;
 }
 
 .reading-card {
-  gap: 14px;
+  gap: 10px;
   --reading-fade-color: var(--color-surface-soft);
 }
 
@@ -71,7 +74,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .reading-text {
@@ -79,8 +82,8 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--color-text-soft);
-  line-height: 1.65;
-  font-size: 14px;
+  line-height: 1.55;
+  font-size: 13px;
 }
 
 .reading-text.collapsed {
@@ -94,7 +97,7 @@
   right: 0;
   bottom: 0;
   left: 0;
-  height: 48px;
+  height: 40px;
   background: linear-gradient(180deg, transparent, var(--reading-fade-color));
   pointer-events: none;
 }
@@ -105,7 +108,7 @@
 
 .reading-placeholder {
   color: var(--color-text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .transcript-text {
@@ -115,15 +118,15 @@
 
 .primary-reading-card .reading-text {
   color: var(--color-text);
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .detail-surface {
   display: grid;
   gap: 8px;
-  padding: 18px;
+  padding: 12px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--color-surface-soft);
 }
 
@@ -149,7 +152,7 @@
 .detail-block,
 .diagnostic-section {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .diagnostics-panel {
@@ -161,7 +164,7 @@
   cursor: pointer;
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
   color: var(--color-text-soft);
 }
 
@@ -182,7 +185,7 @@
   line-height: var(--line-height-base);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 56rem) {
   .detail-panel,
   .detail-panel > .detail-reading-stack,
   .detail-panel > .detail-grid {
@@ -190,7 +193,7 @@
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 45rem) {
   .reading-card-header {
     display: grid;
     grid-template-columns: 1fr;

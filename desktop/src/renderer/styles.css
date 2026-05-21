@@ -42,7 +42,7 @@ strong {
   color: var(--color-text-soft);
 }
 
-@media (max-width: 68.75rem), (max-height: 44rem) {
+@media (max-width: 56rem) {
   body {
     overflow: auto;
   }
