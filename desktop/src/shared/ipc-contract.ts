@@ -1,5 +1,5 @@
-import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState } from './contracts'
-export type { OnboardingStatus, RecordingState } from './contracts'
+import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
+export type { OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
 
 export const IPC_CHANNELS = {
   system: {
@@ -24,6 +24,10 @@ export const IPC_CHANNELS = {
   settings: {
     getLocalAIStatus: 'settings:getLocalAIStatus',
     repairLocalAI: 'settings:repairLocalAI',
+  },
+  update: {
+    getStatus: 'update:getStatus',
+    openUpdatePage: 'update:openUpdatePage',
   },
 } as const
 
@@ -65,5 +69,9 @@ export type GappdApi = {
   settings: {
     getLocalAIStatus(): Promise<LocalAIStatus>
     repairLocalAI(): Promise<LocalAIStatus>
+  }
+  update: {
+    getStatus(): Promise<UpdateStatus>
+    openUpdatePage(): Promise<void>
   }
 }

@@ -3,26 +3,31 @@ name: Desktop macOS Release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
 
 jobs:
   release:
     runs-on: macos-14
     env:
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      GAPPD_ENABLE_NOTARIZATION: '1'
-      GAPPD_REQUIRE_GATEKEEPER: '1'
+      CONTINUOUS_RELEASE_TAG: main-latest
+      CONTINUOUS_RELEASE_NAME: Gappd main latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -47,6 +52,17 @@ jobs:
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Install desktop dependencies
+        run: npm ci
+        working-directory: desktop
 
       - name: Write signing certificate
         run: |
@@ -86,21 +102,46 @@ jobs:
           echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
         env:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
-      - name: Download Go modules
-        run: go mod download
-
-      - name: Install desktop dependencies
-        run: npm ci
+      - name: Set continuous release version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          VERSION="$(node - <<'NODE'
+          const pkg = require('./package.json')
+          const [major, minor] = pkg.version.split('.')
+          console.log(`${Number(major)}.${Number(minor)}.${process.env.GITHUB_RUN_NUMBER}`)
+          NODE
+          )"
+          npm version "$VERSION" --no-git-tag-version
+          echo "GAPPD_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Continuous release version: $VERSION"
         working-directory: desktop
 
       - name: Build release artifacts
-        run: npm run dist
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            npm run dist:mac:arm64
+          else
+            npm run dist
+          fi
         working-directory: desktop
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          GAPPD_ENABLE_NOTARIZATION: '1'
+          GAPPD_REQUIRE_GATEKEEPER: '1'
 
       - name: Verify notarized app bundle
         run: npm run verify:mac-release
         working-directory: desktop
+        env:
+          GAPPD_ENABLE_NOTARIZATION: '1'
+          GAPPD_REQUIRE_GATEKEEPER: '1'
 
       - name: Verify release artifacts exist
         run: |
@@ -121,6 +162,80 @@ jobs:
           printf 'Found app bundle: %s\n' "${app_paths[@]}"
           printf 'Found DMG: %s\n' "${dmg_paths[@]}"
 
+      - name: Write continuous release manifest
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          shopt -s nullglob
+          dmg_paths=(desktop/release/*.dmg)
+          if [ ${#dmg_paths[@]} -ne 1 ]; then
+            echo "Expected exactly one DMG for continuous release, found ${#dmg_paths[@]}" >&2
+            exit 1
+          fi
+
+          mkdir -p desktop/release/continuous
+          cp "${dmg_paths[0]}" desktop/release/continuous/Gappd-main-latest-arm64.dmg
+          export DMG_NAME="Gappd-main-latest-arm64.dmg"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from urllib.parse import quote
+
+          tag = os.environ['CONTINUOUS_RELEASE_TAG']
+          repo = os.environ['GITHUB_REPOSITORY']
+          version = os.environ['GAPPD_RELEASE_VERSION']
+          dmg_name = os.environ['DMG_NAME']
+          release_url = f'https://github.com/{repo}/releases/tag/{tag}'
+          download_url = f'https://github.com/{repo}/releases/download/{tag}/{quote(dmg_name)}'
+          Path('desktop/release/continuous/latest.json').write_text(json.dumps({
+            'version': version,
+            'releaseUrl': release_url,
+            'downloadUrl': download_url,
+          }, indent=2) + '\n')
+          PY
+          cat desktop/release/continuous/latest.json
+
+      - name: Publish continuous release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          if [ "$CONTINUOUS_RELEASE_TAG" != "main-latest" ]; then
+            echo "Refusing to force-push unexpected release tag: $CONTINUOUS_RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          auth_remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags "$auth_remote" main
+          remote_main_sha="$(git rev-parse FETCH_HEAD)"
+          if [ "$GITHUB_SHA" != "$remote_main_sha" ]; then
+            echo "Skipping stale continuous release for $GITHUB_SHA; origin/main is $remote_main_sha."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # main-latest is intentionally moving metadata for in-app update checks.
+          # Force is limited to this guarded CI-owned tag, not human version tags.
+          git tag -f "$CONTINUOUS_RELEASE_TAG" "$GITHUB_SHA"
+          git push "$auth_remote" "refs/tags/$CONTINUOUS_RELEASE_TAG:refs/tags/$CONTINUOUS_RELEASE_TAG" --force
+
+          notes="Continuous macOS arm64 build from main at $GITHUB_SHA. Version $GAPPD_RELEASE_VERSION."
+          if gh release view "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$CONTINUOUS_RELEASE_NAME" --notes "$notes"
+          else
+            gh release create "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$CONTINUOUS_RELEASE_NAME" --notes "$notes" --latest=false --target "$GITHUB_SHA"
+          fi
+
+          gh release view "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
+            case "$asset" in
+              *.dmg|latest.json) gh release delete-asset "$CONTINUOUS_RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
+            esac
+          done
+          gh release upload "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" desktop/release/continuous/Gappd-main-latest-arm64.dmg desktop/release/continuous/latest.json --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -128,4 +243,5 @@ jobs:
           if-no-files-found: error
           path: |
             desktop/release/*.dmg
+            desktop/release/continuous/**
             desktop/release/mac*/**

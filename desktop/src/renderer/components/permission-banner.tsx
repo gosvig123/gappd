@@ -17,10 +17,10 @@ export function PermissionBanner({ error, isPermissionError, onRetry, onOpenSett
             Enable GappdCapture in macOS Privacy &amp; Security, then try again. If GappdCapture is missing in System Settings, click Open System Settings once to register it first. Screen Recording changes may require quitting and reopening the app before retrying.
           </div>
           <div className="actions-row banner-actions">
-            <button className="primary" onClick={onRetry}>
+            <button className="ui-button ui-button-primary" onClick={onRetry}>
               Try again
             </button>
-            <button className="secondary" onClick={onOpenSettings}>
+            <button className="ui-button ui-button-secondary" onClick={onOpenSettings}>
               Open System Settings
             </button>
           </div>

@@ -90,6 +90,21 @@ npm run desktop:dist:dir
 
 `npm run dev` remains a shorthand for `npm run desktop:dev`.
 
+## Desktop update checks
+
+Desktop startup checks the continuous release manifest at
+`https://github.com/gosvig123/gappd/releases/download/main-latest/latest.json`.
+If the manifest version is newer than the packaged app version, the sidebar shows
+a manual update button that opens the `main-latest` release page in the browser.
+Offline or failed checks are ignored so the app remains usable.
+
+Pushes to `main` publish signed/notarized macOS arm64 DMGs to the moving
+`main-latest` release. CI sets the app version to `0.1.<run_number>` for those
+builds and uploads a matching `latest.json` manifest.
+
+Set `GAPPD_UPDATE_CHECK_URL` to point at compatible JSON with `version` plus
+`releaseUrl` or `downloadUrl` when testing a different release manifest.
+
 ## CLI install
 
 ```bash

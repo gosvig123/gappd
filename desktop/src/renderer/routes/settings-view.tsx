@@ -60,7 +60,7 @@ export function SettingsView({ status, loading, busy, onRepair }: SettingsViewPr
       {errorView ? <LocalAIErrorBanner errorView={errorView} /> : null}
 
       <div className="actions-row">
-        <button className="primary" onClick={onRepair} disabled={loading || busy || Boolean(status && !status.canRepair)}>
+        <button className="ui-button ui-button-primary" onClick={onRepair} disabled={loading || busy || Boolean(status && !status.canRepair)}>
           {busy ? 'Repairing...' : 'Repair local AI'}
         </button>
       </div>
