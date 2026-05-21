@@ -2,16 +2,42 @@
   min-height: 0;
   display: grid;
   flex: 1;
-  gap: 1rem;
+  gap: 0.625rem;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.dashboard-grid .panel {
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.dashboard-grid .panel-header {
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dashboard-grid .status-pill {
+  padding: 2px 7px;
+  font-size: 11px;
+}
+
+.dashboard-grid input,
+.dashboard-grid select {
+  border-radius: 8px;
+  padding: 7px 9px;
+}
+
+.dashboard-grid .ui-button {
+  padding: 7px 10px;
+  border-radius: 8px;
 }
 
 .dashboard-workspace {
   min-height: 0;
   display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(19rem, 0.9fr) minmax(24rem, 1.4fr);
+  gap: 0.625rem;
+  grid-template-columns: minmax(17rem, 0.82fr) minmax(24rem, 1.5fr);
 }
 
 .dashboard-inbox-panel,
@@ -25,52 +51,51 @@
 }
 
 .record-action-panel {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 5;
-  padding: 14px;
+  padding: 8px 10px;
 }
 
 .record-action-bar {
   display: grid;
-  grid-template-columns: minmax(12rem, 0.8fr) minmax(22rem, 1.3fr) max-content;
-  gap: 14px;
-  align-items: end;
+  grid-template-columns: minmax(10rem, 0.75fr) minmax(20rem, 1.25fr) max-content;
+  gap: 10px;
+  align-items: center;
 }
 
 .record-status-copy {
   min-width: 0;
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 
 .record-status-copy p {
-  margin: 2px 0 0;
-  color: var(--color-text-soft);
-  font-size: 13px;
-  line-height: 1.35;
+  margin: 1px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.25;
 }
 
 .record-fields {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: minmax(10rem, 0.9fr) minmax(12rem, 1.1fr);
 }
 
 .record-fields label {
-  gap: 6px;
+  gap: 5px;
 }
 
 .record-fields input,
 .record-fields select {
   min-width: 0;
   width: 100%;
-  padding-block: 8px;
 }
 
 .record-actions {
+  gap: 8px;
   margin-top: 0;
   justify-content: flex-end;
 }
@@ -82,20 +107,20 @@
 .filter-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: -4px 0 12px;
+  gap: 6px;
+  margin: -2px 0 8px;
 }
 
 .filter-chip {
   display: inline-flex;
-  gap: 6px;
+  gap: 5px;
   align-items: center;
   border: 1px solid var(--color-border);
   border-radius: 999px;
   background: var(--color-surface-soft);
   color: var(--color-text-soft);
-  padding: 7px 10px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 11px;
   font-weight: var(--font-weight-medium);
 }
 
@@ -111,15 +136,26 @@
 
 @media (max-width: 81.25rem) {
   .dashboard-workspace {
-    grid-template-columns: minmax(18rem, 0.8fr) minmax(22rem, 1.2fr);
+    grid-template-columns: minmax(16rem, 0.8fr) minmax(22rem, 1.25fr);
   }
 
   .record-action-bar {
-    grid-template-columns: minmax(12rem, 0.7fr) minmax(20rem, 1fr) max-content;
+    grid-template-columns: minmax(10rem, 0.7fr) minmax(18rem, 1fr) max-content;
   }
 }
 
 @media (max-width: 68.75rem) {
+  .record-action-bar {
+    grid-template-columns: minmax(10rem, 0.8fr) minmax(18rem, 1.2fr);
+  }
+
+  .record-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 56rem) {
   .dashboard-grid {
     grid-template-rows: auto;
     overflow: visible;
@@ -136,25 +172,13 @@
   }
 
   .record-actions {
-    justify-content: flex-start;
-  }
-}
-
-@media (max-height: 44rem) {
-  .dashboard-grid,
-  .dashboard-workspace,
-  .dashboard-detail-column {
-    overflow: visible;
-  }
-
-  .dashboard-grid {
-    grid-template-rows: auto;
+    grid-column: auto;
   }
 }
 
 @media (max-width: 45rem) {
   .record-action-panel {
-    padding: 12px;
+    padding: 10px;
   }
 
   .record-status-copy {
