@@ -405,23 +405,10 @@ func requestPermissionsAndExit(outputPath: String? = nil) {
     let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
 
     // Request screen recording — shows native dialog if not yet determined
-    var screenGranted = false
-    if #available(macOS 15.0, *) {
-        if !CGPreflightScreenCaptureAccess() {
-            _ = CGRequestScreenCaptureAccess()
-        }
-        screenGranted = CGPreflightScreenCaptureAccess()
-    } else {
-        let sema = DispatchSemaphore(value: 0)
-        Task {
-            do {
-                _ = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-                screenGranted = true
-            } catch {}
-            sema.signal()
-        }
-        sema.wait()
+    if !CGPreflightScreenCaptureAccess() {
+        _ = CGRequestScreenCaptureAccess()
     }
+    let screenGranted = CGPreflightScreenCaptureAccess()
 
     let micStr = micGranted ? "granted" : "denied"
     let screenStr = screenGranted ? "granted" : "denied"
@@ -456,29 +443,10 @@ func checkMicPermission() {
 }
 
 func checkScreenRecordingPermission() {
-    if #available(macOS 15.0, *) {
-        if !CGPreflightScreenCaptureAccess() {
-            _ = CGRequestScreenCaptureAccess()
-            stderrPrint("error: Screen Recording access required for system audio capture.\n  A System Settings window should have opened — enable GappdCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
-            exit(126)
-        }
-    } else {
-        let sema = DispatchSemaphore(value: 0)
-        var denied = false
-        Task {
-            do {
-                _ = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
-            } catch {
-                denied = true
-            }
-            sema.signal()
-        }
-        sema.wait()
-        if denied {
-            stderrPrint("error: Screen Recording access required for system audio capture.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
-            exit(126)
-        }
-    }
+    if CGPreflightScreenCaptureAccess() { return }
+    _ = CGRequestScreenCaptureAccess()
+    stderrPrint("error: Screen Recording access required for system audio capture.\n  A System Settings window should have opened — enable GappdCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
+    exit(126)
 }
 
 // MARK: - Main
