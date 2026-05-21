@@ -41,14 +41,20 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Validate release secrets
+      - name: Resolve signing mode
         run: |
-          test -n "$APPLE_CERTIFICATE_P12_BASE64"
-          test -n "$APPLE_CERTIFICATE_PASSWORD"
-          test -n "$APPLE_SIGNING_IDENTITY"
-          test -n "$APPLE_ID"
-          test -n "$APPLE_APP_SPECIFIC_PASSWORD"
-          test -n "$APPLE_TEAM_ID"
+          missing=0
+          for name in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name:-}" ]; then missing=1; fi
+          done
+
+          if [ "$missing" -eq 0 ]; then
+            echo "GAPPD_SIGNED_RELEASE=1" >> "$GITHUB_ENV"
+            echo "Signing mode: Apple signed and notarized"
+          else
+            echo "GAPPD_SIGNED_RELEASE=0" >> "$GITHUB_ENV"
+            echo "Signing mode: unsigned development DMG because Apple release secrets are not configured"
+          fi
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -65,6 +71,7 @@ jobs:
         working-directory: desktop
 
       - name: Write signing certificate
+        if: env.GAPPD_SIGNED_RELEASE == '1'
         run: |
           CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
           python3 - <<'PY'
@@ -80,6 +87,7 @@ jobs:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
 
       - name: Preflight signing identity
+        if: env.GAPPD_SIGNED_RELEASE == '1'
         run: |
           CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
           KEYCHAIN_PATH="$RUNNER_TEMP/gappd-macos-signing.keychain-db"
@@ -120,6 +128,8 @@ jobs:
 
       - name: Build release artifacts
         run: |
+          export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
+          export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
             npm run dist:mac:arm64
           else
@@ -133,15 +143,13 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          GAPPD_ENABLE_NOTARIZATION: '1'
-          GAPPD_REQUIRE_GATEKEEPER: '1'
 
-      - name: Verify notarized app bundle
-        run: npm run verify:mac-release
+      - name: Verify macOS app bundle
+        run: |
+          export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
+          export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
+          npm run verify:mac-release
         working-directory: desktop
-        env:
-          GAPPD_ENABLE_NOTARIZATION: '1'
-          GAPPD_REQUIRE_GATEKEEPER: '1'
 
       - name: Verify release artifacts exist
         run: |
@@ -220,7 +228,12 @@ jobs:
           git tag -f "$CONTINUOUS_RELEASE_TAG" "$GITHUB_SHA"
           git push "$auth_remote" "refs/tags/$CONTINUOUS_RELEASE_TAG:refs/tags/$CONTINUOUS_RELEASE_TAG" --force
 
-          notes="Continuous macOS arm64 build from main at $GITHUB_SHA. Version $GAPPD_RELEASE_VERSION."
+          if [ "$GAPPD_SIGNED_RELEASE" = "1" ]; then
+            release_kind="signed and notarized"
+          else
+            release_kind="unsigned development"
+          fi
+          notes="Continuous macOS arm64 $release_kind build from main at $GITHUB_SHA. Version $GAPPD_RELEASE_VERSION."
           if gh release view "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release edit "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$CONTINUOUS_RELEASE_NAME" --notes "$notes"
           else
