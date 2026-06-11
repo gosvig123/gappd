@@ -14,9 +14,10 @@ import (
 func enhanceCmd() *cobra.Command {
 	var notes string
 	cmd := &cobra.Command{
-		Use:   "enhance [meeting-id]",
-		Short: "Run AI extraction and synthesis on a meeting transcript",
-		Args:  cobra.ExactArgs(1),
+		Use:     "enhance [meeting-id]",
+		Aliases: []string{"summarize"},
+		Short:   "Run AI extraction and synthesis on a meeting transcript",
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, store, pipeline, err := loadDeps()
 			if err != nil {
@@ -138,20 +139,4 @@ func showMeeting(store *db.DB, id string) error {
 	}
 	fmt.Print(renderMeetingDetail(view))
 	return nil
-}
-
-func summarizeCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "summarize [meeting-id]",
-		Short: "Re-generate AI summary (alias for enhance)",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_, store, pipeline, err := loadDeps()
-			if err != nil {
-				return err
-			}
-			defer store.Close()
-			return runEnhance(store, pipeline, args[0], "")
-		},
-	}
 }

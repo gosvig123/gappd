@@ -6,19 +6,25 @@ import (
 	"fmt"
 )
 
+type CompletionRequest struct {
+	System      string
+	User        string
+	Temperature float64
+}
+
 type Pipeline struct {
-	provider    InferenceProvider
+	ollama      *OllamaProvider
 	temperature float64
 }
 
-func NewPipeline(provider InferenceProvider, temperature float64) *Pipeline {
-	return &Pipeline{provider: provider, temperature: temperature}
+func NewPipeline(ollama *OllamaProvider, temperature float64) *Pipeline {
+	return &Pipeline{ollama: ollama, temperature: temperature}
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
 	system, user := Stage1Prompt(transcript)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	raw, err := p.provider.CompleteJSON(ctx, req)
+	raw, err := p.ollama.CompleteJSON(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
 	}
@@ -32,7 +38,7 @@ func (p *Pipeline) Synthesize(ctx context.Context, extraction *Extraction, userN
 	}
 	system, user := Stage2Prompt(string(data), userNotes)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	result, err := p.provider.Complete(ctx, req)
+	result, err := p.ollama.Complete(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("synthesis failed: %w", err)
 	}

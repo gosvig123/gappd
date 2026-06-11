@@ -80,7 +80,10 @@ func (s Service) transcribeAs(ctx context.Context, audioPath, modelPath, default
 	if s.Events == nil {
 		fmt.Fprintf(s.Out, "● Transcribing %s audio...\n", speaker)
 	}
-	segs, err := s.transcriptions().Transcribe(ctx, audioPath, modelPath)
+	segs, err := transcribe.TranscribeFile(ctx, audioPath, modelPath)
+	if s.transcriber != nil {
+		segs, err = s.transcriber.Transcribe(ctx, audioPath, modelPath)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +97,11 @@ func (s Service) enhanceAndSave(meeting *db.Meeting, transcript string) error {
 	if s.Events == nil {
 		fmt.Fprintln(s.Out, "── Enhancing with AI... ─────────────────")
 	}
-	extraction, summary, err := s.enhancements().Run(context.Background(), transcript, "")
+	var runner enhancer = s.Pipeline
+	if s.enhancer != nil {
+		runner = s.enhancer
+	}
+	extraction, summary, err := runner.Run(context.Background(), transcript, "")
 	if err != nil {
 		return s.saveEnhanceFailure(meeting, transcript, err)
 	}

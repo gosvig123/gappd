@@ -1,31 +1,15 @@
 package recording
 
 import (
-	"context"
-	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 )
-
-type failingProvider struct {
-	err error
-}
-
-func (p failingProvider) Complete(context.Context, ai.CompletionRequest) (string, error) {
-	return "", p.err
-}
-
-func (p failingProvider) CompleteJSON(context.Context, ai.CompletionRequest) (json.RawMessage, error) {
-	return nil, p.err
-}
-
-func (p failingProvider) Available() error {
-	return nil
-}
 
 func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	store := openTestDB(t)
@@ -91,18 +75,28 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	}
 	events := &recordingEvents{}
 	providerErr := errors.New("llm down")
-	service := Service{Store: store, Pipeline: ai.NewPipeline(failingProvider{err: providerErr}, 0), Events: events}
+	server := failingOllamaServer(t, providerErr.Error())
+	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
 	transcript := "[You] hello\n"
 
 	err := service.enhanceAndSave(meeting, transcript)
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("enhanceAndSave() error = %v, want saved transcript failure", err)
 	}
-	assertEnhanceFailure(t, getMeeting(t, store, meeting.ID), transcript, providerErr)
+	assertEnhanceFailure(t, getMeeting(t, store, meeting.ID), transcript, providerErr.Error())
 	assertOneEvent(t, events, EventFailed, meeting.ID, providerErr)
 }
 
-func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr error) {
+func failingOllamaServer(t *testing.T, message string) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"`+message+`"}`, http.StatusInternalServerError)
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr string) {
 	t.Helper()
 	if stored.Transcript == nil || *stored.Transcript != transcript {
 		t.Fatalf("transcript = %v, want %q", stored.Transcript, transcript)
@@ -110,7 +104,7 @@ func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, p
 	if stored.ProcessingStatus != db.ProcessingStatusFailed {
 		t.Fatalf("processing_status = %q, want %q", stored.ProcessingStatus, db.ProcessingStatusFailed)
 	}
-	if stored.ProcessingFailureMessage == nil || !strings.Contains(*stored.ProcessingFailureMessage, providerErr.Error()) {
-		t.Fatalf("processing_failure_message = %v, want contains %q", stored.ProcessingFailureMessage, providerErr.Error())
+	if stored.ProcessingFailureMessage == nil || !strings.Contains(*stored.ProcessingFailureMessage, providerErr) {
+		t.Fatalf("processing_failure_message = %v, want contains %q", stored.ProcessingFailureMessage, providerErr)
 	}
 }

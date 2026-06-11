@@ -3,139 +3,129 @@ package ai
 import (
 	"context"
 	"encoding/json"
-	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-type fakeInferenceProvider struct {
-	completeResult string
-	completeErr    error
-	jsonResult     json.RawMessage
-	jsonErr        error
-	requests       []CompletionRequest
+type ollamaTestServer struct {
+	server   *httptest.Server
+	requests []ollamaRequest
+	contents []string
+	status   int
 }
 
-func (f *fakeInferenceProvider) Complete(ctx context.Context, req CompletionRequest) (string, error) {
-	f.requests = append(f.requests, req)
-	if f.completeErr != nil {
-		return "", f.completeErr
+func newOllamaTestServer(t *testing.T, contents ...string) *ollamaTestServer {
+	t.Helper()
+	h := &ollamaTestServer{contents: contents, status: http.StatusOK}
+	h.server = httptest.NewServer(http.HandlerFunc(h.handleChat))
+	t.Cleanup(h.server.Close)
+	return h
+}
+
+func (h *ollamaTestServer) pipeline(temp float64) *Pipeline {
+	return NewPipeline(NewOllama(h.server.URL, "test-model"), temp)
+}
+
+func (h *ollamaTestServer) handleChat(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/api/chat" {
+		http.NotFound(w, r)
+		return
 	}
-	return f.completeResult, nil
-}
-
-func (f *fakeInferenceProvider) CompleteJSON(ctx context.Context, req CompletionRequest) (json.RawMessage, error) {
-	f.requests = append(f.requests, req)
-	if f.jsonErr != nil {
-		return nil, f.jsonErr
+	var req ollamaRequest
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	h.requests = append(h.requests, req)
+	if h.status != http.StatusOK {
+		http.Error(w, `{"error":"ollama offline"}`, h.status)
+		return
 	}
-	return f.jsonResult, nil
-}
-
-func (f *fakeInferenceProvider) Available() error {
-	return nil
+	content := h.contents[len(h.requests)-1]
+	_ = json.NewEncoder(w).Encode(ollamaResponse{Message: ollamaMessage{Content: content}})
 }
 
 func TestPipelineExtract(t *testing.T) {
-	provider := &fakeInferenceProvider{jsonResult: json.RawMessage(`{"participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)}
-	pipeline := NewPipeline(provider, 0.7)
+	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
 
-	extraction, err := pipeline.Extract(context.Background(), "Ada: let's ship beta on Friday")
+	extraction, err := h.pipeline(0.7).Extract(context.Background(), "Ada: let's ship beta on Friday")
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
-	if len(provider.requests) != 1 {
-		t.Fatalf("provider request count = %d, want 1", len(provider.requests))
-	}
-	if provider.requests[0].Temperature != 0.7 {
-		t.Fatalf("request temperature = %v, want %v", provider.requests[0].Temperature, 0.7)
-	}
-	if provider.requests[0].User != "Ada: let's ship beta on Friday" {
-		t.Fatalf("request user = %q, want transcript", provider.requests[0].User)
-	}
+	assertRequest(t, h.requests, 0, 0.7, "Ada: let's ship beta on Friday")
 	if extraction.Sentiment != "productive" {
-		t.Fatalf("extraction.Sentiment = %q, want %q", extraction.Sentiment, "productive")
+		t.Fatalf("extraction.Sentiment = %q, want productive", extraction.Sentiment)
 	}
 	if len(extraction.ActionItems) != 1 || extraction.ActionItems[0].Owner != "Ada" {
-		t.Fatalf("extraction.ActionItems = %#v, want Ada-owned action item", extraction.ActionItems)
+		t.Fatalf("extraction.ActionItems = %#v, want Ada-owned item", extraction.ActionItems)
 	}
 }
 
 func TestPipelineSynthesize(t *testing.T) {
-	provider := &fakeInferenceProvider{completeResult: "## Meeting Title\nDemo sync"}
-	pipeline := NewPipeline(provider, 0.4)
-	extraction := &Extraction{
-		Participants: []string{"Ada"},
-		Topics:       []Topic{{Name: "Roadmap", Summary: "Reviewed next steps"}},
-	}
+	h := newOllamaTestServer(t, "## Meeting Title\nDemo sync")
+	extraction := &Extraction{Participants: []string{"Ada"}, Topics: []Topic{{Name: "Roadmap", Summary: "Reviewed next steps"}}}
 
-	notes, err := pipeline.Synthesize(context.Background(), extraction, "Emphasize launch blockers")
+	notes, err := h.pipeline(0.4).Synthesize(context.Background(), extraction, "Emphasize launch blockers")
 	if err != nil {
 		t.Fatalf("Synthesize returned error: %v", err)
 	}
 	if notes != "## Meeting Title\nDemo sync" {
 		t.Fatalf("Synthesize result = %q, want provider output", notes)
 	}
-	if len(provider.requests) != 1 {
-		t.Fatalf("provider request count = %d, want 1", len(provider.requests))
-	}
-	if provider.requests[0].Temperature != 0.4 {
-		t.Fatalf("request temperature = %v, want %v", provider.requests[0].Temperature, 0.4)
-	}
-	if !strings.Contains(provider.requests[0].User, "## Extracted Data") {
-		t.Fatalf("request user = %q, want extracted data section", provider.requests[0].User)
-	}
-	if !strings.Contains(provider.requests[0].User, "Emphasize launch blockers") {
-		t.Fatalf("request user = %q, want user notes", provider.requests[0].User)
-	}
+	assertRequestContains(t, h.requests, 0, 0.4, "## Extracted Data", "Emphasize launch blockers")
 }
 
 func TestPipelineRun(t *testing.T) {
-	provider := &fakeInferenceProvider{
-		jsonResult:     json.RawMessage(`{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`),
-		completeResult: "## Meeting Title\nWeekly sync",
-	}
-	pipeline := NewPipeline(provider, 0.3)
+	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, "## Meeting Title\nWeekly sync")
 
-	extraction, notes, err := pipeline.Run(context.Background(), "Ada: weekly sync", "")
+	extraction, notes, err := h.pipeline(0.3).Run(context.Background(), "Ada: weekly sync", "")
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	if extraction == nil {
-		t.Fatal("Run extraction = nil, want extraction")
+	if extraction == nil || notes != "## Meeting Title\nWeekly sync" {
+		t.Fatalf("Run extraction=%v notes=%q, want extraction and notes", extraction, notes)
 	}
-	if notes != "## Meeting Title\nWeekly sync" {
-		t.Fatalf("Run notes = %q, want provider output", notes)
-	}
-	if len(provider.requests) != 2 {
-		t.Fatalf("provider request count = %d, want 2", len(provider.requests))
-	}
-	if provider.requests[0].User != "Ada: weekly sync" {
-		t.Fatalf("extract request user = %q, want transcript", provider.requests[0].User)
-	}
-	if strings.Contains(provider.requests[1].User, "## User Notes") {
-		t.Fatalf("synthesize request user = %q, want no user notes section", provider.requests[1].User)
+	assertRequest(t, h.requests, 0, 0.3, "Ada: weekly sync")
+	if strings.Contains(h.requests[1].Messages[1].Content, "## User Notes") {
+		t.Fatalf("synthesize request user = %q, want no notes section", h.requests[1].Messages[1].Content)
 	}
 }
 
 func TestPipelineRunReturnsExtractionWhenSynthesisFails(t *testing.T) {
-	provider := &fakeInferenceProvider{
-		jsonResult:  json.RawMessage(`{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`),
-		completeErr: errors.New("ollama offline"),
-	}
-	pipeline := NewPipeline(provider, 0.3)
+	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, `{"error":"ollama offline"}`)
+	h.status = http.StatusOK
+	h.contents[1] = ""
+	h.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.handleChat(w, r)
+		if len(h.requests) == 1 {
+			h.status = http.StatusInternalServerError
+		}
+	})
 
-	extraction, notes, err := pipeline.Run(context.Background(), "Ada: weekly sync", "follow up")
-	if err == nil {
-		t.Fatal("Run error = nil, want error")
+	extraction, notes, err := h.pipeline(0.3).Run(context.Background(), "Ada: weekly sync", "follow up")
+	if err == nil || !strings.Contains(err.Error(), "synthesis failed") {
+		t.Fatalf("Run error = %v, want synthesis failure", err)
 	}
-	if !strings.Contains(err.Error(), "synthesis failed: ollama offline") {
-		t.Fatalf("Run error = %q, want synthesis context", err)
+	if extraction == nil || notes != "" {
+		t.Fatalf("Run extraction=%v notes=%q, want extraction and empty notes", extraction, notes)
 	}
-	if extraction == nil {
-		t.Fatal("Run extraction = nil, want extraction")
+}
+
+func assertRequest(t *testing.T, requests []ollamaRequest, idx int, temp float64, user string) {
+	t.Helper()
+	if len(requests) <= idx {
+		t.Fatalf("request count = %d, want > %d", len(requests), idx)
 	}
-	if notes != "" {
-		t.Fatalf("Run notes = %q, want empty string", notes)
+	if requests[idx].Options.Temperature != temp || requests[idx].Messages[1].Content != user {
+		t.Fatalf("request = %#v, want temp %v user %q", requests[idx], temp, user)
+	}
+}
+
+func assertRequestContains(t *testing.T, requests []ollamaRequest, idx int, temp float64, values ...string) {
+	t.Helper()
+	assertRequest(t, requests, idx, temp, requests[idx].Messages[1].Content)
+	for _, value := range values {
+		if !strings.Contains(requests[idx].Messages[1].Content, value) {
+			t.Fatalf("request user = %q, want %q", requests[idx].Messages[1].Content, value)
+		}
 	}
 }
