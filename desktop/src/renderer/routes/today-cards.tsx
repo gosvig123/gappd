@@ -1,5 +1,5 @@
 import type { Device, RecordingStatus } from '../../shared/contracts'
-import { Button, Panel, StatusPill } from '../components/ui'
+import { Button, Field, Panel, StatusPill } from '../components/ui'
 import { readyState } from './today-model'
 
 type CaptureCardProps = {
@@ -37,8 +37,8 @@ export function CaptureCard(props: CaptureCardProps) {
 function RecordFields({ title, device, devices, onTitleChange, onDeviceChange }: Pick<CaptureCardProps, 'title' | 'device' | 'devices' | 'onTitleChange' | 'onDeviceChange'>) {
   return (
     <div className="record-fields">
-      <label><span>Meeting title</span><input value={title} onChange={(event) => onTitleChange(event.target.value)} placeholder="Sprint planning" /></label>
-      <label><span>Audio input</span><select value={device} onChange={(event) => onDeviceChange(Number(event.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>[{item.index}] {item.name}</option>)}</select></label>
+      <Field label="Meeting title"><input value={title} onChange={(event) => onTitleChange(event.target.value)} placeholder="Sprint planning" /></Field>
+      <Field label="Audio input"><select value={device} onChange={(event) => onDeviceChange(Number(event.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>[{item.index}] {item.name}</option>)}</select></Field>
     </div>
   )
 }

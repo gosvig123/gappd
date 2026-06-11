@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
 import { meetingStatusLabel, meetingStatusTone } from '../components/meeting-status'
-import { EmptyState, Panel, StatusPill } from '../components/ui'
+import { EmptyState, ListRow, PageHeader, Panel, StatusPill } from '../components/ui'
 import { MeetingDetailPanel } from './meeting-detail-view'
 import { CaptureCard } from './today-cards'
 import './meetings.css'
@@ -61,9 +61,7 @@ function MeetingInboxPanel(props: { counts: InboxCounts; filter: InboxFilter; me
   const visibleText = `${props.meetings.length} of ${props.totalMeetings} meetings shown`
   return (
     <Panel className="list-panel dashboard-inbox-panel">
-      <div className="panel-header compact inbox-panel-header">
-        <div><h1>Meeting inbox</h1><p>{visibleText}</p></div>
-      </div>
+      <PageHeader className="compact inbox-panel-header" title="Meeting inbox" description={visibleText} />
       <FilterChips counts={props.counts} value={props.filter} onChange={props.onFilterChange} />
       <div className="meeting-list">
         {props.meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === props.selectedMeetingId} onSelect={props.onSelectMeeting} />)}
@@ -83,13 +81,13 @@ function FilterChips({ counts, value, onChange }: { counts: InboxCounts; value: 
 
 function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem; selected: boolean; onSelect: (id: string) => void }) {
   return (
-    <button className={selected ? 'meeting-row selected' : 'meeting-row'} onClick={() => onSelect(meeting.id)} aria-pressed={selected}>
+    <ListRow className="meeting-row" selected={selected} onClick={() => onSelect(meeting.id)}>
       <div className="meeting-row-top">
         <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div><div className="meeting-meta">{dateLabel(meeting.startedAt)}</div></div>
         <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingStatusLabel(meeting.status.state)}</StatusPill>
       </div>
       <div className="meeting-row-summary">{artifactSummary(meeting)}</div>
-    </button>
+    </ListRow>
   )
 }
 

@@ -2,6 +2,7 @@ import './local-ai.css'
 
 import { LocalAITechnicalDetails } from './local-ai-technical-details'
 import type { LocalAIOwnershipHelp } from './local-ai-ownership'
+import { Banner, Button } from './ui'
 
 type LocalAIErrorBannerProps = {
   errorView: {
@@ -19,19 +20,20 @@ function copyInstructions(instructions: string) {
 
 export function LocalAIErrorBanner({ errorView }: LocalAIErrorBannerProps) {
   return (
-    <div className="banner error setup-error-banner">
-      <strong>{errorView.title}</strong>
+    <Banner tone="error" title={errorView.title} className="setup-error-banner">
       {errorView.detail ? <div>{errorView.detail}</div> : null}
-      {errorView.ownershipHelp ? (
-        <div className="setup-error-help">
-          {errorView.ownershipHelp.summary ? <div className="setup-error-summary">Detected listener: {errorView.ownershipHelp.summary}</div> : null}
-          <pre className="setup-error-instructions">{errorView.ownershipHelp.instructions}</pre>
-          <div className="actions-row">
-            <button className="ui-button ui-button-secondary" onClick={() => copyInstructions(errorView.ownershipHelp!.instructions)}>Copy stop instructions</button>
-          </div>
-        </div>
-      ) : null}
+      {errorView.ownershipHelp ? <OwnershipHelp help={errorView.ownershipHelp} /> : null}
       <LocalAITechnicalDetails detail={errorView.debugDetail} />
+    </Banner>
+  )
+}
+
+function OwnershipHelp({ help }: { help: LocalAIOwnershipHelp }) {
+  return (
+    <div className="setup-error-help">
+      {help.summary ? <div className="setup-error-summary">Detected listener: {help.summary}</div> : null}
+      <pre className="setup-error-instructions">{help.instructions}</pre>
+      <div className="actions-row"><Button onClick={() => copyInstructions(help.instructions)}>Copy stop instructions</Button></div>
     </div>
   )
 }

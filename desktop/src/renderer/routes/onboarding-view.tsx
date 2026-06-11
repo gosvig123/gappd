@@ -8,6 +8,7 @@ import {
   type OnboardingStatus,
 } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
+import { Button, Card, Field, MetricCard, PageHeader, Panel, ProgressBar, StatusPill } from '../components/ui'
 import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
 
 type OnboardingViewProps = {
@@ -85,8 +86,8 @@ function SetupActions({ busy, isReady, label, hint, showRetry, onAction, onRetry
   return (
     <>
       <div className="actions-row">
-        <button className="ui-button ui-button-primary" onClick={onAction} disabled={busy || isReady}>{label}</button>
-        {showRetry ? <button className="ui-button ui-button-secondary" onClick={onRetry} disabled={busy}>Retry</button> : null}
+        <Button variant="primary" onClick={onAction} disabled={busy || isReady}>{label}</Button>
+        {showRetry ? <Button onClick={onRetry} disabled={busy}>Retry</Button> : null}
       </div>
       {hint ? <div className="action-copy">{hint}</div> : null}
     </>
@@ -102,9 +103,7 @@ function SetupProgressCard({ status, copy }: SetupProgressCardProps) {
         <span className="label">Progress</span>
         <span className="progress-copy">{progress === null ? progressLabel(status) : `${progress}%`}</span>
       </div>
-      <div className={`progress-track${progress === null ? ' indeterminate' : ''}`}>
-        <div className={`progress-fill${progress === null ? ' indeterminate' : ''}`} style={progress === null ? undefined : { width: `${progress}%` }} />
-      </div>
+      <ProgressBar value={progress} label="Local AI setup progress" />
       <div className="progress-copy">{copy.progressDetail}</div>
       {messageView ? (
         <div className="setup-progress-detail">
@@ -123,16 +122,14 @@ function SetupPlanRail({ status, busy, selectedModel, modelOptions, onModelChang
   return (
     <aside className="setup-panel setup-rail settings-stack">
       <div><h2>Plan</h2><p>Choose local AI model before setup. Default stays selected unless you choose faster setup.</p></div>
-      <label className="setup-model-picker">
-        <span>Model</span>
+      <Field label="Model" className="setup-model-picker" hint={selectedOption?.detail}>
         <select value={selectedModel} onChange={(event) => updateSelectedModel(event.currentTarget.value, onModelChange)} disabled={disabled}>
           {modelOptions.map((option) => <option key={option.tag} value={option.tag}>{option.label}</option>)}
         </select>
-        {selectedOption ? <span className="model-detail">{selectedOption.detail}</span> : null}
-      </label>
+      </Field>
       <div className="setup-metrics">
         {planMetrics(status, selectedModel).map((metric) => (
-          <div key={metric.label} className="metric-card"><div className="label">{metric.label}</div><div className="value">{metric.value}</div></div>
+          <MetricCard key={metric.label} label={metric.label} value={metric.value} />
         ))}
       </div>
       <div className="status-note">After setup, Dashboard unlocks. Settings keeps a repair action for the local runtime.</div>
@@ -152,14 +149,14 @@ export function OnboardingView({ status, busy, selectedModel, modelOptions, onMo
   const action = isError ? onRetry : onStart
   const hint = !isReady && !isError && status.phase !== 'needs_setup' ? copy.actionHint : undefined
   return (
-    <section className="panel panel-large setup-shell">
-      <div className="panel-header"><div><h1>Local AI setup</h1><p>Bundled Ollama and Whisper on this Mac.</p></div><div className={`status-pill ${onboardingStatusTone(status.phase)}`}>{onboardingPhaseLabel(status.phase)}</div></div>
+    <Panel className="panel-large setup-shell">
+      <PageHeader title="Local AI setup" description="Bundled Ollama and Whisper on this Mac." action={<StatusPill tone={onboardingStatusTone(status.phase)}>{onboardingPhaseLabel(status.phase)}</StatusPill>} />
       <div className="setup-grid">
         <div className="setup-panel setup-primary">
-          <div className="setup-callout"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></div>
+          <Card className="setup-callout accent"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></Card>
           <SetupProgressCard status={status} copy={copy} />
           {isReady ? (
-            <div className="actions-row"><button className="ui-button ui-button-primary" onClick={onContinue}>Go to Dashboard</button></div>
+            <div className="actions-row"><Button variant="primary" onClick={onContinue}>Go to Dashboard</Button></div>
           ) : (
             <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
           )}
@@ -167,6 +164,6 @@ export function OnboardingView({ status, busy, selectedModel, modelOptions, onMo
         </div>
         <SetupPlanRail status={status} busy={busy} selectedModel={selectedModel} modelOptions={modelOptions} onModelChange={onModelChange} />
       </div>
-    </section>
+    </Panel>
   )
 }

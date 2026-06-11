@@ -126,7 +126,7 @@
 
 .filter-chip.active {
   border-color: var(--color-accent-border-strong);
-  background: var(--surface-accent-gradient);
+  background: var(--surface-accent);
   color: var(--color-text);
 }
 

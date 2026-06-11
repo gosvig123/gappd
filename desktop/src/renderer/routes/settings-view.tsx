@@ -1,6 +1,6 @@
 import '../components/local-ai.css'
 
-import { Button, StatusPill } from '../components/ui'
+import { Button, MetricCard, PageHeader, StatusPill } from '../components/ui'
 import { onboardingErrorView, onboardingPhaseLabel, onboardingStatusTone, type LocalAIStatus } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 
@@ -29,10 +29,7 @@ export function SettingsView({ status, loading, busy, onRepair }: SettingsViewPr
   const errorView = onboardingErrorView(status)
   return (
     <section className="settings-stack settings-stack-plain">
-      <div className="panel-header">
-        <div><h1>Local AI</h1><p>Runtime health on this Mac.</p></div>
-        <StatusPill tone={status ? onboardingStatusTone(status.phase) : 'processing'}>{loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}</StatusPill>
-      </div>
+      <PageHeader title="Local AI" description="Runtime health on this Mac." action={<StatusPill tone={status ? onboardingStatusTone(status.phase) : 'processing'}>{loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}</StatusPill>} />
       <div className="settings-grid">
         {SETTINGS_METRICS.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value(status)} />)}
       </div>
@@ -45,6 +42,3 @@ export function SettingsView({ status, loading, busy, onRepair }: SettingsViewPr
   )
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return <div className="metric-card"><div className="label">{label}</div><div className="value">{value}</div></div>
-}
