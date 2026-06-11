@@ -83,7 +83,7 @@ function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem;
   return (
     <ListRow className="meeting-row" selected={selected} onClick={() => onSelect(meeting.id)}>
       <div className="meeting-row-top">
-        <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div><div className="meeting-meta">{dateLabel(meeting.startedAt)}</div></div>
+        <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div>{meeting.title !== dateLabel(meeting.startedAt) ? <div className="meeting-meta">{dateLabel(meeting.startedAt)}</div> : null}</div>
         <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingStatusLabel(meeting.status.state)}</StatusPill>
       </div>
       <div className="meeting-row-summary">{artifactSummary(meeting)}</div>

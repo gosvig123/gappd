@@ -10,8 +10,10 @@ html, body, #root {
 
 body {
   overflow: hidden;
-  background: var(--color-bg);
+  background: var(--shell-glow), var(--color-bg);
+  background-attachment: fixed;
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
   font-family: var(--font-ui);
   font-size: var(--font-size-base);
   line-height: var(--line-height-base);
