@@ -16,21 +16,20 @@ store transcripts in SQLite, and run Ollama-based summarisation/extraction.
 | AI | Ollama (local LLM inference), pipeline-based prompts |
 | Transcription | Local whisper binary (`whisper-local`) |
 | Audio capture | macOS ScreenCaptureKit helper (Swift, `capture-helper/`) |
-| Build | Makefile — `make build`, `make install`, `make dev` (watchexec) |
+| Build | Makefile for Go/capture helper; root npm scripts for desktop |
 
 ## Project layout
 
 ```
 cmd/gappd/           CLI entry point & command definitions
   main.go          root command and setup command
-  commands.go      enhance, meetings, show, summarize commands
+  commands.go      enhance (summarize alias), meetings, show commands
   listen.go        listen (record) & devices commands
   helpers.go       shared CLI helpers (loadDeps, formatTranscript, etc.)
 
 internal/
-  ai/              LLM inference layer
-    provider.go    InferenceProvider interface + factory
-    ollama.go      Ollama implementation
+  ai/              Ollama inference layer
+    ollama.go      Ollama HTTP client
     pipeline.go    Multi-step AI pipeline (summarise, extract, etc.)
     prompts.go     Prompt templates
   capture/         Audio capture (macOS)
@@ -61,7 +60,7 @@ gappd devices            List audio devices
 gappd meetings           List stored meetings
 gappd show <id>          Display a meeting transcript + summary
 gappd enhance <id>       Run AI extraction pipeline on a transcript
-gappd summarize <id>     Generate an AI summary
+gappd summarize <id>     Alias for `gappd enhance <id>`
 ```
 
 ## Database
@@ -75,16 +74,18 @@ gappd summarize <id>     Generate an AI summary
 ## Build & test
 
 ```bash
-make build          # → ./build/gappd
-make install        # → /usr/local/bin/gappd
-make dev            # watchexec live reload
-make db-reset       # drop + recreate local DB
-go test ./...       # run all tests
+make build                # → ./build/gappd
+make install              # → /usr/local/bin/gappd
+make dev                  # watchexec live reload
+make db-reset             # drop + recreate local DB
+go test ./...             # run all Go tests
+npm run desktop:typecheck # TypeScript check
+npm run desktop:dev       # desktop dev app
 ```
 
 ## Contributor workflow note
 
-- Use `npm run dev` from `desktop/` for desktop development.
+- Use root `npm run desktop:*` scripts or `npm run dev` from `desktop/` for desktop development.
 - Do not treat this repo as a pnpm workspace.
 - `desktop` dependency installation and packaging/release commands remain npm-based.
 
@@ -93,7 +94,7 @@ go test ./...       # run all tests
 - **Errors**: wrap with `fmt.Errorf("context: %w", err)`, return early
 - **Packages**: thin `cmd/` layer delegates to `internal/` packages
 - **Config**: all runtime config flows through `config.Config`; no globals
-- **AI provider**: new providers implement `ai.InferenceProvider` interface
+- **AI provider**: Ollama-only; keep provider config validation in `internal/config`
 - **SQL**: use parameterised queries, never string-interpolate user input
 - **Schema changes**: keep `internal/db/schema.sql` as source of truth
 - **Tests**: place `_test.go` next to the code; use table-driven tests where sensible
