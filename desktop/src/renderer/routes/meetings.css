@@ -31,7 +31,7 @@
 
 .meeting-row.selected {
   border-color: var(--color-accent-border-strong);
-  background: var(--surface-accent-gradient);
+  background: var(--surface-accent);
 }
 
 .meeting-row-top {
