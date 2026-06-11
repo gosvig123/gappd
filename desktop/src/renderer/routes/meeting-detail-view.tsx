@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
 import { artifactLabel, meetingStatusLabel, processingStatusLabel } from '../components/meeting-status'
+import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel } from '../components/ui'
 
 const READING_COLLAPSE_RATIO = 0.4
@@ -70,7 +71,7 @@ function ReadingCard({ title, value, emptyText, primary }: { title: string; valu
         <div className="meeting-section-label">{title}</div>
         {primary ? <SummaryCopyButton summary={value} /> : null}
       </div>
-      <div ref={ref} className={textClassName}>{value || emptyText}</div>
+      <div ref={ref} className={textClassName}>{value ? (primary ? <Markdown value={value} /> : value) : emptyText}</div>
       {overflowing ? <Button className="compact-action reading-toggle" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>{expanded ? READING_LESS_LABEL : READING_MORE_LABEL}</Button> : null}
     </div>
   )
