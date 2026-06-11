@@ -27,7 +27,7 @@ func rootCmd() *cobra.Command {
 	}
 	root.AddCommand(
 		listenCmd(), devicesCmd(), meetingsCmd(), showCmd(),
-		summarizeCmd(), setupCmd(), enhanceCmd(), appCmd(),
+		setupCmd(), enhanceCmd(), appCmd(),
 	)
 	return root
 }
@@ -37,12 +37,7 @@ func loadDeps() (config.Config, *db.DB, *ai.Pipeline, error) {
 	if err != nil {
 		return cfg, nil, nil, err
 	}
-	provider, err := ai.NewProvider(cfg.AI)
-	if err != nil {
-		store.Close()
-		return cfg, nil, nil, err
-	}
-	pipeline := ai.NewPipeline(provider, cfg.AI.Temp)
+	pipeline := ai.NewPipeline(ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
 	return cfg, store, pipeline, nil
 }
 
@@ -101,12 +96,8 @@ func setupCmd() *cobra.Command {
 				return err
 			}
 			fmt.Printf("Checking AI provider (%s)... ", cfg.AI.Provider)
-			provider, err := ai.NewProvider(cfg.AI)
-			if err != nil {
-				fmt.Println("✗")
-				return err
-			}
-			if err := provider.Available(); err != nil {
+			ollama := ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model)
+			if err := ollama.Available(); err != nil {
 				fmt.Println("✗")
 				return fmt.Errorf("%s not reachable: %w", cfg.AI.Provider, err)
 			}

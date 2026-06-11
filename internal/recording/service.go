@@ -90,6 +90,20 @@ func (s Service) Run(req Request) error {
 	return s.record(req, meeting, sessionDir)
 }
 
+func (s Service) meetings() meetingStore {
+	if s.store != nil {
+		return s.store
+	}
+	return s.Store
+}
+
+func (s Service) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
+	if s.recorder != nil {
+		return s.recorder(mode, dir, device)
+	}
+	return capture.NewRecorder(mode, dir, device)
+}
+
 func (s Service) record(req Request, meeting *db.Meeting, sessionDir string) error {
 	if s.Events == nil {
 		fmt.Fprintf(s.Out, "● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
