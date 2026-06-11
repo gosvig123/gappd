@@ -28,13 +28,6 @@ From repo root:
 ```bash
 git clone https://github.com/gappd-dev/gappd.git
 cd gappd
-make desktop-bootstrap
-make desktop-dev
-```
-
-Equivalent npm path from repo root:
-
-```bash
 npm run desktop:bootstrap
 npm run desktop:dev
 ```
@@ -65,27 +58,14 @@ Native/runtime artifacts are generated or downloaded by bootstrap scripts.
 ## Desktop commands from repo root
 
 ```bash
-make desktop-install     # npm ci in ./desktop
-make desktop-preflight   # check macOS toolchain prerequisites
-make desktop-prepare     # prepare runtime/native artifacts
-make desktop-bootstrap   # install + preflight + prepare
-make desktop-typecheck   # TypeScript check
-make desktop-dev         # start Vite, Electron main build, and Electron
-make desktop-build       # build renderer, native artifacts, and Electron main
-make desktop-dist-dir    # package unpacked macOS app directory
-```
-
-npm equivalents:
-
-```bash
-npm run desktop:install
-npm run desktop:preflight
-npm run desktop:prepare
-npm run desktop:bootstrap
-npm run desktop:typecheck
-npm run desktop:dev
-npm run desktop:build
-npm run desktop:dist:dir
+npm run desktop:install     # npm ci in ./desktop
+npm run desktop:preflight   # check macOS toolchain prerequisites
+npm run desktop:prepare     # prepare runtime/native artifacts
+npm run desktop:bootstrap   # install + preflight + prepare
+npm run desktop:typecheck   # TypeScript check
+npm run desktop:dev         # start Vite, Electron main build, and Electron
+npm run desktop:build       # build renderer, native artifacts, and Electron main
+npm run desktop:dist:dir    # package unpacked macOS app directory
 ```
 
 `npm run dev` remains a shorthand for `npm run desktop:dev`.

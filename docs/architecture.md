@@ -4,114 +4,100 @@
 
 ```
 gappd/
-├── cmd/
-│   └── gappd/              # CLI entrypoint, cobra commands
+├── cmd/gappd/             # Cobra CLI and desktop app subcommands
 ├── internal/
-│   ├── db/               # SQLite schema and queries
-│   ├── capture/          # System audio capture (macOS)
-│   ├── transcribe/       # Whisper.cpp / Deepgram / AssemblyAI
-│   ├── ai/               # LLM summarization + extraction
-│   ├── tui/              # Bubbletea screens and components
-│   └── config/           # TOML config parsing and defaults
-├── docs/                 # Architecture and design docs
-└── go.mod
+│   ├── ai/                # Ollama client, prompts, extraction/synthesis pipeline
+│   ├── capture/           # macOS recording wrapper around capture-helper
+│   ├── config/            # TOML config loading and validation
+│   ├── db/                # SQLite schema, migrations, meeting/segment queries
+│   ├── recording/         # recording lifecycle: capture → transcribe → enhance
+│   └── transcribe/        # local whisper CLI wrapper
+├── desktop/               # Electron app, managed Ollama/Whisper runtime setup
+├── capture-helper/        # Swift ScreenCaptureKit helper app
+├── docs/                  # Architecture and release docs
+└── Makefile               # Go/capture-helper build helpers
 ```
+
+## Product Shape
+
+```
+Electron UI ──IPC──▶ Go CLI app commands ──▶ SQLite
+     │                    │                     ▲
+     │                    ├── capture-helper ───┘
+     │                    ├── whisper-local ───▶ segments
+     │                    └── Ollama ──────────▶ summary
+     └── managed Ollama/Whisper setup
+```
+
+The desktop app owns user-facing setup and runtime management. It downloads and starts managed Ollama, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
+
+The Go CLI owns capture orchestration, transcription, AI post-processing, and SQLite persistence. The CLI can also run standalone when the user provides external Ollama and Whisper runtime dependencies.
 
 ## Data Flow
 
-```
-┌──────────┐    ┌─────────────┐    ┌────────────┐    ┌────────────┐
-│  System   │───▶│ Transcribe  │───▶│  AI Layer  │───▶│   SQLite   │
-│  Audio    │    │  (STT)      │    │ (summarize │    │  Storage   │
-│  Capture  │    │             │    │  + extract)│    │            │
-└──────────┘    └─────────────┘    └────────────┘    └────────────┘
-```
-
-1. **Capture** records system audio via ScreenCaptureKit (macOS)
-2. **Transcribe** converts audio chunks to text (local Whisper.cpp or cloud STT API)
-3. **AI** sends transcript to LLM and returns structured notes
-4. **DB** persists meetings, transcripts, summaries, and transcript segments
+1. User starts a recording from desktop or `gappd listen`.
+2. Go creates a `meetings` row with capture status `recording`.
+3. `capture-helper` records mic/system WAV files into the session directory.
+4. Stop signal marks capture `captured` and processing `processing`.
+5. `whisper-local` transcribes available audio streams into timestamped segments.
+6. Segments are stored in SQLite.
+7. Ollama runs extraction then synthesis prompts over the transcript.
+8. Summary, transcript text, and lifecycle status are saved on the meeting.
 
 ## Component Responsibilities
 
 ### `cmd/gappd`
-Entry point. Cobra root command with subcommands such as `listen`, `devices`,
-`meetings`, `show`, `enhance`, `summarize`, `setup`, and `app`. Parses flags,
-loads config, delegates.
 
-### `internal/db`
-Schema: `meetings`, `segments`, `migrations`, and `meetings_fts`. Uses
-modernc.org/sqlite (pure Go). Provides typed query functions. Initializes from
-embedded `internal/db/schema.sql`.
+Cobra commands for humans (`listen`, `devices`, `meetings`, `show`, `enhance`, `setup`) and desktop IPC (`app ... --json`). It loads config, opens SQLite, and delegates core work to internal packages.
+
+### `internal/recording`
+
+Coordinates one recording session. It creates the session directory, starts capture, persists lifecycle status, transcribes audio streams, stores segments, runs enhancement, and emits desktop events when used by `gappd app record start`.
 
 ### `internal/capture`
-Audio capture behind a `Recorder` interface.
-Returns `io.Reader` of PCM/WAV chunks. macOS impl uses ScreenCaptureKit
-via cgo bridge (pmoust/audiorec for system audio, malgo for mic).
+
+Wraps the macOS Swift `capture-helper` app. Capture modes are `mic`, `system`, and `both`. Output is WAV files consumed after recording stops.
 
 ### `internal/transcribe`
-`Transcriber` interface with implementations: `WhisperLocal` (whisper.cpp
-binary), `Deepgram`, `AssemblyAI`. Accepts audio chunks, returns
-timestamped segments. Handles streaming where supported.
+
+Shells out to the configured local `whisper-local` binary. It parses Whisper output into timestamped segments and assigns speakers based on source stream.
 
 ### `internal/ai`
-`Summarizer` interface. Implementations for OpenAI, Claude, Ollama.
-Two-phase prompt: (1) structured summary, (2) action extraction.
-Returns `Summary` and `[]Action` structs. Configurable model/temperature.
 
-### `internal/tui`
-Bubbletea app with screen-based navigation. Shared layout with header,
-content area, status bar. Each screen is a `tea.Model`.
+Ollama-only inference. The pipeline runs two prompts: extraction to JSON, then synthesis to human-readable meeting notes.
 
-### `internal/config`
-Loads `~/.gappd/config.toml`, merges with defaults and env vars.
-Validates required fields. Exposes typed `Config` struct.
+### `internal/db`
 
-## TUI Screens
+SQLite storage using `modernc.org/sqlite`. Schema source of truth lives in `internal/db/schema.sql`. Tables: `meetings`, `segments`, `migrations`, plus FTS5 table/triggers for meeting search.
 
-### Dashboard (default)
-Split layout: upcoming meetings and recent meeting activity. Keybinds for quick nav.
+### `desktop/`
 
-### Meeting List
-Filterable table of all meetings. Columns: date, title, duration, and status.
-Enter opens detail.
-
-### Meeting Detail
-Tabbed view: Summary | Transcript. Summary shows AI output.
-Transcript shows timestamped segments.
-
-### Navigation
-
-```
-Dashboard ──▶ Meeting List ──▶ Meeting Detail
-```
-
-Global: `?` help, `q` back/quit, `tab` cycle focus, `:` command mode.
+Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed Ollama, managed Whisper, onboarding, update checks, and app command IPC.
 
 ## Configuration
 
-`~/.gappd/config.toml`:
+Config lives at `~/.gappd/config.toml`; missing config falls back to defaults.
 
 ```toml
-[audio]
-backend = "screencapture"   # macOS ScreenCaptureKit
-sample_rate = 16000
-format = "wav"
-
-[transcription]
-engine = "whisper_local"    # "whisper_local" | "deepgram" | "assemblyai"
-model = "base.en"           # whisper model size
-api_key = ""                # for cloud engines
+db_path = "~/.gappd/db.sqlite"
 
 [ai]
-provider = "openai"         # "openai" | "claude" | "ollama"
-model = "gpt-4o"
-api_key = ""
+provider = "ollama"
+model = "llama3.1:8b"
+endpoint = "http://localhost:11434"
 temperature = 0.3
-base_url = ""               # for ollama or proxies
-
-[integrations]
-slack_webhook = ""
 ```
 
-Env var override pattern: `GAPPD_AI_API_KEY` overrides `ai.api_key`.
+Current validation rules:
+
+- `ai.provider` must be `ollama`
+- `ai.model` and `ai.endpoint` must be non-empty
+- `ai.temperature` must be between `0` and `2`
+- `db_path` must be set and may use `~`
+
+## Boundaries
+
+- Desktop setup can manage bundled runtimes; CLI setup only checks externally available dependencies.
+- Transcription is local Whisper only.
+- AI inference is Ollama only.
+- No Bubbletea TUI, cloud STT, OpenAI, or Claude integration exists in current code.
