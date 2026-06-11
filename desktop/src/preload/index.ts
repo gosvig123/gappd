@@ -23,8 +23,8 @@ const api: GappdApi = {
   },
   onboarding: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.getStatus),
-    start: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.start),
-    retry: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.retry),
+    start: (input) => ipcRenderer.invoke(IPC_CHANNELS.onboarding.start, input),
+    retry: (input) => ipcRenderer.invoke(IPC_CHANNELS.onboarding.retry, input),
     onStatusChanged: (listener) => {
       const wrapped = (_event: Electron.IpcRendererEvent, state: OnboardingStatus) => listener(state)
       ipcRenderer.on(IPC_EVENTS.onboarding.statusChanged, wrapped)

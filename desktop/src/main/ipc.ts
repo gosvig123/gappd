@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
-import { IPC_CHANNELS, IPC_EVENTS, type CapturePermissionTarget, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_CHANNELS, IPC_EVENTS, type CapturePermissionTarget, type OnboardingSetupInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
 import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -31,8 +31,8 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     })
     ipcMain.handle(IPC_CHANNELS.recording.getStatus, () => getRecordingState())
     ipcMain.handle(IPC_CHANNELS.onboarding.getStatus, () => getOnboardingStatus())
-    ipcMain.handle(IPC_CHANNELS.onboarding.start, () => startOnboarding())
-    ipcMain.handle(IPC_CHANNELS.onboarding.retry, () => retryOnboarding())
+    ipcMain.handle(IPC_CHANNELS.onboarding.start, (_event, input?: OnboardingSetupInput) => startOnboarding(input))
+    ipcMain.handle(IPC_CHANNELS.onboarding.retry, (_event, input?: OnboardingSetupInput) => retryOnboarding(input))
     ipcMain.handle(IPC_CHANNELS.settings.getLocalAIStatus, () => getLocalAIStatus())
     ipcMain.handle(IPC_CHANNELS.settings.repairLocalAI, () => repairLocalAI())
     ipcMain.handle(IPC_CHANNELS.update.getStatus, () => getUpdateStatus())

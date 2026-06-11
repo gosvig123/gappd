@@ -43,6 +43,7 @@ export const IPC_EVENTS = {
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissions = { microphone: string; screen: string }
 export type StartRecordingInput = { title: string; device: number; mode: string; modelPath?: string }
+export type OnboardingSetupInput = { model?: string }
 
 export type GappdApi = {
   system: {
@@ -62,8 +63,8 @@ export type GappdApi = {
   }
   onboarding: {
     getStatus(): Promise<OnboardingStatus>
-    start(): Promise<OnboardingStatus>
-    retry(): Promise<OnboardingStatus>
+    start(input?: OnboardingSetupInput): Promise<OnboardingStatus>
+    retry(input?: OnboardingSetupInput): Promise<OnboardingStatus>
     onStatusChanged(listener: (state: OnboardingStatus) => void): () => void
   }
   settings: {

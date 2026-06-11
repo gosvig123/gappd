@@ -8,10 +8,14 @@ import {
   type OnboardingStatus,
 } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
+import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
 
 type OnboardingViewProps = {
   status: OnboardingStatus
   busy: boolean
+  selectedModel: ManagedOllamaModelTag
+  modelOptions: readonly ManagedOllamaModelOption[]
+  onModelChange: (model: ManagedOllamaModelTag) => void
   onStart: () => void
   onRetry: () => void
   onContinue: () => void
@@ -68,10 +72,10 @@ function progressLabel(status: OnboardingStatus): string {
   return 'Working'
 }
 
-function planMetrics(status: OnboardingStatus): Array<{ label: string; value: string }> {
+function planMetrics(status: OnboardingStatus, selectedModel: string): Array<{ label: string; value: string }> {
   return [
     { label: 'Mode', value: status.managed ? 'Managed' : 'External' },
-    { label: 'Model', value: status.model || 'Recommended default' },
+    { label: 'Model', value: selectedModel || status.model || 'Recommended default' },
     { label: 'Endpoint', value: status.endpoint || 'Configured during setup' },
     { label: 'Updates', value: 'Live phase events' },
   ]
@@ -113,12 +117,21 @@ function SetupProgressCard({ status, copy }: SetupProgressCardProps) {
   )
 }
 
-function SetupPlanRail({ status }: Pick<OnboardingViewProps, 'status'>) {
+function SetupPlanRail({ status, busy, selectedModel, modelOptions, onModelChange }: Pick<OnboardingViewProps, 'status' | 'busy' | 'selectedModel' | 'modelOptions' | 'onModelChange'>) {
+  const selectedOption = modelOptions.find((option) => option.tag === selectedModel)
+  const disabled = busy || status.phase !== 'needs_setup' && status.phase !== 'error'
   return (
     <aside className="setup-panel setup-rail settings-stack">
-      <div><h2>Plan</h2><p>Managed runtime plus speech model. No picker in this flow.</p></div>
+      <div><h2>Plan</h2><p>Choose local AI model before setup. Default stays selected unless you choose faster setup.</p></div>
+      <label className="setup-model-picker">
+        <span>Model</span>
+        <select value={selectedModel} onChange={(event) => updateSelectedModel(event.currentTarget.value, onModelChange)} disabled={disabled}>
+          {modelOptions.map((option) => <option key={option.tag} value={option.tag}>{option.label}</option>)}
+        </select>
+        {selectedOption ? <span className="model-detail">{selectedOption.detail}</span> : null}
+      </label>
       <div className="setup-metrics">
-        {planMetrics(status).map((metric) => (
+        {planMetrics(status, selectedModel).map((metric) => (
           <div key={metric.label} className="metric-card"><div className="label">{metric.label}</div><div className="value">{metric.value}</div></div>
         ))}
       </div>
@@ -127,7 +140,11 @@ function SetupPlanRail({ status }: Pick<OnboardingViewProps, 'status'>) {
   )
 }
 
-export function OnboardingView({ status, busy, onStart, onRetry, onContinue }: OnboardingViewProps) {
+function updateSelectedModel(value: string, onModelChange: (model: ManagedOllamaModelTag) => void): void {
+  if (isManagedOllamaModel(value)) onModelChange(value)
+}
+
+export function OnboardingView({ status, busy, selectedModel, modelOptions, onModelChange, onStart, onRetry, onContinue }: OnboardingViewProps) {
   const copy = phaseCopy(status)
   const errorView = onboardingErrorView(status)
   const isReady = status.phase === 'ready'
@@ -148,7 +165,7 @@ export function OnboardingView({ status, busy, onStart, onRetry, onContinue }: O
           )}
           {errorView ? <LocalAIErrorBanner errorView={errorView} /> : null}
         </div>
-        <SetupPlanRail status={status} />
+        <SetupPlanRail status={status} busy={busy} selectedModel={selectedModel} modelOptions={modelOptions} onModelChange={onModelChange} />
       </div>
     </section>
   )
