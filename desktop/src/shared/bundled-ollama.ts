@@ -11,4 +11,17 @@ export const MANAGED_OLLAMA_PORT = 11435
 export const MANAGED_OLLAMA_ENDPOINT = `http://${MANAGED_OLLAMA_HOST}:${MANAGED_OLLAMA_PORT}`
 export const MANAGED_OLLAMA_HOST_VALUE = `${MANAGED_OLLAMA_HOST}:${MANAGED_OLLAMA_PORT}`
 export const MANAGED_OLLAMA_MODEL = 'llama3.1:8b'
+export const FAST_MANAGED_OLLAMA_MODEL = 'qwen3:1.7b'
 export const MANAGED_OLLAMA_MODELS_DIRNAME = 'ollama-models'
+
+export const MANAGED_OLLAMA_MODEL_OPTIONS = [
+  { tag: MANAGED_OLLAMA_MODEL, label: 'Recommended: Llama 3.1 8B', detail: 'Best quality default. Larger download and setup time.' },
+  { tag: FAST_MANAGED_OLLAMA_MODEL, label: 'Fast: Qwen3 1.7B', detail: 'Smaller, faster setup. Lower quality on long or subtle meetings.' },
+] as const
+
+export type ManagedOllamaModelOption = typeof MANAGED_OLLAMA_MODEL_OPTIONS[number]
+export type ManagedOllamaModelTag = ManagedOllamaModelOption['tag']
+
+export function isManagedOllamaModel(value: string): value is ManagedOllamaModelTag {
+  return MANAGED_OLLAMA_MODEL_OPTIONS.some((option) => option.tag === value)
+}

@@ -7,6 +7,7 @@ import { SettingsSheet } from './components/settings-sheet'
 import { DashboardView } from './routes/dashboard-view'
 import { OnboardingView } from './routes/onboarding-view'
 import { SettingsView } from './routes/settings-view'
+import { MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODEL_OPTIONS, isManagedOllamaModel, type ManagedOllamaModelTag } from '../shared/bundled-ollama'
 
 type RecordingState = Awaited<ReturnType<typeof window.gappd.recording.getStatus>>
 type Device = Awaited<ReturnType<typeof window.gappd.system.getDevices>>[number]
@@ -34,9 +35,9 @@ export function App() {
   const selectedMeetingIdRef = useRef<string | null>(null)
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null)
   const selectedMeetingRef = useRef<MeetingDetail | null>(null)
-  const selectedMeetingRequestRef = useRef(0)
-  const refreshRequestRef = useRef(0)
-  const settingsRequestRef = useRef(0)
+  const selectedMeetingRequest = useRequestGate()
+  const refreshRequest = useRequestGate()
+  const settingsRequest = useRequestGate()
   const [selectedMeetingLoading, setSelectedMeetingLoading] = useState(false)
   const [selectedMeetingError, setSelectedMeetingError] = useState<string | null>(null)
   const [recording, setRecording] = useState<RecordingState>({ status: IDLE_RECORDING_STATUS })
@@ -46,6 +47,7 @@ export function App() {
   const [device, setDevice] = useState(0)
   const [onboarding, setOnboarding] = useState<OnboardingStatus | null>(null)
   const [onboardingBusy, setOnboardingBusy] = useState(false)
+  const [selectedOnboardingModel, setSelectedOnboardingModel] = useState<ManagedOllamaModelTag>(MANAGED_OLLAMA_MODEL)
   const [settingsStatus, setSettingsStatus] = useState<LocalAIStatus | null>(null)
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [settingsBusy, setSettingsBusy] = useState(false)
@@ -67,10 +69,9 @@ export function App() {
   }
 
   async function refreshMeetings(preferredMeetingId?: string | null) {
-    const requestId = refreshRequestRef.current + 1
-    refreshRequestRef.current = requestId
+    const requestId = refreshRequest.next()
     const items = await window.gappd.meetings.list()
-    if (refreshRequestRef.current !== requestId) return
+    if (!refreshRequest.isCurrent(requestId)) return
     setMeetings(items)
     const nextId = preferredMeetingId ?? selectedMeetingIdRef.current ?? items[0]?.id ?? null
     if (!nextId) return clearSelectedMeeting()
@@ -87,8 +88,7 @@ export function App() {
   }
 
   async function loadMeeting(id: string) {
-    const requestId = selectedMeetingRequestRef.current + 1
-    selectedMeetingRequestRef.current = requestId
+    const requestId = selectedMeetingRequest.next()
     const showLoading = selectedMeetingRef.current?.id !== id
     applySelectedMeetingId(id)
     if (showLoading) applySelectedMeeting(null)
@@ -108,7 +108,7 @@ export function App() {
   }
 
   function isCurrentMeetingRequest(requestId: number, meetingId: string): boolean {
-    return selectedMeetingRequestRef.current === requestId && selectedMeetingIdRef.current === meetingId
+    return selectedMeetingRequest.isCurrent(requestId) && selectedMeetingIdRef.current === meetingId
   }
 
   async function loadAppData() {
@@ -139,8 +139,7 @@ export function App() {
   }
 
   async function loadSettingsStatus() {
-    const requestId = settingsRequestRef.current + 1
-    settingsRequestRef.current = requestId
+    const requestId = settingsRequest.next()
     setSettingsLoading(true)
     try {
       const status = await localAI.settings.getLocalAIStatus()
@@ -153,7 +152,7 @@ export function App() {
   }
 
   function isCurrentSettingsRequest(requestId: number): boolean {
-    return settingsRequestRef.current === requestId
+    return settingsRequest.isCurrent(requestId)
   }
 
   useEffect(() => {
@@ -176,6 +175,11 @@ export function App() {
       dispose()
     }
   }, [])
+
+  useEffect(() => {
+    if (onboardingBusy || !onboarding || !isManagedOllamaModel(onboarding.model)) return
+    setSelectedOnboardingModel(onboarding.model)
+  }, [onboarding?.model, onboardingBusy])
 
   useEffect(() => {
     if (onboarding?.phase !== READY_ONBOARDING_PHASE) return
@@ -205,7 +209,7 @@ export function App() {
       void loadSettingsStatus()
       return
     }
-    settingsRequestRef.current += 1
+    settingsRequest.cancel()
     setSettingsLoading(false)
   }, [onboarding?.phase, settingsOpen])
 
@@ -306,7 +310,8 @@ export function App() {
   async function runOnboarding(action: 'start' | 'retry') {
     setOnboardingBusy(true)
     try {
-      setOnboarding(action === 'start' ? await localAI.onboarding.start() : await localAI.onboarding.retry())
+      const input = { model: selectedOnboardingModel }
+      setOnboarding(action === 'start' ? await localAI.onboarding.start(input) : await localAI.onboarding.retry(input))
     } catch (err) {
       setOnboarding(toStatusError(err))
     } finally {
@@ -349,7 +354,7 @@ export function App() {
         {appReady ? (
           <DashboardView title={title} device={device} devices={devices} meetings={meetings} selectedMeetingId={selectedMeetingId} selectedMeeting={selectedMeeting} selectedMeetingLoading={selectedMeetingLoading} selectedMeetingError={selectedMeetingError} transcript={transcript} recordingStatus={recording.status} canStart={canStart} canStop={canStop} onTitleChange={setTitle} onDeviceChange={setDevice} onStart={() => void handleStart()} onStop={() => void handleStop()} onSelectMeeting={(id) => void loadMeeting(id)} />
         ) : (
-          <div className="single-screen"><OnboardingView status={onboarding} busy={onboardingBusy} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setSettingsOpen(false)} /></div>
+          <div className="single-screen"><OnboardingView status={onboarding} busy={onboardingBusy} selectedModel={selectedOnboardingModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} onModelChange={setSelectedOnboardingModel} onStart={() => void runOnboarding('start')} onRetry={() => void runOnboarding('retry')} onContinue={() => setSettingsOpen(false)} /></div>
         )}
       </main>
       {showSettings ? (
@@ -359,6 +364,18 @@ export function App() {
       ) : null}
     </div>
   )
+}
+
+function useRequestGate() {
+  const requestRef = useRef(0)
+  return {
+    next: () => {
+      requestRef.current += 1
+      return requestRef.current
+    },
+    cancel: () => { requestRef.current += 1 },
+    isCurrent: (requestId: number) => requestRef.current === requestId,
+  }
 }
 
 function needsDynamicRefresh(meetings: MeetingListItem[], recording: RecordingState): boolean {

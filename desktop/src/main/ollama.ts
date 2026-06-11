@@ -6,13 +6,17 @@ import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus } fr
 import { BUNDLED_OLLAMA_BINARY_NAME, BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME, BUNDLED_OLLAMA_RELEASE, MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_HOST_VALUE, MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODELS_DIRNAME, MANAGED_OLLAMA_PORT } from '../shared/bundled-ollama'
 import { lastLines } from '../shared/subprocess-output'
 import { childEnv } from './gappd'
-import { type OnboardingErrorState, toOnboardingErrorState } from './onboarding-error-state'
+import { type OnboardingErrorState, toOnboardingErrorState } from './onboarding-errors'
 import { pullModelFromOllamaApi, type PullProgressUpdate } from './ollama-pull'
 
-let managedOllamaProcess: ReturnType<typeof spawn> | null = null
-let startPromise: Promise<void> | null = null
-let managedOllamaOwnedBySession = false
-let lastError: OnboardingErrorState | undefined
+type ManagedOllamaRuntime = {
+  process: ReturnType<typeof spawn> | null
+  startPromise: Promise<void> | null
+  ownedBySession: boolean
+  lastError?: OnboardingErrorState
+}
+
+const managedOllama: ManagedOllamaRuntime = { process: null, startPromise: null, ownedBySession: false }
 
 type ManagedStatusContext = { config: LocalAIConfig | null; configError?: string; supported: boolean; bundled: boolean; running: boolean; configured: boolean; modelAvailable: boolean; ownershipMismatch: boolean }
 type ManagedReadiness = { running: boolean; ownershipMismatch: boolean }
@@ -34,20 +38,20 @@ export async function ensureManagedOllamaRunning(): Promise<void> {
   const readiness = await managedOllamaReadiness()
   if (readiness.running) return
   if (readiness.ownershipMismatch) throw await managedOllamaOwnershipError()
-  if (!startPromise) startPromise = startManagedOllama()
+  if (!managedOllama.startPromise) managedOllama.startPromise = startManagedOllama()
   try {
-    await startPromise
+    await managedOllama.startPromise
   } finally {
-    startPromise = null
+    managedOllama.startPromise = null
   }
 }
-export async function pullManagedModel(onProgress?: (update: PullProgressUpdate) => void): Promise<void> {
+export async function pullManagedModel(model: string, onProgress?: (update: PullProgressUpdate) => void): Promise<void> {
   await ensureManagedOllamaRunning()
   try {
-    await pullModelFromOllamaApi(MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_MODEL, onProgress)
-    lastError = undefined
+    await pullModelFromOllamaApi(MANAGED_OLLAMA_ENDPOINT, model, onProgress)
+    managedOllama.lastError = undefined
   } catch (error) {
-    lastError = toOnboardingErrorState(error, 'pulling_model', 'Managed Ollama model pull failed')
+    managedOllama.lastError = toOnboardingErrorState(error, 'pulling_model', 'Managed Ollama model pull failed')
     throw error
   }
 }
@@ -62,32 +66,32 @@ export async function managedModelAvailable(model: string): Promise<boolean> {
   }
 }
 export function stopManagedOllama(): void {
-  if (!managedOllamaProcess) return
-  managedOllamaProcess.kill('SIGTERM')
-  managedOllamaOwnedBySession = false
-  managedOllamaProcess = null
+  if (!managedOllama.process) return
+  managedOllama.process.kill('SIGTERM')
+  managedOllama.ownedBySession = false
+  managedOllama.process = null
 }
 
 async function startManagedOllama(): Promise<void> {
   await mkdir(managedOllamaModelsDir(), { recursive: true })
   const binaryPath = resolveBundledOllamaBinary()
-  managedOllamaOwnedBySession = false
+  managedOllama.ownedBySession = false
   const child = spawn(binaryPath, ['serve'], { env: managedOllamaEnv(), stdio: ['ignore', 'ignore', 'pipe'] })
-  managedOllamaProcess = child
-  child.stderr.on('data', (chunk) => { lastError = toOnboardingErrorState(lastLines(chunk.toString()), 'error', 'Managed Ollama reported an error') })
+  managedOllama.process = child
+  child.stderr.on('data', (chunk) => { managedOllama.lastError = toOnboardingErrorState(lastLines(chunk.toString()), 'error', 'Managed Ollama reported an error') })
   child.on('exit', (code, signal) => {
-    managedOllamaOwnedBySession = false
-    managedOllamaProcess = null
-    if (signal !== 'SIGTERM') lastError = toOnboardingErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed Ollama exited before becoming ready')
+    managedOllama.ownedBySession = false
+    managedOllama.process = null
+    if (signal !== 'SIGTERM') managedOllama.lastError = toOnboardingErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed Ollama exited before becoming ready')
   })
   child.on('error', (error) => {
-    managedOllamaOwnedBySession = false
-    managedOllamaProcess = null
-    lastError = toOnboardingErrorState(`Failed to start managed Ollama at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed Ollama')
+    managedOllama.ownedBySession = false
+    managedOllama.process = null
+    managedOllama.lastError = toOnboardingErrorState(`Failed to start managed Ollama at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed Ollama')
   })
   try {
     await waitForManagedOllama(child, binaryPath)
-    lastError = undefined
+    managedOllama.lastError = undefined
   } catch (error) {
     stopManagedOllama()
     throw error
@@ -95,7 +99,7 @@ async function startManagedOllama(): Promise<void> {
 }
 function buildLocalAIStatus(context: ManagedStatusContext): LocalAIStatus {
   const phase = localAIPhase(context)
-  const error = context.configError ? toOnboardingErrorState(context.configError, phase, 'Failed to read local AI configuration') : phase === 'error' ? lastError : undefined
+  const error = context.configError ? toOnboardingErrorState(context.configError, phase, 'Failed to read local AI configuration') : phase === 'error' ? managedOllama.lastError : undefined
   return {
     phase,
     managed: Boolean(context.config?.managed),
@@ -150,7 +154,7 @@ async function managedOllamaOwnedAndHealthy(child: ReturnType<typeof spawn> | nu
 }
 async function managedOllamaReadiness(): Promise<ManagedReadiness> {
   const healthy = await managedOllamaHealthy()
-  const running = managedOllamaOwnedBySession && await managedOllamaOwnedAndHealthy(managedOllamaProcess)
+  const running = managedOllama.ownedBySession && await managedOllamaOwnedAndHealthy(managedOllama.process)
   return { running, ownershipMismatch: healthy && !running }
 }
 async function managedOllamaOwnershipError(): Promise<Error> {
@@ -159,7 +163,7 @@ async function managedOllamaOwnershipError(): Promise<Error> {
   const rawDetail = await managedOllamaListenerSummary()
   const ownershipConflict = pid === null ? undefined : { pid, port: MANAGED_OLLAMA_PORT, summary: rawDetail, stopCommand: `kill ${pid}` }
   const error = Object.assign(new Error('Managed Ollama requires the app-owned runtime, but another Ollama process is already serving 127.0.0.1:11435. Stop the other Ollama process and retry Local AI setup.'), { detail, debug: rawDetail ? { rawDetail } : undefined, ownershipConflict })
-  lastError = toOnboardingErrorState(error, 'starting_ollama', 'Managed Ollama ownership mismatch')
+  managedOllama.lastError = toOnboardingErrorState(error, 'starting_ollama', 'Managed Ollama ownership mismatch')
   return error
 }
 function taggedModelNames(payload: unknown): string[] {
@@ -174,21 +178,21 @@ async function waitForManagedOllama(child: ReturnType<typeof spawn>, binaryPath:
     const startupError = earlyManagedOllamaExit(child, binaryPath)
     if (startupError) throw new Error(startupError)
     if (await managedOllamaOwnedAndHealthy(child)) {
-      managedOllamaOwnedBySession = true
+      managedOllama.ownedBySession = true
       return
     }
     if ((await managedOllamaListenerPid()) !== null && await managedOllamaHealthy()) throw await managedOllamaOwnershipError()
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
-  throw new Error(`Managed Ollama did not become ready in time at ${binaryPath}${lastError?.error ? `: ${lastError.error}` : ''}`)
+  throw new Error(`Managed Ollama did not become ready in time at ${binaryPath}${managedOllama.lastError?.error ? `: ${managedOllama.lastError.error}` : ''}`)
 }
 function earlyManagedOllamaExit(child: ReturnType<typeof spawn>, binaryPath: string): string | null {
   if (child.exitCode === null && child.signalCode === null) return null
-  return lastError?.error || startupExitMessage(binaryPath, child.exitCode, child.signalCode)
+  return managedOllama.lastError?.error || startupExitMessage(binaryPath, child.exitCode, child.signalCode)
 }
 function startupExitMessage(binaryPath: string, code: number | null, signal: NodeJS.Signals | null): string {
   const status = signal ? `signal ${signal}` : `exit code ${code ?? 'unknown'}`
-  return `Managed Ollama exited before becoming ready from ${binaryPath} (${status})${lastError?.error ? `: ${lastError.error}` : ''}`
+  return `Managed Ollama exited before becoming ready from ${binaryPath} (${status})${managedOllama.lastError?.error ? `: ${managedOllama.lastError.error}` : ''}`
 }
 function localAIMessage(context: ManagedStatusContext): string {
   if (context.configError) return 'Failed to read local AI configuration'

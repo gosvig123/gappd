@@ -1,4 +1,4 @@
-import './local-ai-error.css'
+import './local-ai.css'
 
 import { LocalAITechnicalDetails } from './local-ai-technical-details'
 import type { LocalAIOwnershipHelp } from './local-ai-ownership'

@@ -1,5 +1,5 @@
 import type { OnboardingPullStage } from '../shared/contracts'
-import { createPullFailureError, createPullStallController } from './ollama-pull-errors'
+import { createPullFailureError, createPullStallController } from './onboarding-errors'
 
 export type PullProgressUpdate = {
   progress?: number

@@ -76,6 +76,18 @@
   align-content: start;
 }
 
+.setup-model-picker {
+  border: 1px solid var(--shell-border);
+  border-radius: 16px;
+  background: var(--shell-surface-soft);
+  padding: 14px;
+}
+
+.model-detail {
+  color: var(--shell-text-soft);
+  font-size: 13px;
+}
+
 .setup-rail .setup-metrics {
   grid-template-columns: 1fr;
 }
@@ -188,6 +200,29 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--shell-danger-text);
+  font: inherit;
+}
+
+.setup-error-help {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.setup-error-summary {
+  color: var(--shell-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.setup-error-instructions {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--shell-border);
+  border-radius: 12px;
+  background: var(--shell-surface);
+  color: var(--shell-text-soft);
+  white-space: pre-wrap;
+  word-break: break-word;
   font: inherit;
 }
 
