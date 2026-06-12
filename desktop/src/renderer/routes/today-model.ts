@@ -17,8 +17,6 @@ export type InboxFilter = typeof INBOX_FILTERS[number]
 export type InboxCounts = Record<InboxFilter, number>
 
 export type CaptureReadiness = {
-  tone: string
-  title: string
   detail: string
 }
 
@@ -41,11 +39,11 @@ export function filterInboxMeetings(meetings: MeetingListItem[], filter: InboxFi
 }
 
 export function readyState(canStart: boolean, canStop: boolean, devices: Device[], status: RecordingStatus): CaptureReadiness {
-  if (status === RECORDING_RECORDING) return { tone: 'recording', title: 'Recording now', detail: 'Stop when meeting ends. Notes appear in inbox after processing.' }
-  if (canStop) return { tone: 'processing', title: 'Finishing capture', detail: 'Audio handoff is underway. Keep app open.' }
-  if (!devices.length) return { tone: 'error', title: 'Microphone needed', detail: 'Connect or enable input device before recording.' }
-  if (canStart) return { tone: 'idle', title: 'Ready to record', detail: 'Start manual capture when meeting begins.' }
-  return { tone: 'processing', title: 'Recorder busy', detail: 'Wait for current meeting before starting another.' }
+  if (status === RECORDING_RECORDING) return { detail: 'Stop when meeting ends. Notes appear in inbox after processing.' }
+  if (canStop) return { detail: 'Audio handoff is underway. Keep app open.' }
+  if (!devices.length) return { detail: 'Connect or enable input device before recording.' }
+  if (canStart) return { detail: 'Start manual capture when meeting begins.' }
+  return { detail: 'Wait for current meeting before starting another.' }
 }
 
 function hasFailure(meeting: MeetingListItem): boolean {

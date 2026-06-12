@@ -45,7 +45,7 @@ export function DashboardView(props: DashboardViewProps) {
   const counts = useMemo(() => buildInboxCounts(props.meetings), [props.meetings])
   const meetings = useMemo(() => filterInboxMeetings(props.meetings, filter), [filter, props.meetings])
   return (
-    <div className="dashboard-grid">
+    <div className="dashboard-grid ui-density-compact">
       <CaptureCard {...props} />
       <div className="dashboard-workspace">
         <MeetingInboxPanel counts={counts} filter={filter} meetings={meetings} selectedMeetingId={props.selectedMeetingId} totalMeetings={props.meetings.length} onFilterChange={setFilter} onSelectMeeting={props.onSelectMeeting} />

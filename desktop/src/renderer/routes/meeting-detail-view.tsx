@@ -8,6 +8,7 @@ import { dateLabel } from './today-model'
 
 const EXPAND_READING_LABEL = 'Expand'
 const COLLAPSE_READING_LABEL = 'Collapse'
+const SHOW_DIAGNOSTICS = import.meta.env.DEV
 
 type MeetingDetailPanelProps = {
   selectedMeetingId: string | null
@@ -81,15 +82,15 @@ function MeetingDetailMeta({ selectedMeeting }: { selectedMeeting: MeetingDetail
 
 function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; hasSummary: boolean }) {
   return (
-    <details className="detail-surface detail-block diagnostics-panel">
+    <details className="detail-surface detail-block">
       <summary><span>Diagnostics</span><small>Metadata, pipeline, artifacts</small></summary>
       <MeetingDetailMeta selectedMeeting={selectedMeeting} />
-      <div className="diagnostic-section">
+      <div className="detail-block">
         <div className="meeting-section-label">Pipeline</div>
         <p>Capture {meetingStatusLabel(selectedMeeting.status.capture.state)} · updated {dateLabel(selectedMeeting.status.capture.updatedAt)}</p>
         <p>AI {processingStatusLabel(selectedMeeting.status.processing.state)} · updated {dateLabel(selectedMeeting.status.processing.updatedAt)}</p>
       </div>
-      <div className="diagnostic-section">
+      <div className="detail-block">
         <div className="meeting-section-label">Artifacts</div>
         <div className="meeting-flags">
           <span className="meeting-tag">{artifactLabel(hasTranscript, 'Transcript ready', 'No transcript')}</span>
@@ -113,7 +114,7 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
         <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary markdown />
         <ReadingCard title="Transcript" value={transcript} emptyText="No transcript yet." />
-        <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} />
+        {SHOW_DIAGNOSTICS ? <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} /> : null}
       </div>
     </Panel>
   )
