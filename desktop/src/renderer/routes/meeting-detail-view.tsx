@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
 import { artifactLabel, meetingStatusLabel, processingStatusLabel } from '../components/meeting-status'
@@ -6,12 +6,8 @@ import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel } from '../components/ui'
 import { dateLabel } from './today-model'
 
-const READING_COLLAPSE_RATIO = 0.4
-const READING_OVERFLOW_PADDING = 1
-const READING_MORE_LABEL = 'Read more'
-const READING_LESS_LABEL = 'Show less'
-const SHOW_TRANSCRIPT_LABEL = 'Show transcript'
-const HIDE_TRANSCRIPT_LABEL = 'Hide transcript'
+const EXPAND_READING_LABEL = 'Expand'
+const COLLAPSE_READING_LABEL = 'Collapse'
 
 type MeetingDetailPanelProps = {
   selectedMeetingId: string | null
@@ -40,50 +36,25 @@ function SummaryCopyButton({ summary }: { summary: string }) {
   return <Button className="compact-action" onClick={() => void copySummary()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy summary'}</Button>
 }
 
-function useReadingOverflow(value: string) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [expanded, setExpanded] = useState(false)
-  const [overflowing, setOverflowing] = useState(false)
-  useEffect(() => setExpanded(false), [value])
-  useEffect(() => {
-    const target = ref.current
-    if (!target || typeof window === 'undefined') return undefined
-    const update = () => setOverflowing(target.scrollHeight > window.innerHeight * READING_COLLAPSE_RATIO + READING_OVERFLOW_PADDING)
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update)
-    update()
-    observer?.observe(target)
-    window.addEventListener('resize', update)
-    return () => { observer?.disconnect(); window.removeEventListener('resize', update) }
-  }, [value])
-  return { expanded, overflowing, ref, setExpanded }
-}
-
-function ReadingCard({ title, value, emptyText, primary }: { title: string; value: string; emptyText: string; primary?: boolean }) {
-  const { expanded, overflowing, ref, setExpanded } = useReadingOverflow(value)
-  const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
-  const textClassName = overflowing && !expanded ? 'reading-text collapsed' : 'reading-text'
+function ReadingActions({ primary, value, expanded, onToggle }: { primary?: boolean; value: string; expanded: boolean; onToggle: () => void }) {
+  if (!primary && !value) return null
   return (
-    <div className={className}>
-      <div className="reading-card-header">
-        <div className="meeting-section-label">{title}</div>
-        {primary ? <SummaryCopyButton summary={value} /> : null}
-      </div>
-      <div ref={ref} className={textClassName}>{value ? (primary ? <Markdown value={value} /> : value) : emptyText}</div>
-      {overflowing ? <Button className="compact-action reading-toggle" onClick={() => setExpanded((current) => !current)} aria-expanded={expanded}>{expanded ? READING_LESS_LABEL : READING_MORE_LABEL}</Button> : null}
+    <div className="reading-card-actions">
+      {primary ? <SummaryCopyButton summary={value} /> : null}
+      {value ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
     </div>
   )
 }
 
-function TranscriptCard({ value, defaultOpen }: { value: string; defaultOpen: boolean }) {
-  const [open, setOpen] = useState(defaultOpen)
-  useEffect(() => setOpen(defaultOpen), [defaultOpen, value])
+function ReadingCard({ title, value, emptyText, primary, markdown }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean }) {
+  const [expanded, setExpanded] = useState(false)
+  const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
+  const textClassName = expanded ? 'reading-text' : 'reading-text reading-preview'
+  useEffect(() => setExpanded(false), [value])
   return (
-    <div className="detail-surface detail-block reading-card transcript-card">
-      <div className="reading-card-header">
-        <div className="meeting-section-label">Transcript</div>
-        <Button className="compact-action" onClick={() => setOpen((current) => !current)} aria-expanded={open}>{open ? HIDE_TRANSCRIPT_LABEL : SHOW_TRANSCRIPT_LABEL}</Button>
-      </div>
-      {open ? <div className="reading-text transcript-text">{value || 'No transcript yet.'}</div> : <div className="reading-placeholder">Transcript hidden. Show transcript for full context.</div>}
+    <div className={className}>
+      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={expanded} onToggle={() => setExpanded((current) => !current)} /></div>
+      <div className={textClassName}>{value ? (markdown ? <Markdown value={value} /> : value) : emptyText}</div>
     </div>
   )
 }
@@ -140,8 +111,8 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary />
-        <TranscriptCard value={transcript} defaultOpen={!hasSummary} />
+        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary markdown />
+        <ReadingCard title="Transcript" value={transcript} emptyText="No transcript yet." />
         <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} />
       </div>
     </Panel>
