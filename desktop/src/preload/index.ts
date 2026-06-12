@@ -37,6 +37,8 @@ const api: GappdApi = {
   },
   update: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.update.getStatus),
+    checkNow: () => ipcRenderer.invoke(IPC_CHANNELS.update.checkNow),
+    downloadUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.update.downloadUpdate),
     openUpdatePage: () => ipcRenderer.invoke(IPC_CHANNELS.update.openUpdatePage),
   },
 }

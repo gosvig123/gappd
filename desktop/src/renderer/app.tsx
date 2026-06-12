@@ -19,13 +19,13 @@ export function App() {
   const appReady = onboarding.status?.phase === READY_ONBOARDING_PHASE
   const dashboard = useDashboardData(appReady)
   const settings = useLocalAISettings(appReady && settingsOpen, onboarding.setStatus)
-  const updateStatus = useUpdateStatus()
+  const update = useUpdateStatus()
 
   if (onboarding.loading || !onboarding.status) return <div className="screen-center">Loading Gappd…</div>
 
   return (
     <div className="app-shell">
-      <AppHeader appReady={appReady} settingsOpen={settingsOpen && appReady} updateStatus={updateStatus} onToggleSettings={() => setSettingsOpen((current) => !current)} onOpenUpdate={() => void openUpdate(updateStatus, dashboard.actions.setError)} />
+      <AppHeader appReady={appReady} settingsOpen={settingsOpen && appReady} updateStatus={update.status} updateDownloading={update.downloading} onToggleSettings={() => setSettingsOpen((current) => !current)} onDownloadUpdate={() => void downloadUpdate(update.downloadUpdate, dashboard.actions.setError)} />
       <main className="app-main">
         {appReady ? <ReadyApp dashboard={dashboard} /> : <OnboardingApp onboarding={onboarding} />}
       </main>
@@ -42,10 +42,9 @@ function OnboardingApp({ onboarding }: { onboarding: ReturnType<typeof useOnboar
   return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} /></div>
 }
 
-async function openUpdate(updateStatus: ReturnType<typeof useUpdateStatus>, reportError: (message: string) => void) {
-  if (!updateStatus?.available) return
+async function downloadUpdate(download: ReturnType<typeof useUpdateStatus>['downloadUpdate'], reportError: (message: string) => void) {
   try {
-    await window.gappd.update.openUpdatePage()
+    await download()
   } catch (err) {
     reportError(err instanceof Error ? err.message : String(err))
   }

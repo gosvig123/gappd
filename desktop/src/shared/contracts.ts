@@ -131,4 +131,18 @@ export type LocalAIStatus = OnboardingStatus & {
 
 export type UpdateStatus =
   | { available: false; currentVersion: string; latestVersion?: string }
-  | { available: true; currentVersion: string; latestVersion: string; releaseUrl: string; name?: string }
+  | {
+    available: true
+    currentVersion: string
+    latestVersion: string
+    releaseUrl: string
+    downloadUrl?: string
+    sha256?: string
+    channel?: string
+    name?: string
+  }
+
+export type UpdateDownloadResult = {
+  filePath: string
+  fileName: string
+}

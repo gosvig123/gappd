@@ -1,6 +1,7 @@
 {
   "private": true,
   "scripts": {
+    "typecheck": "npm run desktop:typecheck",
     "dev": "npm --prefix ./desktop run dev",
     "desktop:install": "npm --prefix ./desktop ci",
     "desktop:preflight": "npm --prefix ./desktop run preflight:macos",
