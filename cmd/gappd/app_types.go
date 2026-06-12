@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/recording"
 )
 
 type appConfigResponse struct {
@@ -35,21 +36,11 @@ type appMeetingsResponse struct {
 type appMeetingListItem = meetingListView
 
 type appMeetingStatus struct {
-	State      appMeetingState      `json:"state"`
+	State      db.MeetingState      `json:"state"`
 	UpdatedAt  string               `json:"updatedAt"`
 	Capture    appMeetingStatusInfo `json:"capture"`
 	Processing appMeetingStatusInfo `json:"processing"`
 }
-
-type appMeetingState string
-
-const (
-	appMeetingStateRecording  appMeetingState = "recording"
-	appMeetingStateCaptured   appMeetingState = "captured"
-	appMeetingStateProcessing appMeetingState = "processing"
-	appMeetingStateCompleted  appMeetingState = "completed"
-	appMeetingStateFailed     appMeetingState = "failed"
-)
 
 type appMeetingStatusInfo struct {
 	State          string  `json:"state"`
@@ -63,22 +54,12 @@ type appMeetingResponse struct {
 
 type appMeetingDetail = meetingDetailView
 
-type appRecordingEventName string
-
-const (
-	appRecordingStartedEvent    appRecordingEventName = "recording.started"
-	appRecordingStoppingEvent   appRecordingEventName = "recording.stopping"
-	appRecordingProcessingEvent appRecordingEventName = "recording.processing"
-	appRecordingCompletedEvent  appRecordingEventName = "recording.completed"
-	appRecordingFailedEvent     appRecordingEventName = "recording.failed"
-)
-
 type appRecordingEvent struct {
-	Type      appRecordingEventName `json:"type"`
-	MeetingID string                `json:"meetingId"`
-	Title     string                `json:"title"`
-	Status    appMeetingStatus      `json:"status"`
-	Error     *string               `json:"error,omitempty"`
+	Type      recording.EventName `json:"type"`
+	MeetingID string              `json:"meetingId"`
+	Title     string              `json:"title"`
+	Status    appMeetingStatus    `json:"status"`
+	Error     *string             `json:"error,omitempty"`
 }
 
 type appRecordingEventEmitter struct {
@@ -92,7 +73,7 @@ func newAppRecordingEventEmitter(enabled bool) *appRecordingEventEmitter {
 	return &appRecordingEventEmitter{enc: json.NewEncoder(os.Stdout)}
 }
 
-func (e *appRecordingEventEmitter) emit(name appRecordingEventName, meeting db.Meeting, err error) error {
+func (e *appRecordingEventEmitter) emit(name recording.EventName, meeting db.Meeting, err error) error {
 	if e == nil {
 		return nil
 	}
@@ -110,33 +91,11 @@ func (e *appRecordingEventEmitter) emit(name appRecordingEventName, meeting db.M
 }
 
 func appMeetingStatusFor(meeting db.Meeting) appMeetingStatus {
-	state := meetingState(meeting)
 	updatedAt := meeting.CaptureStatusUpdatedAt
-	if usesProcessingTimestamp(meeting, state) {
+	if db.UsesProcessingTimestamp(meeting) {
 		updatedAt = meeting.ProcessingStatusUpdatedAt
 	}
-	return appMeetingStatus{State: state, UpdatedAt: updatedAt, Capture: captureStatusInfo(meeting), Processing: processingStatusInfo(meeting)}
-}
-
-func meetingState(meeting db.Meeting) appMeetingState {
-	switch {
-	case meeting.CaptureStatus == db.CaptureStatusFailed:
-		return appMeetingStateFailed
-	case meeting.CaptureStatus == db.CaptureStatusRecording:
-		return appMeetingStateRecording
-	case meeting.ProcessingStatus == db.ProcessingStatusFailed:
-		return appMeetingStateFailed
-	case meeting.ProcessingStatus == db.ProcessingStatusProcessing:
-		return appMeetingStateProcessing
-	case meeting.ProcessingStatus == db.ProcessingStatusCompleted:
-		return appMeetingStateCompleted
-	default:
-		return appMeetingStateCaptured
-	}
-}
-
-func usesProcessingTimestamp(meeting db.Meeting, state appMeetingState) bool {
-	return meeting.ProcessingStatus == db.ProcessingStatusFailed || state == appMeetingStateProcessing || state == appMeetingStateCompleted
+	return appMeetingStatus{State: db.MeetingStateFor(meeting), UpdatedAt: updatedAt, Capture: captureStatusInfo(meeting), Processing: processingStatusInfo(meeting)}
 }
 
 func captureStatusInfo(meeting db.Meeting) appMeetingStatusInfo {

@@ -13,7 +13,7 @@ import (
 )
 
 func (s Service) FailCapture(meeting *db.Meeting, captureErr error) error {
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := nowUTC()
 	meeting.EndedAt = &now
 	setCaptureStatus(meeting, db.CaptureStatusFailed, now, captureErr)
 	if err := s.meetings().UpdateMeeting(meeting); err != nil {
@@ -23,7 +23,7 @@ func (s Service) FailCapture(meeting *db.Meeting, captureErr error) error {
 }
 
 func (s Service) saveProcessingFailure(meeting *db.Meeting, origErr error) error {
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := nowUTC()
 	if meeting.EndedAt == nil {
 		meeting.EndedAt = &now
 	}
@@ -50,7 +50,7 @@ func (s Service) createSessionDir(title string) (string, error) {
 }
 
 func (s Service) startMeeting(title, sessionDir string) (*db.Meeting, error) {
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := nowUTC()
 	meeting := &db.Meeting{Title: title, StartedAt: now, CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: now, ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: now, AudioPath: &sessionDir, Source: "listen"}
 	if err := s.meetings().CreateMeeting(meeting); err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
@@ -112,4 +112,8 @@ func failureMessage(err error) *string {
 	}
 	message := err.Error()
 	return &message
+}
+
+func nowUTC() string {
+	return time.Now().UTC().Format(time.RFC3339)
 }

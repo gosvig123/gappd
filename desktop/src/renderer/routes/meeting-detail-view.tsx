@@ -4,6 +4,7 @@ import './meeting-detail.css'
 import { artifactLabel, meetingStatusLabel, processingStatusLabel } from '../components/meeting-status'
 import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel } from '../components/ui'
+import { dateLabel } from './today-model'
 
 const READING_COLLAPSE_RATIO = 0.4
 const READING_OVERFLOW_PADDING = 1
@@ -18,10 +19,6 @@ type MeetingDetailPanelProps = {
   selectedMeetingLoading: boolean
   selectedMeetingError: string | null
   transcript: string
-}
-
-function dateLabel(value: string): string {
-  return new Date(value).toLocaleString()
 }
 
 function canCopySummary(): boolean {

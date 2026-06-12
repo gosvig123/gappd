@@ -3,10 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { downloadFile, fileSha256, runCommand } from './bundle-utils.mjs'
+import runtimeManifest from '../src/shared/runtime-manifest.json' with { type: 'json' }
 
-const release = 'v0.20.5'
-const artifact = 'ollama-darwin.tgz'
-const sha256 = '71773629d3581d75b18411a0cba80b2f6e7d9021855bb3c9f34ad4e0fb4b33a0'
+const { release, artifact, sha256 } = runtimeManifest.ollama
 const url = `https://github.com/ollama/ollama/releases/download/${release}/${artifact}`
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const cacheDir = path.join(root, '.cache', 'ollama', release)

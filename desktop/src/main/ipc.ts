@@ -40,15 +40,12 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     registered = true
   }
 
-  onRecordingStateChange((state) => {
-    if (!mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(IPC_EVENTS.recording.statusChanged, state)
-    }
-  })
+  forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange)
+  forwardToWindow(mainWindow, IPC_EVENTS.onboarding.statusChanged, onOnboardingStatusChange)
+}
 
-  onOnboardingStatusChange((state) => {
-    if (!mainWindow.isDestroyed()) {
-      mainWindow.webContents.send(IPC_EVENTS.onboarding.statusChanged, state)
-    }
+function forwardToWindow<T>(mainWindow: BrowserWindow, channel: string, subscribe: (listener: (state: T) => void) => () => void): void {
+  subscribe((state) => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send(channel, state)
   })
 }

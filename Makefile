@@ -10,7 +10,7 @@ UNAME_S   := $(shell uname -s)
 
 export MACOSX_DEPLOYMENT_TARGET ?= 13.0
 
-.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install
+.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -53,6 +53,12 @@ db-init:
 db-reset:
 	rm -f $(DB_PATH)
 	$(MAKE) db-init
+
+gen-protocol:
+	go run ./cmd/gen-protocol
+
+check-protocol:
+	go run ./cmd/gen-protocol -check
 
 clean:
 	rm -rf $(BUILD_DIR)

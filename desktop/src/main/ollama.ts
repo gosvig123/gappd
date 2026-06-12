@@ -1,10 +1,11 @@
 import { execFile, spawn } from 'node:child_process'
-import { access, mkdir } from 'node:fs/promises'
+import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
 import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus } from '../shared/contracts'
 import { BUNDLED_OLLAMA_BINARY_NAME, BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME, BUNDLED_OLLAMA_RELEASE, MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_HOST_VALUE, MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODELS_DIRNAME, MANAGED_OLLAMA_PORT } from '../shared/bundled-ollama'
 import { lastLines } from '../shared/subprocess-output'
+import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './gappd'
 import { type OnboardingErrorState, toOnboardingErrorState } from './onboarding-errors'
 import { pullModelFromOllamaApi, type PullProgressUpdate } from './ollama-pull'
@@ -21,7 +22,12 @@ const managedOllama: ManagedOllamaRuntime = { process: null, startPromise: null,
 type ManagedStatusContext = { config: LocalAIConfig | null; configError?: string; supported: boolean; bundled: boolean; running: boolean; configured: boolean; modelAvailable: boolean; ownershipMismatch: boolean }
 type ManagedReadiness = { running: boolean; ownershipMismatch: boolean }
 
-export function resolveBundledOllamaBinary(): string { return app.isPackaged ? path.join(process.resourcesPath, 'ollama', BUNDLED_OLLAMA_BINARY_NAME) : path.resolve(__dirname, '../..', BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME, BUNDLED_OLLAMA_RELEASE, BUNDLED_OLLAMA_BINARY_NAME) }
+export function resolveBundledOllamaBinary(): string {
+  return resolveBinary({
+    packaged: ['ollama', BUNDLED_OLLAMA_BINARY_NAME],
+    dev: [BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME, BUNDLED_OLLAMA_RELEASE, BUNDLED_OLLAMA_BINARY_NAME],
+  })
+}
 export function managedOllamaSupported(): boolean { return process.platform === 'darwin' }
 export async function getManagedOllamaStatus(config: LocalAIConfig | null, configError?: string): Promise<LocalAIStatus> {
   const supported = managedOllamaSupported()
@@ -171,7 +177,7 @@ function taggedModelNames(payload: unknown): string[] {
   return payload.models.flatMap((model) => (!model || typeof model !== 'object' ? [] : [model.name, model.model].filter((value): value is string => typeof value === 'string')))
 }
 function managedOllamaModelsDir(): string { return path.join(app.getPath('userData'), MANAGED_OLLAMA_MODELS_DIRNAME) }
-async function bundledOllamaAvailable(): Promise<boolean> { try { await access(resolveBundledOllamaBinary()); return true } catch { return false } }
+async function bundledOllamaAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledOllamaBinary()) }
 async function managedOllamaHealthy(): Promise<boolean> { try { const response = await fetch(`${MANAGED_OLLAMA_ENDPOINT}/api/version`); return response.ok } catch { return false } }
 async function waitForManagedOllama(child: ReturnType<typeof spawn>, binaryPath: string): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt += 1) {

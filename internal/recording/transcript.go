@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
@@ -27,12 +26,33 @@ func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, recorder 
 	if err := s.meetings().InsertSegments(segments); err != nil {
 		return fmt.Errorf("save segments: %w", err)
 	}
-	transcript := formatTranscript(segments)
+	transcript := FormatTranscript(segments)
 	if s.Events == nil {
 		fmt.Fprintln(s.Out, "\n── Transcript ──────────────────────────")
 		fmt.Fprintln(s.Out, transcript)
 	}
-	return s.enhanceAndSave(meeting, transcript)
+	return s.enhanceAndSave(ctx, meeting, transcript, "")
+}
+
+// Enhance re-runs the AI pipeline over a stored meeting's transcript and saves the result.
+func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
+	segments, err := s.meetings().GetSegments(meetingID)
+	if err != nil {
+		return fmt.Errorf("get segments: %w", err)
+	}
+	if len(segments) == 0 {
+		return fmt.Errorf("no segments found for meeting %s", meetingID)
+	}
+	transcript := FormatTranscript(segments)
+	meeting, err := s.meetings().GetMeeting(meetingID)
+	if err != nil {
+		return fmt.Errorf("get meeting: %w", err)
+	}
+	setProcessingStatus(meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
+	if err := s.meetings().UpdateMeeting(meeting); err != nil {
+		return fmt.Errorf("mark meeting processing: %w", err)
+	}
+	return s.enhanceAndSave(ctx, meeting, transcript, notes)
 }
 
 func (s Service) transcribeStreams(ctx context.Context, recorder audioRecorder, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
@@ -93,7 +113,7 @@ func (s Service) transcribeAs(ctx context.Context, audioPath, modelPath, default
 	return segs, nil
 }
 
-func (s Service) enhanceAndSave(meeting *db.Meeting, transcript string) error {
+func (s Service) enhanceAndSave(ctx context.Context, meeting *db.Meeting, transcript, notes string) error {
 	if s.Events == nil {
 		fmt.Fprintln(s.Out, "── Enhancing with AI... ─────────────────")
 	}
@@ -101,14 +121,13 @@ func (s Service) enhanceAndSave(meeting *db.Meeting, transcript string) error {
 	if s.enhancer != nil {
 		runner = s.enhancer
 	}
-	extraction, summary, err := runner.Run(context.Background(), transcript, "")
+	extraction, summary, err := runner.Run(ctx, transcript, notes)
 	if err != nil {
 		return s.saveEnhanceFailure(meeting, transcript, err)
 	}
 	meeting.Transcript = &transcript
 	meeting.Summary = &summary
-	now := time.Now().UTC().Format(time.RFC3339)
-	setProcessingStatus(meeting, db.ProcessingStatusCompleted, now, nil)
+	setProcessingStatus(meeting, db.ProcessingStatusCompleted, nowUTC(), nil)
 	if err := s.meetings().UpdateMeeting(meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}
@@ -132,8 +151,7 @@ func printEnhancementResult(s Service, summary string, actionItems int, meetingI
 
 func (s Service) saveEnhanceFailure(meeting *db.Meeting, transcript string, err error) error {
 	meeting.Transcript = &transcript
-	now := time.Now().UTC().Format(time.RFC3339)
-	setProcessingStatus(meeting, db.ProcessingStatusFailed, now, err)
+	setProcessingStatus(meeting, db.ProcessingStatusFailed, nowUTC(), err)
 	updateErr := s.meetings().UpdateMeeting(meeting)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))

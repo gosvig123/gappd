@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState } from '../../shared/contracts'
 import { isPermissionErrorMessage, permissionTarget } from '../components/meeting-status'
+import { ACTIVE_RECORDING_STATUSES, useDynamicRefresh } from './use-dynamic-refresh'
+import { useGuardedEffect } from './use-guarded-effect'
 import { useRequestGate } from './request-gate'
 
 const IDLE_RECORDING_STATUS: RecordingState['status'] = 'idle'
 const ERROR_RECORDING_STATUS: RecordingState['status'] = 'error'
-const ACTIVE_RECORDING_STATUSES: RecordingState['status'][] = ['recording', 'stopping', 'processing']
 const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
-const DYNAMIC_REFRESH_INTERVAL_MS = 5000
-const DYNAMIC_REFRESH_MEETING_STATES: MeetingListItem['status']['state'][] = ['recording', 'processing']
-const VISIBLE_DOCUMENT_STATE: DocumentVisibilityState = 'visible'
 
 export function useDashboardData(enabled: boolean) {
   const selectedMeetingRequest = useRequestGate()
@@ -18,8 +16,8 @@ export function useDashboardData(enabled: boolean) {
   const [state, setState] = useDashboardState()
 
   const actions = useDashboardActions(state, setState, refs, selectedMeetingRequest, refreshRequest)
-  useRecordingLifecycle(enabled, state.recording, refs, actions, setState)
-  useDynamicRefresh(enabled, state.meetings, state.recording, refs, actions.refreshMeetings)
+  useRecordingLifecycle(enabled, refs, actions, setState)
+  useDynamicRefresh(enabled, state.meetings, state.recording, () => refs.selectedId.current, actions.refreshMeetings)
 
   return useMemo(() => buildDashboardViewModel(state, actions), [state, actions])
 }
@@ -54,7 +52,7 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
 
   async function loadMeeting(id: string) {
     const requestId = selectedRequest.next()
-    startMeetingLoad(id, state, setState, refs)
+    startMeetingLoad(id, setState, refs)
     try {
       const meeting = await window.gappd.meetings.show(id)
       if (isCurrentMeeting(requestId, id, refs, selectedRequest)) applySelectedMeeting(meeting, setState, refs)
@@ -96,11 +94,13 @@ async function resolveSelectedMeeting(meetings: MeetingListItem[], preferredId: 
   if (!resolvedId) clear()
 }
 
-function startMeetingLoad(id: string, state: DashboardState, setState: SetDashboardState, refs: MeetingRefs) {
+function startMeetingLoad(id: string, setState: SetDashboardState, refs: MeetingRefs) {
   const showLoading = refs.selected.current?.id !== id
   refs.selectedId.current = id
   if (showLoading) refs.selected.current = null
-  setState((current) => ({ ...current, selectedMeetingId: id, selectedMeeting: showLoading ? null : state.selectedMeeting, selectedMeetingLoading: showLoading, selectedMeetingError: null }))
+  // current.selectedMeeting, not a captured `state`: this runs from the
+  // long-lived refresh interval, whose closure state can be many renders old.
+  setState((current) => ({ ...current, selectedMeetingId: id, selectedMeeting: showLoading ? null : current.selectedMeeting, selectedMeetingLoading: showLoading, selectedMeetingError: null }))
 }
 
 function isCurrentMeeting(requestId: number, meetingId: string, refs: MeetingRefs, request: RequestGate): boolean {
@@ -117,52 +117,21 @@ function failSelectedMeeting(err: unknown, setState: SetDashboardState, refs: Me
   setState((current) => ({ ...current, selectedMeeting: null, selectedMeetingError: errorMessage(err) }))
 }
 
-function useRecordingLifecycle(enabled: boolean, recording: RecordingState, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState) {
-  useEffect(() => {
+function useRecordingLifecycle(enabled: boolean, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState) {
+  useGuardedEffect((guard) => {
     if (!enabled) return undefined
-    let disposed = false
-    const dispose = window.gappd.recording.onStatusChanged((next) => void handleRecordingChange(next, refs, actions, setState, () => disposed))
-    void actions.loadAppData().catch((err) => { if (!disposed) setDashboardError(err, setState) })
-    return () => { disposed = true; dispose() }
+    const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, refs, actions, setState)))
+    void actions.loadAppData().catch((err) => guard(() => setDashboardError(err, setState)))
+    return dispose
   }, [enabled])
 }
 
-async function handleRecordingChange(next: RecordingState, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState, disposed: () => boolean) {
-  if (disposed()) return
+async function handleRecordingChange(next: RecordingState, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState) {
   setState((current) => ({ ...current, recording: next }))
   const meetingId = next.meetingId ?? refs.selectedId.current
   if (next.meetingId) refs.selectedId.current = next.meetingId
   if (meetingId) return actions.refreshMeetings(meetingId)
   if (STARTABLE_RECORDING_STATUSES.includes(next.status)) await actions.refreshMeetings()
-}
-
-function useDynamicRefresh(enabled: boolean, meetings: MeetingListItem[], recording: RecordingState, refs: MeetingRefs, refreshMeetings: (id?: string | null) => Promise<void>) {
-  const hasWork = useMemo(() => needsDynamicRefresh(meetings, recording), [meetings, recording.status])
-  useVisibleRefresh(enabled, refreshMeetings)
-  useIntervalRefresh(enabled && hasWork, recording.meetingId, refs, refreshMeetings)
-}
-
-function useVisibleRefresh(enabled: boolean, refreshMeetings: () => Promise<void>) {
-  useEffect(() => {
-    if (!enabled) return undefined
-    const refresh = () => { if (document.visibilityState === VISIBLE_DOCUMENT_STATE) void refreshMeetings().catch(console.error) }
-    window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    return () => { window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh) }
-  }, [enabled])
-}
-
-function useIntervalRefresh(enabled: boolean, recordingMeetingId: string | undefined, refs: MeetingRefs, refreshMeetings: (id?: string | null) => Promise<void>) {
-  useEffect(() => {
-    if (!enabled) return undefined
-    const timer = window.setInterval(() => void refreshMeetings(refs.selectedId.current ?? recordingMeetingId).catch(console.error), DYNAMIC_REFRESH_INTERVAL_MS)
-    return () => window.clearInterval(timer)
-  }, [enabled, recordingMeetingId])
-}
-
-function needsDynamicRefresh(meetings: MeetingListItem[], recording: RecordingState): boolean {
-  if (ACTIVE_RECORDING_STATUSES.includes(recording.status)) return true
-  return meetings.some((meeting) => DYNAMIC_REFRESH_MEETING_STATES.includes(meeting.status.state))
 }
 
 async function startRecording(state: DashboardState, setState: SetDashboardState) {

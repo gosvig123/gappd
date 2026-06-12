@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/recording"
 )
 
 const (
@@ -112,7 +113,7 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if len(segments) == 0 {
 		return ""
 	}
-	return formatTranscript(segments)
+	return recording.FormatTranscript(segments)
 }
 
 func buildSegmentViews(segments []db.Segment) []meetingSegmentView {
@@ -123,13 +124,13 @@ func buildSegmentViews(segments []db.Segment) []meetingSegmentView {
 	return views
 }
 
-func meetingMarker(status appMeetingState) string {
+func meetingMarker(status db.MeetingState) string {
 	switch status {
-	case appMeetingStateCompleted:
+	case db.MeetingStateCompleted:
 		return meetingMarkerCompleted
-	case appMeetingStateFailed:
+	case db.MeetingStateFailed:
 		return meetingMarkerFailed
-	case appMeetingStateProcessing:
+	case db.MeetingStateProcessing:
 		return meetingMarkerProcessing
 	default:
 		return meetingMarkerCaptured

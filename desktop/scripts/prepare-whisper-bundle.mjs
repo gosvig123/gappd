@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { downloadFile, fileSha256, runCommand } from './bundle-utils.mjs'
+import runtimeManifest from '../src/shared/runtime-manifest.json' with { type: 'json' }
 
 const DEFAULT_MACOS_MIN_VERSION = '13.0'
 const MAC_BUILD_NATIVE = 'native'
@@ -12,9 +13,8 @@ const MAC_BUILD_X64 = 'x64'
 const MAC_BUILD_UNIVERSAL = 'universal'
 const MAC_ARCH_ARM64 = 'arm64'
 const MAC_ARCH_X64 = 'x86_64'
-const release = 'v1.7.6'
+const { release, sourceSha256 } = runtimeManifest.whisper
 const sourceUrl = `https://github.com/ggml-org/whisper.cpp/archive/refs/tags/${release}.tar.gz`
-const sourceSha256 = '166140e9a6d8a36f787a2bd77f8f44dd64874f12dd8359ff7c1f4f9acb86202e'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const macBuildProfile = process.env.GAPPD_MAC_BUILD || MAC_BUILD_NATIVE
 const macosMinVersion = process.env.GAPPD_MACOS_MIN_VERSION || DEFAULT_MACOS_MIN_VERSION

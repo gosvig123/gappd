@@ -2,6 +2,7 @@ import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, typ
 import { MANAGED_OLLAMA_ENDPOINT, MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODEL_OPTIONS, isManagedOllamaModel } from '../shared/bundled-ollama'
 import type { OnboardingSetupInput } from '../shared/ipc-contract'
 import { getLocalAIConfig, saveManagedLocalAIConfig } from './gappd'
+import { createObservableState } from './observable-state'
 import { toOnboardingErrorState } from './onboarding-errors'
 import {
   ensureManagedOllamaRunning,
@@ -18,26 +19,21 @@ import {
   missingManagedWhisperModelMessage,
 } from './whisper'
 
-let status: OnboardingStatus = needsSetupStatus()
+const onboardingState = createObservableState<OnboardingStatus>(needsSetupStatus())
 let onboardingPromise: Promise<OnboardingStatus> | null = null
 let onboardingRunId = 0
-const listeners = new Set<(status: OnboardingStatus) => void>()
 
 type LocalAIConfigLoadResult = { config: LocalAIConfig | null; error?: string }
 
-export function getOnboardingStatus(): OnboardingStatus { return status }
-
-export function onOnboardingStatusChange(listener: (status: OnboardingStatus) => void): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
+export const getOnboardingStatus = onboardingState.get
+export const onOnboardingStatusChange = onboardingState.subscribe
 
 export async function bootstrapOnboarding(): Promise<void> {
   const bootstrapRunId = onboardingRunId
   if (onboardingPromise) return
   const { config, error } = await loadLocalAIConfig()
   if (error) {
-    setBootstrapStatus(bootstrapRunId, errorStatus(error, status.phase))
+    setBootstrapStatus(bootstrapRunId, errorStatus(error, getOnboardingStatus().phase))
     return
   }
   if (!config) {
@@ -70,7 +66,7 @@ export async function bootstrapOnboarding(): Promise<void> {
     }
     setBootstrapStatus(bootstrapRunId, managedStatus('ready', 'Managed Ollama is ready', { endpoint: config.endpoint, model: config.model }))
   } catch (error) {
-    setBootstrapStatus(bootstrapRunId, errorStatus(error, status.phase, config.model))
+    setBootstrapStatus(bootstrapRunId, errorStatus(error, getOnboardingStatus().phase, config.model))
   }
 }
 
@@ -121,8 +117,8 @@ async function runOnboardingSingleFlight(model: string): Promise<OnboardingStatu
 
 async function runOnboarding(model: string): Promise<OnboardingStatus> {
   if (!managedOllamaSupported()) {
-    setStatus(errorStatus('Managed Ollama onboarding is only supported on macOS', status.phase, model))
-    return status
+    setStatus(errorStatus('Managed Ollama onboarding is only supported on macOS', getOnboardingStatus().phase, model))
+    return getOnboardingStatus()
   }
   try {
     setStatus(managedModelStatus(model, 'checking', 'Checking managed Ollama'))
@@ -130,13 +126,13 @@ async function runOnboarding(model: string): Promise<OnboardingStatus> {
     setStatus(managedModelStatus(model, 'starting_ollama', 'Managed Ollama is running'))
     setStatus(managedModelStatus(model, 'pulling_model', `Pulling local model ${model}`))
     await pullManagedModel(model, ({ progress, message, pullStage }) => {
-      const nextProgress = typeof progress === 'number' ? progress : status.progress
+      const nextProgress = typeof progress === 'number' ? progress : getOnboardingStatus().progress
       const nextStatus = typeof nextProgress === 'number' ? { progress: nextProgress } : {}
       setStatus(managedModelStatus(model, 'pulling_model', message || `Pulling local model ${model}`, { ...nextStatus, pullStage }))
     })
     setStatus(managedModelStatus(model, 'pulling_model', 'Preparing speech model download', { progress: undefined, pullStage: 'preparing' }))
     await ensureManagedWhisperModel(({ progress, message, pullStage }) => {
-      const nextProgress = typeof progress === 'number' ? progress : status.progress
+      const nextProgress = typeof progress === 'number' ? progress : getOnboardingStatus().progress
       const nextStatus = typeof nextProgress === 'number' ? { progress: nextProgress } : {}
       setStatus(managedModelStatus(model, 'pulling_model', message || 'Downloading speech model', { ...nextStatus, pullStage }))
     })
@@ -144,9 +140,9 @@ async function runOnboarding(model: string): Promise<OnboardingStatus> {
     const config = await saveManagedLocalAIConfig({ endpoint: MANAGED_OLLAMA_ENDPOINT, model })
     setStatus(managedStatus('ready', 'Local AI is ready', { endpoint: config.endpoint, model: config.model }))
   } catch (error) {
-    setStatus(errorStatus(error, status.phase, model))
+    setStatus(errorStatus(error, getOnboardingStatus().phase, model))
   }
-  return status
+  return getOnboardingStatus()
 }
 
 async function loadLocalAIConfig(): Promise<LocalAIConfigLoadResult> {
@@ -157,10 +153,7 @@ async function loadLocalAIConfig(): Promise<LocalAIConfigLoadResult> {
   }
 }
 
-function setStatus(next: OnboardingStatus): void {
-  status = next
-  for (const listener of listeners) listener(status)
-}
+const setStatus = onboardingState.set
 
 function setBootstrapStatus(runId: number, next: OnboardingStatus): boolean {
   if (onboardingPromise || onboardingRunId !== runId) return false
@@ -172,7 +165,8 @@ async function resolveSetupModel(input: OnboardingSetupInput | undefined, preser
   if (input?.model) return validatedSetupModel(input.model)
   if (!preserveConfigured) return MANAGED_OLLAMA_MODEL
   const { config } = await loadLocalAIConfig()
-  return config?.managed && config.model ? config.model : status.managed && status.model ? status.model : MANAGED_OLLAMA_MODEL
+  const current = getOnboardingStatus()
+  return config?.managed && config.model ? config.model : current.managed && current.model ? current.model : MANAGED_OLLAMA_MODEL
 }
 
 function validatedSetupModel(model: string): string {

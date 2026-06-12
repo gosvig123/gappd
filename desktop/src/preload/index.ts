@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC_CHANNELS, IPC_EVENTS, type GappdApi, type OnboardingStatus, type RecordingState } from '../shared/ipc-contract'
+import { IPC_CHANNELS, IPC_EVENTS, type GappdApi } from '../shared/ipc-contract'
+
+function subscribe<T>(channel: string): (listener: (state: T) => void) => () => void {
+  return (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: T) => listener(state)
+    ipcRenderer.on(channel, wrapped)
+    return () => ipcRenderer.removeListener(channel, wrapped)
+  }
+}
 
 const api: GappdApi = {
   system: {
@@ -15,21 +23,13 @@ const api: GappdApi = {
     start: (input) => ipcRenderer.invoke(IPC_CHANNELS.recording.start, input),
     stop: () => ipcRenderer.invoke(IPC_CHANNELS.recording.stop),
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.recording.getStatus),
-    onStatusChanged: (listener) => {
-      const wrapped = (_event: Electron.IpcRendererEvent, state: RecordingState) => listener(state)
-      ipcRenderer.on(IPC_EVENTS.recording.statusChanged, wrapped)
-      return () => ipcRenderer.removeListener(IPC_EVENTS.recording.statusChanged, wrapped)
-    },
+    onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged),
   },
   onboarding: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.onboarding.getStatus),
     start: (input) => ipcRenderer.invoke(IPC_CHANNELS.onboarding.start, input),
     retry: (input) => ipcRenderer.invoke(IPC_CHANNELS.onboarding.retry, input),
-    onStatusChanged: (listener) => {
-      const wrapped = (_event: Electron.IpcRendererEvent, state: OnboardingStatus) => listener(state)
-      ipcRenderer.on(IPC_EVENTS.onboarding.statusChanged, wrapped)
-      return () => ipcRenderer.removeListener(IPC_EVENTS.onboarding.statusChanged, wrapped)
-    },
+    onStatusChanged: subscribe(IPC_EVENTS.onboarding.statusChanged),
   },
   settings: {
     getLocalAIStatus: () => ipcRenderer.invoke(IPC_CHANNELS.settings.getLocalAIStatus),

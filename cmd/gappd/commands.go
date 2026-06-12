@@ -1,13 +1,11 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"strings"
-	"time"
+	"os"
 
-	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
 
@@ -24,66 +22,12 @@ func enhanceCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			return runEnhance(store, pipeline, args[0], notes)
+			service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+			return service.Enhance(cmdContext(), args[0], notes)
 		},
 	}
 	cmd.Flags().StringVarP(&notes, "notes", "n", "", "Your rough notes")
 	return cmd
-}
-
-func runEnhance(store *db.DB, pipeline *ai.Pipeline, id, notes string) error {
-	segments, err := store.GetSegments(id)
-	if err != nil {
-		return fmt.Errorf("get segments: %w", err)
-	}
-	if len(segments) == 0 {
-		return fmt.Errorf("no segments found for meeting %s", id)
-	}
-	transcript := formatTranscript(segments)
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return fmt.Errorf("get meeting: %w", err)
-	}
-	now := time.Now().UTC().Format(time.RFC3339)
-	setMeetingProcessingStatus(meeting, db.ProcessingStatusProcessing, now, nil)
-	if err := store.UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("mark meeting processing: %w", err)
-	}
-
-	fmt.Println("Extracting structure...")
-	extraction, summary, err := pipeline.Run(cmdContext(), transcript, notes)
-	if err != nil {
-		now = time.Now().UTC().Format(time.RFC3339)
-		setMeetingProcessingStatus(meeting, db.ProcessingStatusFailed, now, err)
-		if updateErr := store.UpdateMeeting(meeting); updateErr != nil {
-			return fmt.Errorf("pipeline: %w", errors.Join(err, fmt.Errorf("update meeting: %w", updateErr)))
-		}
-		return fmt.Errorf("pipeline: %w", err)
-	}
-
-	meeting, err = store.GetMeeting(id)
-	if err != nil {
-		return fmt.Errorf("get meeting: %w", err)
-	}
-	meeting.Transcript = &transcript
-	meeting.Summary = &summary
-	now = time.Now().UTC().Format(time.RFC3339)
-	setMeetingProcessingStatus(meeting, db.ProcessingStatusCompleted, now, nil)
-	if err := store.UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("update meeting: %w", err)
-	}
-
-	fmt.Println(summary)
-	fmt.Printf("\n%d action items extracted.\n", len(extraction.ActionItems))
-	return nil
-}
-
-func formatTranscript(segments []db.Segment) string {
-	var b strings.Builder
-	for _, s := range segments {
-		fmt.Fprintf(&b, "[%s] %s\n", s.Speaker, s.Text)
-	}
-	return b.String()
 }
 
 func meetingsCmd() *cobra.Command {

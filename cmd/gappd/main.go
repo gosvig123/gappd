@@ -68,14 +68,6 @@ func openDB(cfg config.Config) (*db.DB, error) {
 	return store, nil
 }
 
-func gappdDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("resolve home directory: %w", err)
-	}
-	return filepath.Join(home, ".gappd"), nil
-}
-
 func cmdContext() context.Context {
 	return context.Background()
 }

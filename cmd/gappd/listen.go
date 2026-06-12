@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gappd-dev/gappd/internal/capture"
+	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
@@ -62,7 +63,7 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode,
 	if modelPath == "" {
 		modelPath = defaultPath
 	}
-	baseDir, err := gappdDir()
+	baseDir, err := config.GappdDir()
 	if err != nil {
 		return fmt.Errorf("resolve gappd dir for session path: %w", err)
 	}
@@ -94,5 +95,5 @@ type appRecordingSink struct {
 }
 
 func (s appRecordingSink) EmitRecordingEvent(name recording.EventName, meeting db.Meeting, err error) error {
-	return s.emitter.emit(appRecordingEventName(name), meeting, err)
+	return s.emitter.emit(name, meeting, err)
 }

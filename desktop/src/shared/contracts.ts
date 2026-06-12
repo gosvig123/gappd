@@ -1,3 +1,8 @@
+import type { CaptureStatus, MeetingState, ProcessingStatus } from './generated/protocol'
+
+export * from './generated/protocol'
+
+// Desktop-only UI state for the recorder; not part of the gappd wire protocol.
 export const RECORDING_STATUSES = ['idle', 'recording', 'stopping', 'processing', 'error'] as const
 export type RecordingStatus = (typeof RECORDING_STATUSES)[number]
 
@@ -12,24 +17,6 @@ export type Device = {
   index: number
   name: string
 }
-
-export const CAPTURE_STATUSES = ['recording', 'captured', 'failed'] as const
-export type CaptureStatus = (typeof CAPTURE_STATUSES)[number]
-
-export const PROCESSING_STATUSES = ['not_started', 'processing', 'completed', 'failed'] as const
-export type ProcessingStatus = (typeof PROCESSING_STATUSES)[number]
-
-export const MEETING_STATES = ['recording', 'captured', 'processing', 'completed', 'failed'] as const
-export type MeetingState = (typeof MEETING_STATES)[number]
-
-export const RECORDING_PROTOCOL_EVENT_TYPES = [
-  'recording.started',
-  'recording.stopping',
-  'recording.processing',
-  'recording.completed',
-  'recording.failed',
-] as const
-export type RecordingProtocolEventType = (typeof RECORDING_PROTOCOL_EVENT_TYPES)[number]
 
 export type MeetingStatus = {
   state: MeetingState

@@ -1,20 +1,10 @@
 import type { RecordingState } from '../shared/contracts'
+import { createObservableState } from './observable-state'
 
 export type { RecordingState }
 
-let state: RecordingState = { status: 'idle' }
-const listeners = new Set<(state: RecordingState) => void>()
+const recordingState = createObservableState<RecordingState>({ status: 'idle' })
 
-export function getRecordingState(): RecordingState {
-  return state
-}
-
-export function setRecordingState(next: RecordingState): void {
-  state = next
-  for (const listener of listeners) listener(state)
-}
-
-export function onRecordingStateChange(listener: (state: RecordingState) => void): () => void {
-  listeners.add(listener)
-  return () => listeners.delete(listener)
-}
+export const getRecordingState = recordingState.get
+export const setRecordingState = recordingState.set
+export const onRecordingStateChange = recordingState.subscribe
