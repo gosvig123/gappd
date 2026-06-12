@@ -2,8 +2,8 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { app } from 'electron'
 import { RECORDING_PROTOCOL_EVENT_TYPES, type Device, type LocalAIConfig, type MeetingDetail, type MeetingListItem, type MeetingStatus, type RecordingProtocolEventType } from '../shared/contracts'
+import { resolveBinary } from './binaries'
 import { getRecordingState, setRecordingState, type RecordingState } from './state'
 import { getValidatedManagedWhisperPaths } from './whisper'
 
@@ -22,10 +22,11 @@ type RecordingProtocolEvent = {
 let recordingChild: ReturnType<typeof spawn> | null = null
 
 export function resolveCaptureBinary(): string {
-  const override = process.env.GAPPD_CAPTURE_HELPER_PATH
-  if (override) return override
-  if (app.isPackaged) return path.join(process.resourcesPath, 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture')
-  return path.resolve(__dirname, '../../..', 'build', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture')
+  return resolveBinary({
+    envVar: 'GAPPD_CAPTURE_HELPER_PATH',
+    packaged: ['GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'],
+    dev: ['..', 'build', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'],
+  })
 }
 
 export function requestCapturePermissions(): Promise<{ microphone: string; screen: string }> {
@@ -50,10 +51,11 @@ export function requestCapturePermissions(): Promise<{ microphone: string; scree
 }
 
 export function resolveGappdBinary(): string {
-  const override = process.env.GAPPD_BINARY_PATH
-  if (override) return override
-  if (app.isPackaged) return path.join(process.resourcesPath, 'bin', 'gappd')
-  return path.resolve(__dirname, '../../..', 'build', 'gappd')
+  return resolveBinary({
+    envVar: 'GAPPD_BINARY_PATH',
+    packaged: ['bin', 'gappd'],
+    dev: ['..', 'build', 'gappd'],
+  })
 }
 
 export async function getDevices(): Promise<Device[]> {

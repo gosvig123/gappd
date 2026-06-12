@@ -27,7 +27,7 @@ func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
 	return out
 }
 
-func formatTranscript(segments []db.Segment) string {
+func FormatTranscript(segments []db.Segment) string {
 	var b strings.Builder
 	for _, s := range segments {
 		fmt.Fprintf(&b, "[%s] %s\n", s.Speaker, s.Text)

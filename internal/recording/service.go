@@ -24,6 +24,10 @@ const (
 	EventFailed     EventName = "recording.failed"
 )
 
+// AllEventNames is the canonical enumeration of recording protocol events,
+// used by cmd/gen-protocol to generate the TypeScript protocol definitions.
+var AllEventNames = []EventName{EventStarted, EventStopping, EventProcessing, EventCompleted, EventFailed}
+
 type EventSink interface {
 	EmitRecordingEvent(EventName, db.Meeting, error) error
 }
@@ -48,6 +52,8 @@ type meetingStore interface {
 	CreateMeeting(*db.Meeting) error
 	UpdateMeeting(*db.Meeting) error
 	InsertSegments([]db.Segment) error
+	GetMeeting(id string) (*db.Meeting, error)
+	GetSegments(meetingID string) ([]db.Segment, error)
 }
 
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
@@ -152,7 +158,7 @@ func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, meetin
 
 func (s Service) finish(req Request, meeting *db.Meeting, recorder audioRecorder) error {
 	s.printRecorded(meeting.StartedAt)
-	now := time.Now().UTC().Format(time.RFC3339)
+	now := nowUTC()
 	meeting.EndedAt = &now
 	if !hasCapturedAudio(recorder) {
 		captureErr := fmt.Errorf("no audio captured")

@@ -1,6 +1,7 @@
 package recording
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -79,7 +80,7 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
 	transcript := "[You] hello\n"
 
-	err := service.enhanceAndSave(meeting, transcript)
+	err := service.enhanceAndSave(context.Background(), meeting, transcript, "")
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("enhanceAndSave() error = %v, want saved transcript failure", err)
 	}

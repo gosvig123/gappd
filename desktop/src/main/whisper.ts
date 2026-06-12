@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { access, mkdir, rename, rm, stat } from 'node:fs/promises'
+import { access, mkdir, rename, rm } from 'node:fs/promises'
 import { once } from 'node:events'
 import path from 'node:path'
 import { app } from 'electron'
 import type { OnboardingPullStage } from '../shared/contracts'
+import { isExecutableFile, resolveBinary } from './binaries'
 import {
   BUNDLED_WHISPER_BINARY_NAME,
   MANAGED_WHISPER_MODEL,
@@ -21,9 +22,10 @@ export type WhisperProgressUpdate = {
 }
 
 export function resolveBundledWhisperBinary(): string {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, 'whisper', BUNDLED_WHISPER_BINARY_NAME)
-    : path.resolve(__dirname, '../..', 'resources', 'whisper', BUNDLED_WHISPER_BINARY_NAME)
+  return resolveBinary({
+    packaged: ['whisper', BUNDLED_WHISPER_BINARY_NAME],
+    dev: ['resources', 'whisper', BUNDLED_WHISPER_BINARY_NAME],
+  })
 }
 
 export function resolveManagedWhisperModelPath(): string {
@@ -111,15 +113,6 @@ export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperB
 
 export function missingManagedWhisperModelMessage(): string {
   return 'Bundled speech model is missing. Run setup to download it again.'
-}
-
-async function isExecutableFile(filePath: string): Promise<boolean> {
-  try {
-    const info = await stat(filePath)
-    return info.isFile() && (info.mode & 0o111) !== 0
-  } catch {
-    return false
-  }
 }
 
 async function fileSha256IfExists(filePath: string): Promise<string | null> {

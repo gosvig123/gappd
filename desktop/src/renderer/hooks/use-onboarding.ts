@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MANAGED_OLLAMA_MODEL, isManagedOllamaModel, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
 import { getLocalAIContract, toStatusError, type OnboardingStatus } from '../components/local-ai-contract'
+import { useGuardedEffect } from './use-guarded-effect'
 
 const localAI = getLocalAIContract()
 
@@ -29,11 +30,10 @@ export function useOnboarding() {
 }
 
 function useOnboardingStatus(onStatus: (status: OnboardingStatus) => void, onLoading: (loading: boolean) => void) {
-  useEffect(() => {
-    let disposed = false
-    const dispose = localAI.onboarding.onStatusChanged((status) => { if (!disposed) onStatus(status) })
-    void loadInitialStatus((status) => { if (!disposed) onStatus(status) }, () => { if (!disposed) onLoading(false) })
-    return () => { disposed = true; dispose() }
+  useGuardedEffect((guard) => {
+    const dispose = localAI.onboarding.onStatusChanged((status) => guard(() => onStatus(status)))
+    void loadInitialStatus((status) => guard(() => onStatus(status)), () => guard(() => onLoading(false)))
+    return dispose
   }, [])
 }
 

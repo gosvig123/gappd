@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/recording"
 )
 
 func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
@@ -43,8 +44,8 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("appMeetingDetailFor() error = %v", err)
 	}
-	if detail.Status.State != appMeetingStateFailed {
-		t.Fatalf("status.state = %q, want %q", detail.Status.State, appMeetingStateFailed)
+	if detail.Status.State != db.MeetingStateFailed {
+		t.Fatalf("status.state = %q, want %q", detail.Status.State, db.MeetingStateFailed)
 	}
 	if detail.Status.UpdatedAt != meeting.ProcessingStatusUpdatedAt {
 		t.Fatalf("status.updatedAt = %q, want %q", detail.Status.UpdatedAt, meeting.ProcessingStatusUpdatedAt)
@@ -81,7 +82,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		ProcessingStatus:          db.ProcessingStatusProcessing,
 		ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
 	}
-	if err := emitter.emit(appRecordingProcessingEvent, meeting, nil); err != nil {
+	if err := emitter.emit(recording.EventProcessing, meeting, nil); err != nil {
 		t.Fatalf("emit() error = %v", err)
 	}
 	if err := writer.Close(); err != nil {
@@ -97,8 +98,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v\noutput=%s", err, buf.String())
 	}
-	if event.Type != appRecordingProcessingEvent {
-		t.Fatalf("event.type = %q, want %q", event.Type, appRecordingProcessingEvent)
+	if event.Type != recording.EventProcessing {
+		t.Fatalf("event.type = %q, want %q", event.Type, recording.EventProcessing)
 	}
 	if event.MeetingID != meeting.ID {
 		t.Fatalf("event.meetingId = %q, want %q", event.MeetingID, meeting.ID)
@@ -106,8 +107,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if event.Title != meeting.Title {
 		t.Fatalf("event.title = %q, want %q", event.Title, meeting.Title)
 	}
-	if event.Status.State != appMeetingStateProcessing {
-		t.Fatalf("event.status.state = %q, want %q", event.Status.State, appMeetingStateProcessing)
+	if event.Status.State != db.MeetingStateProcessing {
+		t.Fatalf("event.status.state = %q, want %q", event.Status.State, db.MeetingStateProcessing)
 	}
 	if event.Status.Processing.State != string(db.ProcessingStatusProcessing) {
 		t.Fatalf("event.status.processing.state = %q, want %q", event.Status.Processing.State, db.ProcessingStatusProcessing)

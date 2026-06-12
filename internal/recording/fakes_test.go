@@ -47,6 +47,15 @@ func (s *fakeStore) InsertSegments(segments []db.Segment) error {
 	return nil
 }
 
+func (s *fakeStore) GetMeeting(string) (*db.Meeting, error) {
+	copy := *s.meeting
+	return &copy, nil
+}
+
+func (s *fakeStore) GetSegments(string) ([]db.Segment, error) {
+	return append([]db.Segment(nil), s.segments...), nil
+}
+
 type fakeRecorder struct {
 	dir  string
 	done chan error
