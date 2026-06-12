@@ -3,7 +3,7 @@ import { IPC_CHANNELS, IPC_EVENTS, type CapturePermissionTarget, type Onboarding
 import { getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
 import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
 import { getRecordingState, onRecordingStateChange } from './state'
-import { getUpdateStatus, openUpdatePage } from './update'
+import { checkForUpdate, downloadUpdate, getUpdateStatus, openUpdatePage } from './update'
 
 let registered = false
 
@@ -36,6 +36,8 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     ipcMain.handle(IPC_CHANNELS.settings.getLocalAIStatus, () => getLocalAIStatus())
     ipcMain.handle(IPC_CHANNELS.settings.repairLocalAI, () => repairLocalAI())
     ipcMain.handle(IPC_CHANNELS.update.getStatus, () => getUpdateStatus())
+    ipcMain.handle(IPC_CHANNELS.update.checkNow, () => checkForUpdate())
+    ipcMain.handle(IPC_CHANNELS.update.downloadUpdate, () => downloadUpdate())
     ipcMain.handle(IPC_CHANNELS.update.openUpdatePage, () => openUpdatePage())
     registered = true
   }

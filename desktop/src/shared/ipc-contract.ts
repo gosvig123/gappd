@@ -1,5 +1,5 @@
-import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
-export type { OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
+import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
+export type { OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
 
 export const IPC_CHANNELS = {
   system: {
@@ -27,6 +27,8 @@ export const IPC_CHANNELS = {
   },
   update: {
     getStatus: 'update:getStatus',
+    checkNow: 'update:checkNow',
+    downloadUpdate: 'update:downloadUpdate',
     openUpdatePage: 'update:openUpdatePage',
   },
 } as const
@@ -73,6 +75,8 @@ export type GappdApi = {
   }
   update: {
     getStatus(): Promise<UpdateStatus>
+    checkNow(): Promise<UpdateStatus>
+    downloadUpdate(): Promise<UpdateDownloadResult>
     openUpdatePage(): Promise<void>
   }
 }

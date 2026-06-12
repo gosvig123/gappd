@@ -183,6 +183,7 @@ jobs:
           mkdir -p desktop/release/continuous
           cp "${dmg_paths[0]}" desktop/release/continuous/Gappd-main-latest-arm64.dmg
           export DMG_NAME="Gappd-main-latest-arm64.dmg"
+          export DMG_SHA256="$(shasum -a 256 "desktop/release/continuous/$DMG_NAME" | awk '{print $1}')"
           python3 - <<'PY'
           import json
           import os
@@ -197,8 +198,11 @@ jobs:
           download_url = f'https://github.com/{repo}/releases/download/{tag}/{quote(dmg_name)}'
           Path('desktop/release/continuous/latest.json').write_text(json.dumps({
             'version': version,
+            'channel': 'main',
+            'minVersion': '0.1.0',
             'releaseUrl': release_url,
             'downloadUrl': download_url,
+            'sha256': os.environ['DMG_SHA256'],
           }, indent=2) + '\n')
           PY
           cat desktop/release/continuous/latest.json

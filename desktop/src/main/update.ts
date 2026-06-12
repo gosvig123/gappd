@@ -1,5 +1,6 @@
 import { app, shell } from 'electron'
-import type { UpdateStatus } from '../shared/contracts'
+import type { UpdateDownloadResult, UpdateStatus } from '../shared/contracts'
+import { downloadUpdateArtifact } from './update-download'
 
 const DEFAULT_UPDATE_CHECK_URL = 'https://github.com/gosvig123/gappd/releases/download/main-latest/latest.json'
 const DEFAULT_RELEASE_URL = 'https://github.com/gosvig123/gappd/releases/tag/main-latest'
@@ -7,7 +8,15 @@ const UPDATE_CHECK_URL_ENV = 'GAPPD_UPDATE_CHECK_URL'
 const UPDATE_ACCEPT_HEADER = 'application/vnd.github+json, application/json'
 const UPDATE_USER_AGENT = 'gappd-desktop'
 
-type ReleaseInfo = { version: string; releaseUrl: string; name?: string }
+type ReleaseInfo = {
+  version: string
+  releaseUrl: string
+  downloadUrl?: string
+  sha256?: string
+  channel?: string
+  minVersion?: string
+  name?: string
+}
 type ParsedVersion = { parts: [number, number, number]; preRelease: string | null }
 
 let latestUpdateStatus: UpdateStatus | null = null
@@ -17,18 +26,36 @@ export async function getUpdateStatus(): Promise<UpdateStatus> {
   return latestUpdateStatus
 }
 
+export async function checkForUpdate(): Promise<UpdateStatus> {
+  return getUpdateStatus()
+}
+
 export async function openUpdatePage(): Promise<void> {
-  const status = latestUpdateStatus?.available ? latestUpdateStatus : await getUpdateStatus()
-  if (!status.available) throw new Error('No update is available. Check for updates again and retry.')
+  const status = await availableUpdateStatus()
   await shell.openExternal(externalUpdateUrl(status.releaseUrl), { activate: true })
+}
+
+export async function downloadUpdate(): Promise<UpdateDownloadResult> {
+  const status = await availableUpdateStatus()
+  if (!status.downloadUrl) throw new Error('Update download failed: manifest has no downloadUrl. Open the release page and download manually.')
+  return downloadUpdateArtifact({ url: status.downloadUrl, sha256: status.sha256, version: status.latestVersion })
 }
 
 async function resolveUpdateStatus(): Promise<UpdateStatus> {
   const currentVersion = app.getVersion()
   try {
     const release = await fetchRelease(updateCheckUrl())
-    if (!release || !isNewerVersion(release.version, currentVersion)) return unavailable(currentVersion, release?.version)
-    return { available: true, currentVersion, latestVersion: release.version, releaseUrl: release.releaseUrl, name: release.name }
+    if (!release || !isCompatibleRelease(release, currentVersion) || !isNewerVersion(release.version, currentVersion)) return unavailable(currentVersion, release?.version)
+    return {
+      available: true,
+      currentVersion,
+      latestVersion: release.version,
+      releaseUrl: release.releaseUrl,
+      downloadUrl: release.downloadUrl,
+      sha256: release.sha256,
+      channel: release.channel,
+      name: release.name,
+    }
   } catch {
     return unavailable(currentVersion)
   }
@@ -45,11 +72,19 @@ function parseRelease(payload: unknown, sourceUrl: string): ReleaseInfo | null {
   const rawVersion = textField(payload, 'version') ?? textField(payload, 'tag_name')
   if (!rawVersion) return null
   const releaseUrl = releaseUrlField(payload) ?? fallbackReleaseUrl(sourceUrl)
-  return { version: normalizeVersion(rawVersion), releaseUrl, name: textField(payload, 'name') ?? undefined }
+  return {
+    version: normalizeVersion(rawVersion),
+    releaseUrl,
+    downloadUrl: textField(payload, 'downloadUrl') ?? undefined,
+    sha256: textField(payload, 'sha256') ?? undefined,
+    channel: textField(payload, 'channel') ?? undefined,
+    minVersion: normalizeOptionalVersion(textField(payload, 'minVersion')),
+    name: textField(payload, 'name') ?? undefined,
+  }
 }
 
 function releaseUrlField(payload: Record<string, unknown>): string | null {
-  return textField(payload, 'releaseUrl') ?? textField(payload, 'downloadUrl') ?? textField(payload, 'html_url')
+  return textField(payload, 'releaseUrl') ?? textField(payload, 'html_url')
 }
 
 function updateCheckUrl(): string {
@@ -59,6 +94,12 @@ function updateCheckUrl(): string {
 
 function fallbackReleaseUrl(sourceUrl: string): string {
   return sourceUrl === DEFAULT_UPDATE_CHECK_URL ? DEFAULT_RELEASE_URL : sourceUrl
+}
+
+async function availableUpdateStatus(): Promise<Extract<UpdateStatus, { available: true }>> {
+  const status = latestUpdateStatus?.available ? latestUpdateStatus : await getUpdateStatus()
+  if (!status.available) throw new Error('No update is available. Check for updates again and retry.')
+  return status
 }
 
 function unavailable(currentVersion: string, latestVersion?: string): UpdateStatus {
@@ -75,10 +116,20 @@ function httpsUrl(rawUrl: string, message: string): string {
   return url.toString()
 }
 
+function isCompatibleRelease(release: ReleaseInfo, currentVersion: string): boolean {
+  return !release.minVersion || isVersionAtLeast(currentVersion, release.minVersion)
+}
+
 function isNewerVersion(latestVersion: string, currentVersion: string): boolean {
   const latest = parseVersion(latestVersion)
   const current = parseVersion(currentVersion)
   return Boolean(latest && current && compareVersions(latest, current) > 0)
+}
+
+function isVersionAtLeast(version: string, minimumVersion: string): boolean {
+  const parsedVersion = parseVersion(version)
+  const parsedMinimum = parseVersion(minimumVersion)
+  return Boolean(parsedVersion && parsedMinimum && compareVersions(parsedVersion, parsedMinimum) >= 0)
 }
 
 function compareVersions(left: ParsedVersion, right: ParsedVersion): number {
@@ -128,6 +179,10 @@ function parseVersion(version: string): ParsedVersion | null {
 
 function normalizeVersion(version: string): string {
   return version.trim().replace(/^v/i, '')
+}
+
+function normalizeOptionalVersion(version: string | null): string | undefined {
+  return version ? normalizeVersion(version) : undefined
 }
 
 function numericIdentifier(value: string): number | null {
