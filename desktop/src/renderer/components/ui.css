@@ -233,6 +233,38 @@ button:focus-visible {
   font-size: var(--font-size-sm);
 }
 
+.ui-density-compact {
+  --compact-control-radius: var(--radius-sm);
+  --compact-header-space: var(--space-4);
+}
+
+:where(.ui-density-compact) .panel {
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+}
+
+:where(.ui-density-compact) .panel-header {
+  gap: var(--compact-header-space);
+  margin-bottom: var(--compact-header-space);
+}
+
+:where(.ui-density-compact) .status-pill {
+  padding: 2px 7px;
+  font-size: var(--font-size-xs);
+}
+
+:where(.ui-density-compact) :is(input, select, .ui-button) {
+  border-radius: var(--compact-control-radius);
+}
+
+:where(.ui-density-compact) :is(input, select) {
+  padding: var(--space-2) var(--space-3);
+}
+
+:where(.ui-density-compact) .ui-button {
+  padding: var(--space-2) var(--space-4);
+}
+
 .list-row {
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);

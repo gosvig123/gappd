@@ -6,6 +6,14 @@ export {}
 declare global {
   type MeetingStatus = SharedMeetingStatus
 
+  interface ImportMetaEnv {
+    readonly DEV: boolean
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv
+  }
+
   interface Window {
     gappd: GappdApi
   }

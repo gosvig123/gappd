@@ -39,7 +39,7 @@ function ReadyApp({ dashboard }: { dashboard: ReturnType<typeof useDashboardData
 }
 
 function OnboardingApp({ onboarding }: { onboarding: ReturnType<typeof useOnboarding> }) {
-  return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} onContinue={() => undefined} /></div>
+  return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} /></div>
 }
 
 async function openUpdate(updateStatus: ReturnType<typeof useUpdateStatus>, reportError: (message: string) => void) {

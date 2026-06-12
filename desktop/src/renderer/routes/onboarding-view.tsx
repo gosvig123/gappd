@@ -19,7 +19,6 @@ type OnboardingViewProps = {
   onModelChange: (model: ManagedOllamaModelTag) => void
   onStart: () => void
   onRetry: () => void
-  onContinue: () => void
 }
 
 type SetupActionsProps = {
@@ -141,7 +140,7 @@ function updateSelectedModel(value: string, onModelChange: (model: ManagedOllama
   if (isManagedOllamaModel(value)) onModelChange(value)
 }
 
-export function OnboardingView({ status, busy, selectedModel, modelOptions, onModelChange, onStart, onRetry, onContinue }: OnboardingViewProps) {
+export function OnboardingView({ status, busy, selectedModel, modelOptions, onModelChange, onStart, onRetry }: OnboardingViewProps) {
   const copy = phaseCopy(status)
   const errorView = onboardingErrorView(status)
   const isReady = status.phase === 'ready'
@@ -155,11 +154,7 @@ export function OnboardingView({ status, busy, selectedModel, modelOptions, onMo
         <div className="setup-panel setup-primary">
           <Card className="setup-callout accent"><strong>Recommended</strong><h2>{copy.headline}</h2><p>{copy.detail}</p></Card>
           <SetupProgressCard status={status} copy={copy} />
-          {isReady ? (
-            <div className="actions-row"><Button variant="primary" onClick={onContinue}>Go to Dashboard</Button></div>
-          ) : (
-            <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
-          )}
+          <SetupActions busy={busy} isReady={isReady} label={copy.actionLabel} hint={hint} showRetry={status.canRetry && !isError} onAction={action} onRetry={onRetry} />
           {errorView ? <LocalAIErrorBanner errorView={errorView} /> : null}
         </div>
         <SetupPlanRail status={status} busy={busy} selectedModel={selectedModel} modelOptions={modelOptions} onModelChange={onModelChange} />

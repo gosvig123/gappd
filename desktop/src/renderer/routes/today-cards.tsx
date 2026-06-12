@@ -1,5 +1,5 @@
 import type { Device, RecordingStatus } from '../../shared/contracts'
-import { Button, Field, Panel, StatusPill } from '../components/ui'
+import { Button, Field, Panel } from '../components/ui'
 import { readyState } from './today-model'
 
 type CaptureCardProps = {
@@ -21,8 +21,8 @@ export function CaptureCard(props: CaptureCardProps) {
     <Panel className="record-action-panel">
       <div className="record-action-bar">
         <div className="record-status-copy">
-          <StatusPill tone={state.tone}>{state.title}</StatusPill>
-          <div><strong>Record meeting</strong><p>{state.detail}</p></div>
+          <strong>Record meeting</strong>
+          <p>{state.detail}</p>
         </div>
         <RecordFields {...props} />
         <div className="actions-row record-actions">
@@ -38,7 +38,7 @@ function RecordFields({ title, device, devices, onTitleChange, onDeviceChange }:
   return (
     <div className="record-fields">
       <Field label="Meeting title"><input value={title} onChange={(event) => onTitleChange(event.target.value)} placeholder="Sprint planning" /></Field>
-      <Field label="Audio input"><select value={device} onChange={(event) => onDeviceChange(Number(event.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>[{item.index}] {item.name}</option>)}</select></Field>
+      <Field label="Audio input"><select value={device} onChange={(event) => onDeviceChange(Number(event.target.value))}>{devices.map((item) => <option key={item.index} value={item.index}>{item.name}</option>)}</select></Field>
     </div>
   )
 }
