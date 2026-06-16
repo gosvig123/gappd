@@ -106,9 +106,6 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
   const hasSummary = Boolean(selectedMeeting.summary)
   return (
     <Panel className="detail-panel">
-      <div className="panel-header">
-        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p className="meeting-detail-summary">Analysis and transcript for selected meeting.</p></div>
-      </div>
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />

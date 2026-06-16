@@ -36,7 +36,6 @@ function useDashboardState() {
     selectedMeetingError: null as string | null,
     recording: { status: IDLE_RECORDING_STATUS } as RecordingState,
     error: null as string | null,
-    title: '',
     device: 0,
   })
 }
@@ -77,7 +76,7 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
     if (!initialMeetingId) clearSelectedMeeting()
   }
 
-  return { refreshMeetings, loadMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setTitle: (title: string) => setState((current) => ({ ...current, title })), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
+  return { refreshMeetings, loadMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
 }
 
 type DashboardActions = ReturnType<typeof useDashboardActions>
@@ -147,7 +146,7 @@ async function startRecording(state: DashboardState, setState: SetDashboardState
 }
 
 async function recordingStartInput(state: DashboardState): Promise<RecordingState> {
-  const title = state.title.trim() || new Date().toLocaleString()
+  const title = new Date().toLocaleString()
   return window.gappd.recording.start({ title, device: state.device, mode: 'both' })
 }
 
