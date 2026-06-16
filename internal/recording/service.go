@@ -22,6 +22,8 @@ const (
 	EventProcessing EventName = "recording.processing"
 	EventCompleted  EventName = "recording.completed"
 	EventFailed     EventName = "recording.failed"
+
+	recordingHeartbeatInterval = 30 * time.Second
 )
 
 // AllEventNames is the canonical enumeration of recording protocol events,
@@ -51,6 +53,7 @@ type enhancer interface {
 type meetingStore interface {
 	CreateMeeting(*db.Meeting) error
 	UpdateMeeting(*db.Meeting) error
+	UpdateRecordingHeartbeat(id, updatedAt string) error
 	InsertSegments([]db.Segment) error
 	GetMeeting(id string) (*db.Meeting, error)
 	GetSegments(meetingID string) ([]db.Segment, error)
@@ -124,9 +127,12 @@ func (s Service) record(req Request, meeting *db.Meeting, sessionDir string) err
 	if err := s.emit(EventStarted, *meeting, nil); err != nil {
 		return err
 	}
+	stopHeartbeat := s.startCaptureHeartbeat(meeting)
 	if err := s.waitForStop(ctx, recorder, meeting); err != nil {
+		stopHeartbeat()
 		return err
 	}
+	stopHeartbeat()
 	return s.finish(req, meeting, recorder)
 }
 

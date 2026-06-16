@@ -38,6 +38,11 @@ type Meeting struct {
 	CreatedAt                 string
 }
 
+const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
+	processing_status, processing_status_updated_at, processing_failure_message,
+	audio_path, transcript, summary, tags, source, created_at
+	FROM meetings`
+
 func (d *DB) CreateMeeting(m *Meeting) error {
 	if m.ID == "" {
 		id, err := newID()
@@ -77,6 +82,14 @@ func (d *DB) UpdateMeeting(m *Meeting) error {
 	return nil
 }
 
+func (d *DB) UpdateRecordingHeartbeat(id, updatedAt string) error {
+	_, err := d.Conn.Exec(`UPDATE meetings SET capture_status_updated_at = ? WHERE id = ? AND capture_status = ?`, updatedAt, id, CaptureStatusRecording)
+	if err != nil {
+		return fmt.Errorf("update recording heartbeat: %w", err)
+	}
+	return nil
+}
+
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
 	row := d.Conn.QueryRow(
 		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
@@ -97,17 +110,42 @@ func (d *DB) GetMeeting(id string) (*Meeting, error) {
 }
 
 func (d *DB) ListMeetings(limit int) ([]Meeting, error) {
-	rows, err := d.Conn.Query(
-		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
-		 processing_status, processing_status_updated_at, processing_failure_message,
-		 audio_path, transcript, summary, tags, source, created_at
-		 FROM meetings ORDER BY started_at DESC LIMIT ?`, limit,
-	)
+	rows, err := d.Conn.Query(selectMeetingsSQL+` ORDER BY started_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list meetings: %w", err)
 	}
 	defer rows.Close()
 	return scanMeetings(rows)
+}
+
+func (d *DB) ListStaleRecordingMeetings(cutoff string, limit int) ([]Meeting, error) {
+	rows, err := d.Conn.Query(selectMeetingsSQL+` WHERE capture_status = ? AND capture_status_updated_at < ? ORDER BY started_at ASC LIMIT ?`, CaptureStatusRecording, cutoff, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list stale recording meetings: %w", err)
+	}
+	defer rows.Close()
+	return scanMeetings(rows)
+}
+
+func (d *DB) ClaimStaleRecordingForProcessing(id, cutoff, endedAt string) (bool, error) {
+	result, err := d.Conn.Exec(`UPDATE meetings SET ended_at = COALESCE(ended_at, ?), capture_status = ?, capture_status_updated_at = ?, capture_failure_message = NULL, processing_status = ?, processing_status_updated_at = ?, processing_failure_message = NULL WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`, endedAt, CaptureStatusCaptured, endedAt, ProcessingStatusProcessing, endedAt, id, CaptureStatusRecording, cutoff)
+	return changed(result, err, "claim stale recording for processing")
+}
+
+func (d *DB) FailStaleRecording(id, cutoff, endedAt, message string) (bool, error) {
+	result, err := d.Conn.Exec(`UPDATE meetings SET ended_at = COALESCE(ended_at, ?), capture_status = ?, capture_status_updated_at = ?, capture_failure_message = ? WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`, endedAt, CaptureStatusFailed, endedAt, message, id, CaptureStatusRecording, cutoff)
+	return changed(result, err, "fail stale recording")
+}
+
+func changed(result sql.Result, err error, operation string) (bool, error) {
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", operation, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("%s rows affected: %w", operation, err)
+	}
+	return rows > 0, nil
 }
 
 func scanMeetings(rows *sql.Rows) ([]Meeting, error) {

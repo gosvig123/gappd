@@ -22,6 +22,38 @@ func (s Service) FailCapture(meeting *db.Meeting, captureErr error) error {
 	return s.emit(EventFailed, *meeting, captureErr)
 }
 
+func (s Service) startCaptureHeartbeat(meeting *db.Meeting) func() {
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	go s.runCaptureHeartbeat(meeting, done, stopped)
+	return func() {
+		close(done)
+		<-stopped
+	}
+}
+
+func (s Service) runCaptureHeartbeat(meeting *db.Meeting, done <-chan struct{}, stopped chan<- struct{}) {
+	defer close(stopped)
+	ticker := time.NewTicker(recordingHeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			s.saveCaptureHeartbeat(meeting)
+		case <-done:
+			return
+		}
+	}
+}
+
+func (s Service) saveCaptureHeartbeat(meeting *db.Meeting) {
+	updatedAt := nowUTC()
+	if err := s.meetings().UpdateRecordingHeartbeat(meeting.ID, updatedAt); err != nil && s.ErrOut != nil {
+		fmt.Fprintf(s.ErrOut, "warning: update recording heartbeat: %v\n", err)
+	}
+	meeting.CaptureStatusUpdatedAt = updatedAt
+}
+
 func (s Service) saveProcessingFailure(meeting *db.Meeting, origErr error) error {
 	now := nowUTC()
 	if meeting.EndedAt == nil {
