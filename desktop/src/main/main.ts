@@ -35,8 +35,7 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   createWindow()
-  startStaleRecordingRecovery()
-  void bootstrapOnboarding()
+  void bootstrapOnboarding().finally(() => startStaleRecordingRecovery())
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

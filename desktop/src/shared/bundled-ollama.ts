@@ -8,13 +8,12 @@ export const BUNDLED_OLLAMA_BINARY_NAME = 'ollama'
 export const BUNDLED_OLLAMA_CACHE_DIRNAME = '.cache'
 export const BUNDLED_OLLAMA_CACHE_ROOT_DIRNAME = 'ollama'
 
-// The managed runtime deliberately uses a different port from stock Ollama
-// (11434, the Go-side default in internal/config) so it never collides with a
-// user-installed Ollama. gappd learns this endpoint via `app config use-managed-ollama`.
+// Prefer a stable managed port, but desktop startup may pick another free local
+// port when this one is already occupied. gappd learns the live endpoint via
+// `app config use-managed-ollama`.
 export const MANAGED_OLLAMA_HOST = '127.0.0.1'
 export const MANAGED_OLLAMA_PORT = 11435
 export const MANAGED_OLLAMA_ENDPOINT = `http://${MANAGED_OLLAMA_HOST}:${MANAGED_OLLAMA_PORT}`
-export const MANAGED_OLLAMA_HOST_VALUE = `${MANAGED_OLLAMA_HOST}:${MANAGED_OLLAMA_PORT}`
 export const MANAGED_OLLAMA_MODEL = 'llama3.1:8b'
 export const FAST_MANAGED_OLLAMA_MODEL = 'qwen3:1.7b'
 export const MANAGED_OLLAMA_MODELS_DIRNAME = 'ollama-models'
