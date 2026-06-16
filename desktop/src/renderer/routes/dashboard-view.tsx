@@ -21,7 +21,6 @@ const INBOX_EMPTY: Record<InboxFilter, string> = {
 }
 
 type DashboardViewProps = {
-  title: string
   device: number
   devices: Device[]
   meetings: MeetingListItem[]
@@ -33,7 +32,6 @@ type DashboardViewProps = {
   recordingStatus: RecordingStatus
   canStart: boolean
   canStop: boolean
-  onTitleChange: (value: string) => void
   onDeviceChange: (value: number) => void
   onStart: () => void
   onStop: () => void
