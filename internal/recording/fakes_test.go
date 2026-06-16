@@ -42,6 +42,11 @@ func (s *fakeStore) UpdateMeeting(meeting *db.Meeting) error {
 	return nil
 }
 
+func (s *fakeStore) UpdateRecordingHeartbeat(_ string, updatedAt string) error {
+	s.meeting.CaptureStatusUpdatedAt = updatedAt
+	return nil
+}
+
 func (s *fakeStore) InsertSegments(segments []db.Segment) error {
 	s.segments = append([]db.Segment(nil), segments...)
 	return nil

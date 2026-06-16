@@ -5,12 +5,13 @@ import path from 'node:path'
 import { RECORDING_PROTOCOL_EVENT_TYPES, type Device, type LocalAIConfig, type MeetingDetail, type MeetingListItem, type MeetingStatus, type RecordingProtocolEventType } from '../shared/contracts'
 import { resolveBinary } from './binaries'
 import { getRecordingState, setRecordingState, type RecordingState } from './state'
-import { getValidatedManagedWhisperPaths } from './whisper'
+import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
 type DevicesResponse = { devices: Device[] }
 type MeetingsResponse = { meetings: MeetingListItem[] }
 type MeetingResponse = { meeting: MeetingDetail }
 type LocalAIConfigResponse = { ai: LocalAIConfig }
+type RecoverStaleResponse = { recovered: number }
 type RecordingProtocolEvent = {
   type: RecordingProtocolEventType
   meetingId: string
@@ -19,7 +20,11 @@ type RecordingProtocolEvent = {
   error?: string
 }
 
+const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
+
 let recordingChild: ReturnType<typeof spawn> | null = null
+let staleRecoveryTimer: NodeJS.Timeout | null = null
+let staleRecoveryRunning = false
 
 export function resolveCaptureBinary(): string {
   return resolveBinary({
@@ -95,6 +100,37 @@ export async function saveManagedLocalAIConfig(input: {
   if (typeof input.temperature === 'number') args.push('--temperature', String(input.temperature))
   const result = await runJSON<LocalAIConfigResponse>(args)
   return result.ai
+}
+
+export function startStaleRecordingRecovery(): void {
+  if (staleRecoveryTimer) return
+  void runStaleRecordingRecovery()
+  staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
+}
+
+export function stopStaleRecordingRecovery(): void {
+  if (!staleRecoveryTimer) return
+  clearInterval(staleRecoveryTimer)
+  staleRecoveryTimer = null
+}
+
+export async function recoverStaleRecordings(): Promise<number> {
+  const result = await runJSON<RecoverStaleResponse>(['app', 'record', 'recover-stale', '--json', '--model', resolveManagedWhisperModelPath()], {
+    GAPPD_WHISPER_BIN: resolveBundledWhisperBinary(),
+  })
+  return result.recovered
+}
+
+async function runStaleRecordingRecovery(): Promise<void> {
+  if (staleRecoveryRunning) return
+  staleRecoveryRunning = true
+  try {
+    await recoverStaleRecordings()
+  } catch (error) {
+    console.error('stale recording recovery failed', error)
+  } finally {
+    staleRecoveryRunning = false
+  }
 }
 
 export async function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<void> {
@@ -181,15 +217,15 @@ export function stopRecording(): void {
   recordingChild.kill('SIGINT')
 }
 
-export async function runJSON<T>(args: string[]): Promise<T> {
-  const output = await runCommand(args)
+export async function runJSON<T>(args: string[], env: NodeJS.ProcessEnv = {}): Promise<T> {
+  const output = await runCommand(args, env)
   return JSON.parse(output) as T
 }
 
-function runCommand(args: string[]): Promise<string> {
+function runCommand(args: string[], env: NodeJS.ProcessEnv = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(resolveGappdBinary(), args, {
-      env: childEnv({ GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary() }),
+      env: childEnv({ GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), ...env }),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 

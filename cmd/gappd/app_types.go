@@ -52,6 +52,10 @@ type appMeetingResponse struct {
 	Meeting appMeetingDetail `json:"meeting"`
 }
 
+type appRecoverStaleRecordingsResponse struct {
+	Recovered int `json:"recovered"`
+}
+
 type appMeetingDetail = meetingDetailView
 
 type appRecordingEvent struct {

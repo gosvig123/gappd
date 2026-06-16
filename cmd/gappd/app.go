@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
 
@@ -55,7 +58,7 @@ func appRecordCmd() *cobra.Command {
 		Use:   "record",
 		Short: "Machine-readable recording entrypoints",
 	}
-	cmd.AddCommand(appRecordStartCmd())
+	cmd.AddCommand(appRecordStartCmd(), appRecordRecoverStaleCmd())
 	return cmd
 }
 
@@ -77,6 +80,49 @@ func appRecordStartCmd() *cobra.Command {
 	cmd.Flags().StringVar(&modelPath, "model", "", "Whisper model path")
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
 	return cmd
+}
+
+func appRecordRecoverStaleCmd() *cobra.Command {
+	var asJSON bool
+	var modelPath string
+	cmd := &cobra.Command{
+		Use:   "recover-stale",
+		Short: "Recover stale desktop recordings",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runAppRecoverStale(asJSON, modelPath)
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	cmd.Flags().StringVar(&modelPath, "model", "", "Whisper model path")
+	return cmd
+}
+
+func runAppRecoverStale(asJSON bool, modelPath string) error {
+	if !asJSON {
+		return fmt.Errorf("app record recover-stale requires --json")
+	}
+	_, store, pipeline, err := loadDeps()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	recovered, err := recoverStaleRecordings(store, pipeline, modelPath)
+	if err != nil {
+		return err
+	}
+	return writeJSON(appRecoverStaleRecordingsResponse{Recovered: recovered})
+}
+
+func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline, modelPath string) (int, error) {
+	defaultPath, err := defaultModelPath()
+	if err != nil {
+		return 0, err
+	}
+	if modelPath == "" {
+		modelPath = defaultPath
+	}
+	service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{ModelPath: modelPath, DefaultModelPath: defaultPath, SuppressProcessingFailure: true})
 }
 
 func appMeetingsListCmd() *cobra.Command {
