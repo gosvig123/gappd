@@ -1,13 +1,16 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
-import { artifactLabel, meetingStatusLabel, processingStatusLabel } from '../components/meeting-status'
+import { artifactLabel, meetingStatusLabel, meetingStatusTone, processingStatusLabel } from '../components/meeting-status'
 import { Markdown } from '../components/markdown'
-import { Button, EmptyState, Panel } from '../components/ui'
+import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { dateLabel } from './today-model'
 
 const EXPAND_READING_LABEL = 'Expand'
 const COLLAPSE_READING_LABEL = 'Collapse'
+const PROCESSING_STATUS = 'processing'
+const RECORDING_STATE = 'recording'
+const CAPTURED_STATE = 'captured'
 const SHOW_DIAGNOSTICS = import.meta.env.DEV
 
 type MeetingDetailPanelProps = {
@@ -69,6 +72,48 @@ function MeetingFailureState({ message }: { message?: string }) {
   return <div className="detail-surface detail-alert">{message}</div>
 }
 
+function meetingIsProcessing(meeting: MeetingDetail): boolean {
+  return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS
+}
+
+function ProcessingProgress({ meeting, hasTranscript }: { meeting: MeetingDetail; hasTranscript: boolean }) {
+  if (!meetingIsProcessing(meeting)) return null
+  return (
+    <div className="detail-surface processing-progress">
+      <div><div className="meeting-section-label">{processingLabel(meeting)}</div><p>{processingDetail(meeting, hasTranscript)}</p></div>
+      <ProcessingSteps meeting={meeting} hasTranscript={hasTranscript} />
+    </div>
+  )
+}
+
+function processingLabel(meeting: MeetingDetail): string {
+  return meeting.status.state === RECORDING_STATE ? 'Conversation recording' : 'Conversation processing'
+}
+
+function processingDetail(meeting: MeetingDetail, hasTranscript: boolean): string {
+  if (meeting.status.state === RECORDING_STATE) return 'Recording now. Live transcript draft updates every few seconds.'
+  if (hasTranscript) return 'Transcript saved. AI summary is still running.'
+  return 'Audio captured. Transcribing and creating AI summary now.'
+}
+
+function ProcessingSteps({ meeting, hasTranscript }: { meeting: MeetingDetail; hasTranscript: boolean }) {
+  const recording = meeting.status.state === RECORDING_STATE
+  const processing = meeting.status.processing.state === PROCESSING_STATUS
+  return (
+    <ol className="processing-steps">
+      <ProcessingStep active={recording} done={!recording}>Recording audio</ProcessingStep>
+      <ProcessingStep done={!recording}>Audio captured</ProcessingStep>
+      <ProcessingStep active={(recording || processing) && !hasTranscript} done={hasTranscript}>Transcript draft</ProcessingStep>
+      <ProcessingStep active={processing && hasTranscript}>Creating AI summary</ProcessingStep>
+    </ol>
+  )
+}
+
+function ProcessingStep({ children, active, done }: { children: ReactNode; active?: boolean; done?: boolean }) {
+  const className = done ? 'done' : active ? 'active' : undefined
+  return <li className={className}>{children}</li>
+}
+
 function MeetingDetailMeta({ selectedMeeting }: { selectedMeeting: MeetingDetail }) {
   return (
     <div className="detail-meta-grid">
@@ -104,17 +149,39 @@ function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { se
 function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
+  const processing = meetingIsProcessing(selectedMeeting)
   return (
     <Panel className="detail-panel">
+      <div className="panel-header compact meeting-detail-header">
+        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p>{detailSubtitle(selectedMeeting, hasTranscript, hasSummary)}</p></div>
+        <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill>
+      </div>
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText="No AI summary yet." primary markdown />
-        <ReadingCard title="Transcript" value={transcript} emptyText="No transcript yet." />
+        <ProcessingProgress meeting={selectedMeeting} hasTranscript={hasTranscript} />
+        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(processing)} primary markdown />
+        <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(processing)} />
         {SHOW_DIAGNOSTICS ? <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} /> : null}
       </div>
     </Panel>
   )
+}
+
+function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean, hasSummary: boolean): string {
+  if (meeting.status.state === RECORDING_STATE) return 'Recording with live transcript draft.'
+  if (meetingIsProcessing(meeting)) return 'Processing transcript and AI summary.'
+  if (hasSummary || hasTranscript) return 'Ready to review.'
+  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured. Processing has not started.'
+  return 'Analysis and transcript for selected meeting.'
+}
+
+function summaryEmptyText(processing: boolean): string {
+  return processing ? 'Summary appears after transcript processing finishes.' : 'No AI summary yet.'
+}
+
+function transcriptEmptyText(processing: boolean): string {
+  return processing ? 'Transcript is being prepared from captured audio.' : 'No transcript yet.'
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {

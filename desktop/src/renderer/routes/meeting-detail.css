@@ -20,6 +20,25 @@
   max-width: none;
 }
 
+.meeting-detail-header {
+  flex: 0 0 auto;
+  align-items: start;
+}
+
+.meeting-detail-header .status-pill {
+  white-space: nowrap;
+}
+
+.meeting-detail-title {
+  display: grid;
+  gap: 6px;
+}
+
+.meeting-detail-title h1 {
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
 .detail-meta-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -184,6 +203,58 @@
   border-color: var(--color-danger-border);
 }
 
+.processing-progress {
+  border-color: var(--color-warning-border);
+  background: var(--color-warning-bg);
+}
+
+.processing-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.processing-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.processing-steps li::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.45;
+}
+
+.processing-steps li.active {
+  color: var(--color-warning);
+  font-weight: var(--font-weight-semibold);
+}
+
+.processing-steps li.active::before {
+  animation: status-pulse 1.3s ease-in-out infinite;
+  opacity: 0.9;
+}
+
+.processing-steps li.done {
+  color: var(--color-success);
+}
+
+.processing-steps li.done::before {
+  content: '✓';
+  width: auto;
+  height: auto;
+  background: transparent;
+  opacity: 1;
+}
+
 .detail-panel {
   min-width: 0;
   display: flex;
@@ -238,6 +309,14 @@ details.detail-surface summary small,
 }
 
 @media (max-width: 45rem) {
+  .meeting-detail-header {
+    display: grid;
+  }
+
+  .meeting-detail-header .status-pill {
+    justify-self: start;
+  }
+
   .reading-card-header {
     display: grid;
     grid-template-columns: 1fr;

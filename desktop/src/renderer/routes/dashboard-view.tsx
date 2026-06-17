@@ -20,6 +20,10 @@ const INBOX_EMPTY: Record<InboxFilter, string> = {
   [INBOX_ALL]: 'Recorded meetings appear here.',
 }
 
+const MEETING_CAPTURED = 'captured'
+const MEETING_RECORDING = 'recording'
+const PROCESSING_PROCESSING = 'processing'
+
 type DashboardViewProps = {
   device: number
   devices: Device[]
@@ -90,6 +94,11 @@ function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem;
 }
 
 function artifactSummary(meeting: MeetingListItem): string {
+  if (meeting.status.state === MEETING_RECORDING && meeting.hasTranscript) return 'Recording now · live transcript draft updating…'
+  if (meeting.status.state === MEETING_RECORDING) return 'Recording now · live transcript starts soon…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio and preparing summary…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Transcript ready · creating summary…'
+  if (meeting.status.state === MEETING_CAPTURED) return 'Audio captured · waiting to process'
   if (meeting.hasSummary && meeting.hasTranscript) return 'Summary + transcript ready'
   if (meeting.hasSummary) return 'Summary ready'
   if (meeting.hasTranscript) return 'Transcript ready'
