@@ -53,10 +53,10 @@ func usableWAV(path string) bool {
 	return err == nil && info.Size() > minWAVSize
 }
 
-func pruneLiveTail(segments []db.Segment, chunk liveChunk) []db.Segment {
+func replaceLiveWindow(segments []db.Segment, speaker string, start float64) []db.Segment {
 	out := segments[:0]
 	for _, segment := range segments {
-		if segment.Speaker == chunk.speaker && segment.End > chunk.start {
+		if segment.Speaker == speaker && segment.End > start {
 			continue
 		}
 		out = append(out, segment)

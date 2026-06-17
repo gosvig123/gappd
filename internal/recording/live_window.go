@@ -8,14 +8,11 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-
-	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 type liveWindow struct {
 	path    string
 	start   float64
-	cutoff  float64
 	cleanup func()
 }
 
@@ -29,20 +26,10 @@ func liveChunkWindow(chunk liveChunk) (liveWindow, error) {
 		return liveWindow{}, err
 	}
 	duration := liveChunkDurationFromFile(previous)
-	return liveWindow{path: path, start: chunk.start - duration, cutoff: duration, cleanup: func() { _ = os.Remove(path) }}, nil
+	return liveWindow{path: path, start: chunk.start - duration, cleanup: func() { _ = os.Remove(path) }}, nil
 }
 
 func noop() {}
-
-func liveWindowSegments(segments []transcribe.Segment, cutoff float64) []transcribe.Segment {
-	out := segments[:0]
-	for _, segment := range segments {
-		if segment.Start >= cutoff {
-			out = append(out, segment)
-		}
-	}
-	return out
-}
 
 func previousLiveChunk(path string) string {
 	prefix := liveChunkPrefix(path)

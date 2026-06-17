@@ -87,9 +87,9 @@ func (s Service) transcribeLiveChunk(ctx context.Context, session *liveTranscrip
 		s.warnLiveTranscript(err)
 		return
 	}
-	dbSegments := toDBSegments(meetingID, liveWindowSegments(segments, window.cutoff))
+	dbSegments := toDBSegments(meetingID, segments)
 	offsetSegments(dbSegments, window.start)
-	session.segments = pruneLiveTail(session.segments, chunk)
+	session.segments = replaceLiveWindow(session.segments, chunk.speaker, window.start)
 	session.segments = append(session.segments, dbSegments...)
 	session.seen[chunk.path] = true
 }
