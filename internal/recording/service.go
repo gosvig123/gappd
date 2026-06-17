@@ -54,6 +54,7 @@ type meetingStore interface {
 	CreateMeeting(*db.Meeting) error
 	UpdateMeeting(*db.Meeting) error
 	UpdateRecordingHeartbeat(id, updatedAt string) error
+	UpdateTranscript(id, transcript string) error
 	InsertSegments([]db.Segment) error
 	GetMeeting(id string) (*db.Meeting, error)
 	GetSegments(meetingID string) ([]db.Segment, error)
@@ -127,12 +128,15 @@ func (s Service) record(req Request, meeting *db.Meeting, sessionDir string) err
 	if err := s.emit(EventStarted, *meeting, nil); err != nil {
 		return err
 	}
+	stopLiveTranscript := s.startLiveTranscript(ctx, meeting, recorder, req)
 	stopHeartbeat := s.startCaptureHeartbeat(meeting)
 	if err := s.waitForStop(ctx, recorder, meeting); err != nil {
 		stopHeartbeat()
+		stopLiveTranscript()
 		return err
 	}
 	stopHeartbeat()
+	stopLiveTranscript()
 	return s.finish(req, meeting, recorder)
 }
 
