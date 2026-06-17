@@ -86,6 +86,7 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode,
 		ModelPath:                 modelPath,
 		DefaultModelPath:          defaultPath,
 		Mode:                      mode,
+		LiveTranscript:            suppressProcessingFailure,
 		SuppressProcessingFailure: suppressProcessingFailure,
 	})
 }

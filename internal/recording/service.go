@@ -68,6 +68,7 @@ type Request struct {
 	ModelPath                 string
 	DefaultModelPath          string
 	Mode                      capture.CaptureMode
+	LiveTranscript            bool
 	SuppressProcessingFailure bool
 }
 

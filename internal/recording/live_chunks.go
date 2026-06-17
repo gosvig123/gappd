@@ -37,13 +37,13 @@ func sourceLiveChunks(src audioSource, seen map[string]bool) ([]liveChunk, error
 }
 
 func closedLiveChunks(files []string, src audioSource, seen map[string]bool) []liveChunk {
-	prefix := chunkPrefix(src.path)
 	var chunks []liveChunk
+	start := 0.0
 	for _, file := range files[:len(files)-1] {
-		if seen[file] || !usableWAV(file) {
-			continue
+		if !seen[file] && usableWAV(file) {
+			chunks = append(chunks, liveChunk{path: file, speaker: src.speaker, start: start})
 		}
-		chunks = append(chunks, liveChunk{path: file, speaker: src.speaker, start: chunkStart(file, prefix)})
+		start += liveChunkDurationFromFile(file)
 	}
 	return chunks
 }
@@ -51,10 +51,6 @@ func closedLiveChunks(files []string, src audioSource, seen map[string]bool) []l
 func usableWAV(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Size() > minWAVSize
-}
-
-func chunkStart(path, prefix string) float64 {
-	return float64(chunkIndex(path, prefix)) * liveChunkDuration.Seconds()
 }
 
 func pruneLiveTail(segments []db.Segment, chunk liveChunk) []db.Segment {

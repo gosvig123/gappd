@@ -207,6 +207,7 @@ class ChunkedWAVWriter {
     private let framesPerChunk: Int
     private let chunksDir: String
     private let prefix: String
+    private let lock = NSLock()
     private var chunkWriter: WAVWriter?
     private var chunkFrames = 0
     private var chunkIndex = 0
@@ -222,22 +223,45 @@ class ChunkedWAVWriter {
     }
 
     func write(pcmBuffer: AVAudioPCMBuffer) {
+        lock.lock(); defer { lock.unlock() }
         writer.write(pcmBuffer: pcmBuffer)
-        chunkWriter?.write(pcmBuffer: pcmBuffer)
-        chunkFrames += Int(pcmBuffer.frameLength)
-        rotateIfNeeded()
+        guard let floatData = pcmBuffer.floatChannelData else { return }
+        writeInt16Chunks(samples: floatData[0], frameCount: Int(pcmBuffer.frameLength))
     }
 
     func writeRaw(data: Data) {
+        lock.lock(); defer { lock.unlock() }
         writer.writeRaw(data: data)
-        chunkWriter?.writeRaw(data: data)
-        chunkFrames += data.count / 2
-        rotateIfNeeded()
+        writeRawChunks(data: data)
     }
 
     func finalize() {
+        lock.lock(); defer { lock.unlock() }
         writer.finalize()
         chunkWriter?.finalize()
+        chunkWriter = nil
+    }
+
+    private func writeInt16Chunks(samples: UnsafePointer<Float>, frameCount: Int) {
+        var offset = 0
+        while offset < frameCount {
+            let count = min(framesPerChunk - chunkFrames, frameCount - offset)
+            chunkWriter?.writeRaw(data: int16Data(samples: samples, offset: offset, count: count))
+            offset += count
+            chunkFrames += count
+            rotateIfNeeded()
+        }
+    }
+
+    private func writeRawChunks(data: Data) {
+        var offset = 0
+        while offset < data.count {
+            let bytes = min((framesPerChunk - chunkFrames) * 2, data.count - offset)
+            chunkWriter?.writeRaw(data: data.subdata(in: offset..<(offset + bytes)))
+            offset += bytes
+            chunkFrames += bytes / 2
+            rotateIfNeeded()
+        }
     }
 
     private func rotateIfNeeded() {
@@ -254,6 +278,17 @@ class ChunkedWAVWriter {
         let path = (chunksDir as NSString).appendingPathComponent(name)
         chunkWriter = try WAVWriter(path: path, sampleRate: UInt32(sampleRate), channels: 1)
     }
+}
+
+func int16Data(samples: UnsafePointer<Float>, offset: Int, count: Int) -> Data {
+    var data = Data(count: count * 2)
+    for i in 0..<count {
+        let sample = max(-1.0, min(1.0, samples[offset + i]))
+        let int16 = Int16(sample * 32767.0)
+        data[i * 2] = UInt8(int16 & 0xFF)
+        data[i * 2 + 1] = UInt8((int16 >> 8) & 0xFF)
+    }
+    return data
 }
 
 // MARK: - Mic Recorder
@@ -365,6 +400,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     private var stream: SCStream?
     private var writer: ChunkedWAVWriter?
     private let sampleRate: Double
+    private let sampleQueue = DispatchQueue(label: "dev.gappd.capture.system-audio")
 
     init(sampleRate: Double) {
         self.sampleRate = sampleRate
@@ -385,7 +421,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
         config.excludesCurrentProcessAudio = true
 
         stream = SCStream(filter: filter, configuration: config, delegate: nil)
-        try stream!.addStreamOutput(self, type: .audio, sampleHandlerQueue: .global())
+        try stream!.addStreamOutput(self, type: .audio, sampleHandlerQueue: sampleQueue)
         try await stream!.startCapture()
     }
 
