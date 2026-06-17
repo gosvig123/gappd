@@ -36,6 +36,9 @@ type liveChunk struct {
 }
 
 func (s Service) startLiveTranscript(ctx context.Context, meeting *db.Meeting, recorder audioRecorder, req Request) func() {
+	if !req.LiveTranscript {
+		return noop
+	}
 	liveCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	session := &liveTranscriptSession{seen: map[string]bool{}}

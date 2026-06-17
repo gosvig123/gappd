@@ -28,7 +28,8 @@ func liveChunkWindow(chunk liveChunk) (liveWindow, error) {
 	if err != nil {
 		return liveWindow{}, err
 	}
-	return liveWindow{path: path, start: chunk.start - liveChunkDuration.Seconds(), cutoff: liveChunkDuration.Seconds(), cleanup: func() { _ = os.Remove(path) }}, nil
+	duration := liveChunkDurationFromFile(previous)
+	return liveWindow{path: path, start: chunk.start - duration, cutoff: duration, cleanup: func() { _ = os.Remove(path) }}, nil
 }
 
 func noop() {}
@@ -36,7 +37,7 @@ func noop() {}
 func liveWindowSegments(segments []transcribe.Segment, cutoff float64) []transcribe.Segment {
 	out := segments[:0]
 	for _, segment := range segments {
-		if segment.End > cutoff {
+		if segment.Start >= cutoff {
 			out = append(out, segment)
 		}
 	}
@@ -81,6 +82,10 @@ func joinLiveChunks(previous, current string) (string, error) {
 }
 
 func writeLiveWindow(file *os.File, chunks []string) error {
+	header, err := readWAVHeader(chunks[0])
+	if err != nil {
+		return err
+	}
 	if _, err := file.Write(make([]byte, minWAVSize)); err != nil {
 		return err
 	}
@@ -88,7 +93,7 @@ func writeLiveWindow(file *os.File, chunks []string) error {
 	if err != nil {
 		return err
 	}
-	return writeLiveHeader(file, size)
+	return writeLiveHeader(file, header, size)
 }
 
 func copyLivePCM(out *os.File, chunks []string) (int64, error) {
@@ -115,28 +120,41 @@ func appendLivePCM(out *os.File, path string) (int64, error) {
 	return io.Copy(out, in)
 }
 
-func writeLiveHeader(file *os.File, dataSize int64) error {
+func writeLiveHeader(file *os.File, header []byte, dataSize int64) error {
 	if _, err := file.Seek(0, io.SeekStart); err != nil {
 		return err
 	}
-	_, err := file.Write(liveWAVHeader(dataSize))
+	_, err := file.Write(liveWAVHeader(header, dataSize))
 	return err
 }
 
-func liveWAVHeader(dataSize int64) []byte {
-	header := make([]byte, minWAVSize)
-	copy(header[0:4], "RIFF")
+func liveWAVHeader(source []byte, dataSize int64) []byte {
+	header := append([]byte(nil), source...)
 	binary.LittleEndian.PutUint32(header[4:8], uint32(dataSize+36))
-	copy(header[8:12], "WAVE")
-	copy(header[12:16], "fmt ")
-	binary.LittleEndian.PutUint32(header[16:20], 16)
-	binary.LittleEndian.PutUint16(header[20:22], 1)
-	binary.LittleEndian.PutUint16(header[22:24], 1)
-	binary.LittleEndian.PutUint32(header[24:28], 16000)
-	binary.LittleEndian.PutUint32(header[28:32], 32000)
-	binary.LittleEndian.PutUint16(header[32:34], 2)
-	binary.LittleEndian.PutUint16(header[34:36], 16)
-	copy(header[36:40], "data")
 	binary.LittleEndian.PutUint32(header[40:44], uint32(dataSize))
 	return header
+}
+
+func readWAVHeader(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	header := make([]byte, minWAVSize)
+	_, err = io.ReadFull(file, header)
+	return header, err
+}
+
+func liveChunkDurationFromFile(path string) float64 {
+	header, err := readWAVHeader(path)
+	if err != nil {
+		return liveChunkDuration.Seconds()
+	}
+	byteRate := binary.LittleEndian.Uint32(header[28:32])
+	if byteRate == 0 {
+		return liveChunkDuration.Seconds()
+	}
+	dataSize := binary.LittleEndian.Uint32(header[40:44])
+	return float64(dataSize) / float64(byteRate)
 }
