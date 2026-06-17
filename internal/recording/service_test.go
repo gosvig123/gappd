@@ -36,7 +36,7 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 	if len(store.segments) != 2 {
 		t.Fatalf("segments = %d, want 2", len(store.segments))
 	}
-	assertEventNames(t, events, EventStarted, EventStopping, EventProcessing, EventCompleted)
+	assertEventNames(t, events, EventStarted, EventStopping, EventProcessing, EventProcessing, EventCompleted)
 }
 
 func assertCompletedMeeting(t *testing.T, meeting *db.Meeting) {
