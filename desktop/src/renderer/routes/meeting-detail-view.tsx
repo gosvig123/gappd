@@ -91,7 +91,7 @@ function processingLabel(meeting: MeetingDetail): string {
 }
 
 function processingDetail(meeting: MeetingDetail, hasTranscript: boolean): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Recording now. Live transcript draft updates every few seconds.'
+  if (meeting.status.state === RECORDING_STATE) return 'Recording now. Live transcript draft appears shortly after each audio chunk.'
   if (hasTranscript) return 'Transcript saved. AI summary is still running.'
   return 'Audio captured. Transcribing and creating AI summary now.'
 }
