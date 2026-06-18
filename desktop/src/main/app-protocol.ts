@@ -75,7 +75,7 @@ function readProtocolLine<ID extends AppStreamID>(id: ID, state: StreamState, li
   if (!trimmed) return
   const event = parseProtocolEvent<ID>(trimmed)
   if (!event) {
-    state.protocolError = `Invalid recording protocol event: ${trimmed}`
+    state.protocolError = `Invalid protocol event JSON: ${trimmed}`
     return
   }
   state.sawEvent = true
@@ -85,15 +85,17 @@ function readProtocolLine<ID extends AppStreamID>(id: ID, state: StreamState, li
 
 function parseProtocolEvent<ID extends AppStreamID>(line: string): AppStreamEvent<ID> | null {
   try {
-    const parsed = JSON.parse(line) as AppStreamEvent<ID>
-    return hasProtocolEventShape(parsed) ? parsed : null
+    const parsed = JSON.parse(line) as unknown
+    return hasProtocolEventShape(parsed) ? parsed as AppStreamEvent<ID> : null
   } catch {
     return null
   }
 }
 
-function hasProtocolEventShape(event: { type?: unknown; meetingId?: unknown; title?: unknown; status?: unknown }): boolean {
-  return typeof event.type === 'string' && typeof event.meetingId === 'string' && typeof event.title === 'string' && Boolean(event.status)
+function hasProtocolEventShape(event: unknown): boolean {
+  if (!event || typeof event !== 'object') return false
+  const candidate = event as { type?: unknown; meetingId?: unknown; title?: unknown; status?: unknown }
+  return typeof candidate.type === 'string' && typeof candidate.meetingId === 'string' && typeof candidate.title === 'string' && Boolean(candidate.status)
 }
 
 function isTerminalEvent<ID extends AppStreamID>(id: ID, event: AppStreamEvent<ID>): boolean {

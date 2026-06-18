@@ -54,7 +54,7 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if detail.Status.Processing.FailureMessage == nil || *detail.Status.Processing.FailureMessage != failure {
 		t.Fatalf("status.processing.failureMessage = %v, want %q", detail.Status.Processing.FailureMessage, failure)
 	}
-	if detail.Status.Processing.State != string(db.ProcessingStatusFailed) {
+	if detail.Status.Processing.State != db.ProcessingStatusFailed {
 		t.Fatalf("status.processing.state = %q, want %q", detail.Status.Processing.State, db.ProcessingStatusFailed)
 	}
 	if detail.TranscriptText == "" {
@@ -111,7 +111,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if event.Status.State != db.MeetingStateProcessing {
 		t.Fatalf("event.status.state = %q, want %q", event.Status.State, db.MeetingStateProcessing)
 	}
-	if event.Status.Processing.State != string(db.ProcessingStatusProcessing) {
+	if event.Status.Processing.State != db.ProcessingStatusProcessing {
 		t.Fatalf("event.status.processing.state = %q, want %q", event.Status.Processing.State, db.ProcessingStatusProcessing)
 	}
 }

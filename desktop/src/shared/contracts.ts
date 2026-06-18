@@ -1,6 +1,9 @@
-import type { CaptureStatus, MeetingState, ProcessingStatus } from './generated/protocol'
+import type { AIConfig } from './generated/contracts'
 
 export * from './generated/protocol'
+export type { AIConfig, CaptureStatusInfo, Device, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
+
+export type LocalAIConfig = AIConfig
 
 // Desktop-only UI state for the recorder; not part of the gappd wire protocol.
 export const RECORDING_STATUSES = ['idle', 'recording', 'stopping', 'processing', 'error'] as const
@@ -11,62 +14,6 @@ export type RecordingState = {
   meetingId?: string
   title?: string
   error?: string
-}
-
-export type Device = {
-  index: number
-  name: string
-}
-
-export type MeetingStatus = {
-  state: MeetingState
-  updatedAt: string
-  capture: {
-    state: CaptureStatus
-    updatedAt: string
-    failureMessage?: string
-  }
-  processing: {
-    state: ProcessingStatus
-    updatedAt: string
-    failureMessage?: string
-  }
-}
-
-export type MeetingListItem = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  hasTranscript: boolean
-  hasSummary: boolean
-}
-
-export type MeetingSegment = {
-  startSec: number
-  endSec: number
-  speaker: string
-  text: string
-}
-
-export type MeetingDetail = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  transcriptText?: string
-  summary?: string
-  segments: MeetingSegment[]
-}
-
-export type LocalAIConfig = {
-  provider: string
-  temperature: number
-  managed: boolean
-  endpoint: string
-  model: string
 }
 
 export function isLocalAIConfigured(config: LocalAIConfig | null | undefined): boolean {

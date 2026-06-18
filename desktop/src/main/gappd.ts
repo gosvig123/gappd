@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem } from '../shared/contracts'
-import type { RecordingProtocolEvent } from '../shared/generated/app-protocol'
+import type { RecordingEvent } from '../shared/generated/contracts'
 import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureBinary } from './native-runtime'
 import { getRecordingState, setRecordingState } from './state'
@@ -103,7 +103,7 @@ async function runStaleRecordingRecovery(): Promise<void> {
 
 function recordingHandlers(title: string) {
   return {
-    onEvent(event: RecordingProtocolEvent) {
+    onEvent(event: RecordingEvent) {
       setRecordingState(recordingStateFromEvent(event))
     },
     onError(error: string) {
@@ -117,7 +117,7 @@ function recordingHandlers(title: string) {
   }
 }
 
-function recordingStateFromEvent(event: RecordingProtocolEvent) {
+function recordingStateFromEvent(event: RecordingEvent) {
   const base = { meetingId: event.meetingId, title: event.title }
   switch (event.type) {
     case 'recording.started':
@@ -135,6 +135,6 @@ function recordingStateFromEvent(event: RecordingProtocolEvent) {
   }
 }
 
-function protocolFailureMessage(event: RecordingProtocolEvent): string {
+function protocolFailureMessage(event: RecordingEvent): string {
   return event.status.capture.failureMessage ?? event.status.processing.failureMessage ?? 'Recording failed'
 }

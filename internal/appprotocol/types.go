@@ -42,16 +42,22 @@ type RecoverStaleRecordingsResponse struct {
 }
 
 type MeetingStatus struct {
-	State      db.MeetingState   `json:"state"`
-	UpdatedAt  string            `json:"updatedAt"`
-	Capture    MeetingStatusInfo `json:"capture"`
-	Processing MeetingStatusInfo `json:"processing"`
+	State      db.MeetingState      `json:"state"`
+	UpdatedAt  string               `json:"updatedAt"`
+	Capture    CaptureStatusInfo    `json:"capture"`
+	Processing ProcessingStatusInfo `json:"processing"`
 }
 
-type MeetingStatusInfo struct {
-	State          string  `json:"state"`
-	UpdatedAt      string  `json:"updatedAt"`
-	FailureMessage *string `json:"failureMessage,omitempty"`
+type CaptureStatusInfo struct {
+	State          db.CaptureStatus `json:"state"`
+	UpdatedAt      string           `json:"updatedAt"`
+	FailureMessage *string          `json:"failureMessage,omitempty"`
+}
+
+type ProcessingStatusInfo struct {
+	State          db.ProcessingStatus `json:"state"`
+	UpdatedAt      string              `json:"updatedAt"`
+	FailureMessage *string             `json:"failureMessage,omitempty"`
 }
 
 type RecordingEvent struct {
@@ -94,13 +100,13 @@ func MeetingStatusFor(meeting db.Meeting) MeetingStatus {
 	if db.UsesProcessingTimestamp(meeting) {
 		updatedAt = meeting.ProcessingStatusUpdatedAt
 	}
-	return MeetingStatus{State: db.MeetingStateFor(meeting), UpdatedAt: updatedAt, Capture: CaptureStatusInfo(meeting), Processing: ProcessingStatusInfo(meeting)}
+	return MeetingStatus{State: db.MeetingStateFor(meeting), UpdatedAt: updatedAt, Capture: CaptureStatusInfoFor(meeting), Processing: ProcessingStatusInfoFor(meeting)}
 }
 
-func CaptureStatusInfo(meeting db.Meeting) MeetingStatusInfo {
-	return MeetingStatusInfo{State: string(meeting.CaptureStatus), UpdatedAt: meeting.CaptureStatusUpdatedAt, FailureMessage: meeting.CaptureFailureMessage}
+func CaptureStatusInfoFor(meeting db.Meeting) CaptureStatusInfo {
+	return CaptureStatusInfo{State: meeting.CaptureStatus, UpdatedAt: meeting.CaptureStatusUpdatedAt, FailureMessage: meeting.CaptureFailureMessage}
 }
 
-func ProcessingStatusInfo(meeting db.Meeting) MeetingStatusInfo {
-	return MeetingStatusInfo{State: string(meeting.ProcessingStatus), UpdatedAt: meeting.ProcessingStatusUpdatedAt, FailureMessage: meeting.ProcessingFailureMessage}
+func ProcessingStatusInfoFor(meeting db.Meeting) ProcessingStatusInfo {
+	return ProcessingStatusInfo{State: meeting.ProcessingStatus, UpdatedAt: meeting.ProcessingStatusUpdatedAt, FailureMessage: meeting.ProcessingFailureMessage}
 }

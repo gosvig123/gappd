@@ -1,20 +1,8 @@
 package appprotocol
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
-)
-
-const (
-	meetingMarkerCaptured   = "○"
-	meetingMarkerCompleted  = "●"
-	meetingMarkerFailed     = "!"
-	meetingMarkerProcessing = "..."
-	meetingIDPreviewLength  = 8
-	meetingDateLength       = 10
 )
 
 type MeetingListItem struct {
@@ -25,25 +13,17 @@ type MeetingListItem struct {
 	Status        MeetingStatus `json:"status"`
 	HasTranscript bool          `json:"hasTranscript"`
 	HasSummary    bool          `json:"hasSummary"`
-	shortID       string
-	date          string
-	capture       db.CaptureStatus
-	processing    db.ProcessingStatus
 }
 
 type MeetingDetail struct {
-	ID                       string           `json:"id"`
-	Title                    string           `json:"title"`
-	StartedAt                string           `json:"startedAt"`
-	EndedAt                  *string          `json:"endedAt,omitempty"`
-	Status                   MeetingStatus    `json:"status"`
-	TranscriptText           string           `json:"transcriptText,omitempty"`
-	Summary                  string           `json:"summary,omitempty"`
-	Segments                 []MeetingSegment `json:"segments"`
-	capture                  db.CaptureStatus
-	processing               db.ProcessingStatus
-	captureFailureMessage    *string
-	processingFailureMessage *string
+	ID             string           `json:"id"`
+	Title          string           `json:"title"`
+	StartedAt      string           `json:"startedAt"`
+	EndedAt        *string          `json:"endedAt,omitempty"`
+	Status         MeetingStatus    `json:"status"`
+	TranscriptText string           `json:"transcriptText,omitempty"`
+	Summary        string           `json:"summary,omitempty"`
+	Segments       []MeetingSegment `json:"segments"`
 }
 
 type MeetingSegment struct {
@@ -62,7 +42,7 @@ func BuildMeetingListViews(meetings []db.Meeting) []MeetingListItem {
 }
 
 func BuildMeetingListView(meeting db.Meeting) MeetingListItem {
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: meeting.Transcript != nil, HasSummary: meeting.Summary != nil, shortID: previewID(meeting.ID), date: meetingDate(meeting.StartedAt), capture: meeting.CaptureStatus, processing: meeting.ProcessingStatus}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: meeting.Transcript != nil, HasSummary: meeting.Summary != nil}
 }
 
 func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
@@ -78,7 +58,7 @@ func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
 }
 
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), TranscriptText: transcriptText(meeting, segments), Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments), capture: meeting.CaptureStatus, processing: meeting.ProcessingStatus, captureFailureMessage: meeting.CaptureFailureMessage, processingFailureMessage: meeting.ProcessingFailureMessage}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), TranscriptText: transcriptText(meeting, segments), Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
 }
 
 func transcriptText(meeting db.Meeting, segments []db.Segment) string {
@@ -99,27 +79,9 @@ func buildSegmentViews(segments []db.Segment) []MeetingSegment {
 	return views
 }
 
-func RenderMeetingListLine(view MeetingListItem) string {
-	return fmt.Sprintf("  %s %s  %s  %s (capture: %s, processing: %s)", meetingMarker(view.Status.State), view.shortID, view.date, view.Title, view.capture, view.processing)
-}
-
-func RenderMeetingDetail(view MeetingDetail) string {
-	var b strings.Builder
-	writeMeetingHeader(&b, view)
-	writeMeetingTranscript(&b, view)
-	writeMeetingSummary(&b, view)
-	return b.String()
-}
-
-func meetingMarker(status db.MeetingState) string {
-	switch status {
-	case db.MeetingStateCompleted:
-		return meetingMarkerCompleted
-	case db.MeetingStateFailed:
-		return meetingMarkerFailed
-	case db.MeetingStateProcessing:
-		return meetingMarkerProcessing
-	default:
-		return meetingMarkerCaptured
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
 	}
+	return *value
 }
