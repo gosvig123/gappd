@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/config"
-	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
@@ -69,8 +69,8 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode,
 	}
 
 	var events recording.EventSink
-	if emitter := newAppRecordingEventEmitter(suppressProcessingFailure); emitter != nil {
-		events = appRecordingSink{emitter}
+	if emitter := appprotocol.NewRecordingEventEmitter(os.Stdout, suppressProcessingFailure); emitter != nil {
+		events = emitter
 	}
 	service := recording.Service{
 		Store:    store,
@@ -86,14 +86,7 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode,
 		ModelPath:                 modelPath,
 		DefaultModelPath:          defaultPath,
 		Mode:                      mode,
+		LiveTranscript:            suppressProcessingFailure,
 		SuppressProcessingFailure: suppressProcessingFailure,
 	})
-}
-
-type appRecordingSink struct {
-	emitter *appRecordingEventEmitter
-}
-
-func (s appRecordingSink) EmitRecordingEvent(name recording.EventName, meeting db.Meeting, err error) error {
-	return s.emitter.emit(name, meeting, err)
 }

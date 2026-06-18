@@ -90,6 +90,14 @@ func (d *DB) UpdateRecordingHeartbeat(id, updatedAt string) error {
 	return nil
 }
 
+func (d *DB) UpdateTranscript(id, transcript string) error {
+	_, err := d.Conn.Exec(`UPDATE meetings SET transcript = ? WHERE id = ?`, transcript, id)
+	if err != nil {
+		return fmt.Errorf("update transcript: %w", err)
+	}
+	return nil
+}
+
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
 	row := d.Conn.QueryRow(
 		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,

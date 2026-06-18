@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/spf13/cobra"
 )
@@ -114,9 +115,9 @@ func applyManagedOllama(cfg *config.Config, endpoint, model string, temperature 
 	return nil
 }
 
-func appConfigResponseFor(cfg config.Config) appConfigResponse {
-	return appConfigResponse{
-		AI: appAIConfig{
+func appConfigResponseFor(cfg config.Config) appprotocol.ConfigResponse {
+	return appprotocol.ConfigResponse{
+		AI: appprotocol.AIConfig{
 			Provider:    cfg.AI.Provider,
 			Model:       cfg.AI.Model,
 			Endpoint:    cfg.AI.Endpoint,

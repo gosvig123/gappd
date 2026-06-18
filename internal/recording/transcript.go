@@ -27,11 +27,23 @@ func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, recorder 
 		return fmt.Errorf("save segments: %w", err)
 	}
 	transcript := FormatTranscript(segments)
+	if err := s.saveDraftTranscript(meeting, transcript); err != nil {
+		return err
+	}
 	if s.Events == nil {
 		fmt.Fprintln(s.Out, "\n── Transcript ──────────────────────────")
 		fmt.Fprintln(s.Out, transcript)
 	}
 	return s.enhanceAndSave(ctx, meeting, transcript, "")
+}
+
+func (s Service) saveDraftTranscript(meeting *db.Meeting, transcript string) error {
+	meeting.Transcript = &transcript
+	setProcessingStatus(meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
+	if err := s.meetings().UpdateMeeting(meeting); err != nil {
+		return fmt.Errorf("save draft transcript: %w", err)
+	}
+	return s.emit(EventProcessing, *meeting, nil)
 }
 
 // Enhance re-runs the AI pipeline over a stored meeting's transcript and saves the result.
@@ -58,7 +70,7 @@ func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
 func (s Service) transcribeStreams(ctx context.Context, recorder audioRecorder, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
 	var all []db.Segment
 	var errs []string
-	for _, src := range []struct{ path, speaker string }{{recorder.MicPath(), "You"}, {recorder.SystemPath(), "Other"}} {
+	for _, src := range audioSources(recorder) {
 		segments, err := s.transcribeStream(ctx, src.path, modelPath, defaultModelPath, src.speaker)
 		if errors.Is(err, errMissingAudio) {
 			continue

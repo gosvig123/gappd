@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
@@ -54,8 +55,8 @@ func listMeetings(store *db.DB) error {
 		fmt.Println("No meetings yet. Run `gappd listen` to record one.")
 		return nil
 	}
-	for _, view := range buildMeetingListViews(meetings) {
-		fmt.Println(renderMeetingListLine(view))
+	for _, view := range appprotocol.BuildMeetingListViews(meetings) {
+		fmt.Println(appprotocol.RenderMeetingListLine(view))
 	}
 	return nil
 }
@@ -77,10 +78,10 @@ func showCmd() *cobra.Command {
 }
 
 func showMeeting(store *db.DB, id string) error {
-	view, err := buildMeetingDetailView(store, id)
+	view, err := appprotocol.BuildMeetingDetailView(store, id)
 	if err != nil {
 		return fmt.Errorf("meeting not found: %w", err)
 	}
-	fmt.Print(renderMeetingDetail(view))
+	fmt.Print(appprotocol.RenderMeetingDetail(view))
 	return nil
 }

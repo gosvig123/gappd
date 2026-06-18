@@ -1,3 +1,5 @@
+import type { MeetingStatus } from '../../shared/contracts'
+
 const permissionErrorHints = [
   'permission denied',
   'microphone access denied',
