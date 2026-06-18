@@ -112,6 +112,9 @@ func (s Service) newRecorder(mode capture.CaptureMode, dir string, device int) a
 	if s.recorder != nil {
 		return s.recorder(mode, dir, device)
 	}
+	if s.Events != nil {
+		return capture.NewRecorderWithOutput(mode, dir, device, io.Discard)
+	}
 	return capture.NewRecorder(mode, dir, device)
 }
 
