@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
@@ -72,7 +73,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		os.Stdout = originalStdout
 	})
 
-	emitter := newAppRecordingEventEmitter(true)
+	emitter := appprotocol.NewRecordingEventEmitter(os.Stdout, true)
 	meeting := db.Meeting{
 		ID:                        "meeting-42",
 		Title:                     "Weekly sync",
@@ -82,8 +83,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		ProcessingStatus:          db.ProcessingStatusProcessing,
 		ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
 	}
-	if err := emitter.emit(recording.EventProcessing, meeting, nil); err != nil {
-		t.Fatalf("emit() error = %v", err)
+	if err := emitter.EmitRecordingEvent(recording.EventProcessing, meeting, nil); err != nil {
+		t.Fatalf("EmitRecordingEvent() error = %v", err)
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("writer.Close() error = %v", err)
@@ -94,7 +95,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		t.Fatalf("ReadFrom() error = %v", err)
 	}
 
-	var event appRecordingEvent
+	var event appprotocol.RecordingEvent
 	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v\noutput=%s", err, buf.String())
 	}

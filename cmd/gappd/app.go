@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/recording"
@@ -33,11 +34,11 @@ func appDevicesCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := make([]captureDevice, 0, len(devices))
+			out := make([]appprotocol.Device, 0, len(devices))
 			for _, device := range devices {
-				out = append(out, captureDevice{Index: device.Index, Name: device.Name})
+				out = append(out, appprotocol.Device{Index: device.Index, Name: device.Name})
 			}
-			return writeJSON(appDevicesResponse{Devices: out})
+			return writeJSON(appprotocol.DevicesResponse{Devices: out})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
@@ -110,7 +111,7 @@ func runAppRecoverStale(asJSON bool, modelPath string) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(appRecoverStaleRecordingsResponse{Recovered: recovered})
+	return writeJSON(appprotocol.RecoverStaleRecordingsResponse{Recovered: recovered})
 }
 
 func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline, modelPath string) (int, error) {
@@ -143,7 +144,7 @@ func appMeetingsListCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return writeJSON(appMeetingsResponse{Meetings: buildMeetingListViews(meetings)})
+			return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(meetings)})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
@@ -169,13 +170,13 @@ func appMeetingsShowCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return writeJSON(appMeetingResponse{Meeting: detail})
+			return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
 
-func appMeetingDetailFor(store *db.DB, id string) (appMeetingDetail, error) {
-	return buildMeetingDetailView(store, id)
+func appMeetingDetailFor(store *db.DB, id string) (appprotocol.MeetingDetail, error) {
+	return appprotocol.BuildMeetingDetailView(store, id)
 }

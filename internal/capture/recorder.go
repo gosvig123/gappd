@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,10 +28,15 @@ type Recorder struct {
 	cmd       *exec.Cmd
 	waitCh    chan error
 	stderr    bytes.Buffer
+	stdout    io.Writer
 }
 
 func NewRecorder(mode CaptureMode, outputDir string, deviceIdx int) *Recorder {
-	return &Recorder{mode: mode, outputDir: outputDir, deviceIdx: deviceIdx}
+	return NewRecorderWithOutput(mode, outputDir, deviceIdx, os.Stdout)
+}
+
+func NewRecorderWithOutput(mode CaptureMode, outputDir string, deviceIdx int, stdout io.Writer) *Recorder {
+	return &Recorder{mode: mode, outputDir: outputDir, deviceIdx: deviceIdx, stdout: stdout}
 }
 
 func (r *Recorder) Start(ctx context.Context) error {
@@ -45,9 +51,10 @@ func (r *Recorder) Start(ctx context.Context) error {
 		"--mode", string(r.mode),
 		"--output-dir", r.outputDir,
 		"--device", fmt.Sprintf("%d", r.deviceIdx),
+		"--chunk-seconds", "5",
 	}
 	r.cmd = exec.Command(bin, args...)
-	r.cmd.Stdout = os.Stdout
+	r.cmd.Stdout = r.stdout
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
 	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}

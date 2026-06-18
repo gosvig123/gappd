@@ -61,5 +61,5 @@ function isInboxProcessing(meeting: MeetingListItem): boolean {
 }
 
 function isReadyToReview(meeting: MeetingListItem): boolean {
-  return hasFailure(meeting) || meeting.hasSummary || meeting.hasTranscript
+  return hasFailure(meeting) || (!isProcessing(meeting) && (meeting.hasSummary || meeting.hasTranscript))
 }
