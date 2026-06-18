@@ -55,8 +55,8 @@ func listMeetings(store *db.DB) error {
 		fmt.Println("No meetings yet. Run `gappd listen` to record one.")
 		return nil
 	}
-	for _, view := range appprotocol.BuildMeetingListViews(meetings) {
-		fmt.Println(appprotocol.RenderMeetingListLine(view))
+	for _, meeting := range meetings {
+		fmt.Println(renderMeetingListLine(meeting))
 	}
 	return nil
 }
@@ -78,10 +78,14 @@ func showCmd() *cobra.Command {
 }
 
 func showMeeting(store *db.DB, id string) error {
-	view, err := appprotocol.BuildMeetingDetailView(store, id)
+	meeting, err := store.GetMeeting(id)
 	if err != nil {
 		return fmt.Errorf("meeting not found: %w", err)
 	}
-	fmt.Print(appprotocol.RenderMeetingDetail(view))
+	segments, err := store.GetSegments(id)
+	if err != nil {
+		return err
+	}
+	fmt.Print(renderMeetingDetail(*meeting, appprotocol.BuildMeetingDetail(*meeting, segments)))
 	return nil
 }
