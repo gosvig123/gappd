@@ -23,6 +23,8 @@ sessions/
 
 # Config with real credentials
 config.toml
+.apple-signing/
+apple-signing/
 
 # OS
 .DS_Store

@@ -12,7 +12,11 @@ and can run Ollama-based summarization and extraction over saved meetings.
 - AI provider support: `ollama`
 - Meeting capture, listing, display, and post-processing commands
 
-## Desktop macOS fresh-clone setup
+## Fresh-clone setup for contributors
+
+Most contributors should use the desktop setup. It installs JavaScript
+dependencies, downloads the local runtimes, builds the native helper binaries,
+and starts the Electron app.
 
 Prerequisites:
 
@@ -31,6 +35,11 @@ cd gappd
 npm run desktop:bootstrap
 npm run desktop:dev
 ```
+
+On first app launch, the in-app local AI onboarding may download the selected
+Ollama model and the Whisper model into the app user-data directory. No API keys,
+Apple signing credentials, private packages, or checked-in binary artifacts are
+required for local development.
 
 What bootstrap does:
 
@@ -51,9 +60,17 @@ these paths:
 - `desktop/.cache/whisper/`
 - `desktop/dist*` and `desktop/release/`
 
-There are no unpublished local package dependencies required for clone setup: no
-npm `file:`, `link:`, or `workspace:` dependencies, and no Go `replace` directives.
+There are no unpublished local package dependencies in the current setup: no npm
+`file:`, `link:`, or `workspace:` dependencies, and no Go `replace` directives.
 Native/runtime artifacts are generated or downloaded by bootstrap scripts.
+
+If setup fails, run the checks separately so the failing layer is obvious:
+
+```bash
+npm run desktop:install
+npm run desktop:preflight
+npm run desktop:prepare
+```
 
 ## Desktop commands from repo root
 
@@ -69,6 +86,13 @@ npm run desktop:dist:dir    # package unpacked macOS app directory
 ```
 
 `npm run dev` remains a shorthand for `npm run desktop:dev`.
+
+Contributor validation before opening a PR:
+
+```bash
+go test ./...
+npm run desktop:typecheck
+```
 
 ## Desktop update checks
 
