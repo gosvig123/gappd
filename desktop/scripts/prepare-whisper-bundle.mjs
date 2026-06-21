@@ -13,12 +13,17 @@ const MAC_BUILD_X64 = 'x64'
 const MAC_BUILD_UNIVERSAL = 'universal'
 const MAC_ARCH_ARM64 = 'arm64'
 const MAC_ARCH_X64 = 'x86_64'
+const WHISPER_BACKEND_CPU = 'cpu'
+const WHISPER_BACKEND_METAL = 'metal'
+const CMAKE_ON = 'ON'
+const CMAKE_OFF = 'OFF'
 const { release, sourceSha256 } = runtimeManifest.whisper
 const sourceUrl = `https://github.com/ggml-org/whisper.cpp/archive/refs/tags/${release}.tar.gz`
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const macBuildProfile = process.env.GAPPD_MAC_BUILD || MAC_BUILD_NATIVE
 const macosMinVersion = process.env.GAPPD_MACOS_MIN_VERSION || DEFAULT_MACOS_MIN_VERSION
-const cacheKey = process.platform === 'darwin' ? `${macBuildProfile}-macos-${macosMinVersion}` : process.platform
+const whisperBackend = process.platform === 'darwin' ? WHISPER_BACKEND_METAL : WHISPER_BACKEND_CPU
+const cacheKey = process.platform === 'darwin' ? `${macBuildProfile}-macos-${macosMinVersion}-${whisperBackend}` : `${process.platform}-${whisperBackend}`
 const cacheDir = path.join(root, '.cache', 'whisper', release, cacheKey)
 const archivePath = path.join(cacheDir, 'whisper.cpp.tar.gz')
 const cacheBinaryPath = path.join(cacheDir, 'whisper-cli')
@@ -58,8 +63,10 @@ async function buildBinary() {
   try {
     runCommand('tar', ['-xzf', archivePath, '-C', tempDir, '--strip-components=1'], 'Failed to extract Whisper source archive')
     const buildDir = path.join(tempDir, 'build')
-    const configureArgs = ['-S', tempDir, '-B', buildDir, '-DBUILD_SHARED_LIBS=OFF', '-DGGML_METAL=OFF', '-DGGML_NATIVE=OFF']
+    const configureArgs = ['-S', tempDir, '-B', buildDir, '-DBUILD_SHARED_LIBS=OFF', `-DGGML_METAL=${cmakeBoolean(whisperBackend === WHISPER_BACKEND_METAL)}`, '-DGGML_NATIVE=OFF']
     if (process.platform === 'darwin') {
+      configureArgs.push('-DGGML_METAL_EMBED_LIBRARY=ON')
+      configureArgs.push(`-DGGML_METAL_MACOSX_VERSION_MIN=${macosMinVersion}`)
       configureArgs.push(`-DCMAKE_OSX_DEPLOYMENT_TARGET=${macosMinVersion}`)
       configureArgs.push(`-DCMAKE_OSX_ARCHITECTURES=${cmakeArchitectures()}`)
     }
@@ -77,6 +84,10 @@ async function buildBinary() {
 function runBinaryCheck(filePath) {
   const result = spawnSync(filePath, ['-h'], { stdio: 'pipe' })
   return !result.error && result.status === 0
+}
+
+function cmakeBoolean(enabled) {
+  return enabled ? CMAKE_ON : CMAKE_OFF
 }
 
 function shouldRunBinaryCheck() {
