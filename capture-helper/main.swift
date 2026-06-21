@@ -12,7 +12,6 @@ struct Config {
     let outputDir: String
     let sampleRate: Double
     let deviceIndex: Int?
-    let chunkSeconds: Double
 }
 
 func parseArgs() -> Config {
@@ -20,7 +19,6 @@ func parseArgs() -> Config {
     var outputDir = "."
     var sampleRate = 16000.0
     var deviceIndex: Int? = nil
-    var chunkSeconds = 5.0
 
     let args = CommandLine.arguments
     var i = 1
@@ -34,8 +32,6 @@ func parseArgs() -> Config {
             i += 1; sampleRate = Double(args[i]) ?? 16000.0
         case "--device":
             i += 1; deviceIndex = Int(args[i])
-        case "--chunk-seconds":
-            i += 1; chunkSeconds = Double(args[i]) ?? 5.0
         case "--list-devices":
             listDevices(); exit(0)
         case "--request-permissions":
@@ -52,7 +48,7 @@ func parseArgs() -> Config {
         }
         i += 1
     }
-    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex, chunkSeconds: chunkSeconds)
+    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex)
 }
 
 func printUsage() {
@@ -67,14 +63,12 @@ func printUsage() {
       --output-dir <path>       Directory for output files
       --sample-rate <hz>        Sample rate (default: 16000)
       --device <index>          Mic device index
-      --chunk-seconds <seconds> Write finalized chunk WAVs for live transcription (default: 5)
       --list-devices            List available audio input devices
       --help                    Show this help
 
     Outputs:
       mic.wav      - Microphone audio (when mode is mic or both)
       system.wav   - System audio (when mode is system or both)
-      chunks/*.wav - Finalized short WAV chunks for live transcription
 
     Send SIGINT (Ctrl-C) to stop recording.
     """
@@ -201,101 +195,11 @@ class WAVWriter {
     }
 }
 
-class ChunkedWAVWriter {
-    private let writer: WAVWriter
-    private let sampleRate: Double
-    private let framesPerChunk: Int
-    private let chunksDir: String
-    private let prefix: String
-    private let lock = NSLock()
-    private var chunkWriter: WAVWriter?
-    private var chunkFrames = 0
-    private var chunkIndex = 0
-
-    init(path: String, sampleRate: Double, chunkSeconds: Double) throws {
-        self.writer = try WAVWriter(path: path, sampleRate: UInt32(sampleRate), channels: 1)
-        self.sampleRate = sampleRate
-        self.framesPerChunk = max(1, Int(sampleRate * chunkSeconds))
-        self.chunksDir = ((path as NSString).deletingLastPathComponent as NSString).appendingPathComponent("chunks")
-        self.prefix = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
-        try FileManager.default.createDirectory(atPath: chunksDir, withIntermediateDirectories: true)
-        try openChunk()
-    }
-
-    func write(pcmBuffer: AVAudioPCMBuffer) {
-        lock.lock(); defer { lock.unlock() }
-        writer.write(pcmBuffer: pcmBuffer)
-        guard let floatData = pcmBuffer.floatChannelData else { return }
-        writeInt16Chunks(samples: floatData[0], frameCount: Int(pcmBuffer.frameLength))
-    }
-
-    func writeRaw(data: Data) {
-        lock.lock(); defer { lock.unlock() }
-        writer.writeRaw(data: data)
-        writeRawChunks(data: data)
-    }
-
-    func finalize() {
-        lock.lock(); defer { lock.unlock() }
-        writer.finalize()
-        chunkWriter?.finalize()
-        chunkWriter = nil
-    }
-
-    private func writeInt16Chunks(samples: UnsafePointer<Float>, frameCount: Int) {
-        var offset = 0
-        while offset < frameCount {
-            let count = min(framesPerChunk - chunkFrames, frameCount - offset)
-            chunkWriter?.writeRaw(data: int16Data(samples: samples, offset: offset, count: count))
-            offset += count
-            chunkFrames += count
-            rotateIfNeeded()
-        }
-    }
-
-    private func writeRawChunks(data: Data) {
-        var offset = 0
-        while offset < data.count {
-            let bytes = min((framesPerChunk - chunkFrames) * 2, data.count - offset)
-            chunkWriter?.writeRaw(data: data.subdata(in: offset..<(offset + bytes)))
-            offset += bytes
-            chunkFrames += bytes / 2
-            rotateIfNeeded()
-        }
-    }
-
-    private func rotateIfNeeded() {
-        guard chunkFrames >= framesPerChunk else { return }
-        chunkWriter?.finalize()
-        chunkWriter = nil
-        chunkIndex += 1
-        chunkFrames = 0
-        do { try openChunk() } catch { print("warning: live chunk disabled: \(error)") }
-    }
-
-    private func openChunk() throws {
-        let name = String(format: "%@-%06d.wav", prefix, chunkIndex)
-        let path = (chunksDir as NSString).appendingPathComponent(name)
-        chunkWriter = try WAVWriter(path: path, sampleRate: UInt32(sampleRate), channels: 1)
-    }
-}
-
-func int16Data(samples: UnsafePointer<Float>, offset: Int, count: Int) -> Data {
-    var data = Data(count: count * 2)
-    for i in 0..<count {
-        let sample = max(-1.0, min(1.0, samples[offset + i]))
-        let int16 = Int16(sample * 32767.0)
-        data[i * 2] = UInt8(int16 & 0xFF)
-        data[i * 2 + 1] = UInt8((int16 >> 8) & 0xFF)
-    }
-    return data
-}
-
 // MARK: - Mic Recorder
 
 class MicRecorder {
     private let engine = AVAudioEngine()
-    private var writer: ChunkedWAVWriter?
+    private var writer: WAVWriter?
     private let sampleRate: Double
     private let requestedDevice: Int?
     private var converter: AVAudioConverter?
@@ -355,7 +259,7 @@ class MicRecorder {
         }
     }
 
-    func start(outputPath: String, chunkSeconds: Double) throws {
+    func start(outputPath: String) throws {
         applyDeviceSelection()
 
         let inputNode = engine.inputNode
@@ -363,7 +267,7 @@ class MicRecorder {
         print("  mic hw: \(UInt32(hwFormat.sampleRate))Hz \(hwFormat.channelCount)ch")
 
         let targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        writer = try ChunkedWAVWriter(path: outputPath, sampleRate: sampleRate, chunkSeconds: chunkSeconds)
+        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1)
         converter = AVAudioConverter(from: hwFormat, to: targetFormat)
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
@@ -398,7 +302,7 @@ class MicRecorder {
 
 class SystemAudioRecorder: NSObject, SCStreamOutput {
     private var stream: SCStream?
-    private var writer: ChunkedWAVWriter?
+    private var writer: WAVWriter?
     private let sampleRate: Double
     private let sampleQueue = DispatchQueue(label: "dev.gappd.capture.system-audio")
 
@@ -406,8 +310,8 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
         self.sampleRate = sampleRate
     }
 
-    func start(outputPath: String, chunkSeconds: Double) async throws {
-        writer = try ChunkedWAVWriter(path: outputPath, sampleRate: sampleRate, chunkSeconds: chunkSeconds)
+    func start(outputPath: String) async throws {
+        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1)
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
 
@@ -576,7 +480,7 @@ sigintSource.resume()
 if let mic = micRecorder {
     let micPath = (config.outputDir as NSString).appendingPathComponent("mic.wav")
     do {
-        try mic.start(outputPath: micPath, chunkSeconds: config.chunkSeconds)
+        try mic.start(outputPath: micPath)
         print("● Mic recording to \(micPath)")
     } catch {
         print("Error starting mic: \(error)")
@@ -590,7 +494,7 @@ if let sys = systemRecorder {
     group.enter()
     Task {
         do {
-            try await sys.start(outputPath: sysPath, chunkSeconds: config.chunkSeconds)
+            try await sys.start(outputPath: sysPath)
             print("● System audio recording to \(sysPath)")
         } catch {
             print("Error starting system audio: \(error)")

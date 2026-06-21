@@ -47,12 +47,7 @@ func (s *fakeStore) UpdateRecordingHeartbeat(_ string, updatedAt string) error {
 	return nil
 }
 
-func (s *fakeStore) UpdateTranscript(_ string, transcript string) error {
-	s.meeting.Transcript = &transcript
-	return nil
-}
-
-func (s *fakeStore) InsertSegments(segments []db.Segment) error {
+func (s *fakeStore) ReplaceSegments(_ string, segments []db.Segment) error {
 	s.segments = append([]db.Segment(nil), segments...)
 	return nil
 }

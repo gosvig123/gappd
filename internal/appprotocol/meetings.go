@@ -27,6 +27,7 @@ type MeetingDetail struct {
 }
 
 type MeetingSegment struct {
+	ID       string  `json:"id"`
 	StartSec float64 `json:"startSec"`
 	EndSec   float64 `json:"endSec"`
 	Speaker  string  `json:"speaker"`
@@ -58,7 +59,8 @@ func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
 }
 
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), TranscriptText: transcriptText(meeting, segments), Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+	status := MeetingStatusFor(meeting)
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcriptText(meeting, segments), Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
 }
 
 func transcriptText(meeting db.Meeting, segments []db.Segment) string {
@@ -74,9 +76,13 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 func buildSegmentViews(segments []db.Segment) []MeetingSegment {
 	views := make([]MeetingSegment, 0, len(segments))
 	for _, segment := range segments {
-		views = append(views, MeetingSegment{StartSec: segment.Start, EndSec: segment.End, Speaker: segment.Speaker, Text: segment.Text})
+		views = append(views, buildSegmentView(segment))
 	}
 	return views
+}
+
+func buildSegmentView(segment db.Segment) MeetingSegment {
+	return MeetingSegment{ID: segment.ID, StartSec: segment.Start, EndSec: segment.End, Speaker: segment.Speaker, Text: segment.Text}
 }
 
 func stringValue(value *string) string {

@@ -1,21 +1,21 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
+import './meeting-reading.css'
 import { artifactLabel, meetingStatusLabel, meetingStatusTone, processingStatusLabel } from '../components/meeting-status'
 import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { dateLabel } from './today-model'
+import { TranscriptText } from './transcript-view'
 
 const EXPAND_READING_LABEL = 'More'
 const COLLAPSE_READING_LABEL = 'Less'
 const PREVIEW_CHARACTER_LIMIT = 700
 const PREVIEW_LINE_LIMIT = 8
-const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 const PROCESSING_STATUS = 'processing'
 const RECORDING_STATE = 'recording'
 const CAPTURED_STATE = 'captured'
 const SHOW_DIAGNOSTICS = import.meta.env.DEV
-
 type MeetingDetailPanelProps = {
   selectedMeetingId: string | null
   selectedMeeting: MeetingDetail | null
@@ -57,50 +57,19 @@ function canExpandReading(value: string): boolean {
   return value.length > PREVIEW_CHARACTER_LIMIT || value.split('\n').length > PREVIEW_LINE_LIMIT
 }
 
-function ReadingCard({ title, value, emptyText, primary, markdown, children }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean; children?: ReactNode }) {
-  const [expanded, setExpanded] = useState(false)
+function ReadingCard({ title, value, emptyText, primary, markdown, defaultExpanded = false, resetKey = value, children }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean; defaultExpanded?: boolean; resetKey?: string; children?: ReactNode }) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const expandable = canExpandReading(value)
   const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
   const textClassName = expanded || !expandable ? 'reading-text' : 'reading-text reading-preview'
   const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
-  useEffect(() => setExpanded(false), [value])
+  useEffect(() => setExpanded(defaultExpanded), [resetKey, defaultExpanded])
   return (
     <div className={className}>
       <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={expanded} expandable={expandable} onToggle={() => setExpanded((current) => !current)} /></div>
       <div className={textClassName}>{body}</div>
     </div>
   )
-}
-
-type TranscriptGroup = { speaker: string | null; lines: string[] }
-
-function TranscriptText({ value }: { value: string }) {
-  return <div className="transcript-groups">{transcriptGroups(value).map((group, index) => <TranscriptGroupView key={index} group={group} />)}</div>
-}
-
-function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
-  return (
-    <section className="transcript-group">
-      {group.speaker ? <div className="transcript-speaker">{group.speaker}</div> : null}
-      <div className="transcript-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div>
-    </section>
-  )
-}
-
-function transcriptGroups(value: string): TranscriptGroup[] {
-  return value.split('\n').reduce<TranscriptGroup[]>((groups, line) => appendTranscriptLine(groups, line), [])
-}
-
-function appendTranscriptLine(groups: TranscriptGroup[], line: string): TranscriptGroup[] {
-  const trimmed = line.trim()
-  if (!trimmed) return groups
-  const match = SPEAKER_LINE_PATTERN.exec(trimmed)
-  const speaker = match?.[1] ?? null
-  const text = match?.[2]?.trim() || trimmed
-  const previous = groups[groups.length - 1]
-  if (previous?.speaker === speaker) previous.lines.push(text)
-  else groups.push({ speaker, lines: [text] })
-  return groups
 }
 
 function DetailShell({ children }: { children: ReactNode }) {
@@ -151,6 +120,7 @@ function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { se
 function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
+  const recording = selectedMeeting.status.state === RECORDING_STATE
   return (
     <Panel className="detail-panel">
       <div className="panel-header compact meeting-detail-header">
@@ -160,17 +130,20 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-        {hasSummary ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText="" primary markdown /> : null}
-        <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)}><TranscriptText value={transcript} /></ReadingCard>
+        {hasSummary ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText="" resetKey={selectedMeeting.id} primary markdown /> : null}
+        {recording ? <TrackingIndicator /> : <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} resetKey={selectedMeeting.id}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard>}
         {SHOW_DIAGNOSTICS ? <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} /> : null}
       </div>
     </Panel>
   )
 }
 
+function TrackingIndicator() {
+  return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div>
+}
+
 function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean, hasSummary: boolean): string {
-  if (meeting.status.state === RECORDING_STATE && hasTranscript) return 'Live transcript on.'
-  if (meeting.status.state === RECORDING_STATE) return 'Recording · transcript starts soon.'
+  if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
   if (meetingIsProcessing(meeting) && hasTranscript) return 'Transcript ready · summary running.'
   if (meetingIsProcessing(meeting)) return 'Transcribing audio.'
   if (hasSummary) return 'Summary ready.'
@@ -180,7 +153,6 @@ function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean, hasSumma
 }
 
 function transcriptEmptyText(meeting: MeetingDetail): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Listening… transcript starts after first audio chunk.'
   if (meetingIsProcessing(meeting)) return 'Transcribing audio…'
   return 'No transcript yet.'
 }
