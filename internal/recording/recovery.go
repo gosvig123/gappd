@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"time"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
@@ -14,8 +14,6 @@ const (
 	StaleRecordingTimeout = 5 * time.Minute
 	staleRecoveryLimit    = 10
 	staleNoAudioMessage   = "Recording was interrupted before audio was saved. Start a new recording."
-	micAudioFilename      = "mic.wav"
-	systemAudioFilename   = "system.wav"
 )
 
 type RecoverStaleOptions struct {
@@ -77,7 +75,7 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
 		return true, err
 	}
-	err := s.postProcess(ctx, meeting, storedAudioRecorder{dir: *meeting.AudioPath}, opts.ModelPath, opts.DefaultModelPath)
+	err := s.postProcess(ctx, meeting, audioartifact.New(*meeting.AudioPath), opts.ModelPath, opts.DefaultModelPath)
 	if err != nil && opts.SuppressProcessingFailure {
 		if s.ErrOut != nil {
 			fmt.Fprintf(s.ErrOut, "warning: stale recording post-processing failed: %v\n", err)
@@ -115,15 +113,5 @@ func (s Service) failStaleRecording(meeting *db.Meeting, cutoff string, now time
 }
 
 func staleMeetingHasAudio(meeting *db.Meeting) bool {
-	return meeting.AudioPath != nil && (fileExists(filepath.Join(*meeting.AudioPath, micAudioFilename)) || fileExists(filepath.Join(*meeting.AudioPath, systemAudioFilename)))
+	return meeting.AudioPath != nil && audioartifact.New(*meeting.AudioPath).HasAudio()
 }
-
-type storedAudioRecorder struct {
-	dir string
-}
-
-func (r storedAudioRecorder) Start(context.Context) error { return nil }
-func (r storedAudioRecorder) Stop() error                 { return nil }
-func (r storedAudioRecorder) Done() <-chan error          { return nil }
-func (r storedAudioRecorder) MicPath() string             { return filepath.Join(r.dir, micAudioFilename) }
-func (r storedAudioRecorder) SystemPath() string          { return filepath.Join(r.dir, systemAudioFilename) }

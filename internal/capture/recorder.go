@@ -11,6 +11,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 )
 
 type CaptureMode string
@@ -114,11 +116,11 @@ func (r *Recorder) stopProcessGroup(sig syscall.Signal) error {
 }
 
 func (r *Recorder) MicPath() string {
-	return filepath.Join(r.outputDir, "mic.wav")
+	return audioartifact.New(r.outputDir).MicPath()
 }
 
 func (r *Recorder) SystemPath() string {
-	return filepath.Join(r.outputDir, "system.wav")
+	return audioartifact.New(r.outputDir).SystemPath()
 }
 
 func findCaptureBinary() (string, error) {

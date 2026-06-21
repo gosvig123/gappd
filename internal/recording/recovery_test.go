@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
@@ -71,7 +72,7 @@ func createStaleRecordingMeeting(t *testing.T, store *db.DB, withAudio bool) *db
 func writeUsableAudio(t *testing.T) *string {
 	t.Helper()
 	dir := t.TempDir()
-	path := filepath.Join(dir, micAudioFilename)
+	path := filepath.Join(dir, audioartifact.MicFilename)
 	if err := os.WriteFile(path, []byte(strings.Repeat("m", 45)), 0o644); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
