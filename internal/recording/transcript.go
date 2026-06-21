@@ -23,11 +23,11 @@ func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, recorder 
 	if s.Events == nil {
 		fmt.Fprintf(s.Out, "● Got %d segments\n", len(segments))
 	}
-	if err := s.meetings().InsertSegments(segments); err != nil {
+	if err := s.meetings().ReplaceSegments(meeting.ID, segments); err != nil {
 		return fmt.Errorf("save segments: %w", err)
 	}
 	transcript := FormatTranscript(segments)
-	if err := s.saveDraftTranscript(meeting, transcript); err != nil {
+	if err := s.saveTranscript(meeting, transcript); err != nil {
 		return err
 	}
 	if s.Events == nil {
@@ -37,11 +37,11 @@ func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, recorder 
 	return s.enhanceAndSave(ctx, meeting, transcript, "")
 }
 
-func (s Service) saveDraftTranscript(meeting *db.Meeting, transcript string) error {
+func (s Service) saveTranscript(meeting *db.Meeting, transcript string) error {
 	meeting.Transcript = &transcript
 	setProcessingStatus(meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
 	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("save draft transcript: %w", err)
+		return fmt.Errorf("save transcript: %w", err)
 	}
 	return s.emit(EventProcessing, *meeting, nil)
 }
@@ -65,6 +65,15 @@ func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
 		return fmt.Errorf("mark meeting processing: %w", err)
 	}
 	return s.enhanceAndSave(ctx, meeting, transcript, notes)
+}
+
+type audioSource struct {
+	path    string
+	speaker string
+}
+
+func audioSources(recorder audioRecorder) []audioSource {
+	return []audioSource{{recorder.MicPath(), "You"}, {recorder.SystemPath(), "Other"}}
 }
 
 func (s Service) transcribeStreams(ctx context.Context, recorder audioRecorder, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {

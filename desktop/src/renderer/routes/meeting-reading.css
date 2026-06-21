@@ -1,0 +1,126 @@
+.reading-card {
+  gap: 12px;
+  align-content: start;
+  --reading-fade-color: var(--color-surface);
+}
+
+.primary-reading-card {
+  --reading-fade-color: var(--color-accent-tint);
+  background: var(--color-accent-tint);
+  border-color: var(--color-accent-border);
+}
+
+.reading-card-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.reading-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.reading-text {
+  position: relative;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--color-text-soft);
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.reading-preview {
+  max-height: 13rem;
+  overflow: hidden;
+}
+
+.reading-preview::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2.5rem;
+  background: linear-gradient(180deg, transparent, var(--reading-fade-color));
+  pointer-events: none;
+}
+
+.reading-toggle {
+  align-self: start;
+}
+
+.primary-reading-card .reading-text {
+  color: var(--color-text);
+  font-size: 14px;
+  white-space: normal;
+}
+
+.markdown {
+  display: grid;
+  gap: 8px;
+}
+
+.markdown h3,
+.markdown h4 {
+  margin: 4px 0 0;
+  line-height: var(--line-height-tight);
+}
+
+.markdown h3 {
+  font-size: var(--font-size-lg);
+}
+
+.markdown h4 {
+  font-size: var(--font-size-base);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+.markdown p,
+.markdown ul,
+.markdown ol {
+  margin: 0;
+  line-height: var(--line-height-reading);
+}
+
+.markdown ul,
+.markdown ol {
+  display: grid;
+  gap: 4px;
+  padding-left: 1.25rem;
+}
+
+.markdown li.nested {
+  margin-left: 1rem;
+  list-style-type: circle;
+}
+
+.markdown li::marker {
+  color: var(--color-text-muted);
+}
+
+.detail-surface.reading-card {
+  background: transparent;
+}
+
+.detail-surface.primary-reading-card {
+  background: var(--color-accent-tint);
+}
+
+@media (max-width: 45rem) {
+  .reading-card-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .reading-card-actions {
+    justify-content: flex-start;
+  }
+}

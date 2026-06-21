@@ -51,7 +51,6 @@ func (r *Recorder) Start(ctx context.Context) error {
 		"--mode", string(r.mode),
 		"--output-dir", r.outputDir,
 		"--device", fmt.Sprintf("%d", r.deviceIdx),
-		"--chunk-seconds", "5",
 	}
 	r.cmd = exec.Command(bin, args...)
 	r.cmd.Stdout = r.stdout

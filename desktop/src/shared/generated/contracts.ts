@@ -67,6 +67,7 @@ export type MeetingDetail = {
 }
 
 export type MeetingSegment = {
+  id: string
   startSec: number
   endSec: number
   speaker: string

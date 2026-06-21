@@ -19,6 +19,7 @@ export function CaptureCard(props: CaptureCardProps) {
   const disabled = !props.canStop && !props.canStart
   const label = props.canStop ? 'Stop and process' : 'Start'
   const variant = props.canStop ? 'secondary' : 'primary'
+  const buttonClassName = props.canStop ? 'record-toggle-button stop-process-button' : 'record-toggle-button'
 
   return (
     <Panel className="record-action-panel">
@@ -29,7 +30,7 @@ export function CaptureCard(props: CaptureCardProps) {
         </div>
         <RecordFields {...props} />
         <div className="actions-row record-actions">
-          <Button className="record-toggle-button" variant={variant} onClick={action} disabled={disabled}>{label}</Button>
+          <Button className={buttonClassName} variant={variant} onClick={action} disabled={disabled}>{label}</Button>
         </div>
       </div>
     </Panel>

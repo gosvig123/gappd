@@ -69,8 +69,7 @@ function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem;
 }
 
 function artifactSummary(meeting: MeetingListItem): string {
-  if (meeting.status.state === MEETING_RECORDING && meeting.hasTranscript) return 'Recording now · live transcript draft updating…'
-  if (meeting.status.state === MEETING_RECORDING) return 'Recording now · live transcript starts soon…'
+  if (meeting.status.state === MEETING_RECORDING) return 'Recording now · transcript after stop…'
   if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio and preparing summary…'
   if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Transcript ready · creating summary…'
   if (meeting.status.state === MEETING_CAPTURED) return 'Audio captured · waiting to process'
