@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
@@ -136,7 +137,8 @@ func (s Service) record(req Request, meeting *db.Meeting, sessionDir string) err
 		return err
 	}
 	stopHeartbeat()
-	return s.finish(req, meeting, recorder)
+	artifacts := audioartifact.FromPaths(recorder.MicPath(), recorder.SystemPath())
+	return s.finish(req, meeting, artifacts)
 }
 
 func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, meeting *db.Meeting) error {
@@ -165,11 +167,11 @@ func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, meetin
 	return nil
 }
 
-func (s Service) finish(req Request, meeting *db.Meeting, recorder audioRecorder) error {
+func (s Service) finish(req Request, meeting *db.Meeting, artifacts audioartifact.Artifacts) error {
 	s.printRecorded(meeting.StartedAt)
 	now := nowUTC()
 	meeting.EndedAt = &now
-	if !hasCapturedAudio(recorder) {
+	if !artifacts.HasAudio() {
 		captureErr := fmt.Errorf("no audio captured")
 		if err := s.FailCapture(meeting, captureErr); err != nil {
 			return err
@@ -186,7 +188,7 @@ func (s Service) finish(req Request, meeting *db.Meeting, recorder audioRecorder
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	err := s.postProcess(ctx, meeting, recorder, req.ModelPath, req.DefaultModelPath)
+	err := s.postProcess(ctx, meeting, artifacts, req.ModelPath, req.DefaultModelPath)
 	if err != nil && req.SuppressProcessingFailure {
 		fmt.Fprintf(s.ErrOut, "warning: post-processing failed after capture: %v\n", err)
 		return nil

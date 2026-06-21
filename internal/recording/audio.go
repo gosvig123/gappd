@@ -2,22 +2,12 @@ package recording
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
-
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.Size() > 44
-}
-
-func hasCapturedAudio(recorder audioRecorder) bool {
-	return fileExists(recorder.MicPath()) || fileExists(recorder.SystemPath())
-}
 
 func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
 	out := make([]db.Segment, len(segs))

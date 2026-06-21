@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
-func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, recorder audioRecorder, modelPath, defaultModelPath string) error {
-	segments, err := s.transcribeStreams(ctx, recorder, meeting.ID, modelPath, defaultModelPath)
+func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, artifacts audioartifact.Artifacts, modelPath, defaultModelPath string) error {
+	segments, err := s.transcribeStreams(ctx, artifacts, meeting.ID, modelPath, defaultModelPath)
 	if err != nil {
 		return s.saveProcessingFailure(meeting, err)
 	}
@@ -67,25 +68,16 @@ func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
 	return s.enhanceAndSave(ctx, meeting, transcript, notes)
 }
 
-type audioSource struct {
-	path    string
-	speaker string
-}
-
-func audioSources(recorder audioRecorder) []audioSource {
-	return []audioSource{{recorder.MicPath(), "You"}, {recorder.SystemPath(), "Other"}}
-}
-
-func (s Service) transcribeStreams(ctx context.Context, recorder audioRecorder, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
+func (s Service) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
 	var all []db.Segment
 	var errs []string
-	for _, src := range audioSources(recorder) {
-		segments, err := s.transcribeStream(ctx, src.path, modelPath, defaultModelPath, src.speaker)
+	for _, src := range artifacts.Sources() {
+		segments, err := s.transcribeStream(ctx, src.Path, modelPath, defaultModelPath, src.Speaker)
 		if errors.Is(err, errMissingAudio) {
 			continue
 		}
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", src.speaker, err))
+			errs = append(errs, fmt.Sprintf("%s: %v", src.Speaker, err))
 			continue
 		}
 		all = append(all, toDBSegments(meetingID, segments)...)
@@ -100,7 +92,7 @@ func (s Service) transcribeStreams(ctx context.Context, recorder audioRecorder, 
 var errMissingAudio = errors.New("missing audio")
 
 func (s Service) transcribeStream(ctx context.Context, audioPath, modelPath, defaultModelPath, speaker string) ([]transcribe.Segment, error) {
-	if !fileExists(audioPath) {
+	if !audioartifact.FileHasAudio(audioPath) {
 		if s.Events == nil {
 			fmt.Fprintf(s.Out, "  skipping %s: file missing or empty (no audio captured)\n", filepath.Base(audioPath))
 		}
