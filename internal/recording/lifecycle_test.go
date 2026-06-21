@@ -20,8 +20,8 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	captureErr := errors.New("start capture: boom")
 
-	if err := service.FailCapture(meeting, captureErr); err != nil {
-		t.Fatalf("FailCapture() error = %v", err)
+	if err := testSession(service, meeting).failCapture(captureErr); err != nil {
+		t.Fatalf("failCapture() error = %v", err)
 	}
 
 	stored := getMeeting(t, store, meeting.ID)
@@ -48,7 +48,7 @@ func TestSaveProcessingFailurePreservesCaptureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	processingErr := errors.New("no audio to transcribe")
 
-	err := service.saveProcessingFailure(meeting, processingErr)
+	err := testSession(service, meeting).saveProcessingFailure(processingErr)
 	if err == nil || !strings.Contains(err.Error(), "transcription failed: no audio to transcribe") {
 		t.Fatalf("saveProcessingFailure() error = %v, want transcription failure", err)
 	}
@@ -80,12 +80,16 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
 	transcript := "[You] hello\n"
 
-	err := service.enhanceAndSave(context.Background(), meeting, transcript, "")
+	err := testSession(service, meeting).enhanceAndSave(context.Background(), transcript, "")
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("enhanceAndSave() error = %v, want saved transcript failure", err)
 	}
 	assertEnhanceFailure(t, getMeeting(t, store, meeting.ID), transcript, providerErr.Error())
 	assertOneEvent(t, events, EventFailed, meeting.ID, providerErr)
+}
+
+func testSession(service Service, meeting *db.Meeting) recordingSession {
+	return recordingSession{service: service, meeting: meeting}
 }
 
 func failingOllamaServer(t *testing.T, message string) *httptest.Server {

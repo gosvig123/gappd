@@ -1,7 +1,6 @@
 package recording
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,16 +10,6 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/db"
 )
-
-func (s Service) FailCapture(meeting *db.Meeting, captureErr error) error {
-	now := nowUTC()
-	meeting.EndedAt = &now
-	setCaptureStatus(meeting, db.CaptureStatusFailed, now, captureErr)
-	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("mark meeting capture failed: %w", err)
-	}
-	return s.emit(EventFailed, *meeting, captureErr)
-}
 
 func (s Service) startCaptureHeartbeat(meeting *db.Meeting) func() {
 	done := make(chan struct{})
@@ -52,25 +41,6 @@ func (s Service) saveCaptureHeartbeat(meeting *db.Meeting) {
 		fmt.Fprintf(s.ErrOut, "warning: update recording heartbeat: %v\n", err)
 	}
 	meeting.CaptureStatusUpdatedAt = updatedAt
-}
-
-func (s Service) saveProcessingFailure(meeting *db.Meeting, origErr error) error {
-	now := nowUTC()
-	if meeting.EndedAt == nil {
-		meeting.EndedAt = &now
-	}
-	setProcessingStatus(meeting, db.ProcessingStatusFailed, now, origErr)
-	updateErr := s.meetings().UpdateMeeting(meeting)
-	if updateErr == nil && meeting.AudioPath != nil && s.Events == nil {
-		fmt.Fprintf(s.Out, "  session saved (audio may be incomplete — check %s)\n", *meeting.AudioPath)
-	}
-	if updateErr != nil {
-		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", updateErr))
-	}
-	if err := s.emit(EventFailed, *meeting, origErr); err != nil {
-		return err
-	}
-	return fmt.Errorf("transcription failed: %w", origErr)
 }
 
 func (s Service) createSessionDir(title string) (string, error) {

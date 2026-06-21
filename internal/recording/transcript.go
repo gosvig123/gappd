@@ -13,38 +13,42 @@ import (
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
-func (s Service) postProcess(ctx context.Context, meeting *db.Meeting, artifacts audioartifact.Artifacts, modelPath, defaultModelPath string) error {
-	segments, err := s.transcribeStreams(ctx, artifacts, meeting.ID, modelPath, defaultModelPath)
+func (session recordingSession) postProcess(ctx context.Context, modelPath, defaultModelPath string) error {
+	segments, err := session.service.transcribeStreams(ctx, session.artifacts, session.meeting.ID, modelPath, defaultModelPath)
 	if err != nil {
-		return s.saveProcessingFailure(meeting, err)
+		return session.saveProcessingFailure(err)
 	}
 	if len(segments) == 0 {
-		return s.saveProcessingFailure(meeting, fmt.Errorf("no audio to transcribe"))
+		return session.saveProcessingFailure(fmt.Errorf("no audio to transcribe"))
 	}
-	if s.Events == nil {
-		fmt.Fprintf(s.Out, "● Got %d segments\n", len(segments))
-	}
-	if err := s.meetings().ReplaceSegments(meeting.ID, segments); err != nil {
-		return fmt.Errorf("save segments: %w", err)
-	}
-	transcript := FormatTranscript(segments)
-	if err := s.saveTranscript(meeting, transcript); err != nil {
+	transcript, err := session.saveSegments(segments)
+	if err != nil {
 		return err
 	}
-	if s.Events == nil {
-		fmt.Fprintln(s.Out, "\n── Transcript ──────────────────────────")
-		fmt.Fprintln(s.Out, transcript)
-	}
-	return s.enhanceAndSave(ctx, meeting, transcript, "")
+	return session.enhanceAndSave(ctx, transcript, "")
 }
 
-func (s Service) saveTranscript(meeting *db.Meeting, transcript string) error {
-	meeting.Transcript = &transcript
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
-	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("save transcript: %w", err)
+func (session recordingSession) saveSegments(segments []db.Segment) (string, error) {
+	if session.service.Events == nil {
+		fmt.Fprintf(session.service.Out, "● Got %d segments\n", len(segments))
 	}
-	return s.emit(EventProcessing, *meeting, nil)
+	if err := session.service.meetings().ReplaceSegments(session.meeting.ID, segments); err != nil {
+		return "", fmt.Errorf("save segments: %w", err)
+	}
+	transcript := FormatTranscript(segments)
+	if err := session.saveTranscript(transcript); err != nil {
+		return "", err
+	}
+	session.printTranscript(transcript)
+	return transcript, nil
+}
+
+func (session recordingSession) printTranscript(transcript string) {
+	if session.service.Events != nil {
+		return
+	}
+	fmt.Fprintln(session.service.Out, "\n── Transcript ──────────────────────────")
+	fmt.Fprintln(session.service.Out, transcript)
 }
 
 // Enhance re-runs the AI pipeline over a stored meeting's transcript and saves the result.
@@ -61,32 +65,40 @@ func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
 	if err != nil {
 		return fmt.Errorf("get meeting: %w", err)
 	}
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
-	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("mark meeting processing: %w", err)
+	session := s.sessionFor(meeting, audioartifact.Artifacts{})
+	if err := session.markProcessing(); err != nil {
+		return err
 	}
-	return s.enhanceAndSave(ctx, meeting, transcript, notes)
+	return session.enhanceAndSave(ctx, transcript, notes)
 }
 
 func (s Service) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
 	var all []db.Segment
 	var errs []string
 	for _, src := range artifacts.Sources() {
-		segments, err := s.transcribeStream(ctx, src.Path, modelPath, defaultModelPath, src.Speaker)
+		segments, err := s.transcribeSource(ctx, src, meetingID, modelPath, defaultModelPath)
 		if errors.Is(err, errMissingAudio) {
 			continue
 		}
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", src.Speaker, err))
+			errs = append(errs, err.Error())
 			continue
 		}
-		all = append(all, toDBSegments(meetingID, segments)...)
+		all = append(all, segments...)
 	}
 	if len(all) == 0 && len(errs) > 0 {
 		return nil, fmt.Errorf("transcription failed: %s", strings.Join(errs, "; "))
 	}
 	sortSegmentsChronologically(all)
 	return all, nil
+}
+
+func (s Service) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
+	segments, err := s.transcribeStream(ctx, src.Path, modelPath, defaultModelPath, src.Speaker)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
+	}
+	return toDBSegments(meetingID, segments), nil
 }
 
 var errMissingAudio = errors.New("missing audio")
@@ -126,31 +138,28 @@ func (s Service) transcribeAs(ctx context.Context, audioPath, modelPath, default
 	return segs, nil
 }
 
-func (s Service) enhanceAndSave(ctx context.Context, meeting *db.Meeting, transcript, notes string) error {
-	if s.Events == nil {
-		fmt.Fprintln(s.Out, "── Enhancing with AI... ─────────────────")
+func (session recordingSession) enhanceAndSave(ctx context.Context, transcript, notes string) error {
+	if session.service.Events == nil {
+		fmt.Fprintln(session.service.Out, "── Enhancing with AI... ─────────────────")
 	}
-	var runner enhancer = s.Pipeline
-	if s.enhancer != nil {
-		runner = s.enhancer
-	}
-	extraction, summary, err := runner.Run(ctx, transcript, notes)
+	extraction, summary, err := session.enhancer().Run(ctx, transcript, notes)
 	if err != nil {
-		return s.saveEnhanceFailure(meeting, transcript, err)
+		return session.saveEnhanceFailure(transcript, err)
 	}
-	meeting.Transcript = &transcript
-	meeting.Summary = &summary
-	setProcessingStatus(meeting, db.ProcessingStatusCompleted, nowUTC(), nil)
-	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("update meeting: %w", err)
-	}
-	if err := s.emit(EventCompleted, *meeting, nil); err != nil {
+	if err := session.saveEnhancement(transcript, summary); err != nil {
 		return err
 	}
-	if s.Events == nil {
-		printEnhancementResult(s, summary, len(extraction.ActionItems), meeting.ID)
+	if session.service.Events == nil {
+		printEnhancementResult(session.service, summary, len(extraction.ActionItems), session.meeting.ID)
 	}
 	return nil
+}
+
+func (session recordingSession) enhancer() enhancer {
+	if session.service.enhancer != nil {
+		return session.service.enhancer
+	}
+	return session.service.Pipeline
 }
 
 func printEnhancementResult(s Service, summary string, actionItems int, meetingID string) {
@@ -160,19 +169,6 @@ func printEnhancementResult(s Service, summary string, actionItems int, meetingI
 		fmt.Fprintf(s.Out, "\n● %d action items extracted.\n", actionItems)
 	}
 	fmt.Fprintf(s.Out, "● Saved: %s\n", meetingID)
-}
-
-func (s Service) saveEnhanceFailure(meeting *db.Meeting, transcript string, err error) error {
-	meeting.Transcript = &transcript
-	setProcessingStatus(meeting, db.ProcessingStatusFailed, nowUTC(), err)
-	updateErr := s.meetings().UpdateMeeting(meeting)
-	if updateErr != nil {
-		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
-	}
-	if emitErr := s.emit(EventFailed, *meeting, err); emitErr != nil {
-		return emitErr
-	}
-	return fmt.Errorf("enhance failed (transcript saved): %w", err)
 }
 
 func whisperModelNotFoundError(modelPath, defaultModelPath string) error {
