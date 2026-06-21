@@ -97,7 +97,8 @@ func (s Service) Run(req Request) error {
 	if err != nil {
 		return err
 	}
-	return s.record(req, meeting, sessionDir)
+	session := s.sessionFor(meeting, audioartifact.New(sessionDir))
+	return s.record(req, session, sessionDir)
 }
 
 func (s Service) meetings() meetingStore {
@@ -117,81 +118,58 @@ func (s Service) newRecorder(mode capture.CaptureMode, dir string, device int) a
 	return capture.NewRecorder(mode, dir, device)
 }
 
-func (s Service) record(req Request, meeting *db.Meeting, sessionDir string) error {
-	if s.Events == nil {
-		fmt.Fprintf(s.Out, "● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
-		fmt.Fprintf(s.Out, "  mode: %s, device: [%d]\n\n", req.Mode, req.DeviceIdx)
-	}
+func (s Service) record(req Request, session recordingSession, sessionDir string) error {
+	s.printRecordingStart(req, sessionDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 	recorder := s.newRecorder(req.Mode, sessionDir, req.DeviceIdx)
-	if err := recorder.Start(ctx); err != nil {
-		return s.FailCapture(meeting, err)
-	}
-	if err := s.emit(EventStarted, *meeting, nil); err != nil {
+	if err := s.startCapture(ctx, recorder, session); err != nil {
 		return err
 	}
-	stopHeartbeat := s.startCaptureHeartbeat(meeting)
-	if err := s.waitForStop(ctx, recorder, meeting); err != nil {
+	stopHeartbeat := s.startCaptureHeartbeat(session.meeting)
+	if err := s.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
 		return err
 	}
 	stopHeartbeat()
 	artifacts := audioartifact.FromPaths(recorder.MicPath(), recorder.SystemPath())
-	return s.finish(req, meeting, artifacts)
+	return session.withArtifacts(artifacts).finish(req)
 }
 
-func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, meeting *db.Meeting) error {
+func (s Service) printRecordingStart(req Request, sessionDir string) {
+	if s.Events != nil {
+		return
+	}
+	fmt.Fprintf(s.Out, "● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
+	fmt.Fprintf(s.Out, "  mode: %s, device: [%d]\n\n", req.Mode, req.DeviceIdx)
+}
+
+func (s Service) startCapture(ctx context.Context, recorder audioRecorder, session recordingSession) error {
+	if err := recorder.Start(ctx); err != nil {
+		return session.failCapture(err)
+	}
+	return s.emit(EventStarted, *session.meeting, nil)
+}
+
+func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, session recordingSession) error {
 	select {
 	case <-ctx.Done():
-		if s.Events == nil {
-			fmt.Fprintln(s.Out, "\n● Stopping...")
-		}
-		if err := s.emit(EventStopping, *meeting, nil); err != nil {
-			return err
-		}
-		if err := recorder.Stop(); err != nil {
-			fmt.Fprintf(s.ErrOut, "warning: capture did not exit cleanly: %v\n", err)
-			fmt.Fprintln(s.ErrOut, "  audio files may be incomplete")
-		}
+		return s.stopCapture(recorder, session)
 	case err := <-recorder.Done():
-		unexpectedErr := fmt.Errorf("capture stopped unexpectedly")
-		if err != nil {
-			unexpectedErr = fmt.Errorf("capture stopped unexpectedly: %w", err)
-		}
-		if failErr := s.FailCapture(meeting, unexpectedErr); failErr != nil {
-			return failErr
-		}
-		return unexpectedErr
+		return session.failUnexpectedCaptureStop(err)
 	}
-	return nil
 }
 
-func (s Service) finish(req Request, meeting *db.Meeting, artifacts audioartifact.Artifacts) error {
-	s.printRecorded(meeting.StartedAt)
-	now := nowUTC()
-	meeting.EndedAt = &now
-	if !artifacts.HasAudio() {
-		captureErr := fmt.Errorf("no audio captured")
-		if err := s.FailCapture(meeting, captureErr); err != nil {
-			return err
-		}
-		return captureErr
+func (s Service) stopCapture(recorder audioRecorder, session recordingSession) error {
+	if s.Events == nil {
+		fmt.Fprintln(s.Out, "\n● Stopping...")
 	}
-	setCaptureStatus(meeting, db.CaptureStatusCaptured, now, nil)
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, now, nil)
-	if err := s.meetings().UpdateMeeting(meeting); err != nil {
-		return fmt.Errorf("mark meeting captured: %w", err)
-	}
-	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
+	if err := s.emit(EventStopping, *session.meeting, nil); err != nil {
 		return err
 	}
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-	err := s.postProcess(ctx, meeting, artifacts, req.ModelPath, req.DefaultModelPath)
-	if err != nil && req.SuppressProcessingFailure {
-		fmt.Fprintf(s.ErrOut, "warning: post-processing failed after capture: %v\n", err)
-		return nil
+	if err := recorder.Stop(); err != nil {
+		fmt.Fprintf(s.ErrOut, "warning: capture did not exit cleanly: %v\n", err)
+		fmt.Fprintln(s.ErrOut, "  audio files may be incomplete")
 	}
-	return err
+	return nil
 }

@@ -72,10 +72,11 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if ok, err := s.claimStaleRecording(meeting, cutoff, opts.Now); !ok || err != nil {
 		return ok, err
 	}
+	session := s.sessionFor(meeting, audioartifact.New(*meeting.AudioPath))
 	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
 		return true, err
 	}
-	err := s.postProcess(ctx, meeting, audioartifact.New(*meeting.AudioPath), opts.ModelPath, opts.DefaultModelPath)
+	err := session.postProcess(ctx, opts.ModelPath, opts.DefaultModelPath)
 	if err != nil && opts.SuppressProcessingFailure {
 		if s.ErrOut != nil {
 			fmt.Fprintf(s.ErrOut, "warning: stale recording post-processing failed: %v\n", err)
