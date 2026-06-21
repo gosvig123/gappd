@@ -6,8 +6,11 @@ import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { dateLabel } from './today-model'
 
-const EXPAND_READING_LABEL = 'Expand'
-const COLLAPSE_READING_LABEL = 'Collapse'
+const EXPAND_READING_LABEL = 'More'
+const COLLAPSE_READING_LABEL = 'Less'
+const PREVIEW_CHARACTER_LIMIT = 700
+const PREVIEW_LINE_LIMIT = 8
+const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 const PROCESSING_STATUS = 'processing'
 const RECORDING_STATE = 'recording'
 const CAPTURED_STATE = 'captured'
@@ -40,27 +43,64 @@ function SummaryCopyButton({ summary }: { summary: string }) {
   return <Button className="compact-action" onClick={() => void copySummary()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy summary'}</Button>
 }
 
-function ReadingActions({ primary, value, expanded, onToggle }: { primary?: boolean; value: string; expanded: boolean; onToggle: () => void }) {
-  if (!primary && !value) return null
+function ReadingActions({ primary, value, expanded, expandable, onToggle }: { primary?: boolean; value: string; expanded: boolean; expandable: boolean; onToggle: () => void }) {
+  if (!primary && !expandable) return null
   return (
     <div className="reading-card-actions">
       {primary ? <SummaryCopyButton summary={value} /> : null}
-      {value ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
+      {expandable ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
     </div>
   )
 }
 
-function ReadingCard({ title, value, emptyText, primary, markdown }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean }) {
+function canExpandReading(value: string): boolean {
+  return value.length > PREVIEW_CHARACTER_LIMIT || value.split('\n').length > PREVIEW_LINE_LIMIT
+}
+
+function ReadingCard({ title, value, emptyText, primary, markdown, children }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean; children?: ReactNode }) {
   const [expanded, setExpanded] = useState(false)
+  const expandable = canExpandReading(value)
   const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
-  const textClassName = expanded ? 'reading-text' : 'reading-text reading-preview'
+  const textClassName = expanded || !expandable ? 'reading-text' : 'reading-text reading-preview'
+  const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
   useEffect(() => setExpanded(false), [value])
   return (
     <div className={className}>
-      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={expanded} onToggle={() => setExpanded((current) => !current)} /></div>
-      <div className={textClassName}>{value ? (markdown ? <Markdown value={value} /> : value) : emptyText}</div>
+      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={expanded} expandable={expandable} onToggle={() => setExpanded((current) => !current)} /></div>
+      <div className={textClassName}>{body}</div>
     </div>
   )
+}
+
+type TranscriptGroup = { speaker: string | null; lines: string[] }
+
+function TranscriptText({ value }: { value: string }) {
+  return <div className="transcript-groups">{transcriptGroups(value).map((group, index) => <TranscriptGroupView key={index} group={group} />)}</div>
+}
+
+function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
+  return (
+    <section className="transcript-group">
+      {group.speaker ? <div className="transcript-speaker">{group.speaker}</div> : null}
+      <div className="transcript-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div>
+    </section>
+  )
+}
+
+function transcriptGroups(value: string): TranscriptGroup[] {
+  return value.split('\n').reduce<TranscriptGroup[]>((groups, line) => appendTranscriptLine(groups, line), [])
+}
+
+function appendTranscriptLine(groups: TranscriptGroup[], line: string): TranscriptGroup[] {
+  const trimmed = line.trim()
+  if (!trimmed) return groups
+  const match = SPEAKER_LINE_PATTERN.exec(trimmed)
+  const speaker = match?.[1] ?? null
+  const text = match?.[2]?.trim() || trimmed
+  const previous = groups[groups.length - 1]
+  if (previous?.speaker === speaker) previous.lines.push(text)
+  else groups.push({ speaker, lines: [text] })
+  return groups
 }
 
 function DetailShell({ children }: { children: ReactNode }) {
@@ -74,44 +114,6 @@ function MeetingFailureState({ message }: { message?: string }) {
 
 function meetingIsProcessing(meeting: MeetingDetail): boolean {
   return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS
-}
-
-function ProcessingProgress({ meeting, hasTranscript }: { meeting: MeetingDetail; hasTranscript: boolean }) {
-  if (!meetingIsProcessing(meeting)) return null
-  return (
-    <div className="detail-surface processing-progress">
-      <div><div className="meeting-section-label">{processingLabel(meeting)}</div><p>{processingDetail(meeting, hasTranscript)}</p></div>
-      <ProcessingSteps meeting={meeting} hasTranscript={hasTranscript} />
-    </div>
-  )
-}
-
-function processingLabel(meeting: MeetingDetail): string {
-  return meeting.status.state === RECORDING_STATE ? 'Conversation recording' : 'Conversation processing'
-}
-
-function processingDetail(meeting: MeetingDetail, hasTranscript: boolean): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Recording now. Live transcript draft appears shortly after each audio chunk.'
-  if (hasTranscript) return 'Transcript saved. AI summary is still running.'
-  return 'Audio captured. Transcribing and creating AI summary now.'
-}
-
-function ProcessingSteps({ meeting, hasTranscript }: { meeting: MeetingDetail; hasTranscript: boolean }) {
-  const recording = meeting.status.state === RECORDING_STATE
-  const processing = meeting.status.processing.state === PROCESSING_STATUS
-  return (
-    <ol className="processing-steps">
-      <ProcessingStep active={recording} done={!recording}>Recording audio</ProcessingStep>
-      <ProcessingStep done={!recording}>Audio captured</ProcessingStep>
-      <ProcessingStep active={(recording || processing) && !hasTranscript} done={hasTranscript}>Transcript draft</ProcessingStep>
-      <ProcessingStep active={processing && hasTranscript}>Creating AI summary</ProcessingStep>
-    </ol>
-  )
-}
-
-function ProcessingStep({ children, active, done }: { children: ReactNode; active?: boolean; done?: boolean }) {
-  const className = done ? 'done' : active ? 'active' : undefined
-  return <li className={className}>{children}</li>
 }
 
 function MeetingDetailMeta({ selectedMeeting }: { selectedMeeting: MeetingDetail }) {
@@ -149,7 +151,6 @@ function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { se
 function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
-  const processing = meetingIsProcessing(selectedMeeting)
   return (
     <Panel className="detail-panel">
       <div className="panel-header compact meeting-detail-header">
@@ -159,9 +160,8 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
         <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-        <ProcessingProgress meeting={selectedMeeting} hasTranscript={hasTranscript} />
-        <ReadingCard title="AI summary" value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(processing)} primary markdown />
-        <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(processing)} />
+        {hasSummary ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText="" primary markdown /> : null}
+        <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)}><TranscriptText value={transcript} /></ReadingCard>
         {SHOW_DIAGNOSTICS ? <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} /> : null}
       </div>
     </Panel>
@@ -169,19 +169,20 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
 }
 
 function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean, hasSummary: boolean): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Recording with live transcript draft.'
-  if (meetingIsProcessing(meeting)) return 'Processing transcript and AI summary.'
-  if (hasSummary || hasTranscript) return 'Ready to review.'
-  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured. Processing has not started.'
+  if (meeting.status.state === RECORDING_STATE && hasTranscript) return 'Live transcript on.'
+  if (meeting.status.state === RECORDING_STATE) return 'Recording · transcript starts soon.'
+  if (meetingIsProcessing(meeting) && hasTranscript) return 'Transcript ready · summary running.'
+  if (meetingIsProcessing(meeting)) return 'Transcribing audio.'
+  if (hasSummary) return 'Summary ready.'
+  if (hasTranscript) return 'Transcript ready.'
+  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured.'
   return 'Analysis and transcript for selected meeting.'
 }
 
-function summaryEmptyText(processing: boolean): string {
-  return processing ? 'Summary appears after transcript processing finishes.' : 'No AI summary yet.'
-}
-
-function transcriptEmptyText(processing: boolean): string {
-  return processing ? 'Transcript is being prepared from captured audio.' : 'No transcript yet.'
+function transcriptEmptyText(meeting: MeetingDetail): string {
+  if (meeting.status.state === RECORDING_STATE) return 'Listening… transcript starts after first audio chunk.'
+  if (meetingIsProcessing(meeting)) return 'Transcribing audio…'
+  return 'No transcript yet.'
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {

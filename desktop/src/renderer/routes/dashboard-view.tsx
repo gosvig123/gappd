@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
 import { meetingStatusLabel, meetingStatusTone } from '../components/meeting-status'
 import { EmptyState, ListRow, PageHeader, Panel, StatusPill } from '../components/ui'
@@ -6,19 +5,7 @@ import { MeetingDetailPanel } from './meeting-detail-view'
 import { CaptureCard } from './today-cards'
 import './meetings.css'
 import './today.css'
-import { buildInboxCounts, dateLabel, EMPTY_TITLE, filterInboxMeetings, INBOX_ALL, INBOX_FILTERS, INBOX_PROCESSING, INBOX_READY, type InboxCounts, type InboxFilter } from './today-model'
-
-const INBOX_LABELS: Record<InboxFilter, string> = {
-  [INBOX_READY]: 'Ready',
-  [INBOX_PROCESSING]: 'Processing',
-  [INBOX_ALL]: 'All',
-}
-
-const INBOX_EMPTY: Record<InboxFilter, string> = {
-  [INBOX_READY]: 'No summaries or transcripts ready yet.',
-  [INBOX_PROCESSING]: 'No meetings processing now.',
-  [INBOX_ALL]: 'Recorded meetings appear here.',
-}
+import { dateLabel, EMPTY_TITLE } from './today-model'
 
 const MEETING_CAPTURED = 'captured'
 const MEETING_RECORDING = 'recording'
@@ -43,14 +30,11 @@ type DashboardViewProps = {
 }
 
 export function DashboardView(props: DashboardViewProps) {
-  const [filter, setFilter] = useState<InboxFilter>(INBOX_ALL)
-  const counts = useMemo(() => buildInboxCounts(props.meetings), [props.meetings])
-  const meetings = useMemo(() => filterInboxMeetings(props.meetings, filter), [filter, props.meetings])
   return (
     <div className="dashboard-grid ui-density-compact">
       <CaptureCard {...props} />
       <div className="dashboard-workspace">
-        <MeetingInboxPanel counts={counts} filter={filter} meetings={meetings} selectedMeetingId={props.selectedMeetingId} totalMeetings={props.meetings.length} onFilterChange={setFilter} onSelectMeeting={props.onSelectMeeting} />
+        <MeetingInboxPanel meetings={props.meetings} selectedMeetingId={props.selectedMeetingId} onSelectMeeting={props.onSelectMeeting} />
         <div className="dashboard-detail-column">
           <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} />
         </div>
@@ -59,25 +43,16 @@ export function DashboardView(props: DashboardViewProps) {
   )
 }
 
-function MeetingInboxPanel(props: { counts: InboxCounts; filter: InboxFilter; meetings: MeetingListItem[]; selectedMeetingId: string | null; totalMeetings: number; onFilterChange: (filter: InboxFilter) => void; onSelectMeeting: (id: string) => void }) {
-  const visibleText = `${props.meetings.length} of ${props.totalMeetings} meetings shown`
+function MeetingInboxPanel(props: { meetings: MeetingListItem[]; selectedMeetingId: string | null; onSelectMeeting: (id: string) => void }) {
+  const visibleText = `${props.meetings.length} meetings shown`
   return (
     <Panel className="list-panel dashboard-inbox-panel">
       <PageHeader className="compact inbox-panel-header" title="Meeting inbox" description={visibleText} />
-      <FilterChips counts={props.counts} value={props.filter} onChange={props.onFilterChange} />
       <div className="meeting-list">
         {props.meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === props.selectedMeetingId} onSelect={props.onSelectMeeting} />)}
-        {props.meetings.length === 0 ? <EmptyState className="meetings-empty">{INBOX_EMPTY[props.filter]}</EmptyState> : null}
+        {props.meetings.length === 0 ? <EmptyState className="meetings-empty">Recorded meetings appear here.</EmptyState> : null}
       </div>
     </Panel>
-  )
-}
-
-function FilterChips({ counts, value, onChange }: { counts: InboxCounts; value: InboxFilter; onChange: (filter: InboxFilter) => void }) {
-  return (
-    <div className="filter-chips" aria-label="Meeting filters">
-      {INBOX_FILTERS.map((filter) => <button key={filter} className={filter === value ? 'filter-chip active' : 'filter-chip'} onClick={() => onChange(filter)} aria-pressed={filter === value}>{INBOX_LABELS[filter]} <span>{counts[filter]}</span></button>)}
-    </div>
   )
 }
 
