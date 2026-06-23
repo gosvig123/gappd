@@ -1,8 +1,8 @@
 {
   "ollama": {
-    "release": "v0.20.5",
+    "release": "v0.30.10",
     "artifact": "ollama-darwin.tgz",
-    "sha256": "71773629d3581d75b18411a0cba80b2f6e7d9021855bb3c9f34ad4e0fb4b33a0"
+    "sha256": "ad8a4d2918ed09480b8160419570602b4f49e48c9e3792efb601c0f54619e48e"
   },
   "whisper": {
     "release": "v1.7.6",

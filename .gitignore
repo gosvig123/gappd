@@ -45,7 +45,7 @@ Thumbs.db
 /gappd
 # Desktop Ollama artifacts
 desktop/.cache/ollama/
-desktop/resources/ollama/ollama
+desktop/resources/ollama/
 desktop/.cache/whisper/
 desktop/resources/whisper/whisper-cli
 desktop/release/
