@@ -451,7 +451,7 @@ func checkMicPermission() {
 func checkScreenRecordingPermission() {
     if CGPreflightScreenCaptureAccess() { return }
     _ = CGRequestScreenCaptureAccess()
-    stderrPrint("error: Screen Recording access required for system audio capture.\n  A System Settings window should have opened — enable GappdCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen Recording → enable GappdCapture")
+    stderrPrint("error: Screen & System Audio Recording access required for system audio capture.\n  A System Settings window should have opened — enable GappdCapture, then re-run.\n  Manual path: System Settings → Privacy & Security → Screen & System Audio Recording → enable GappdCapture")
     exit(126)
 }
 

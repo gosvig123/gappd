@@ -171,8 +171,8 @@ async function openPermissionsSettings(state: DashboardState, setState: SetDashb
 
 async function permissionSettingsTarget(error: string | null) {
   const permissions = await window.gappd.system.requestCapturePermissions()
-  if (isPermissionDeniedState(permissions.microphone)) return 'microphone'
-  if (isPermissionDeniedState(permissions.screen)) return 'screen-recording'
+  if (permissions.screen !== 'granted') return 'screen-recording'
+  if (permissions.microphone !== 'granted') return 'microphone'
   return permissionTarget(error)
 }
 
@@ -181,10 +181,10 @@ function capturePermissionError(permissions: Awaited<ReturnType<typeof window.ga
   const screenDenied = isPermissionDeniedState(permissions.screen)
   const microphoneGranted = permissions.microphone === 'granted'
   const screenGranted = permissions.screen === 'granted'
-  if ((!microphoneGranted && !microphoneDenied) || (!screenGranted && !screenDenied)) return 'Could not confirm microphone and screen recording permissions. Try again, then check System Settings if the problem continues.'
-  if (microphoneDenied && screenDenied) return 'Microphone and Screen Recording access denied. Enable GappdCapture in System Settings to record.'
+  if ((!microphoneGranted && !microphoneDenied) || (!screenGranted && !screenDenied)) return 'Could not confirm microphone and screen/system audio permissions. Try again, then check System Settings if the problem continues.'
+  if (microphoneDenied && screenDenied) return 'Microphone and Screen & System Audio Recording access denied. Enable GappdCapture in System Settings to record.'
   if (microphoneDenied) return 'Microphone access denied. Enable GappdCapture in System Settings to record.'
-  if (screenDenied) return 'Screen Recording access required. Enable GappdCapture in System Settings to capture system audio.'
+  if (screenDenied) return 'Screen & System Audio Recording access required. Enable GappdCapture in System Settings to capture system audio.'
   return null
 }
 
