@@ -1,5 +1,4 @@
-import { chmod, copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises'
-import os from 'node:os'
+import { chmod, mkdir, rm } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { downloadFile, fileSha256, runCommand } from './bundle-utils.mjs'
@@ -10,15 +9,14 @@ const url = `https://github.com/ollama/ollama/releases/download/${release}/${art
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const cacheDir = path.join(root, '.cache', 'ollama', release)
 const archivePath = path.join(cacheDir, artifact)
-const cacheBinaryPath = path.join(cacheDir, 'ollama')
 const outputDir = path.join(root, 'resources', 'ollama')
-const outputPath = path.join(outputDir, 'ollama')
+const executableNames = ['ollama', 'llama-server', 'llama-quantize']
 
 await mkdir(cacheDir, { recursive: true })
 await mkdir(outputDir, { recursive: true })
 
 if (!(await hasMatchingArchive())) await downloadFile({ url, outputPath: archivePath, sha256, label: 'Ollama archive' })
-await extractBinary()
+await extractRuntime()
 
 async function hasMatchingArchive() {
   try {
@@ -28,18 +26,18 @@ async function hasMatchingArchive() {
   }
 }
 
-async function extractBinary() {
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'gappd-ollama-'))
-  try {
-    runCommand('tar', ['-xzf', archivePath, '-C', tempDir], 'Failed to extract Ollama archive')
-    await copyExecutable(path.join(tempDir, 'ollama'), cacheBinaryPath)
-    await copyExecutable(cacheBinaryPath, outputPath)
-  } finally {
-    await rm(tempDir, { recursive: true, force: true })
-  }
+async function extractRuntime() {
+  await extractArchive(cacheDir, false)
+  await extractArchive(outputDir, true)
 }
 
-async function copyExecutable(source, target) {
-  await copyFile(source, target)
-  await chmod(target, 0o755)
+async function extractArchive(targetDir, clean) {
+  if (clean) await rm(targetDir, { recursive: true, force: true })
+  await mkdir(targetDir, { recursive: true })
+  runCommand('tar', ['-xzf', archivePath, '-C', targetDir], 'Failed to extract Ollama archive')
+  await markExecutables(targetDir)
+}
+
+async function markExecutables(targetDir) {
+  for (const name of executableNames) await chmod(path.join(targetDir, name), 0o755)
 }

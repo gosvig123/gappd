@@ -14,7 +14,7 @@ module.exports = {
   extraResources: [
     { from: '../build/gappd', to: 'bin/gappd' },
     { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
-    { from: 'resources/ollama/ollama', to: 'ollama/ollama' },
+    { from: 'resources/ollama', to: 'ollama' },
     { from: 'resources/whisper/whisper-cli', to: 'whisper/whisper-cli' },
   ],
   afterPack: hooks.afterPack,
