@@ -22,17 +22,17 @@ type OnboardingErrorView = {
 
 const PULL_STAGE_VIEWS: Record<NonNullable<OnboardingStatus['pullStage']>, OnboardingMessageView> = {
   preparing: { headline: 'Preparing download', compact: 'Preparing download.' },
-  downloading: { headline: 'Downloading model', compact: 'Downloading model.' },
-  verifying: { headline: 'Verifying download', compact: 'Verifying download.' },
-  finalizing: { headline: 'Finishing model install', compact: 'Finishing install.' },
+  downloading: { headline: 'Downloading tools', compact: 'Downloading tools.' },
+  verifying: { headline: 'Checking download', compact: 'Checking download.' },
+  finalizing: { headline: 'Finishing install', compact: 'Finishing install.' },
   complete: { headline: 'Download complete', compact: 'Download complete.' },
 }
 
 const ERROR_VIEWS: Record<NonNullable<OnboardingStatus['errorKind']>, Omit<OnboardingErrorView, 'debugDetail' | 'ownershipHelp'>> = {
-  pull_timeout: { title: 'Model download timed out.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download timed out.' },
-  pull_network: { title: 'Model download interrupted.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download interrupted.' },
-  pull_blob_host_network: { title: 'Gappd could not reach the model download host.', detail: 'Check VPN, firewall, or network filtering on this Mac, then retry Local AI setup.', compact: 'Model host unavailable.' },
-  disk_space: { title: 'Not enough disk space for the model.', detail: 'Free some space on this Mac, then retry Local AI setup.', compact: 'Need more disk space.' },
+  pull_timeout: { title: 'Download took too long.', detail: 'Check your connection, then click Fix setup.', compact: 'Download timed out.' },
+  pull_network: { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' },
+  pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Fix setup.', compact: 'Download host unavailable.' },
+  disk_space: { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' },
   permission: { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' },
   ownership_mismatch: { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.' },
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },
@@ -57,12 +57,12 @@ export function getLocalAIContract(): LocalAIContract {
 export function onboardingPhaseLabel(phase: OnboardingStatus['phase']): string {
   switch (phase) {
     case 'checking': return 'Checking'
-    case 'needs_setup': return 'Needs setup'
-    case 'starting_ollama': return 'Starting Ollama'
-    case 'pulling_model': return 'Pulling model'
-    case 'saving_config': return 'Saving config'
+    case 'needs_setup': return 'Setup needed'
+    case 'starting_ollama': return 'Starting'
+    case 'pulling_model': return 'Downloading'
+    case 'saving_config': return 'Finishing'
     case 'ready': return 'Ready'
-    case 'error': return 'Error'
+    case 'error': return 'Needs attention'
   }
 }
 
@@ -135,8 +135,8 @@ function structuredErrorView(status: Pick<OnboardingStatus, 'debugDetail' | 'err
 function legacyErrorView(error: string | undefined): OnboardingErrorView | null {
   const text = cleanErrorText(error)
   if (!text) return null
-  if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Model download interrupted.', detail: 'Check your connection, then retry Local AI setup.', compact: 'Download interrupted.' }
-  if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space for the model.', detail: 'Free some space on this Mac, then retry Local AI setup.', compact: 'Need more disk space.' }
+  if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' }
+  if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' }
   if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
   if (matchesText(text, ['another ollama process', 'app-owned runtime', '127.0.0.1:11435', 'address already in use'])) return { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.', ownershipHelp: buildOwnershipHelp(undefined) }
   return matchesText(text, ['spawn', 'listen', 'whisper']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
