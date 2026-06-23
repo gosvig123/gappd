@@ -182,7 +182,7 @@ function PermissionSetupCard({ status, state, onOpenSettings, onReset }: { statu
 }
 
 function PermissionButtons({ onOpenSettings, onReset }: { onOpenSettings: (target: CapturePermissionTarget) => void; onReset: () => void }) {
-  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button><Button onClick={onReset}>Reset mic prompt</Button></div>
+  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button><Button onClick={onReset}>Reset permission prompts</Button></div>
 }
 
 function PermissionDebug({ state }: { state: SetupPermissionState }) {
