@@ -16,8 +16,6 @@
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
-    <key>LSUIElement</key>
-    <true/>
     <key>NSAudioCaptureUsageDescription</key>
     <string>gappd captures system audio to transcribe your meetings</string>
     <key>NSMicrophoneUsageDescription</key>

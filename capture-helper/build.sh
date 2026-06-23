@@ -35,6 +35,7 @@ build_arch_binary() {
     swiftc \
         -O \
         -target "${arch}-apple-macos${MACOS_MIN_VERSION}" \
+        -framework AppKit \
         -framework AVFoundation \
         -framework ScreenCaptureKit \
         -framework CoreMedia \
