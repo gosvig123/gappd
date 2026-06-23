@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { systemPreferences } from 'electron'
 import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { RecordingEvent } from '../shared/generated/contracts'
 import type { CapturePermissions } from '../shared/ipc-contract'
@@ -19,17 +20,40 @@ let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
 let staleRecoveryRunning = false
 
-export function requestCapturePermissions(): Promise<CapturePermissions> {
+export async function requestCapturePermissions(): Promise<CapturePermissions> {
+  // The capture helper runs as a child of this app, so macOS TCC attributes the
+  // helper's microphone request to the responsible process — this Electron app.
+  // If the app has never been granted microphone access the helper's request
+  // resolves to "denied" without ever showing a prompt. Request access here so
+  // the prompt appears as "Gappd" (the app the user recognizes) and the helper
+  // inherits the grant.
+  const appMicStatusBefore = await ensureAppMicrophoneAccess()
   return new Promise((resolve) => {
     const tmpFile = path.join(os.tmpdir(), `gappd-perms-${Date.now()}.json`)
     const command = capturePermissionCommand(tmpFile)
-    const details = capturePermissionDetails(command)
+    const details = { ...capturePermissionDetails(command), ...appMicStatusBefore }
     let stderr = ''
     const child = spawn(command.bin, command.args, { env: capturePermissionEnv(), stdio: ['ignore', 'ignore', 'pipe'] })
     child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
     child.on('close', (code) => resolvePermissionResult(tmpFile, resolve, { ...details, exitCode: String(code ?? ''), stderr: stderr.trim() }))
     child.on('error', (error) => resolve({ microphone: 'unknown', screen: 'unknown', details: { ...details, error: error.message } }))
   })
+}
+
+// Requests microphone access for this app (dev.gappd.desktop) on macOS. The app
+// is the TCC-responsible process for the capture helper, so granting it here is
+// what lets the helper record. Returns debug fields describing the transition.
+async function ensureAppMicrophoneAccess(): Promise<Record<string, string>> {
+  if (process.platform !== 'darwin') return {}
+  const before = systemPreferences.getMediaAccessStatus('microphone')
+  if (before !== 'not-determined') return { appMicStatusBefore: before, appMicStatusAfter: before }
+  let granted = false
+  try {
+    granted = await systemPreferences.askForMediaAccess('microphone')
+  } catch (error) {
+    return { appMicStatusBefore: before, appMicStatusAfter: 'error', appMicError: String(error) }
+  }
+  return { appMicStatusBefore: before, appMicStatusAfter: granted ? 'granted' : 'denied' }
 }
 
 export async function resetCapturePermissions(): Promise<CapturePermissions> {
