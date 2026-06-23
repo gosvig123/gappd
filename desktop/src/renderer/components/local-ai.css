@@ -91,10 +91,26 @@
   padding: var(--space-5);
 }
 
-.permission-actions {
+.permission-actions,
+.permission-debug {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.permission-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.permission-debug {
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+}
+
+.permission-debug div {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 10rem minmax(0, 1fr);
+  overflow-wrap: anywhere;
 }
 
 .setup-actions {

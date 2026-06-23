@@ -33,7 +33,17 @@ export function useSetupPermissions(enabled: boolean) {
     }
   }
 
-  return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request, openSettings }
+  async function reset() {
+    if (!enabled) return
+    setState({ status: 'checking', permissions: state.permissions })
+    try {
+      setState(permissionState(await window.gappd.system.resetCapturePermissions()))
+    } catch (err) {
+      setState({ status: 'error', permissions: state.permissions, error: err instanceof Error ? err.message : String(err) })
+    }
+  }
+
+  return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request, openSettings, reset }
 }
 
 function permissionState(permissions: CapturePermissions): SetupPermissionState {

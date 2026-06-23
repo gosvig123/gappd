@@ -26,6 +26,11 @@ module.exports = {
     identity: MAC_SIGNING_IDENTITY,
     hardenedRuntime: true,
     gatekeeperAssess: false,
+    extendInfo: {
+      NSAudioCaptureUsageDescription: 'Gappd captures system audio to transcribe your meetings.',
+      NSMicrophoneUsageDescription: 'Gappd captures your microphone to transcribe your voice.',
+      NSScreenCaptureUsageDescription: 'Gappd uses screen capture to access system audio for meeting transcription.',
+    },
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',
   },

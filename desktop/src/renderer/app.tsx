@@ -42,7 +42,7 @@ function ReadyApp({ dashboard }: { dashboard: ReturnType<typeof useDashboardData
 }
 
 function OnboardingApp({ onboarding, permissions }: { onboarding: ReturnType<typeof useOnboarding>; permissions: ReturnType<typeof useSetupPermissions> }) {
-  return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} onRequestPermissions={() => void permissions.request()} onOpenPermissionsSettings={(target) => void permissions.openSettings(target)} /></div>
+  return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} onRequestPermissions={() => void permissions.request()} onOpenPermissionsSettings={(target) => void permissions.openSettings(target)} onResetPermissions={() => void permissions.reset()} /></div>
 }
 
 async function downloadUpdate(download: ReturnType<typeof useUpdateStatus>['downloadUpdate'], reportError: (message: string) => void) {
