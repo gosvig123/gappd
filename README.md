@@ -137,7 +137,7 @@ The CLI does not bundle Whisper or Ollama. For `gappd listen` and AI commands,
 provide these separately:
 
 - Whisper CLI binary in `PATH`, or set `GAPPD_WHISPER_BIN`
-- Whisper model at `~/.gappd/models/ggml-base.en.bin`, or pass `--model`
+- Whisper model at `~/.gappd/models/ggml-small.en-q5_1.bin`, or pass `--model`
 - Ollama running locally with configured model available, for example `llama3.1:8b`
 
 ## CLI commands
@@ -158,7 +158,7 @@ Notes:
 - There is no global `--json` output mode.
 - `gappd summarize` is an alias for running the AI pipeline on an existing meeting.
 - `gappd listen` stops with `Ctrl+C`.
-- If no model path is provided to `gappd listen`, it looks for a Whisper model at `~/.gappd/models/ggml-base.en.bin`.
+- If no model path is provided to `gappd listen`, it looks for a Whisper model at `~/.gappd/models/ggml-small.en-q5_1.bin`.
 
 ## CLI quick start
 
