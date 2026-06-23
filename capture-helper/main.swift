@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import AVFoundation
 import ScreenCaptureKit
 import CoreGraphics
@@ -402,12 +403,7 @@ func stderrPrint(_ message: String) {
 
 func requestPermissionsAndExit(outputPath: String? = nil) {
     let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
-    if micBefore == .notDetermined {
-        let sema = DispatchSemaphore(value: 0)
-        AVCaptureDevice.requestAccess(for: .audio) { _ in sema.signal() }
-        sema.wait()
-    }
-    let micAfter = AVCaptureDevice.authorizationStatus(for: .audio)
+    let micAfter = requestMicrophoneAccessIfNeeded(micBefore)
     let screenBefore = CGPreflightScreenCaptureAccess()
     if !screenBefore { _ = CGRequestScreenCaptureAccess() }
     let screenAfter = CGPreflightScreenCaptureAccess()
@@ -439,16 +435,27 @@ func authorizationName(_ status: AVAuthorizationStatus) -> String {
     }
 }
 
+func requestMicrophoneAccessIfNeeded(_ status: AVAuthorizationStatus) -> AVAuthorizationStatus {
+    guard status == .notDetermined else { return status }
+    activateForPermissionPrompt()
+    var finished = false
+    AVCaptureDevice.requestAccess(for: .audio) { _ in finished = true }
+    while !finished { RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1)) }
+    return AVCaptureDevice.authorizationStatus(for: .audio)
+}
+
+func activateForPermissionPrompt() {
+    NSApplication.shared.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+}
+
 func checkMicPermission() {
     let status = AVCaptureDevice.authorizationStatus(for: .audio)
     switch status {
     case .authorized:
         return
     case .notDetermined:
-        let sema = DispatchSemaphore(value: 0)
-        AVCaptureDevice.requestAccess(for: .audio) { _ in sema.signal() }
-        sema.wait()
-        if AVCaptureDevice.authorizationStatus(for: .audio) != .authorized {
+        if requestMicrophoneAccessIfNeeded(status) != .authorized {
             stderrPrint("error: Microphone access denied.\n  Grant permission: System Settings → Privacy & Security → Microphone → enable GappdCapture")
             exit(126)
         }
