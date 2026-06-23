@@ -13,6 +13,7 @@
 
 ## Release workflow inputs
 
+- `release_tag`: existing `v*` tag for manual release runs
 - `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application certificate
 - `APPLE_CERTIFICATE_PASSWORD`: password for the `.p12`
 - `APPLE_SIGNING_IDENTITY`: full codesign identity name
