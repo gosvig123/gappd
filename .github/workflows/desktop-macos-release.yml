@@ -2,9 +2,12 @@ name: Desktop macOS Release
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing v* tag to publish
+        required: true
+        type: string
   push:
-    branches:
-      - main
     tags:
       - 'v*'
 
@@ -12,22 +15,34 @@ permissions:
   contents: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: macos-14
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-      CONTINUOUS_RELEASE_TAG: main-latest
-      CONTINUOUS_RELEASE_NAME: Gappd main latest
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Validate release tag
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            v*) ;;
+            *)
+              echo "Release tag must start with v, got: $RELEASE_TAG" >&2
+              echo "Use a v* tag such as v0.1.0." >&2
+              exit 1
+              ;;
+          esac
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -112,29 +127,11 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
-      - name: Set continuous release version
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          VERSION="$(node - <<'NODE'
-          const pkg = require('./package.json')
-          const [major, minor] = pkg.version.split('.')
-          console.log(`${Number(major)}.${Number(minor)}.${process.env.GITHUB_RUN_NUMBER}`)
-          NODE
-          )"
-          npm version "$VERSION" --no-git-tag-version
-          echo "GAPPD_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "Continuous release version: $VERSION"
-        working-directory: desktop
-
       - name: Build release artifacts
         run: |
           export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
           export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$GITHUB_REF" = "refs/heads/main" ]; then
-            npm run dist:mac:arm64
-          else
-            npm run dist
-          fi
+          npm run dist
         working-directory: desktop
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -170,86 +167,61 @@ jobs:
           printf 'Found app bundle: %s\n' "${app_paths[@]}"
           printf 'Found DMG: %s\n' "${dmg_paths[@]}"
 
-      - name: Write continuous release manifest
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Write release manifest
         run: |
           shopt -s nullglob
           dmg_paths=(desktop/release/*.dmg)
           if [ ${#dmg_paths[@]} -ne 1 ]; then
-            echo "Expected exactly one DMG for continuous release, found ${#dmg_paths[@]}" >&2
+            echo "Expected exactly one DMG for release, found ${#dmg_paths[@]}" >&2
             exit 1
           fi
 
-          mkdir -p desktop/release/continuous
-          cp "${dmg_paths[0]}" desktop/release/continuous/Gappd-main-latest-arm64.dmg
-          export DMG_NAME="Gappd-main-latest-arm64.dmg"
-          export DMG_SHA256="$(shasum -a 256 "desktop/release/continuous/$DMG_NAME" | awk '{print $1}')"
+          export DMG_NAME="$(basename "${dmg_paths[0]}")"
+          export DMG_SHA256="$(shasum -a 256 "${dmg_paths[0]}" | awk '{print $1}')"
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
           from urllib.parse import quote
 
-          tag = os.environ['CONTINUOUS_RELEASE_TAG']
+          tag = os.environ['RELEASE_TAG']
           repo = os.environ['GITHUB_REPOSITORY']
-          version = os.environ['GAPPD_RELEASE_VERSION']
+          version = tag.removeprefix('v')
           dmg_name = os.environ['DMG_NAME']
           release_url = f'https://github.com/{repo}/releases/tag/{tag}'
           download_url = f'https://github.com/{repo}/releases/download/{tag}/{quote(dmg_name)}'
-          Path('desktop/release/continuous/latest.json').write_text(json.dumps({
+          Path('desktop/release/latest.json').write_text(json.dumps({
             'version': version,
-            'channel': 'main',
+            'channel': 'stable',
             'minVersion': '0.1.0',
             'releaseUrl': release_url,
             'downloadUrl': download_url,
             'sha256': os.environ['DMG_SHA256'],
           }, indent=2) + '\n')
           PY
-          cat desktop/release/continuous/latest.json
+          cat desktop/release/latest.json
 
-      - name: Publish continuous release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Publish release
         run: |
           set -euo pipefail
-          if [ "$CONTINUOUS_RELEASE_TAG" != "main-latest" ]; then
-            echo "Refusing to force-push unexpected release tag: $CONTINUOUS_RELEASE_TAG" >&2
-            exit 1
-          fi
-
-          auth_remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags "$auth_remote" main
-          remote_main_sha="$(git rev-parse FETCH_HEAD)"
-          if [ "$GITHUB_SHA" != "$remote_main_sha" ]; then
-            echo "Skipping stale continuous release for $GITHUB_SHA; origin/main is $remote_main_sha."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # main-latest is intentionally moving metadata for in-app update checks.
-          # Force is limited to this guarded CI-owned tag, not human version tags.
-          git tag -f "$CONTINUOUS_RELEASE_TAG" "$GITHUB_SHA"
-          git push "$auth_remote" "refs/tags/$CONTINUOUS_RELEASE_TAG:refs/tags/$CONTINUOUS_RELEASE_TAG" --force
-
           if [ "$GAPPD_SIGNED_RELEASE" = "1" ]; then
             release_kind="signed and notarized"
           else
             release_kind="unsigned development"
           fi
-          notes="Continuous macOS arm64 $release_kind build from main at $GITHUB_SHA. Version $GAPPD_RELEASE_VERSION."
-          if gh release view "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$CONTINUOUS_RELEASE_NAME" --notes "$notes"
+          notes="Gappd macOS $release_kind build for $RELEASE_TAG."
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "Gappd $RELEASE_TAG" --notes "$notes"
           else
-            gh release create "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$CONTINUOUS_RELEASE_NAME" --notes "$notes" --latest=false --target "$GITHUB_SHA"
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "Gappd $RELEASE_TAG" --notes "$notes" --verify-tag
           fi
 
-          gh release view "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
             case "$asset" in
-              *.dmg|latest.json) gh release delete-asset "$CONTINUOUS_RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
+              *.dmg|latest.json) gh release delete-asset "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
             esac
           done
-          gh release upload "$CONTINUOUS_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" desktop/release/continuous/Gappd-main-latest-arm64.dmg desktop/release/continuous/latest.json --clobber
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" desktop/release/*.dmg desktop/release/latest.json --clobber
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -260,5 +232,5 @@ jobs:
           if-no-files-found: error
           path: |
             desktop/release/*.dmg
-            desktop/release/continuous/**
+            desktop/release/latest.json
             desktop/release/mac*/**
