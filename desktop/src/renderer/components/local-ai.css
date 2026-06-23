@@ -91,6 +91,12 @@
   padding: var(--space-5);
 }
 
+.permission-actions {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .setup-actions {
   display: grid;
   grid-area: actions;
