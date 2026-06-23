@@ -15,6 +15,7 @@ const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
 const CAPTURE_BUNDLE_ID = 'dev.gappd.capture'
 const DESKTOP_BUNDLE_ID = 'dev.gappd.desktop'
 const MICROPHONE_TCC_SERVICE = 'Microphone'
+const SCREEN_CAPTURE_TCC_SERVICE = 'ScreenCapture'
 
 let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
@@ -57,7 +58,12 @@ async function ensureAppMicrophoneAccess(): Promise<Record<string, string>> {
 }
 
 export async function resetCapturePermissions(): Promise<CapturePermissions> {
-  await Promise.all([resetTcc(MICROPHONE_TCC_SERVICE, CAPTURE_BUNDLE_ID), resetTcc(MICROPHONE_TCC_SERVICE, DESKTOP_BUNDLE_ID)])
+  await Promise.all([
+    resetTcc(MICROPHONE_TCC_SERVICE, CAPTURE_BUNDLE_ID),
+    resetTcc(MICROPHONE_TCC_SERVICE, DESKTOP_BUNDLE_ID),
+    resetTcc(SCREEN_CAPTURE_TCC_SERVICE, CAPTURE_BUNDLE_ID),
+    resetTcc(SCREEN_CAPTURE_TCC_SERVICE, DESKTOP_BUNDLE_ID),
+  ])
   return requestCapturePermissions()
 }
 
