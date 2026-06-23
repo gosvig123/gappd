@@ -112,7 +112,7 @@ export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperB
 }
 
 export function missingManagedWhisperModelMessage(): string {
-  return 'Bundled speech model is missing. Run setup to download it again.'
+  return 'Speech tool missing. Click Fix setup to download it.'
 }
 
 async function fileSha256IfExists(filePath: string): Promise<string | null> {
