@@ -5,6 +5,7 @@ export const IPC_CHANNELS = {
   system: {
     getDevices: 'system:getDevices',
     requestCapturePermissions: 'system:requestCapturePermissions',
+    resetCapturePermissions: 'system:resetCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
   },
   meetings: {
@@ -43,7 +44,8 @@ export const IPC_EVENTS = {
 } as const
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
-export type CapturePermissions = { microphone: string; screen: string }
+export type CapturePermissionDetails = Record<string, string>
+export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title: string; device: number; mode: string; modelPath?: string }
 export type OnboardingSetupInput = { model?: string }
 
@@ -51,6 +53,7 @@ export type GappdApi = {
   system: {
     getDevices(): Promise<Device[]>
     requestCapturePermissions(): Promise<CapturePermissions>
+    resetCapturePermissions(): Promise<CapturePermissions>
     openPermissionsSettings(target?: CapturePermissionTarget): Promise<void>
   }
   meetings: {

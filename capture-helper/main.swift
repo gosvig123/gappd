@@ -401,30 +401,42 @@ func stderrPrint(_ message: String) {
 }
 
 func requestPermissionsAndExit(outputPath: String? = nil) {
-    // Request mic — shows native dialog if not yet determined
-    let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-    if micStatus == .notDetermined {
+    let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
+    if micBefore == .notDetermined {
         let sema = DispatchSemaphore(value: 0)
         AVCaptureDevice.requestAccess(for: .audio) { _ in sema.signal() }
         sema.wait()
     }
-    let micGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+    let micAfter = AVCaptureDevice.authorizationStatus(for: .audio)
+    let screenBefore = CGPreflightScreenCaptureAccess()
+    if !screenBefore { _ = CGRequestScreenCaptureAccess() }
+    let screenAfter = CGPreflightScreenCaptureAccess()
 
-    // Request screen recording — shows native dialog if not yet determined
-    if !CGPreflightScreenCaptureAccess() {
-        _ = CGRequestScreenCaptureAccess()
-    }
-    let screenGranted = CGPreflightScreenCaptureAccess()
-
-    let micStr = micGranted ? "granted" : "denied"
-    let screenStr = screenGranted ? "granted" : "denied"
-    let json = "{\"microphone\":\"\(micStr)\",\"screen\":\"\(screenStr)\"}"
+    let json = permissionJSON(micBefore: micBefore, micAfter: micAfter, screenBefore: screenBefore, screenAfter: screenAfter)
     if let path = outputPath {
         try? json.write(toFile: path, atomically: true, encoding: .utf8)
     } else {
         print(json)
     }
-    exit(micGranted && screenGranted ? 0 : 126)
+    exit(micAfter == .authorized && screenAfter ? 0 : 126)
+}
+
+func permissionJSON(micBefore: AVAuthorizationStatus, micAfter: AVAuthorizationStatus, screenBefore: Bool, screenAfter: Bool) -> String {
+    let micStr = micAfter == .authorized ? "granted" : "denied"
+    let screenStr = screenAfter ? "granted" : "denied"
+    let screenBeforeStr = screenBefore ? "granted" : "denied"
+    let screenAfterStr = screenAfter ? "granted" : "denied"
+    return "{\"microphone\":\"\(micStr)\",\"screen\":\"\(screenStr)\",\"microphoneStatusBefore\":\"\(authorizationName(micBefore))\",\"microphoneStatusAfter\":\"\(authorizationName(micAfter))\",\"screenStatusBefore\":\"\(screenBeforeStr)\",\"screenStatusAfter\":\"\(screenAfterStr)\"}"
+}
+
+func authorizationName(_ status: AVAuthorizationStatus) -> String {
+    switch status {
+    case .authorized: return "authorized"
+    case .denied: return "denied"
+    case .notDetermined: return "notDetermined"
+    case .restricted: return "restricted"
+    @unknown default: return "unknown"
+    }
 }
 
 func checkMicPermission() {

@@ -24,6 +24,7 @@ type OnboardingViewProps = {
   onRetry: () => void
   onRequestPermissions: () => void
   onOpenPermissionsSettings: (target?: CapturePermissionTarget) => void
+  onResetPermissions: () => void
 }
 
 type SetupActionsProps = {
@@ -167,20 +168,27 @@ function stepIcon(state: SetupStepState): string {
   return '○'
 }
 
-function PermissionSetupCard({ status, state, onOpenSettings }: { status: OnboardingStatus; state: SetupPermissionState; onOpenSettings: (target?: CapturePermissionTarget) => void }) {
+function PermissionSetupCard({ status, state, onOpenSettings, onReset }: { status: OnboardingStatus; state: SetupPermissionState; onOpenSettings: (target?: CapturePermissionTarget) => void; onReset: () => void }) {
   if (status.phase !== 'ready') return null
   const needsSettings = state.status === 'blocked' || state.status === 'unknown' || state.status === 'error'
   return (
     <Card className="setup-permissions">
       <div><div className="label">Recording access</div><h3>{permissionTitle(state)}</h3></div>
       <p>{permissionDetail(state)}</p>
-      {needsSettings ? <PermissionButtons onOpenSettings={onOpenSettings} /> : null}
+      {needsSettings ? <PermissionButtons onOpenSettings={onOpenSettings} onReset={onReset} /> : null}
+      <PermissionDebug state={state} />
     </Card>
   )
 }
 
-function PermissionButtons({ onOpenSettings }: { onOpenSettings: (target: CapturePermissionTarget) => void }) {
-  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button></div>
+function PermissionButtons({ onOpenSettings, onReset }: { onOpenSettings: (target: CapturePermissionTarget) => void; onReset: () => void }) {
+  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button><Button onClick={onReset}>Reset mic prompt</Button></div>
+}
+
+function PermissionDebug({ state }: { state: SetupPermissionState }) {
+  const details = state.permissions?.details
+  if (!details) return null
+  return <details className="permission-debug"><summary>Permission debug</summary>{Object.entries(details).map(([key, value]) => <div key={key}><strong>{key}</strong><span>{value || 'empty'}</span></div>)}</details>
 }
 
 function permissionTitle(state: SetupPermissionState): string {
@@ -238,7 +246,7 @@ function SetupBody(props: OnboardingViewProps & { copy: OnboardingPhaseCopy }) {
       <SetupHero copy={props.copy} />
       <SetupChecklist status={props.status} permissionState={props.permissionState} />
       {props.status.phase !== 'ready' ? <SetupProgressCard status={props.status} copy={props.copy} /> : null}
-      <PermissionSetupCard status={props.status} state={props.permissionState} onOpenSettings={props.onOpenPermissionsSettings} />
+      <PermissionSetupCard status={props.status} state={props.permissionState} onOpenSettings={props.onOpenPermissionsSettings} onReset={props.onResetPermissions} />
       <SetupActions busy={props.busy} disabled={view.disabled} label={view.label} hint={view.hint} onAction={view.action} />
       {view.error ? <LocalAIErrorBanner errorView={view.error} /> : null}
       <SetupAdvancedDetails {...props} />

@@ -4,25 +4,37 @@ import os from 'node:os'
 import path from 'node:path'
 import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { RecordingEvent } from '../shared/generated/contracts'
+import type { CapturePermissions } from '../shared/ipc-contract'
 import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
+const CAPTURE_BUNDLE_ID = 'dev.gappd.capture'
+const DESKTOP_BUNDLE_ID = 'dev.gappd.desktop'
+const MICROPHONE_TCC_SERVICE = 'Microphone'
 
 let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
 let staleRecoveryRunning = false
 
-export function requestCapturePermissions(): Promise<{ microphone: string; screen: string }> {
+export function requestCapturePermissions(): Promise<CapturePermissions> {
   return new Promise((resolve) => {
     const tmpFile = path.join(os.tmpdir(), `gappd-perms-${Date.now()}.json`)
     const command = capturePermissionCommand(tmpFile)
-    const child = spawn(command.bin, command.args, { env: capturePermissionEnv(), stdio: ['ignore', 'ignore', 'ignore'] })
-    child.on('close', () => resolvePermissionResult(tmpFile, resolve))
-    child.on('error', () => resolve({ microphone: 'unknown', screen: 'unknown' }))
+    const details = capturePermissionDetails(command)
+    let stderr = ''
+    const child = spawn(command.bin, command.args, { env: capturePermissionEnv(), stdio: ['ignore', 'ignore', 'pipe'] })
+    child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
+    child.on('close', (code) => resolvePermissionResult(tmpFile, resolve, { ...details, exitCode: String(code ?? ''), stderr: stderr.trim() }))
+    child.on('error', (error) => resolve({ microphone: 'unknown', screen: 'unknown', details: { ...details, error: error.message } }))
   })
+}
+
+export async function resetCapturePermissions(): Promise<CapturePermissions> {
+  await Promise.all([resetTcc(MICROPHONE_TCC_SERVICE, CAPTURE_BUNDLE_ID), resetTcc(MICROPHONE_TCC_SERVICE, DESKTOP_BUNDLE_ID)])
+  return requestCapturePermissions()
 }
 
 function capturePermissionCommand(tmpFile: string): { bin: string; args: string[] } {
@@ -33,6 +45,26 @@ function capturePermissionCommand(tmpFile: string): { bin: string; args: string[
 
 function capturePermissionEnv(): NodeJS.ProcessEnv {
   return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary() })
+}
+
+function capturePermissionDetails(command: { bin: string; args: string[] }): Record<string, string> {
+  const appPath = resolveCaptureApp() ?? ''
+  const helperPath = resolveCaptureBinary()
+  return {
+    launch: [command.bin, ...command.args].join(' '),
+    appPath,
+    helperPath,
+    appExists: String(Boolean(appPath && fs.existsSync(appPath))),
+    helperExists: String(fs.existsSync(helperPath)),
+  }
+}
+
+function resetTcc(service: string, bundleID: string): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawn('/usr/bin/tccutil', ['reset', service, bundleID], { stdio: 'ignore' })
+    child.on('close', () => resolve())
+    child.on('error', () => resolve())
+  })
 }
 
 export async function getDevices(): Promise<Device[]> {
@@ -89,14 +121,19 @@ export function stopRecording(): void {
   recordingChild.kill('SIGINT')
 }
 
-function resolvePermissionResult(tmpFile: string, resolve: (value: { microphone: string; screen: string }) => void): void {
+function resolvePermissionResult(tmpFile: string, resolve: (value: CapturePermissions) => void, details: Record<string, string>): void {
   try {
-    resolve(JSON.parse(fs.readFileSync(tmpFile, 'utf8')))
+    const result = JSON.parse(fs.readFileSync(tmpFile, 'utf8'))
+    resolve({ ...result, details: cleanPermissionDetails({ ...details, ...result }) })
   } catch {
-    resolve({ microphone: 'unknown', screen: 'unknown' })
+    resolve({ microphone: 'unknown', screen: 'unknown', details })
   } finally {
     try { fs.unlinkSync(tmpFile) } catch {}
   }
+}
+
+function cleanPermissionDetails(details: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'microphone' && key !== 'screen'))
 }
 
 async function runStaleRecordingRecovery(): Promise<void> {
