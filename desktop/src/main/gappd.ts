@@ -5,7 +5,7 @@ import path from 'node:path'
 import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { RecordingEvent } from '../shared/generated/contracts'
 import { requestCommand, streamCommand } from './app-protocol'
-import { childEnv, resolveCaptureBinary } from './native-runtime'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
@@ -17,12 +17,22 @@ let staleRecoveryRunning = false
 
 export function requestCapturePermissions(): Promise<{ microphone: string; screen: string }> {
   return new Promise((resolve) => {
-    const bin = resolveCaptureBinary()
     const tmpFile = path.join(os.tmpdir(), `gappd-perms-${Date.now()}.json`)
-    const child = spawn(bin, ['--request-permissions', '--output', tmpFile], { env: childEnv({ GAPPD_CAPTURE_HELPER_PATH: bin }), stdio: ['ignore', 'ignore', 'ignore'] })
+    const command = capturePermissionCommand(tmpFile)
+    const child = spawn(command.bin, command.args, { env: capturePermissionEnv(), stdio: ['ignore', 'ignore', 'ignore'] })
     child.on('close', () => resolvePermissionResult(tmpFile, resolve))
     child.on('error', () => resolve({ microphone: 'unknown', screen: 'unknown' }))
   })
+}
+
+function capturePermissionCommand(tmpFile: string): { bin: string; args: string[] } {
+  const appPath = resolveCaptureApp()
+  if (appPath) return { bin: '/usr/bin/open', args: ['-W', '-n', appPath, '--args', '--request-permissions', '--output', tmpFile] }
+  return { bin: resolveCaptureBinary(), args: ['--request-permissions', '--output', tmpFile] }
+}
+
+function capturePermissionEnv(): NodeJS.ProcessEnv {
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary() })
 }
 
 export async function getDevices(): Promise<Device[]> {

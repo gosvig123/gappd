@@ -12,6 +12,7 @@ struct Config {
     let outputDir: String
     let sampleRate: Double
     let deviceIndex: Int?
+    let stopFile: String?
 }
 
 func parseArgs() -> Config {
@@ -19,6 +20,7 @@ func parseArgs() -> Config {
     var outputDir = "."
     var sampleRate = 16000.0
     var deviceIndex: Int? = nil
+    var stopFile: String? = nil
 
     let args = CommandLine.arguments
     var i = 1
@@ -32,6 +34,8 @@ func parseArgs() -> Config {
             i += 1; sampleRate = Double(args[i]) ?? 16000.0
         case "--device":
             i += 1; deviceIndex = Int(args[i])
+        case "--stop-file":
+            i += 1; stopFile = args[i]
         case "--list-devices":
             listDevices(); exit(0)
         case "--request-permissions":
@@ -48,7 +52,7 @@ func parseArgs() -> Config {
         }
         i += 1
     }
-    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex)
+    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex, stopFile: stopFile)
 }
 
 func printUsage() {
@@ -63,6 +67,7 @@ func printUsage() {
       --output-dir <path>       Directory for output files
       --sample-rate <hz>        Sample rate (default: 16000)
       --device <index>          Mic device index
+      --stop-file <path>        Stop when this file appears
       --list-devices            List available audio input devices
       --help                    Show this help
 
@@ -450,6 +455,15 @@ func checkScreenRecordingPermission() {
     exit(126)
 }
 
+func watchStopFile(_ path: String, stopSemaphore: DispatchSemaphore) {
+    DispatchQueue.global().async {
+        while true {
+            if FileManager.default.fileExists(atPath: path) { stopSemaphore.signal(); return }
+            Thread.sleep(forTimeInterval: 0.25)
+        }
+    }
+}
+
 // MARK: - Main
 
 let config = parseArgs()
@@ -476,6 +490,10 @@ sigintSource.setEventHandler {
     stopSemaphore.signal()
 }
 sigintSource.resume()
+
+if let stopFile = config.stopFile {
+    watchStopFile(stopFile, stopSemaphore: stopSemaphore)
+}
 
 if let mic = micRecorder {
     let micPath = (config.outputDir as NSString).appendingPathComponent("mic.wav")
