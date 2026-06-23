@@ -22,12 +22,12 @@ export function useSetupPermissions(enabled: boolean) {
     }
   }
 
-  async function openSettings() {
+  async function openSettings(target?: CapturePermissionTarget) {
     if (!enabled) return
     try {
       const permissions = await window.gappd.system.requestCapturePermissions()
       setState(permissionState(permissions))
-      await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
+      await window.gappd.system.openPermissionsSettings(target ?? permissionTarget(permissions))
     } catch (err) {
       setState({ status: 'error', permissions: state.permissions, error: err instanceof Error ? err.message : String(err) })
     }

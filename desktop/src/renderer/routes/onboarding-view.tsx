@@ -10,6 +10,7 @@ import {
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 import { Button, Card, Field, MetricCard, PageHeader, Panel, ProgressBar, StatusPill, cx } from '../components/ui'
 import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
+import type { CapturePermissionTarget } from '../../shared/ipc-contract'
 import type { SetupPermissionState } from '../hooks/use-setup-permissions'
 
 type OnboardingViewProps = {
@@ -22,7 +23,7 @@ type OnboardingViewProps = {
   onStart: () => void
   onRetry: () => void
   onRequestPermissions: () => void
-  onOpenPermissionsSettings: () => void
+  onOpenPermissionsSettings: (target?: CapturePermissionTarget) => void
 }
 
 type SetupActionsProps = {
@@ -166,16 +167,20 @@ function stepIcon(state: SetupStepState): string {
   return '○'
 }
 
-function PermissionSetupCard({ status, state, onOpenSettings }: { status: OnboardingStatus; state: SetupPermissionState; onOpenSettings: () => void }) {
+function PermissionSetupCard({ status, state, onOpenSettings }: { status: OnboardingStatus; state: SetupPermissionState; onOpenSettings: (target?: CapturePermissionTarget) => void }) {
   if (status.phase !== 'ready') return null
   const needsSettings = state.status === 'blocked' || state.status === 'unknown' || state.status === 'error'
   return (
     <Card className="setup-permissions">
       <div><div className="label">Recording access</div><h3>{permissionTitle(state)}</h3></div>
       <p>{permissionDetail(state)}</p>
-      {needsSettings ? <Button onClick={onOpenSettings}>Open System Settings</Button> : null}
+      {needsSettings ? <PermissionButtons onOpenSettings={onOpenSettings} /> : null}
     </Card>
   )
+}
+
+function PermissionButtons({ onOpenSettings }: { onOpenSettings: (target: CapturePermissionTarget) => void }) {
+  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button></div>
 }
 
 function permissionTitle(state: SetupPermissionState): string {
