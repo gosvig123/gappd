@@ -91,7 +91,7 @@ function primaryActionLabel(status: OnboardingStatus, permission: SetupPermissio
   if (permission.status === 'checking') return 'Checking permissions...'
   if (permission.status === 'granted') return 'Start using Gappd'
   if (permission.status === 'blocked' || permission.status === 'unknown' || permission.status === 'error') return 'Check again'
-  return 'Allow microphone & screen'
+  return 'Allow microphone & screen/audio'
 }
 
 function setupAction(status: OnboardingStatus, permission: SetupPermissionState, onStart: () => void, onRetry: () => void, onRequestPermissions: () => void): () => void {
@@ -153,10 +153,10 @@ function setupSteps(status: OnboardingStatus, permission: SetupPermissionState):
 }
 
 function permissionStep(aiReady: boolean, permission: SetupPermissionState): SetupStep {
-  if (!aiReady) return { label: 'Allow recording access', detail: 'Microphone and screen prompts come next', state: 'locked' }
+  if (!aiReady) return { label: 'Allow recording access', detail: 'Microphone and screen/system audio prompts come next', state: 'locked' }
   if (permission.status === 'granted') return { label: 'Allow recording access', detail: 'Done', state: 'done' }
   if (permission.status === 'blocked' || permission.status === 'error') return { label: 'Allow recording access', detail: 'Needs System Settings', state: 'blocked' }
-  return { label: 'Allow recording access', detail: 'Microphone and screen recording', state: 'active' }
+  return { label: 'Allow recording access', detail: 'Microphone and screen/system audio', state: 'active' }
 }
 
 function stepIcon(state: SetupStepState): string {
@@ -180,14 +180,14 @@ function PermissionSetupCard({ status, state, onOpenSettings }: { status: Onboar
 
 function permissionTitle(state: SetupPermissionState): string {
   if (state.status === 'granted') return 'Access ready.'
-  if (state.status === 'checking') return 'Checking microphone and screen access.'
+  if (state.status === 'checking') return 'Checking microphone and screen/system audio access.'
   if (state.status === 'blocked') return 'Permission blocked.'
   if (state.status === 'unknown' || state.status === 'error') return 'Could not confirm access.'
-  return 'Allow microphone and screen recording.'
+  return 'Allow microphone and screen/system audio.'
 }
 
 function permissionDetail(state: SetupPermissionState): string {
-  if (state.status === 'blocked') return 'Enable GappdCapture in Privacy & Security, then click Check again.'
+  if (state.status === 'blocked') return 'Enable GappdCapture in Screen & System Audio Recording and Microphone, then click Check again.'
   if (state.status === 'unknown') return 'macOS did not give a clear answer. Check again or open System Settings.'
   if (state.status === 'error') return state.error || 'Permission check failed. Open System Settings, then check again.'
   return 'Gappd asks now so recording does not stop when you start your first meeting.'

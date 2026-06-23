@@ -4,6 +4,7 @@ const permissionErrorHints = [
   'permission denied',
   'microphone access denied',
   'screen recording access required',
+  'screen & system audio recording access required',
   'grant permission:',
   'privacy & security',
 ]
@@ -63,7 +64,7 @@ export function isPermissionErrorMessage(message: string | null | undefined): bo
 export function permissionTarget(message: string | null | undefined): 'microphone' | 'screen-recording' | undefined {
   if (!message) return undefined
   const normalized = message.toLowerCase()
+  if (normalized.includes('screen recording') || normalized.includes('screen & system audio')) return 'screen-recording'
   if (normalized.includes('microphone')) return 'microphone'
-  if (normalized.includes('screen recording')) return 'screen-recording'
   return undefined
 }

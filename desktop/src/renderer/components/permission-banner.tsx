@@ -18,5 +18,5 @@ function PermissionActions({ onRetry, onOpenSettings }: Pick<PermissionBannerPro
 
 function permissionBody(error: string, isPermissionError: boolean) {
   if (!isPermissionError) return error
-  return <>{error}<div>Open System Settings registers GappdCapture first, then opens the correct macOS Privacy &amp; Security pane. Enable GappdCapture, then try again. Screen Recording changes may require quitting and reopening the app before retrying.</div></>
+  return <>{error}<div>Open System Settings registers GappdCapture first, then opens Screen &amp; System Audio Recording or Microphone. Enable GappdCapture, then try again. Screen &amp; System Audio changes may require quitting and reopening the app before retrying.</div></>
 }

@@ -23,7 +23,14 @@ export function useSetupPermissions(enabled: boolean) {
   }
 
   async function openSettings() {
-    await window.gappd.system.openPermissionsSettings(permissionTarget(state.permissions))
+    if (!enabled) return
+    try {
+      const permissions = await window.gappd.system.requestCapturePermissions()
+      setState(permissionState(permissions))
+      await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
+    } catch (err) {
+      setState({ status: 'error', permissions: state.permissions, error: err instanceof Error ? err.message : String(err) })
+    }
   }
 
   return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request, openSettings }
@@ -36,8 +43,8 @@ function permissionState(permissions: CapturePermissions): SetupPermissionState 
 }
 
 function permissionTarget(permissions?: CapturePermissions): CapturePermissionTarget | undefined {
-  if (!permissions || isDenied(permissions.microphone) || permissions.microphone !== 'granted') return 'microphone'
-  if (isDenied(permissions.screen) || permissions.screen !== 'granted') return 'screen-recording'
+  if (!permissions || permissions.screen !== 'granted') return 'screen-recording'
+  if (permissions.microphone !== 'granted') return 'microphone'
   return undefined
 }
 

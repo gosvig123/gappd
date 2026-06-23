@@ -1,3 +1,4 @@
+import os from 'node:os'
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC_CHANNELS, IPC_EVENTS, type CapturePermissionTarget, type OnboardingSetupInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
@@ -5,20 +6,24 @@ import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repair
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, openUpdatePage } from './update'
 
+const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
+const LEGACY_PRIVACY_SECURITY_PANE = 'com.apple.preference.security'
+const MODERN_PRIVACY_SECURITY_PANE = 'com.apple.settings.PrivacySecurity.extension'
+const PRIVACY_MAIN_ANCHOR = 'Privacy'
+const PRIVACY_MICROPHONE_ANCHOR = 'Privacy_Microphone'
+const PRIVACY_SCREEN_CAPTURE_ANCHOR = 'Privacy_ScreenCapture'
+const PRIVACY_ANCHORS: Record<CapturePermissionTarget, string> = {
+  'microphone': PRIVACY_MICROPHONE_ANCHOR,
+  'screen-recording': PRIVACY_SCREEN_CAPTURE_ANCHOR,
+}
+
 let registered = false
 
 export function registerIpc(mainWindow: BrowserWindow): void {
   if (!registered) {
     ipcMain.handle(IPC_CHANNELS.system.getDevices, () => getDevices())
     ipcMain.handle(IPC_CHANNELS.system.requestCapturePermissions, () => requestCapturePermissions())
-    ipcMain.handle(IPC_CHANNELS.system.openPermissionsSettings, async (_event, target?: CapturePermissionTarget) => {
-      const urls: Record<CapturePermissionTarget, string> = {
-        'microphone': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
-        'screen-recording': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
-      }
-      const url = (target && urls[target]) ?? 'x-apple.systempreferences:com.apple.preference.security'
-      await shell.openExternal(url, { activate: true })
-    })
+    ipcMain.handle(IPC_CHANNELS.system.openPermissionsSettings, (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target))
     ipcMain.handle(IPC_CHANNELS.meetings.list, () => listMeetings())
     ipcMain.handle(IPC_CHANNELS.meetings.show, (_event, id: string) => showMeeting(id))
     ipcMain.handle(IPC_CHANNELS.recording.start, async (_event, input: StartRecordingInput) => {
@@ -44,6 +49,30 @@ export function registerIpc(mainWindow: BrowserWindow): void {
 
   forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange)
   forwardToWindow(mainWindow, IPC_EVENTS.onboarding.statusChanged, onOnboardingStatusChange)
+}
+
+function privacySettingsUrl(target?: CapturePermissionTarget): string {
+  const anchor = target ? PRIVACY_ANCHORS[target] : legacyPrivacyAnchor()
+  const suffix = anchor ? `?${anchor}` : ''
+  return `x-apple.systempreferences:${privacySecurityPane()}${suffix}`
+}
+
+function privacySecurityPane(): string {
+  return usesModernPrivacyPane() ? MODERN_PRIVACY_SECURITY_PANE : LEGACY_PRIVACY_SECURITY_PANE
+}
+
+function legacyPrivacyAnchor(): string {
+  return usesModernPrivacyPane() ? '' : PRIVACY_MAIN_ANCHOR
+}
+
+function usesModernPrivacyPane(): boolean {
+  if (process.platform !== 'darwin') return true
+  const darwinMajor = Number.parseInt(os.release().split('.')[0] ?? '', 10)
+  return Number.isNaN(darwinMajor) || darwinMajor >= SYSTEM_SETTINGS_DARWIN_MAJOR
+}
+
+async function openPermissionsSettings(target?: CapturePermissionTarget): Promise<void> {
+  await shell.openExternal(privacySettingsUrl(target), { activate: true })
 }
 
 function forwardToWindow<T>(mainWindow: BrowserWindow, channel: string, subscribe: (listener: (state: T) => void) => () => void): void {
