@@ -1,10 +1,11 @@
 import { app, shell } from 'electron'
-import { DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateDownloadResult, type UpdateStatus } from '../shared/contracts'
+import { BETA_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateDownloadResult, type UpdateStatus } from '../shared/contracts'
 import { downloadUpdateArtifact } from './update-download'
 import { selectUpdateRelease, type UpdateContext, type UpdateRelease } from './update-manifest'
 import { isNewerVersion, isVersionAtLeast } from './update-version'
 
 const DEFAULT_UPDATE_CHECK_URL = 'https://github.com/gosvig123/gappd/releases/latest/download/latest.json'
+const BETA_UPDATE_CHECK_URL = 'https://github.com/gosvig123/gappd/releases/download/beta/latest.json'
 const DEFAULT_RELEASE_URL = 'https://github.com/gosvig123/gappd/releases/latest'
 const UPDATE_CHECK_URL_ENV = 'GAPPD_UPDATE_CHECK_URL'
 const UPDATE_CHANNEL_ENV = 'GAPPD_UPDATE_CHANNEL'
@@ -64,10 +65,11 @@ async function fetchRelease(context: UpdateContext): Promise<UpdateRelease | nul
 }
 
 function updateContext(): UpdateContext {
-  const sourceUrl = updateCheckUrl()
+  const channel = updateChannel(app.getVersion())
+  const sourceUrl = updateCheckUrl(channel)
   return {
     arch: process.arch,
-    channel: updateChannel(),
+    channel,
     defaultReleaseUrl: DEFAULT_RELEASE_URL,
     defaultUpdateUrl: DEFAULT_UPDATE_CHECK_URL,
     platform: process.platform,
@@ -75,14 +77,19 @@ function updateContext(): UpdateContext {
   }
 }
 
-function updateCheckUrl(): string {
-  const rawUrl = process.env[UPDATE_CHECK_URL_ENV]?.trim() || DEFAULT_UPDATE_CHECK_URL
+function updateCheckUrl(channel: UpdateChannel): string {
+  const rawUrl = process.env[UPDATE_CHECK_URL_ENV]?.trim() || defaultUpdateCheckUrl(channel)
   return httpsUrl(rawUrl, 'Update check URL must use https.')
 }
 
-function updateChannel(): UpdateChannel {
+function defaultUpdateCheckUrl(channel: UpdateChannel): string {
+  return channel === BETA_UPDATE_CHANNEL ? BETA_UPDATE_CHECK_URL : DEFAULT_UPDATE_CHECK_URL
+}
+
+function updateChannel(currentVersion: string): UpdateChannel {
   const rawChannel = process.env[UPDATE_CHANNEL_ENV]?.trim()
-  return isUpdateChannel(rawChannel) ? rawChannel : DEFAULT_UPDATE_CHANNEL
+  if (isUpdateChannel(rawChannel)) return rawChannel
+  return currentVersion.includes('-beta.') ? BETA_UPDATE_CHANNEL : DEFAULT_UPDATE_CHANNEL
 }
 
 async function availableUpdateStatus(): Promise<Extract<UpdateStatus, { available: true }>> {
