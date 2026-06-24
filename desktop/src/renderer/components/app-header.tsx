@@ -25,6 +25,7 @@ export function AppHeader(props: AppHeaderProps) {
 
 function UpdateControls(props: AppHeaderProps) {
   if (props.settingsOpen || !props.updateStatus?.available) return null
-  const title = `${UPDATE_LABEL} to v${props.updateStatus.latestVersion}`
-  return <button className="app-control update-control" onClick={props.onDownloadUpdate} disabled={props.updateDownloading} aria-label={title} title={title}>⇧<span>{props.updateDownloading ? 'Updating…' : UPDATE_LABEL}</span></button>
+  const title = props.updateStatus.name ?? `${UPDATE_LABEL} to v${props.updateStatus.latestVersion}`
+  const label = props.updateDownloading ? 'Updating…' : `v${props.updateStatus.latestVersion}`
+  return <button className="app-control update-control" onClick={props.onDownloadUpdate} disabled={props.updateDownloading} aria-label={title} title={title}>⇧<span>{label}</span></button>
 }
