@@ -74,12 +74,15 @@ The updater accepts legacy flat JSON plus schema-2 channel manifests, then picks
 matching `platform-arch` assets such as `darwin-arm64` or `darwin-universal`.
 Offline or failed checks are ignored so the app remains usable.
 
-The macOS release workflow publishes only from `v*` tag pushes or manual runs
-with an existing `v*` tag. It writes `latest.json` with schema-2 channels and
-legacy top-level fields so older apps can still update.
+The macOS release workflow publishes stable builds only from manual runs with
+an existing `v*` tag. Pushes to the `beta` branch publish prerelease builds named
+`v<next-version>-beta.<run-number>`. Each run writes `latest.json` with schema-2
+channels and legacy top-level fields so older apps can still update.
 
-Set `GAPPD_UPDATE_CHECK_URL` to test a different manifest. Set
-`GAPPD_UPDATE_CHANNEL=beta` to read the beta channel instead of stable.
+Beta release assets appear under GitHub Releases as prereleases. Beta builds
+read `https://github.com/gosvig123/gappd/releases/download/beta/latest.json` by
+default, which points at the newest versioned beta prerelease. Set
+`GAPPD_UPDATE_CHECK_URL` or `GAPPD_UPDATE_CHANNEL` only to override this.
 
 ## CLI install
 

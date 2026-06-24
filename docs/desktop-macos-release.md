@@ -13,7 +13,11 @@
 
 ## Release workflow inputs
 
-- `release_tag`: existing `v*` tag for manual release runs
+- Manual workflow runs publish stable releases from an existing `v*` tag
+- Pushes to `beta` publish prereleases named `v<next-version>-beta.<run-number>` from the pushed commit
+- Beta builds use prerelease package versions while keeping macOS bundle/build versions numeric
+- Beta pushes also update the mutable `beta` release's `latest.json` so beta apps can find the newest prerelease
+- `release_tag`: existing `vMAJOR.MINOR.PATCH` tag for manual stable release runs
 - `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application certificate
 - `APPLE_CERTIFICATE_PASSWORD`: password for the `.p12`
 - `APPLE_SIGNING_IDENTITY`: full codesign identity name
