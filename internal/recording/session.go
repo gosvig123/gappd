@@ -28,8 +28,7 @@ func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recor
 
 func (r recordingSession) failCapture(captureErr error) error {
 	now := nowUTC()
-	r.meeting.EndedAt = &now
-	setCaptureStatus(r.meeting, db.CaptureStatusFailed, now, captureErr)
+	lifecycleFor(r.meeting).captureFailed(now, captureErr)
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("mark meeting capture failed: %w", err)
 	}
@@ -81,9 +80,7 @@ func (r recordingSession) process(req Request) error {
 }
 
 func (r recordingSession) markCaptured(at string) error {
-	r.meeting.EndedAt = &at
-	setCaptureStatus(r.meeting, db.CaptureStatusCaptured, at, nil)
-	setProcessingStatus(r.meeting, db.ProcessingStatusProcessing, at, nil)
+	lifecycleFor(r.meeting).captured(at)
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("mark meeting captured: %w", err)
 	}
@@ -92,10 +89,7 @@ func (r recordingSession) markCaptured(at string) error {
 
 func (r recordingSession) saveProcessingFailure(origErr error) error {
 	now := nowUTC()
-	if r.meeting.EndedAt == nil {
-		r.meeting.EndedAt = &now
-	}
-	setProcessingStatus(r.meeting, db.ProcessingStatusFailed, now, origErr)
+	lifecycleFor(r.meeting).processingFailed(now, origErr)
 	updateErr := r.service.meetings().UpdateMeeting(r.meeting)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", updateErr))
@@ -114,7 +108,7 @@ func (r recordingSession) emitProcessingFailure(origErr error) error {
 }
 
 func (r recordingSession) markProcessing() error {
-	setProcessingStatus(r.meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
+	lifecycleFor(r.meeting).processingStarted(nowUTC())
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("mark meeting processing: %w", err)
 	}
@@ -122,8 +116,7 @@ func (r recordingSession) markProcessing() error {
 }
 
 func (r recordingSession) saveTranscript(transcript string) error {
-	r.meeting.Transcript = &transcript
-	setProcessingStatus(r.meeting, db.ProcessingStatusProcessing, nowUTC(), nil)
+	lifecycleFor(r.meeting).transcriptSaved(transcript, nowUTC())
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("save transcript: %w", err)
 	}
@@ -131,9 +124,7 @@ func (r recordingSession) saveTranscript(transcript string) error {
 }
 
 func (r recordingSession) saveEnhancement(transcript, summary string) error {
-	r.meeting.Transcript = &transcript
-	r.meeting.Summary = &summary
-	setProcessingStatus(r.meeting, db.ProcessingStatusCompleted, nowUTC(), nil)
+	lifecycleFor(r.meeting).processingCompleted(transcript, summary, nowUTC())
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}
@@ -141,8 +132,7 @@ func (r recordingSession) saveEnhancement(transcript, summary string) error {
 }
 
 func (r recordingSession) saveEnhanceFailure(transcript string, err error) error {
-	r.meeting.Transcript = &transcript
-	setProcessingStatus(r.meeting, db.ProcessingStatusFailed, nowUTC(), err)
+	lifecycleFor(r.meeting).enhancementFailed(transcript, nowUTC(), err)
 	updateErr := r.service.meetings().UpdateMeeting(r.meeting)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))

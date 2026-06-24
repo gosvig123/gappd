@@ -128,14 +128,25 @@ func (d *DB) ListStaleRecordingMeetings(cutoff string, limit int) ([]Meeting, er
 }
 
 func (d *DB) ClaimStaleRecordingForProcessing(id, cutoff, endedAt string) (bool, error) {
-	result, err := d.Conn.Exec(`UPDATE meetings SET ended_at = COALESCE(ended_at, ?), capture_status = ?, capture_status_updated_at = ?, capture_failure_message = NULL, processing_status = ?, processing_status_updated_at = ?, processing_failure_message = NULL WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`, endedAt, CaptureStatusCaptured, endedAt, ProcessingStatusProcessing, endedAt, id, CaptureStatusRecording, cutoff)
+	result, err := d.Conn.Exec(claimStaleRecordingSQL, endedAt, CaptureStatusCaptured, endedAt,
+		ProcessingStatusProcessing, endedAt, id, CaptureStatusRecording, cutoff)
 	return changed(result, err, "claim stale recording for processing")
 }
 
 func (d *DB) FailStaleRecording(id, cutoff, endedAt, message string) (bool, error) {
-	result, err := d.Conn.Exec(`UPDATE meetings SET ended_at = COALESCE(ended_at, ?), capture_status = ?, capture_status_updated_at = ?, capture_failure_message = ? WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`, endedAt, CaptureStatusFailed, endedAt, message, id, CaptureStatusRecording, cutoff)
+	result, err := d.Conn.Exec(failStaleRecordingSQL, endedAt, CaptureStatusFailed, endedAt, message,
+		id, CaptureStatusRecording, cutoff)
 	return changed(result, err, "fail stale recording")
 }
+
+const claimStaleRecordingSQL = `UPDATE meetings SET ended_at = COALESCE(ended_at, ?),
+	capture_status = ?, capture_status_updated_at = ?, capture_failure_message = NULL,
+	processing_status = ?, processing_status_updated_at = ?, processing_failure_message = NULL
+	WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`
+
+const failStaleRecordingSQL = `UPDATE meetings SET ended_at = COALESCE(ended_at, ?),
+	capture_status = ?, capture_status_updated_at = ?, capture_failure_message = ?
+	WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`
 
 func changed(result sql.Result, err error, operation string) (bool, error) {
 	if err != nil {
