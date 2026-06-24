@@ -71,7 +71,7 @@ func (r recordingSession) requireAudio() error {
 func (r recordingSession) process(req Request) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	err := r.postProcess(ctx, req.ModelPath, req.DefaultModelPath)
+	err := r.service.processing().processCaptured(ctx, r, req.ModelPath, req.DefaultModelPath)
 	if err != nil && req.SuppressProcessingFailure {
 		fmt.Fprintf(r.service.ErrOut, "warning: post-processing failed after capture: %v\n", err)
 		return nil
@@ -123,8 +123,8 @@ func (r recordingSession) saveTranscript(transcript string) error {
 	return r.service.emit(EventProcessing, *r.meeting, nil)
 }
 
-func (r recordingSession) saveEnhancement(transcript, summary string) error {
-	lifecycleFor(r.meeting).processingCompleted(transcript, summary, nowUTC())
+func (r recordingSession) saveEnhancement(title, transcript, summary string) error {
+	lifecycleFor(r.meeting).processingCompleted(title, transcript, summary, nowUTC())
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}

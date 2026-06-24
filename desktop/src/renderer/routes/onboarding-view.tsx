@@ -48,6 +48,8 @@ type OnboardingPhaseCopy = {
 type SetupStepState = 'done' | 'active' | 'locked' | 'blocked'
 type SetupStep = { label: string; detail: string; state: SetupStepState }
 
+const SHOW_PERMISSION_DEBUG = import.meta.env.DEV
+
 const PHASE_COPY: Record<OnboardingStatus['phase'], OnboardingPhaseCopy> = {
   checking: { headline: 'Checking setup.', detail: 'Looking for tools already installed on this Mac.', progressDetail: 'Gappd is checking what is already ready.', actionLabel: 'Checking setup...' },
   needs_setup: { headline: 'Gappd needs one-time setup.', detail: 'Download local AI tools once. Recordings stay on this Mac.', progressDetail: 'Setup downloads speech and summary tools, then saves them for next time.', actionLabel: 'Set up Gappd' },
@@ -178,7 +180,7 @@ function PermissionSetupCard({ status, state }: { status: OnboardingStatus; stat
 
 function PermissionDebug({ state }: { state: SetupPermissionState }) {
   const details = state.permissions?.details
-  if (!details) return null
+  if (!SHOW_PERMISSION_DEBUG || !details) return null
   return <details className="permission-debug"><summary>Permission debug</summary>{Object.entries(details).map(([key, value]) => <div key={key}><strong>{key}</strong><span>{value || 'empty'}</span></div>)}</details>
 }
 
