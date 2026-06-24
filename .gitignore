@@ -40,6 +40,7 @@ Thumbs.db
 # Local agent artifacts
 /.pi-question-decisions.md
 /context.md
+!/CONTEXT.md
 /false
 
 /gappd
