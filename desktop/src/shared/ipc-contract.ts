@@ -1,16 +1,16 @@
-import type { Device, LocalAIStatus, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
+import type { Device, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
 export type { OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
 
 export const IPC_CHANNELS = {
   system: {
     getDevices: 'system:getDevices',
     requestCapturePermissions: 'system:requestCapturePermissions',
-    resetCapturePermissions: 'system:resetCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
   },
   meetings: {
     list: 'meetings:list',
     show: 'meetings:show',
+    delete: 'meetings:delete',
   },
   recording: {
     start: 'recording:start',
@@ -53,12 +53,12 @@ export type GappdApi = {
   system: {
     getDevices(): Promise<Device[]>
     requestCapturePermissions(): Promise<CapturePermissions>
-    resetCapturePermissions(): Promise<CapturePermissions>
     openPermissionsSettings(target?: CapturePermissionTarget): Promise<void>
   }
   meetings: {
     list(): Promise<MeetingListItem[]>
     show(id: string): Promise<MeetingDetail>
+    delete(id: string): Promise<MeetingDeleteResponse>
   }
   recording: {
     start(input: StartRecordingInput): Promise<RecordingState>

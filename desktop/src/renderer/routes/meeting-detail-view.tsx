@@ -22,6 +22,7 @@ type MeetingDetailPanelProps = {
   selectedMeetingLoading: boolean
   selectedMeetingError: string | null
   transcript: string
+  onDeleteMeeting: (id: string) => Promise<void>
 }
 
 function canCopySummary(): boolean {
@@ -117,7 +118,37 @@ function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { se
   )
 }
 
-function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
+function MeetingDeleteButton({ meeting, onDeleteMeeting }: { meeting: MeetingDetail; onDeleteMeeting: (id: string) => Promise<void> }) {
+  const [deleting, setDeleting] = useState(false)
+  const disabled = deleting || !meetingDeleteAllowed(meeting)
+  async function handleDelete() {
+    if (!confirmMeetingDelete(meeting)) return
+    setDeleting(true)
+    try {
+      await onDeleteMeeting(meeting.id)
+    } finally {
+      setDeleting(false)
+    }
+  }
+  return <Button className="compact-action danger-action" disabled={disabled} title={disabled ? deleteDisabledLabel(meeting) : undefined} onClick={() => void handleDelete()}>{deleting ? 'Deleting…' : 'Delete'}</Button>
+}
+
+function meetingDeleteAllowed(meeting: MeetingDetail): boolean {
+  return meeting.status.state !== RECORDING_STATE && meeting.status.processing.state !== PROCESSING_STATUS
+}
+
+function deleteDisabledLabel(meeting: MeetingDetail): string {
+  if (meeting.status.state === RECORDING_STATE) return 'Stop recording before deleting.'
+  if (meeting.status.processing.state === PROCESSING_STATUS) return 'Wait for processing to finish before deleting.'
+  return ''
+}
+
+function confirmMeetingDelete(meeting: MeetingDetail): boolean {
+  const title = meeting.title || 'this meeting'
+  return window.confirm(`Delete “${title}”?\n\nThis removes summary, transcript, segments, and audio files.`)
+}
+
+function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }: { selectedMeeting: MeetingDetail; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }) {
   const hasTranscript = Boolean(transcript)
   const hasSummary = Boolean(selectedMeeting.summary)
   const recording = selectedMeeting.status.state === RECORDING_STATE
@@ -125,7 +156,7 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
     <Panel className="detail-panel">
       <div className="panel-header compact meeting-detail-header">
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p>{detailSubtitle(selectedMeeting, hasTranscript, hasSummary)}</p></div>
-        <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill>
+        <div className="meeting-detail-actions"><MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /><StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill></div>
       </div>
       <div className="detail-grid detail-reading-stack">
         <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
@@ -158,9 +189,9 @@ function transcriptEmptyText(meeting: MeetingDetail): string {
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
-  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript } = props
+  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript, onDeleteMeeting } = props
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><div className="detail-surface detail-alert">{selectedMeetingError}</div></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onDeleteMeeting={onDeleteMeeting} />
 }

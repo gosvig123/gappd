@@ -1,7 +1,7 @@
 import type { AIConfig } from './generated/contracts'
 
 export * from './generated/protocol'
-export type { AIConfig, CaptureStatusInfo, Device, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
+export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
 
 export type LocalAIConfig = AIConfig
 
