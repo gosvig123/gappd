@@ -3,29 +3,17 @@
 `gappd` records meeting audio, transcribes it locally, stores transcripts in SQLite,
 and can run Ollama-based summarization and extraction over saved meetings.
 
-## Current surface area
+## Surface area
 
-- Desktop app for macOS
-- Terminal CLI
-- Local SQLite database at `~/.gappd/db.sqlite` by default
-- Local transcription via bundled desktop Whisper runtime or CLI `whisper-local`
-- AI provider support: `ollama`
-- Meeting capture, listing, display, and post-processing commands
+macOS desktop app and CLI. Data lives in local SQLite at `~/.gappd/db.sqlite` by
+default. Transcription uses bundled desktop Whisper or CLI `whisper-local`; AI
+post-processing uses Ollama.
 
 ## Fresh-clone setup for contributors
 
-Most contributors should use the desktop setup. It installs JavaScript
-dependencies, downloads the local runtimes, builds the native helper binaries,
-and starts the Electron app.
-
-Prerequisites:
-
-- macOS `14+` with network access to GitHub for Ollama/Whisper runtime downloads
-- Node.js `22.12.0+` and npm
-- Go `1.25+`
-- Xcode Command Line Tools, including `swiftc`, `codesign`, `lipo`, and `xcrun`
-- `cmake`
-- `tar`
+Most contributors should use the desktop setup. Prereqs: macOS `14+`, Node.js
+`22.12.0+`, Go `1.25+`, Xcode Command Line Tools, `cmake`, `tar`, and GitHub
+network access for runtime downloads.
 
 From repo root:
 
@@ -41,28 +29,12 @@ Ollama model and the Whisper model into the app user-data directory. No API keys
 Apple signing credentials, private packages, or checked-in binary artifacts are
 required for local development.
 
-What bootstrap does:
-
-1. Installs desktop npm dependencies with `npm --prefix ./desktop ci`.
-2. Runs macOS prerequisite checks.
-3. Downloads Ollama into `desktop/resources/ollama/`.
-4. Downloads/builds Whisper into `desktop/resources/whisper/`.
-5. Builds native Go and capture-helper artifacts into `build/`.
-
-Generated artifacts are intentionally ignored by git. Fresh clones rebuild or download
-these paths:
-
-- `build/gappd`
-- `build/GappdCapture.app`
-- `desktop/resources/ollama/ollama`
-- `desktop/resources/whisper/whisper-cli`
-- `desktop/.cache/ollama/`
-- `desktop/.cache/whisper/`
-- `desktop/dist*` and `desktop/release/`
-
-There are no unpublished local package dependencies in the current setup: no npm
-`file:`, `link:`, or `workspace:` dependencies, and no Go `replace` directives.
-Native/runtime artifacts are generated or downloaded by bootstrap scripts.
+Bootstrap installs desktop npm dependencies, checks macOS prerequisites,
+downloads Ollama/Whisper runtimes, and builds native Go/capture artifacts.
+Generated paths stay ignored: `build/`, `desktop/resources/`,
+`desktop/.cache/`, `desktop/dist*`, and `desktop/release/`. There are no local
+npm `file:`, `link:`, or `workspace:` dependencies, and no Go `replace`
+directives.
 
 If setup fails, run the checks separately so the failing layer is obvious:
 
@@ -98,17 +70,16 @@ npm run desktop:typecheck
 
 Desktop startup checks the latest release manifest at
 `https://github.com/gosvig123/gappd/releases/latest/download/latest.json`.
-If the manifest version is newer than the packaged app version, a floating update
-control opens the latest release page in the browser.
+The updater accepts legacy flat JSON plus schema-2 channel manifests, then picks
+matching `platform-arch` assets such as `darwin-arm64` or `darwin-universal`.
 Offline or failed checks are ignored so the app remains usable.
 
 The macOS release workflow publishes only from `v*` tag pushes or manual runs
-with an existing `v*` tag. When Apple signing secrets are configured, CI signs
-and notarizes the app; otherwise it publishes an unsigned development DMG. Each
-release uploads a matching `latest.json` manifest.
+with an existing `v*` tag. It writes `latest.json` with schema-2 channels and
+legacy top-level fields so older apps can still update.
 
-Set `GAPPD_UPDATE_CHECK_URL` to point at compatible JSON with `version` plus
-`releaseUrl` or `downloadUrl` when testing a different release manifest.
+Set `GAPPD_UPDATE_CHECK_URL` to test a different manifest. Set
+`GAPPD_UPDATE_CHANNEL=beta` to read the beta channel instead of stable.
 
 ## CLI install
 

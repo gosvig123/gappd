@@ -154,52 +154,14 @@ jobs:
           app_paths=(desktop/release/mac*/Gappd.app)
           dmg_paths=(desktop/release/*.dmg)
 
-          if [ ${#app_paths[@]} -eq 0 ]; then
-            echo "No packaged app found at desktop/release/mac*/Gappd.app" >&2
-            exit 1
-          fi
-
-          if [ ${#dmg_paths[@]} -eq 0 ]; then
-            echo "No DMG found at desktop/release/*.dmg" >&2
-            exit 1
-          fi
+          [ ${#app_paths[@]} -gt 0 ] || { echo "No packaged app found at desktop/release/mac*/Gappd.app" >&2; exit 1; }
+          [ ${#dmg_paths[@]} -gt 0 ] || { echo "No DMG found at desktop/release/*.dmg" >&2; exit 1; }
 
           printf 'Found app bundle: %s\n' "${app_paths[@]}"
           printf 'Found DMG: %s\n' "${dmg_paths[@]}"
 
       - name: Write release manifest
-        run: |
-          shopt -s nullglob
-          dmg_paths=(desktop/release/*.dmg)
-          if [ ${#dmg_paths[@]} -ne 1 ]; then
-            echo "Expected exactly one DMG for release, found ${#dmg_paths[@]}" >&2
-            exit 1
-          fi
-
-          export DMG_NAME="$(basename "${dmg_paths[0]}")"
-          export DMG_SHA256="$(shasum -a 256 "${dmg_paths[0]}" | awk '{print $1}')"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          from urllib.parse import quote
-
-          tag = os.environ['RELEASE_TAG']
-          repo = os.environ['GITHUB_REPOSITORY']
-          version = tag.removeprefix('v')
-          dmg_name = os.environ['DMG_NAME']
-          release_url = f'https://github.com/{repo}/releases/tag/{tag}'
-          download_url = f'https://github.com/{repo}/releases/download/{tag}/{quote(dmg_name)}'
-          Path('desktop/release/latest.json').write_text(json.dumps({
-            'version': version,
-            'channel': 'stable',
-            'minVersion': '0.1.0',
-            'releaseUrl': release_url,
-            'downloadUrl': download_url,
-            'sha256': os.environ['DMG_SHA256'],
-          }, indent=2) + '\n')
-          PY
-          cat desktop/release/latest.json
+        run: node desktop/scripts/write-release-manifest.mjs
 
       - name: Publish release
         run: |

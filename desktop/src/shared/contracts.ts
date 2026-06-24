@@ -76,6 +76,16 @@ export type LocalAIStatus = OnboardingStatus & {
   canRepair: boolean
 }
 
+export const STABLE_UPDATE_CHANNEL = 'stable'
+export const BETA_UPDATE_CHANNEL = 'beta'
+export const DEFAULT_UPDATE_CHANNEL = STABLE_UPDATE_CHANNEL
+export const UPDATE_CHANNELS = [STABLE_UPDATE_CHANNEL, BETA_UPDATE_CHANNEL] as const
+export type UpdateChannel = (typeof UPDATE_CHANNELS)[number]
+
+export function isUpdateChannel(value: string | undefined): value is UpdateChannel {
+  return UPDATE_CHANNELS.some((channel) => channel === value)
+}
+
 export type UpdateStatus =
   | { available: false; currentVersion: string; latestVersion?: string }
   | {
@@ -85,7 +95,7 @@ export type UpdateStatus =
     releaseUrl: string
     downloadUrl?: string
     sha256?: string
-    channel?: string
+    channel?: UpdateChannel
     name?: string
   }
 
