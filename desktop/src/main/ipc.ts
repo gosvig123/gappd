@@ -1,7 +1,7 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import { IPC_CHANNELS, IPC_EVENTS, type CapturePermissionTarget, type OnboardingSetupInput, type StartRecordingInput } from '../shared/ipc-contract'
-import { getDevices, listMeetings, requestCapturePermissions, resetCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
+import { deleteMeeting, getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, stopRecording } from './gappd'
 import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, openUpdatePage } from './update'
@@ -23,10 +23,10 @@ export function registerIpc(mainWindow: BrowserWindow): void {
   if (!registered) {
     ipcMain.handle(IPC_CHANNELS.system.getDevices, () => getDevices())
     ipcMain.handle(IPC_CHANNELS.system.requestCapturePermissions, () => requestCapturePermissions())
-    ipcMain.handle(IPC_CHANNELS.system.resetCapturePermissions, () => resetCapturePermissions())
     ipcMain.handle(IPC_CHANNELS.system.openPermissionsSettings, (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target))
     ipcMain.handle(IPC_CHANNELS.meetings.list, () => listMeetings())
     ipcMain.handle(IPC_CHANNELS.meetings.show, (_event, id: string) => showMeeting(id))
+    ipcMain.handle(IPC_CHANNELS.meetings.delete, (_event, id: string) => deleteMeeting(id))
     ipcMain.handle(IPC_CHANNELS.recording.start, async (_event, input: StartRecordingInput) => {
       await startRecording(input)
       return getRecordingState()

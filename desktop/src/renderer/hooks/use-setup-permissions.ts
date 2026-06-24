@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { CapturePermissions, CapturePermissionTarget } from '../../shared/ipc-contract'
 
 export type SetupPermissionState = {
@@ -12,38 +12,44 @@ const WAITING_PERMISSIONS: SetupPermissionState = { status: 'waiting' }
 export function useSetupPermissions(enabled: boolean) {
   const [state, setState] = useState<SetupPermissionState>(WAITING_PERMISSIONS)
 
-  async function request() {
-    if (!enabled) return
-    setState({ status: 'checking', permissions: state.permissions })
-    try {
-      setState(permissionState(await window.gappd.system.requestCapturePermissions()))
-    } catch (err) {
-      setState({ status: 'error', error: err instanceof Error ? err.message : String(err) })
-    }
+  useEffect(() => {
+    if (!enabled || state.status !== 'waiting') return
+    void check()
+  }, [enabled, state.status])
+
+  useEffect(() => {
+    if (!enabled || !shouldRecheckOnFocus(state.status)) return
+    const recheck = () => void check()
+    window.addEventListener('focus', recheck)
+    return () => window.removeEventListener('focus', recheck)
+  }, [enabled, state.status])
+
+  async function check() {
+    await updatePermissionState(false)
   }
 
-  async function openSettings(target?: CapturePermissionTarget) {
+  async function request() {
+    await updatePermissionState(true)
+  }
+
+  async function updatePermissionState(openWhenBlocked: boolean) {
     if (!enabled) return
+    setState((current) => ({ status: 'checking', permissions: current.permissions }))
     try {
       const permissions = await window.gappd.system.requestCapturePermissions()
-      setState(permissionState(permissions))
-      await window.gappd.system.openPermissionsSettings(target ?? permissionTarget(permissions))
+      const next = permissionState(permissions)
+      setState(next)
+      if (openWhenBlocked && next.status !== 'granted') await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
     } catch (err) {
-      setState({ status: 'error', permissions: state.permissions, error: err instanceof Error ? err.message : String(err) })
+      setState((current) => ({ status: 'error', permissions: current.permissions, error: err instanceof Error ? err.message : String(err) }))
     }
   }
 
-  async function reset() {
-    if (!enabled) return
-    setState({ status: 'checking', permissions: state.permissions })
-    try {
-      setState(permissionState(await window.gappd.system.resetCapturePermissions()))
-    } catch (err) {
-      setState({ status: 'error', permissions: state.permissions, error: err instanceof Error ? err.message : String(err) })
-    }
-  }
+  return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request }
+}
 
-  return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request, openSettings, reset }
+function shouldRecheckOnFocus(status: SetupPermissionState['status']): boolean {
+  return status === 'blocked' || status === 'unknown' || status === 'error'
 }
 
 function permissionState(permissions: CapturePermissions): SetupPermissionState {

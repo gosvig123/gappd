@@ -29,6 +29,21 @@
   white-space: nowrap;
 }
 
+.meeting-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-button.danger-action {
+  border-color: var(--color-danger-border);
+  color: var(--color-danger);
+}
+
+.ui-button.danger-action:hover:not(:disabled) {
+  background: var(--color-danger-bg);
+}
+
 .meeting-detail-title {
   display: grid;
   gap: 6px;
@@ -143,6 +158,7 @@ details.detail-surface summary small,
     display: grid;
   }
 
+  .meeting-detail-actions,
   .meeting-detail-header .status-pill {
     justify-self: start;
   }

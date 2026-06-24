@@ -27,6 +27,7 @@ type DashboardViewProps = {
   onStart: () => void
   onStop: () => void
   onSelectMeeting: (id: string) => void
+  onDeleteMeeting: (id: string) => Promise<void>
 }
 
 export function DashboardView(props: DashboardViewProps) {
@@ -36,7 +37,7 @@ export function DashboardView(props: DashboardViewProps) {
       <div className="dashboard-workspace">
         <MeetingInboxPanel meetings={props.meetings} selectedMeetingId={props.selectedMeetingId} onSelectMeeting={props.onSelectMeeting} />
         <div className="dashboard-detail-column">
-          <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} />
+          <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} />
         </div>
       </div>
     </div>
