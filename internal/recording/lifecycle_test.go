@@ -70,10 +70,6 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
 	meeting := createCapturedMeeting(t, store)
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, *meeting.EndedAt, nil)
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
-	}
 	events := &recordingEvents{}
 	providerErr := errors.New("llm down")
 	server := failingOllamaServer(t, providerErr.Error())

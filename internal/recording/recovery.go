@@ -92,21 +92,18 @@ func (s Service) claimStaleRecording(meeting *db.Meeting, cutoff string, now tim
 	if !ok || err != nil {
 		return ok, err
 	}
-	meeting.EndedAt = &endedAt
-	setCaptureStatus(meeting, db.CaptureStatusCaptured, endedAt, nil)
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, endedAt, nil)
+	lifecycleFor(meeting).captured(endedAt)
 	return true, nil
 }
 
 func (s Service) failStaleRecording(meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {
 	endedAt := now.UTC().Format(time.RFC3339)
-	ok, err := s.Store.FailStaleRecording(meeting.ID, cutoff, endedAt, staleNoAudioMessage)
+	failureErr := errors.New(staleNoAudioMessage)
+	ok, err := s.Store.FailStaleRecording(meeting.ID, cutoff, endedAt, failureErr.Error())
 	if !ok || err != nil {
 		return ok, err
 	}
-	failureErr := errors.New(staleNoAudioMessage)
-	meeting.EndedAt = &endedAt
-	setCaptureStatus(meeting, db.CaptureStatusFailed, endedAt, failureErr)
+	lifecycleFor(meeting).captureFailed(endedAt, failureErr)
 	if err := s.emit(EventFailed, *meeting, failureErr); err != nil {
 		return true, err
 	}

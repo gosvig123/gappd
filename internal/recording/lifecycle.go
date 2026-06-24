@@ -53,7 +53,7 @@ func (s Service) createSessionDir(title string) (string, error) {
 
 func (s Service) startMeeting(title, sessionDir string) (*db.Meeting, error) {
 	now := nowUTC()
-	meeting := &db.Meeting{Title: title, StartedAt: now, CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: now, ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: now, AudioPath: &sessionDir, Source: "listen"}
+	meeting := newRecordingMeeting(title, sessionDir, now)
 	if err := s.meetings().CreateMeeting(meeting); err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
 	}
@@ -94,26 +94,6 @@ func sanitize(s string) string {
 		}
 	}
 	return b.String()
-}
-
-func setCaptureStatus(meeting *db.Meeting, status db.CaptureStatus, updatedAt string, err error) {
-	meeting.CaptureStatus = status
-	meeting.CaptureStatusUpdatedAt = updatedAt
-	meeting.CaptureFailureMessage = failureMessage(err)
-}
-
-func setProcessingStatus(meeting *db.Meeting, status db.ProcessingStatus, updatedAt string, err error) {
-	meeting.ProcessingStatus = status
-	meeting.ProcessingStatusUpdatedAt = updatedAt
-	meeting.ProcessingFailureMessage = failureMessage(err)
-}
-
-func failureMessage(err error) *string {
-	if err == nil {
-		return nil
-	}
-	message := err.Error()
-	return &message
 }
 
 func nowUTC() string {
