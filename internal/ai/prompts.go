@@ -3,12 +3,13 @@ package ai
 import "fmt"
 
 type Extraction struct {
-	Participants  []string        `json:"participants"`
-	Topics        []Topic         `json:"topics"`
-	Decisions     []Decision      `json:"decisions"`
+	Title         string            `json:"title"`
+	Participants  []string          `json:"participants"`
+	Topics        []Topic           `json:"topics"`
+	Decisions     []Decision        `json:"decisions"`
 	ActionItems   []ExtractedAction `json:"action_items"`
-	OpenQuestions []string        `json:"open_questions"`
-	Sentiment     string          `json:"sentiment"`
+	OpenQuestions []string          `json:"open_questions"`
+	Sentiment     string            `json:"sentiment"`
 }
 
 type Topic struct {
@@ -29,6 +30,7 @@ type ExtractedAction struct {
 }
 
 const extractionSchema = `{
+  "title": "string, 3-8 words, specific, no date, empty if transcript lacks topic context",
   "participants": ["string"],
   "topics": [{"name": "string", "summary": "string"}],
   "decisions": [{"what": "string", "who_decided": ["string"], "context": "string"}],
@@ -42,6 +44,7 @@ Output valid JSON matching this schema:
 %s
 Rules:
 - Use exact participant names from the transcript
+- Title must name the meeting topic, not generic words like "Meeting" or "Recording"
 - Be concise but preserve key details
 - Capture ALL action items with owners and deadlines when mentioned
 - If a deadline is not mentioned, use "unspecified"

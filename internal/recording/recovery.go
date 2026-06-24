@@ -76,14 +76,18 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
 		return true, err
 	}
-	err := session.postProcess(ctx, opts.ModelPath, opts.DefaultModelPath)
-	if err != nil && opts.SuppressProcessingFailure {
-		if s.ErrOut != nil {
-			fmt.Fprintf(s.ErrOut, "warning: stale recording post-processing failed: %v\n", err)
-		}
-		return true, nil
+	err := s.processing().processCaptured(ctx, session, opts.ModelPath, opts.DefaultModelPath)
+	return s.finishStaleProcessing(err, opts)
+}
+
+func (s Service) finishStaleProcessing(err error, opts RecoverStaleOptions) (bool, error) {
+	if err == nil || !opts.SuppressProcessingFailure {
+		return true, err
 	}
-	return true, err
+	if s.ErrOut != nil {
+		fmt.Fprintf(s.ErrOut, "warning: stale recording post-processing failed: %v\n", err)
+	}
+	return true, nil
 }
 
 func (s Service) claimStaleRecording(meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {

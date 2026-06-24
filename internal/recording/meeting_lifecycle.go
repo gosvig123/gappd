@@ -1,6 +1,17 @@
 package recording
 
-import "github.com/gappd-dev/gappd/internal/db"
+import (
+	"strings"
+
+	"github.com/gappd-dev/gappd/internal/db"
+)
+
+const (
+	generatedMeetingTitleMaxRunes       = 80
+	genericMeetingTitleMeeting          = "meeting"
+	genericMeetingTitleRecording        = "recording"
+	genericMeetingTitleRecordedDialogue = "recorded conversation"
+)
 
 type meetingLifecycle struct {
 	meeting *db.Meeting
@@ -46,10 +57,40 @@ func (l meetingLifecycle) transcriptSaved(transcript, at string) {
 	l.processing(db.ProcessingStatusProcessing, at, nil)
 }
 
-func (l meetingLifecycle) processingCompleted(transcript, summary, at string) {
+func (l meetingLifecycle) processingCompleted(title, transcript, summary, at string) {
+	if title = cleanGeneratedMeetingTitle(title); title != "" {
+		l.meeting.Title = title
+	}
 	l.meeting.Transcript = &transcript
 	l.meeting.Summary = &summary
 	l.processing(db.ProcessingStatusCompleted, at, nil)
+}
+
+func cleanGeneratedMeetingTitle(title string) string {
+	title = strings.TrimSpace(title)
+	title = strings.Trim(title, `"'“”‘’`)
+	title = strings.Join(strings.Fields(title), " ")
+	if isGenericMeetingTitle(title) {
+		return ""
+	}
+	return trimRunes(title, generatedMeetingTitleMaxRunes)
+}
+
+func isGenericMeetingTitle(title string) bool {
+	switch strings.ToLower(title) {
+	case "", genericMeetingTitleMeeting, genericMeetingTitleRecording, genericMeetingTitleRecordedDialogue:
+		return true
+	default:
+		return false
+	}
+}
+
+func trimRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit])
 }
 
 func (l meetingLifecycle) enhancementFailed(transcript, at string, err error) {
