@@ -1,5 +1,5 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: var(--font-ui);
 
   --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -34,52 +34,58 @@
   --radius-panel: 0.875rem;
   --radius-pill: 999px;
 
-  --color-bg: #131316;
-  --color-bg-soft: #18181c;
-  --color-surface: #1c1c21;
-  --color-surface-soft: #222229;
-  --color-surface-raised: #2a2a33;
-  --color-border: rgba(255, 255, 255, 0.07);
-  --color-border-strong: rgba(255, 255, 255, 0.13);
-  --color-text: #e7e7ec;
-  --color-text-muted: #8e8e9a;
-  --color-text-soft: #bcbcc8;
-  --color-accent: #9aabff;
-  --color-accent-strong: #5b6ce8;
-  --color-accent-bright: #6e7ff2;
-  --color-accent-contrast: #f4f5ff;
-  --color-accent-soft: rgba(123, 140, 245, 0.16);
-  --color-accent-tint: rgba(123, 140, 245, 0.09);
-  --color-accent-tint-strong: rgba(123, 140, 245, 0.14);
-  --color-accent-border: rgba(138, 153, 255, 0.26);
-  --color-accent-border-strong: rgba(138, 153, 255, 0.42);
-  --color-success: #84d3a2;
-  --color-success-bg: rgba(110, 200, 145, 0.12);
-  --color-success-border: rgba(110, 200, 145, 0.26);
-  --color-warning: #e6c07e;
-  --color-warning-bg: rgba(220, 178, 105, 0.12);
-  --color-warning-border: rgba(220, 178, 105, 0.26);
-  --color-danger: #ef8e8e;
-  --color-danger-bg: rgba(232, 122, 122, 0.12);
-  --color-danger-border: rgba(232, 122, 122, 0.28);
-  --color-overlay-scrim: rgba(8, 8, 12, 0.45);
+  --color-brand: #16244e;
+  --color-accent: #3d52d5;
+  --color-secure: #18935e;
+  --color-surface: #f4f6fb;
+  --color-border: #e3e7f0;
+  --color-text: #101a33;
+  --color-card: #ffffff;
+  --color-bg: var(--color-surface);
+  --color-bg-soft: color-mix(in srgb, var(--color-surface) 84%, var(--color-card));
+  --color-surface-soft: color-mix(in srgb, var(--color-surface) 72%, var(--color-card));
+  --color-surface-raised: var(--color-card);
+  --color-border-strong: color-mix(in srgb, var(--color-border) 74%, var(--color-brand));
+  --color-text-muted: color-mix(in srgb, var(--color-text) 56%, var(--color-surface));
+  --color-text-soft: color-mix(in srgb, var(--color-text) 74%, var(--color-surface));
+  --color-accent-strong: var(--color-accent);
+  --color-accent-bright: color-mix(in srgb, var(--color-accent) 88%, var(--color-card));
+  --color-accent-contrast: var(--color-card);
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  --color-accent-tint: color-mix(in srgb, var(--color-accent) 8%, var(--color-card));
+  --color-accent-tint-strong: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
+  --color-accent-border: color-mix(in srgb, var(--color-accent) 28%, var(--color-border));
+  --color-accent-border-strong: color-mix(in srgb, var(--color-accent) 46%, var(--color-border));
+  --color-success: var(--color-secure);
+  --color-success-bg: color-mix(in srgb, var(--color-secure) 12%, var(--color-card));
+  --color-success-border: color-mix(in srgb, var(--color-secure) 32%, var(--color-border));
+  --color-warning: color-mix(in srgb, var(--color-secure) 72%, var(--color-brand));
+  --color-warning-contrast: var(--color-card);
+  --color-warning-bg: color-mix(in srgb, var(--color-warning) 11%, var(--color-card));
+  --color-warning-border: color-mix(in srgb, var(--color-warning) 30%, var(--color-border));
+  --color-danger: color-mix(in srgb, var(--color-accent) 68%, var(--color-brand));
+  --color-danger-bg: color-mix(in srgb, var(--color-danger) 10%, var(--color-card));
+  --color-danger-border: color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  --color-overlay-scrim: color-mix(in srgb, var(--color-text) 28%, transparent);
 
-  --surface-panel: linear-gradient(180deg, #1f1f25, #1b1b20);
-  --surface-control: var(--color-surface-raised);
+  --surface-panel: var(--color-card);
+  --surface-control: var(--color-card);
   --surface-accent: var(--color-accent-tint);
-  --surface-hover: #2e2e37;
-  --surface-translucent: var(--color-surface-soft);
-  --highlight-subtle: rgba(255, 255, 255, 0.05);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px -16px rgba(0, 0, 0, 0.5);
-  --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 40px -20px rgba(0, 0, 0, 0.65);
-  --shadow-sheet: 0 1.5rem 4rem rgba(0, 0, 0, 0.55);
-  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px -8px rgba(91, 108, 232, 0.55);
+  --surface-hover: color-mix(in srgb, var(--color-accent) 6%, var(--color-card));
+  --surface-translucent: color-mix(in srgb, var(--color-card) 88%, transparent);
+  --highlight-subtle: color-mix(in srgb, var(--color-card) 72%, transparent);
+  --highlight-strong: color-mix(in srgb, var(--color-card) 86%, transparent);
+  --shadow-soft: 0 1px 2px color-mix(in srgb, var(--color-text) 8%, transparent), 0 8px 24px -16px color-mix(in srgb, var(--color-text) 24%, transparent);
+  --shadow-raised: 0 1px 2px color-mix(in srgb, var(--color-text) 10%, transparent), 0 16px 40px -20px color-mix(in srgb, var(--color-text) 30%, transparent);
+  --shadow-sheet: 0 1.5rem 4rem color-mix(in srgb, var(--color-text) 24%, transparent);
+  --shadow-accent: 0 1px 2px color-mix(in srgb, var(--color-text) 10%, transparent), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 42%, transparent);
+  --shadow-logo: 0 0 10px color-mix(in srgb, var(--color-accent) 36%, transparent);
   --focus-ring: 0 0 0 3px var(--color-accent-soft);
-  --gradient-accent: linear-gradient(180deg, #6e7ff2, #5560e0);
-  --gradient-accent-hover: linear-gradient(180deg, #7d8df7, #6470ec);
+  --gradient-accent: linear-gradient(180deg, var(--color-accent-bright), var(--color-accent));
+  --gradient-accent-hover: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 80%, var(--color-card)), color-mix(in srgb, var(--color-accent) 92%, var(--color-brand)));
   --shell-glow:
-    radial-gradient(60rem 30rem at 12% -12%, rgba(99, 113, 240, 0.07), transparent 60%),
-    radial-gradient(50rem 26rem at 88% -16%, rgba(140, 110, 240, 0.05), transparent 60%);
+    radial-gradient(60rem 30rem at 12% -12%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 60%),
+    radial-gradient(50rem 26rem at 88% -16%, color-mix(in srgb, var(--color-secure) 8%, transparent), transparent 60%);
 
   --transition-quick: 140ms ease;
 }

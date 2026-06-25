@@ -1,21 +1,20 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
 import './meeting-reading.css'
-import { artifactLabel, meetingStatusLabel, meetingStatusTone, processingStatusLabel } from '../components/meeting-status'
+import { meetingStatusLabel, meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
 import { Markdown } from '../components/markdown'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
-import { dateLabel } from './today-model'
 import { TranscriptText } from './transcript-view'
 
 const EXPAND_READING_LABEL = 'More'
 const COLLAPSE_READING_LABEL = 'Less'
-const PREVIEW_CHARACTER_LIMIT = 700
-const PREVIEW_LINE_LIMIT = 8
 const PROCESSING_STATUS = 'processing'
 const RECORDING_STATE = 'recording'
 const CAPTURED_STATE = 'captured'
-const SHOW_DIAGNOSTICS = import.meta.env.DEV
+const SUMMARY_TAB = 'summary'
+const TRANSCRIPT_TAB = 'transcript'
+type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingDetailPanelProps = {
   selectedMeetingId: string | null
   selectedMeeting: MeetingDetail | null
@@ -25,9 +24,7 @@ type MeetingDetailPanelProps = {
   onDeleteMeeting: (id: string) => Promise<void>
 }
 
-function canCopySummary(): boolean {
-  return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText)
-}
+function canCopySummary(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
 function SummaryCopyButton({ summary }: { summary: string }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
@@ -54,69 +51,53 @@ function ReadingActions({ primary, value, expanded, expandable, onToggle }: { pr
   )
 }
 
-function canExpandReading(value: string): boolean {
-  return value.length > PREVIEW_CHARACTER_LIMIT || value.split('\n').length > PREVIEW_LINE_LIMIT
-}
-
 function ReadingCard({ title, value, emptyText, primary, markdown, defaultExpanded = false, resetKey = value, children }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean; defaultExpanded?: boolean; resetKey?: string; children?: ReactNode }) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
-  const expandable = canExpandReading(value)
+  const reading = useReadingExpansion(value, defaultExpanded, resetKey)
   const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
-  const textClassName = expanded || !expandable ? 'reading-text' : 'reading-text reading-preview'
+  const textClassName = reading.expanded ? 'reading-text reading-expanded' : 'reading-text reading-preview'
   const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
-  useEffect(() => setExpanded(defaultExpanded), [resetKey, defaultExpanded])
   return (
     <div className={className}>
-      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={expanded} expandable={expandable} onToggle={() => setExpanded((current) => !current)} /></div>
-      <div className={textClassName}>{body}</div>
+      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={reading.expanded} expandable={reading.expandable} onToggle={() => reading.setExpanded((current) => !current)} /></div>
+      <div ref={reading.ref} className={textClassName}>{body}</div>
     </div>
   )
 }
 
-function DetailShell({ children }: { children: ReactNode }) {
-  return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel>
+function useReadingExpansion(value: string, defaultExpanded: boolean, resetKey: string) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [overflowing, setOverflowing] = useState(false)
+  useEffect(() => setExpanded(defaultExpanded), [resetKey, defaultExpanded])
+  useLayoutEffect(() => observeOverflow(ref.current, value, setOverflowing), [value, expanded])
+  return { ref, expanded, setExpanded, expandable: expanded || overflowing }
 }
 
-function MeetingFailureState({ message }: { message?: string }) {
-  if (!message) return null
-  return <div className="detail-surface detail-alert">{message}</div>
+function observeOverflow(element: HTMLDivElement | null, value: string, setOverflowing: (value: boolean) => void) {
+  if (!element || !value) return setOverflowing(false)
+  const measure = () => setOverflowing(element.scrollHeight > element.clientHeight + 1)
+  measure()
+  const observer = new ResizeObserver(measure)
+  observer.observe(element)
+  return () => observer.disconnect()
 }
 
-function meetingIsProcessing(meeting: MeetingDetail): boolean {
-  return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS
-}
+function DetailShell({ children }: { children: ReactNode }) { return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel> }
 
-function MeetingDetailMeta({ selectedMeeting }: { selectedMeeting: MeetingDetail }) {
+function MeetingFailureState({ message }: { message?: string }) { return message ? <div className="detail-surface detail-alert">{message}</div> : null }
+
+function meetingIsProcessing(meeting: MeetingDetail): boolean { return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS }
+
+function DetailTabs({ activeTab, onChange }: { activeTab: DetailTab; onChange: (tab: DetailTab) => void }) {
   return (
-    <div className="detail-meta-grid">
-      <div className="detail-stat"><span>Started</span><strong>{dateLabel(selectedMeeting.startedAt)}</strong></div>
-      <div className="detail-stat"><span>Meeting ID</span><strong>{selectedMeeting.id}</strong></div>
-      <div className="detail-stat"><span>Capture</span><strong>{meetingStatusLabel(selectedMeeting.status.capture.state)}</strong></div>
-      <div className="detail-stat"><span>AI</span><strong>{processingStatusLabel(selectedMeeting.status.processing.state)}</strong></div>
+    <div className="detail-tabs" role="tablist" aria-label="Meeting detail sections">
+      <button className={tabClassName(activeTab, SUMMARY_TAB)} onClick={() => onChange(SUMMARY_TAB)} role="tab" aria-selected={activeTab === SUMMARY_TAB}>Summary</button>
+      <button className={tabClassName(activeTab, TRANSCRIPT_TAB)} onClick={() => onChange(TRANSCRIPT_TAB)} role="tab" aria-selected={activeTab === TRANSCRIPT_TAB}>Transcript</button>
     </div>
   )
 }
 
-function MeetingDiagnostics({ selectedMeeting, hasTranscript, hasSummary }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; hasSummary: boolean }) {
-  return (
-    <details className="detail-surface detail-block">
-      <summary><span>Diagnostics</span><small>Metadata, pipeline, artifacts</small></summary>
-      <MeetingDetailMeta selectedMeeting={selectedMeeting} />
-      <div className="detail-block">
-        <div className="meeting-section-label">Pipeline</div>
-        <p>Capture {meetingStatusLabel(selectedMeeting.status.capture.state)} · updated {dateLabel(selectedMeeting.status.capture.updatedAt)}</p>
-        <p>AI {processingStatusLabel(selectedMeeting.status.processing.state)} · updated {dateLabel(selectedMeeting.status.processing.updatedAt)}</p>
-      </div>
-      <div className="detail-block">
-        <div className="meeting-section-label">Artifacts</div>
-        <div className="meeting-flags">
-          <span className="meeting-tag">{artifactLabel(hasTranscript, 'Transcript ready', 'No transcript')}</span>
-          <span className="meeting-tag">{artifactLabel(hasSummary, 'Summary ready', 'No summary')}</span>
-        </div>
-      </div>
-    </details>
-  )
-}
+function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
 function MeetingDeleteButton({ meeting, onDeleteMeeting }: { meeting: MeetingDetail; onDeleteMeeting: (id: string) => Promise<void> }) {
   const [deleting, setDeleting] = useState(false)
@@ -133,9 +114,7 @@ function MeetingDeleteButton({ meeting, onDeleteMeeting }: { meeting: MeetingDet
   return <Button className="compact-action danger-action" disabled={disabled} title={disabled ? deleteDisabledLabel(meeting) : undefined} onClick={() => void handleDelete()}>{deleting ? 'Deleting…' : 'Delete'}</Button>
 }
 
-function meetingDeleteAllowed(meeting: MeetingDetail): boolean {
-  return meeting.status.state !== RECORDING_STATE && meeting.status.processing.state !== PROCESSING_STATUS
-}
+function meetingDeleteAllowed(meeting: MeetingDetail): boolean { return meeting.status.state !== RECORDING_STATE && meeting.status.processing.state !== PROCESSING_STATUS }
 
 function deleteDisabledLabel(meeting: MeetingDetail): string {
   if (meeting.status.state === RECORDING_STATE) return 'Stop recording before deleting.'
@@ -150,37 +129,50 @@ function confirmMeetingDelete(meeting: MeetingDetail): boolean {
 
 function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }: { selectedMeeting: MeetingDetail; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }) {
   const hasTranscript = Boolean(transcript)
-  const hasSummary = Boolean(selectedMeeting.summary)
-  const recording = selectedMeeting.status.state === RECORDING_STATE
+  const [activeTab, setActiveTab] = useState<DetailTab>(SUMMARY_TAB)
+  useEffect(() => setActiveTab(SUMMARY_TAB), [selectedMeeting.id])
   return (
-    <Panel className="detail-panel">
+    <Panel className="detail-panel readable-detail-panel">
       <div className="panel-header compact meeting-detail-header">
-        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p>{detailSubtitle(selectedMeeting, hasTranscript, hasSummary)}</p></div>
-        <div className="meeting-detail-actions"><MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /><StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill></div>
+        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p>{detailSubtitle(selectedMeeting, hasTranscript)}</p></div>
+        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill> : null}<MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
       </div>
-      <div className="detail-grid detail-reading-stack">
-        <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
-        <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-        {hasSummary ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText="" resetKey={selectedMeeting.id} primary markdown /> : null}
-        {recording ? <TrackingIndicator /> : <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} resetKey={selectedMeeting.id}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard>}
-        {SHOW_DIAGNOSTICS ? <MeetingDiagnostics selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} hasSummary={hasSummary} /> : null}
-      </div>
+      <DetailTabs activeTab={activeTab} onChange={(tab) => setActiveTab(tab)} />
+      <DetailBody activeTab={activeTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
     </Panel>
   )
 }
 
-function TrackingIndicator() {
-  return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div>
+function DetailBody({ activeTab, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
+  const recording = selectedMeeting.status.state === RECORDING_STATE
+  return (
+    <div className="detail-grid detail-reading-stack">
+      <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
+      <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
+      <div className="detail-tab-body">
+        {activeTab === SUMMARY_TAB ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(selectedMeeting, hasTranscript)} resetKey={selectedMeeting.id} primary markdown /> : null}
+        {activeTab === TRANSCRIPT_TAB && recording ? <TrackingIndicator /> : null}
+        {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} resetKey={selectedMeeting.id}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
+      </div>
+    </div>
+  )
 }
 
-function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean, hasSummary: boolean): string {
+function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div> }
+
+function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
   if (meetingIsProcessing(meeting) && hasTranscript) return 'Transcript ready · summary running.'
   if (meetingIsProcessing(meeting)) return 'Transcribing audio.'
-  if (hasSummary) return 'Summary ready.'
   if (hasTranscript) return 'Transcript ready.'
   if (meeting.status.state === CAPTURED_STATE) return 'Audio captured.'
   return 'Analysis and transcript for selected meeting.'
+}
+
+function summaryEmptyText(meeting: MeetingDetail, hasTranscript: boolean): string {
+  if (meetingIsProcessing(meeting)) return 'Summary appears when local AI finishes.'
+  if (hasTranscript) return 'Transcript ready. Summary not generated yet.'
+  return 'Summary appears after recording is processed.'
 }
 
 function transcriptEmptyText(meeting: MeetingDetail): string {

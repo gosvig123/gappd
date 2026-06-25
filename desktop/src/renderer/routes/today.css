@@ -3,7 +3,7 @@
   display: grid;
   flex: 1;
   gap: 0.625rem;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
@@ -12,6 +12,11 @@
   display: grid;
   gap: 0.625rem;
   grid-template-columns: minmax(17rem, 24rem) minmax(0, 1fr);
+}
+
+.dashboard-workspace.meeting-list-collapsed {
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .dashboard-inbox-panel,
@@ -25,48 +30,79 @@
   overflow: hidden;
 }
 
+.meeting-list-collapsed .dashboard-detail-column {
+  min-height: 0;
+}
+
 .record-action-panel {
+  --record-control-height: clamp(2.25rem, 4vw, 2.5rem);
+  --record-button-min: clamp(7rem, 10vw, 10.5rem);
   position: relative;
   z-index: 5;
-  padding: var(--space-4) var(--space-5);
+  padding: clamp(var(--space-2), 1vw, var(--space-3)) clamp(var(--space-3), 2vw, var(--space-5));
 }
 
 .record-action-bar {
   display: grid;
-  grid-template-columns: minmax(11rem, 0.7fr) minmax(16rem, 1fr) minmax(10.5rem, auto);
-  gap: var(--space-4);
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(24rem, 1.6fr);
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.record-section {
+  min-width: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-soft) 74%, var(--color-card));
+  box-shadow: inset 0 1px 0 var(--highlight-subtle);
+}
+
+.record-controls {
+  display: grid;
+  grid-template-columns: minmax(16rem, 1fr) minmax(var(--record-button-min), auto);
+  gap: var(--space-3);
   align-items: end;
 }
 
 .record-status-copy {
-  min-width: 0;
   display: grid;
-  gap: 3px;
-  align-self: center;
+  align-content: center;
+  gap: var(--space-1);
+}
+
+.record-status-copy strong {
+  white-space: nowrap;
 }
 
 .record-status-copy p {
+  min-width: 0;
   margin: 0;
+  overflow: hidden;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-tight);
 }
 
 .record-fields {
-  min-width: 0;
   display: grid;
-  gap: var(--space-3);
-  align-items: end;
+  align-content: center;
 }
 
 .record-fields label {
+  display: grid;
   gap: var(--space-2);
+  align-items: stretch;
+}
+
+.record-fields label span {
+  white-space: nowrap;
 }
 
 .record-fields select {
   min-width: 0;
   width: 100%;
-  min-height: 2.75rem;
+  min-height: var(--record-control-height);
   padding-right: calc(var(--space-5) + 1.25rem);
   appearance: none;
   -webkit-appearance: none;
@@ -80,16 +116,18 @@
   background-size: 0.35rem 0.35rem;
 }
 
-.record-actions {
+.actions-row.record-actions {
   gap: var(--space-3);
-  margin-top: 0;
+  margin: 0;
+  align-self: end;
   align-items: center;
   justify-content: flex-end;
 }
 
 .record-toggle-button {
-  min-width: 10.5rem;
-  min-height: 2.75rem;
+  min-width: var(--record-button-min);
+  width: 100%;
+  min-height: var(--record-control-height);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -99,8 +137,8 @@
 .record-toggle-button.stop-process-button {
   border-color: var(--color-warning-border);
   background: var(--color-warning);
-  color: var(--color-bg);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), var(--shadow-soft);
+  color: var(--color-warning-contrast);
+  box-shadow: inset 0 1px 0 var(--highlight-strong), var(--shadow-soft);
 }
 
 .record-toggle-button.stop-process-button:hover:not(:disabled) {
@@ -116,10 +154,6 @@
   .dashboard-workspace {
     grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
   }
-
-  .record-action-bar {
-    grid-template-columns: minmax(10rem, 0.7fr) minmax(15rem, 1fr) minmax(10.5rem, auto);
-  }
 }
 
 @media (max-width: 56rem) {
@@ -129,30 +163,52 @@
   }
 
   .dashboard-workspace,
-  .record-action-bar {
+  .dashboard-workspace.meeting-list-collapsed {
     grid-template-columns: 1fr;
   }
 
   .dashboard-detail-column {
     overflow: visible;
   }
+}
 
+@media (max-width: 45rem) {
+  .record-action-panel {
+    padding: clamp(var(--space-2), 2vw, var(--space-3));
+  }
+
+  .record-action-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .record-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .record-status-copy,
+  .record-fields,
   .record-actions {
-    grid-column: auto;
+    width: 100%;
+  }
+
+  .record-fields label {
+    grid-template-columns: 1fr;
+  }
+
+  .record-status-copy {
+    align-items: flex-start;
+  }
+
+  .record-status-copy p {
+    white-space: normal;
+  }
+
+  .actions-row.record-actions {
+    margin: 0;
     justify-content: flex-start;
   }
 
   .record-toggle-button {
     width: 100%;
-  }
-}
-
-@media (max-width: 45rem) {
-  .record-action-panel {
-    padding: 10px;
-  }
-
-  .record-status-copy {
-    grid-template-columns: 1fr;
   }
 }
