@@ -23,6 +23,7 @@ module.exports = {
   afterPack: hooks.afterPack,
   afterSign: hooks.afterSign,
   mac: {
+    icon: 'assets/app-icon.icns',
     category: 'public.app-category.productivity',
     target: ['dmg'],
     bundleShortVersion: MAC_BUNDLE_SHORT_VERSION,
