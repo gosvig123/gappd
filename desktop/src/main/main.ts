@@ -7,6 +7,11 @@ import { stopManagedOllama } from './ollama'
 
 let mainWindow: BrowserWindow | null = null
 
+function applyDevDockIcon(): void {
+  if (process.platform !== 'darwin' || app.isPackaged || !app.dock) return
+  app.dock.setIcon(path.join(__dirname, '../../assets/app-icon.png'))
+}
+
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -34,6 +39,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  applyDevDockIcon()
   createWindow()
   void bootstrapOnboarding().finally(() => startStaleRecordingRecovery())
 
