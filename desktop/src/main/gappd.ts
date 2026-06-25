@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { systemPreferences } from 'electron'
-import type { Device, LocalAIConfig, MeetingDetail, MeetingListItem } from '../shared/contracts'
+import type { Device, LocalAIConfig, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { RecordingEvent } from '../shared/generated/contracts'
 import type { CapturePermissions } from '../shared/ipc-contract'
 import { requestCommand, streamCommand } from './app-protocol'
@@ -12,10 +12,6 @@ import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
-const CAPTURE_BUNDLE_ID = 'dev.gappd.capture'
-const DESKTOP_BUNDLE_ID = 'dev.gappd.desktop'
-const MICROPHONE_TCC_SERVICE = 'Microphone'
-const SCREEN_CAPTURE_TCC_SERVICE = 'ScreenCapture'
 
 let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
@@ -57,16 +53,6 @@ async function ensureAppMicrophoneAccess(): Promise<Record<string, string>> {
   return { appMicStatusBefore: before, appMicStatusAfter: granted ? 'granted' : 'denied' }
 }
 
-export async function resetCapturePermissions(): Promise<CapturePermissions> {
-  await Promise.all([
-    resetTcc(MICROPHONE_TCC_SERVICE, CAPTURE_BUNDLE_ID),
-    resetTcc(MICROPHONE_TCC_SERVICE, DESKTOP_BUNDLE_ID),
-    resetTcc(SCREEN_CAPTURE_TCC_SERVICE, CAPTURE_BUNDLE_ID),
-    resetTcc(SCREEN_CAPTURE_TCC_SERVICE, DESKTOP_BUNDLE_ID),
-  ])
-  return requestCapturePermissions()
-}
-
 function capturePermissionCommand(tmpFile: string): { bin: string; args: string[] } {
   const appPath = resolveCaptureApp()
   if (appPath) return { bin: '/usr/bin/open', args: ['-W', '-n', appPath, '--args', '--request-permissions', '--output', tmpFile] }
@@ -89,14 +75,6 @@ function capturePermissionDetails(command: { bin: string; args: string[] }): Rec
   }
 }
 
-function resetTcc(service: string, bundleID: string): Promise<void> {
-  return new Promise((resolve) => {
-    const child = spawn('/usr/bin/tccutil', ['reset', service, bundleID], { stdio: 'ignore' })
-    child.on('close', () => resolve())
-    child.on('error', () => resolve())
-  })
-}
-
 export async function getDevices(): Promise<Device[]> {
   const result = await requestCommand('devices.list', {})
   return result.devices
@@ -110,6 +88,10 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 export async function showMeeting(id: string): Promise<MeetingDetail> {
   const result = await requestCommand('meetings.show', { id })
   return result.meeting
+}
+
+export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
+  return requestCommand('meetings.delete', { id })
 }
 
 export async function getLocalAIConfig(): Promise<LocalAIConfig> {

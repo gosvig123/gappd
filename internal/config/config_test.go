@@ -29,15 +29,7 @@ func TestLoadRejectsUnknownKeys(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	configDir := filepath.Join(home, ".gappd")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll returned error: %v", err)
-	}
-	path := filepath.Join(configDir, "config.toml")
-	if err := os.WriteFile(path, []byte("mystery = true\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
+	path := writeConfigFile(t, home, "mystery = true\n")
 	_, err := Load()
 	if err == nil {
 		t.Fatal("Load error = nil, want error")
@@ -50,19 +42,21 @@ func TestLoadRejectsUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestLoadToleratesGoogleCalendarConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	writeConfigFile(t, home, "[google]\nclient_id = \"id\"\nclient_secret = \"secret\"\ntoken_path = \"token.json\"\n")
+	if _, err := Load(); err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+}
+
 func TestLoadExpandsTildeDBPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	configDir := filepath.Join(home, ".gappd")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll returned error: %v", err)
-	}
-	path := filepath.Join(configDir, "config.toml")
-	if err := os.WriteFile(path, []byte("db_path = \"~/.gappd/custom.sqlite\"\n"), 0o644); err != nil {
-		t.Fatalf("WriteFile returned error: %v", err)
-	}
-
+	writeConfigFile(t, home, "db_path = \"~/.gappd/custom.sqlite\"\n")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
@@ -72,4 +66,17 @@ func TestLoadExpandsTildeDBPath(t *testing.T) {
 	if cfg.DBPath != want {
 		t.Fatalf("cfg.DBPath = %q, want %q", cfg.DBPath, want)
 	}
+}
+
+func writeConfigFile(t *testing.T, home, content string) string {
+	t.Helper()
+	configDir := filepath.Join(home, ".gappd")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll returned error: %v", err)
+	}
+	path := filepath.Join(configDir, "config.toml")
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile returned error: %v", err)
+	}
+	return path
 }

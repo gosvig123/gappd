@@ -70,17 +70,13 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
 	meeting := createCapturedMeeting(t, store)
-	setProcessingStatus(meeting, db.ProcessingStatusProcessing, *meeting.EndedAt, nil)
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
-	}
 	events := &recordingEvents{}
 	providerErr := errors.New("llm down")
 	server := failingOllamaServer(t, providerErr.Error())
 	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
 	transcript := "[You] hello\n"
 
-	err := testSession(service, meeting).enhanceAndSave(context.Background(), transcript, "")
+	err := service.processing().enhanceAndSave(context.Background(), testSession(service, meeting), transcript, "")
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("enhanceAndSave() error = %v, want saved transcript failure", err)
 	}

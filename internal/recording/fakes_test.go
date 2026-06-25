@@ -12,12 +12,13 @@ import (
 )
 
 type fakeEnhancer struct {
+	title   string
 	summary string
 	err     error
 }
 
 func (e fakeEnhancer) Run(context.Context, string, string) (*ai.Extraction, string, error) {
-	return &ai.Extraction{}, e.summary, e.err
+	return &ai.Extraction{Title: e.title}, e.summary, e.err
 }
 
 type fakeStore struct {

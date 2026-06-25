@@ -50,7 +50,7 @@ func appMeetingsCmd() *cobra.Command {
 		Use:   "meetings",
 		Short: "Machine-readable meeting access",
 	}
-	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd())
+	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
