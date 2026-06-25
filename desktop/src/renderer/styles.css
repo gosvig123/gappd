@@ -1,5 +1,44 @@
+:root {
+  --scrollbar-size: 0.625rem;
+  --scrollbar-thumb-active: color-mix(in srgb, var(--color-text-soft) 54%, transparent);
+}
+
 * {
   box-sizing: border-box;
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  height: var(--scrollbar-size);
+  width: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-clip: padding-box;
+  background-color: transparent;
+  border: 0.1875rem solid transparent;
+  border-radius: var(--radius-pill);
+  transition: background-color var(--transition-quick);
+}
+
+.is-scrollbar-active,
+*:hover,
+*:focus,
+*:focus-within {
+  scrollbar-color: var(--scrollbar-thumb-active) transparent;
+}
+
+.is-scrollbar-active::-webkit-scrollbar-thumb,
+*:hover::-webkit-scrollbar-thumb,
+*:focus::-webkit-scrollbar-thumb,
+*:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-active);
 }
 
 html, body, #root {

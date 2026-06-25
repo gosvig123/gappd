@@ -36,7 +36,8 @@ function TranscriptSegmentRow({ segment }: { segment: MeetingSegment }) {
 }
 
 function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
-  return <section className="transcript-group">{group.speaker ? <div className="transcript-speaker">{group.speaker}</div> : null}<div className="transcript-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div></section>
+  const className = group.speaker ? 'transcript-group' : 'transcript-group transcript-group-plain'
+  return <section className={className}>{group.speaker ? <div className="transcript-speaker">{group.speaker}</div> : null}<div className="transcript-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div></section>
 }
 
 function transcriptGroups(value: string): TranscriptGroup[] {
