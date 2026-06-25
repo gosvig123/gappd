@@ -68,6 +68,20 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
     setState((current) => ({ ...current, selectedMeetingId: null, selectedMeeting: null, selectedMeetingLoading: false, selectedMeetingError: null }))
   }
 
+  async function deleteMeeting(id: string) {
+    selectedRequest.cancel()
+    setState((current) => ({ ...current, error: null, selectedMeetingLoading: current.selectedMeetingId === id || current.selectedMeetingLoading }))
+    try {
+      const result = await window.gappd.meetings.delete(id)
+      if (refs.selectedId.current === id) refs.selectedId.current = null
+      await refreshMeetings(null)
+      if (result.artifactWarning) setState((current) => ({ ...current, error: result.artifactWarning ?? null }))
+    } catch (err) {
+      setDashboardError(err, setState)
+      setState((current) => ({ ...current, selectedMeetingLoading: false }))
+    }
+  }
+
   async function loadAppData() {
     const [devices, meetings, recording] = await Promise.all([window.gappd.system.getDevices(), window.gappd.meetings.list(), window.gappd.recording.getStatus()])
     setState((current) => ({ ...current, devices, meetings, recording, device: devices[0]?.index ?? current.device }))
@@ -76,7 +90,7 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
     if (!initialMeetingId) clearSelectedMeeting()
   }
 
-  return { refreshMeetings, loadMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
+  return { refreshMeetings, loadMeeting, deleteMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
 }
 
 type DashboardActions = ReturnType<typeof useDashboardActions>

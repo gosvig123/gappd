@@ -91,17 +91,9 @@
   padding: var(--space-5);
 }
 
-.permission-actions,
 .permission-debug {
   display: grid;
   gap: var(--space-3);
-}
-
-.permission-actions {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.permission-debug {
   color: var(--color-text-soft);
   font-size: var(--font-size-sm);
 }

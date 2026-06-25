@@ -24,7 +24,7 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 		store:       store,
 		recorder:    func(capture.CaptureMode, string, int) audioRecorder { return recorder },
 		transcriber: fakeTranscriber{},
-		enhancer:    fakeEnhancer{summary: "summary"},
+		enhancer:    fakeEnhancer{title: "Lifecycle Planning", summary: "summary"},
 	}
 
 	err := service.Run(Request{Title: "Lifecycle", ModelPath: modelPath})
@@ -52,5 +52,8 @@ func assertCompletedMeeting(t *testing.T, meeting *db.Meeting) {
 	}
 	if meeting.Summary == nil || *meeting.Summary != "summary" {
 		t.Fatalf("summary = %v, want summary", meeting.Summary)
+	}
+	if meeting.Title != "Lifecycle Planning" {
+		t.Fatalf("title = %q, want generated title", meeting.Title)
 	}
 }

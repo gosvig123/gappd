@@ -2,11 +2,14 @@ const hooks = require('./scripts/electron-builder-hooks.cjs')
 
 const MACOS_MINIMUM_SYSTEM_VERSION = '14.0'
 const MAC_SIGNING_IDENTITY = process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || '-'
+const MAC_BUNDLE_SHORT_VERSION = process.env.GAPPD_BUNDLE_SHORT_VERSION
+const MAC_BUILD_VERSION = process.env.GAPPD_BUILD_VERSION
 
 /** @type {import('electron-builder').Configuration} */
 module.exports = {
   appId: 'dev.gappd.desktop',
   productName: 'Gappd',
+  buildVersion: MAC_BUILD_VERSION,
   directories: {
     output: 'release',
   },
@@ -20,8 +23,10 @@ module.exports = {
   afterPack: hooks.afterPack,
   afterSign: hooks.afterSign,
   mac: {
+    icon: 'assets/app-icon.icns',
     category: 'public.app-category.productivity',
     target: ['dmg'],
+    bundleShortVersion: MAC_BUNDLE_SHORT_VERSION,
     minimumSystemVersion: MACOS_MINIMUM_SYSTEM_VERSION,
     identity: MAC_SIGNING_IDENTITY,
     hardenedRuntime: true,

@@ -10,7 +10,6 @@ import {
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 import { Button, Card, Field, MetricCard, PageHeader, Panel, ProgressBar, StatusPill, cx } from '../components/ui'
 import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
-import type { CapturePermissionTarget } from '../../shared/ipc-contract'
 import type { SetupPermissionState } from '../hooks/use-setup-permissions'
 
 type OnboardingViewProps = {
@@ -23,8 +22,6 @@ type OnboardingViewProps = {
   onStart: () => void
   onRetry: () => void
   onRequestPermissions: () => void
-  onOpenPermissionsSettings: (target?: CapturePermissionTarget) => void
-  onResetPermissions: () => void
 }
 
 type SetupActionsProps = {
@@ -50,6 +47,8 @@ type OnboardingPhaseCopy = {
 
 type SetupStepState = 'done' | 'active' | 'locked' | 'blocked'
 type SetupStep = { label: string; detail: string; state: SetupStepState }
+
+const SHOW_PERMISSION_DEBUG = import.meta.env.DEV
 
 const PHASE_COPY: Record<OnboardingStatus['phase'], OnboardingPhaseCopy> = {
   checking: { headline: 'Checking setup.', detail: 'Looking for tools already installed on this Mac.', progressDetail: 'Gappd is checking what is already ready.', actionLabel: 'Checking setup...' },
@@ -92,7 +91,7 @@ function primaryActionLabel(status: OnboardingStatus, permission: SetupPermissio
   if (status.phase !== 'ready') return status.phase === 'error' || status.canRetry ? 'Fix setup' : copy.actionLabel
   if (permission.status === 'checking') return 'Checking permissions...'
   if (permission.status === 'granted') return 'Start using Gappd'
-  if (permission.status === 'blocked' || permission.status === 'unknown' || permission.status === 'error') return 'Check again'
+  if (permission.status === 'blocked' || permission.status === 'unknown' || permission.status === 'error') return 'Open System Settings'
   return 'Allow microphone & screen/audio'
 }
 
@@ -168,26 +167,20 @@ function stepIcon(state: SetupStepState): string {
   return '○'
 }
 
-function PermissionSetupCard({ status, state, onOpenSettings, onReset }: { status: OnboardingStatus; state: SetupPermissionState; onOpenSettings: (target?: CapturePermissionTarget) => void; onReset: () => void }) {
+function PermissionSetupCard({ status, state }: { status: OnboardingStatus; state: SetupPermissionState }) {
   if (status.phase !== 'ready') return null
-  const needsSettings = state.status === 'blocked' || state.status === 'unknown' || state.status === 'error'
   return (
     <Card className="setup-permissions">
       <div><div className="label">Recording access</div><h3>{permissionTitle(state)}</h3></div>
       <p>{permissionDetail(state)}</p>
-      {needsSettings ? <PermissionButtons onOpenSettings={onOpenSettings} onReset={onReset} /> : null}
       <PermissionDebug state={state} />
     </Card>
   )
 }
 
-function PermissionButtons({ onOpenSettings, onReset }: { onOpenSettings: (target: CapturePermissionTarget) => void; onReset: () => void }) {
-  return <div className="permission-actions"><Button onClick={() => onOpenSettings('screen-recording')}>Open Screen &amp; Audio</Button><Button onClick={() => onOpenSettings('microphone')}>Open Microphone</Button><Button onClick={onReset}>Reset permission prompts</Button></div>
-}
-
 function PermissionDebug({ state }: { state: SetupPermissionState }) {
   const details = state.permissions?.details
-  if (!details) return null
+  if (!SHOW_PERMISSION_DEBUG || !details) return null
   return <details className="permission-debug"><summary>Permission debug</summary>{Object.entries(details).map(([key, value]) => <div key={key}><strong>{key}</strong><span>{value || 'empty'}</span></div>)}</details>
 }
 
@@ -200,9 +193,9 @@ function permissionTitle(state: SetupPermissionState): string {
 }
 
 function permissionDetail(state: SetupPermissionState): string {
-  if (state.status === 'blocked') return 'Enable GappdCapture in Screen & System Audio Recording and Microphone, then click Check again.'
-  if (state.status === 'unknown') return 'macOS did not give a clear answer. Check again or open System Settings.'
-  if (state.status === 'error') return state.error || 'Permission check failed. Open System Settings, then check again.'
+  if (state.status === 'blocked') return 'System Settings should open. Enable GappdCapture for Screen & System Audio Recording and Microphone, then return to Gappd.'
+  if (state.status === 'unknown') return 'macOS did not give a clear answer. Gappd opens System Settings so you can enable access manually.'
+  if (state.status === 'error') return state.error || 'Permission check failed. Gappd opens System Settings when access needs manual approval.'
   return 'Gappd asks now so recording does not stop when you start your first meeting.'
 }
 
@@ -246,7 +239,7 @@ function SetupBody(props: OnboardingViewProps & { copy: OnboardingPhaseCopy }) {
       <SetupHero copy={props.copy} />
       <SetupChecklist status={props.status} permissionState={props.permissionState} />
       {props.status.phase !== 'ready' ? <SetupProgressCard status={props.status} copy={props.copy} /> : null}
-      <PermissionSetupCard status={props.status} state={props.permissionState} onOpenSettings={props.onOpenPermissionsSettings} onReset={props.onResetPermissions} />
+      <PermissionSetupCard status={props.status} state={props.permissionState} />
       <SetupActions busy={props.busy} disabled={view.disabled} label={view.label} hint={view.hint} onAction={view.action} />
       {view.error ? <LocalAIErrorBanner errorView={view.error} /> : null}
       <SetupAdvancedDetails {...props} />

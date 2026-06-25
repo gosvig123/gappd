@@ -74,6 +74,15 @@ export type MeetingSegment = {
   text: string
 }
 
+export type MeetingDeleteInput = {
+  id: string
+}
+
+export type MeetingDeleteResponse = {
+  deletedId: string
+  artifactWarning?: string
+}
+
 export type ConfigResponse = {
   ai: AIConfig
 }

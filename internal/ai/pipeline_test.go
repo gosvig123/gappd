@@ -45,13 +45,16 @@ func (h *ollamaTestServer) handleChat(w http.ResponseWriter, r *http.Request) {
 }
 
 func TestPipelineExtract(t *testing.T) {
-	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
+	h := newOllamaTestServer(t, `{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
 
 	extraction, err := h.pipeline(0.7).Extract(context.Background(), "Ada: let's ship beta on Friday")
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
 	assertRequest(t, h.requests, 0, 0.7, "Ada: let's ship beta on Friday")
+	if extraction.Title != "Beta Launch Planning" {
+		t.Fatalf("extraction.Title = %q, want generated title", extraction.Title)
+	}
 	if extraction.Sentiment != "productive" {
 		t.Fatalf("extraction.Sentiment = %q, want productive", extraction.Sentiment)
 	}
@@ -75,7 +78,7 @@ func TestPipelineSynthesize(t *testing.T) {
 }
 
 func TestPipelineRun(t *testing.T) {
-	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, "## Meeting Title\nWeekly sync")
+	h := newOllamaTestServer(t, `{"title":"Weekly Sync","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, "## Meeting Title\nWeekly sync")
 
 	extraction, notes, err := h.pipeline(0.3).Run(context.Background(), "Ada: weekly sync", "")
 	if err != nil {
@@ -91,7 +94,7 @@ func TestPipelineRun(t *testing.T) {
 }
 
 func TestPipelineRunReturnsExtractionWhenSynthesisFails(t *testing.T) {
-	h := newOllamaTestServer(t, `{"participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, `{"error":"ollama offline"}`)
+	h := newOllamaTestServer(t, `{"title":"Weekly Sync","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, `{"error":"ollama offline"}`)
 	h.status = http.StatusOK
 	h.contents[1] = ""
 	h.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -37,6 +37,11 @@ type MeetingResponse struct {
 	Meeting MeetingDetail `json:"meeting"`
 }
 
+type MeetingDeleteResponse struct {
+	DeletedID       string  `json:"deletedId"`
+	ArtifactWarning *string `json:"artifactWarning,omitempty"`
+}
+
 type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
 }

@@ -23,6 +23,8 @@ type Config struct {
 	AI     AI     `toml:"ai"`
 }
 
+const toleratedGoogleConfigTable = "google"
+
 func defaults() (Config, error) {
 	dir, err := GappdDir()
 	if err != nil {
@@ -65,14 +67,24 @@ func Load() (Config, error) {
 	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
 		keys := make([]string, 0, len(undecoded))
 		for _, key := range undecoded {
+			if toleratedUndecodedKey(key) {
+				continue
+			}
 			keys = append(keys, key.String())
 		}
-		return Config{}, fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
+		if len(keys) > 0 {
+			return Config{}, fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
+		}
 	}
 	if err := validate(&cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+func toleratedUndecodedKey(key toml.Key) bool {
+	name := key.String()
+	return name == toleratedGoogleConfigTable || strings.HasPrefix(name, toleratedGoogleConfigTable+".")
 }
 
 func DefaultAI() (AI, error) {
