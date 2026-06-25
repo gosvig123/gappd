@@ -15,26 +15,28 @@ type CaptureCardProps = {
 
 export function CaptureCard(props: CaptureCardProps) {
   const state = readyState(props.canStart, props.canStop, props.devices, props.recordingStatus)
-  const action = props.canStop ? props.onStop : props.onStart
-  const disabled = !props.canStop && !props.canStart
-  const label = props.canStop ? 'Stop and process' : 'Start'
-  const variant = props.canStop ? 'secondary' : 'primary'
-  const buttonClassName = props.canStop ? 'record-toggle-button stop-process-button' : 'record-toggle-button'
-
+  const action = captureAction(props)
   return (
     <Panel className="record-action-panel">
       <div className="record-action-bar">
-        <div className="record-status-copy">
-          <strong>Record meeting</strong>
-          <p>{state.detail}</p>
-        </div>
-        <RecordFields {...props} />
-        <div className="actions-row record-actions">
-          <Button className={buttonClassName} variant={variant} onClick={action} disabled={disabled}>{label}</Button>
+        <div className="record-status-copy record-section"><strong>Record meeting</strong><p>{state.detail}</p></div>
+        <div className="record-controls record-section">
+          <RecordFields {...props} />
+          <div className="actions-row record-actions"><Button className={action.className} variant={action.variant} onClick={action.onClick} disabled={action.disabled}>{action.label}</Button></div>
         </div>
       </div>
     </Panel>
   )
+}
+
+function captureAction(props: CaptureCardProps) {
+  return {
+    className: props.canStop ? 'record-toggle-button stop-process-button' : 'record-toggle-button',
+    disabled: !props.canStop && !props.canStart,
+    label: props.canStop ? 'Stop and process' : 'Start',
+    onClick: props.canStop ? props.onStop : props.onStart,
+    variant: props.canStop ? ('secondary' as const) : ('primary' as const),
+  }
 }
 
 function RecordFields({ device, devices, onDeviceChange }: Pick<CaptureCardProps, 'device' | 'devices' | 'onDeviceChange'>) {

@@ -26,6 +26,7 @@ export type MeetingListItem = {
   status: MeetingStatus
   hasTranscript: boolean
   hasSummary: boolean
+  searchText?: string
 }
 
 export type MeetingStatus = {

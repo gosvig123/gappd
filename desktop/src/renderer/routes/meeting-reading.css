@@ -1,6 +1,9 @@
 .reading-card {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 12px;
-  align-content: start;
+  align-content: stretch;
   --reading-fade-color: var(--color-surface);
 }
 
@@ -28,6 +31,10 @@
 
 .reading-text {
   position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  justify-self: stretch;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--color-text-soft);
@@ -36,8 +43,12 @@
 }
 
 .reading-preview {
-  max-height: 13rem;
   overflow: hidden;
+}
+
+.reading-expanded {
+  overflow: auto;
+  padding-right: var(--space-2);
 }
 
 .reading-preview::after {
@@ -57,19 +68,29 @@
 
 .primary-reading-card .reading-text {
   color: var(--color-text);
-  font-size: 14px;
+  font-size: 15px;
   white-space: normal;
 }
 
 .markdown {
   display: grid;
-  gap: 8px;
+  gap: 12px;
+  width: 100%;
 }
 
 .markdown h3,
 .markdown h4 {
-  margin: 4px 0 0;
+  margin: 8px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
   line-height: var(--line-height-tight);
+}
+
+.markdown h3:first-child,
+.markdown h4:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .markdown h3 {
@@ -86,13 +107,14 @@
 .markdown ul,
 .markdown ol {
   margin: 0;
-  line-height: var(--line-height-reading);
+  color: var(--color-text-soft);
+  line-height: 1.7;
 }
 
 .markdown ul,
 .markdown ol {
   display: grid;
-  gap: 4px;
+  gap: 8px;
   padding-left: 1.25rem;
 }
 
@@ -102,7 +124,7 @@
 }
 
 .markdown li::marker {
-  color: var(--color-text-muted);
+  color: var(--color-accent);
 }
 
 .detail-surface.reading-card {
