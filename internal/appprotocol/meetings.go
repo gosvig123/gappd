@@ -13,6 +13,7 @@ type MeetingListItem struct {
 	Status        MeetingStatus `json:"status"`
 	HasTranscript bool          `json:"hasTranscript"`
 	HasSummary    bool          `json:"hasSummary"`
+	SearchText    string        `json:"searchText,omitempty"`
 }
 
 type MeetingDetail struct {
@@ -43,7 +44,11 @@ func BuildMeetingListViews(meetings []db.Meeting) []MeetingListItem {
 }
 
 func BuildMeetingListView(meeting db.Meeting) MeetingListItem {
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: meeting.Transcript != nil, HasSummary: meeting.Summary != nil}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: meeting.Transcript != nil, HasSummary: meeting.Summary != nil, SearchText: meetingSearchText(meeting)}
+}
+
+func meetingSearchText(meeting db.Meeting) string {
+	return meeting.Title + "\n" + stringValue(meeting.Summary) + "\n" + stringValue(meeting.Transcript)
 }
 
 func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {

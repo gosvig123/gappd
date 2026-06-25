@@ -24,19 +24,6 @@ export function meetingStatusLabel(state: MeetingStatus['state']): string {
   }
 }
 
-export function processingStatusLabel(state: MeetingStatus['processing']['state']): string {
-  switch (state) {
-    case 'not_started':
-      return 'Not started'
-    case 'processing':
-      return 'Processing'
-    case 'completed':
-      return 'Completed'
-    case 'failed':
-      return 'Failed'
-  }
-}
-
 export function meetingStatusTone(state: MeetingStatus['state']): 'recording' | 'processing' | 'idle' | 'error' {
   switch (state) {
     case 'recording':
@@ -49,6 +36,10 @@ export function meetingStatusTone(state: MeetingStatus['state']): 'recording' | 
     case 'completed':
       return 'idle'
   }
+}
+
+export function meetingStatusPillVisible(state: MeetingStatus['state']): boolean {
+  return meetingStatusTone(state) !== 'idle'
 }
 
 export function artifactLabel(ready: boolean, present: string, missing: string): string {
