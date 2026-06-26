@@ -165,9 +165,7 @@ func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recording
 	if err := session.saveEnhancement(extraction.Title, transcript, summary); err != nil {
 		return err
 	}
-	if p.service.Events == nil {
-		printEnhancementResult(p.service, summary, len(extraction.ActionItems), session.meeting.ID)
-	}
+	p.printEnhancementResult(summary, len(extraction.ActionItems), session.meeting.ID)
 	return nil
 }
 
@@ -176,6 +174,12 @@ func (p meetingProcessing) enhancer() enhancer {
 		return p.service.enhancer
 	}
 	return p.service.Pipeline
+}
+
+func (p meetingProcessing) printEnhancementResult(summary string, actionItems int, meetingID string) {
+	if p.service.Events == nil {
+		printEnhancementResult(p.service, summary, actionItems, meetingID)
+	}
 }
 
 func printEnhancementResult(s Service, summary string, actionItems int, meetingID string) {

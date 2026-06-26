@@ -22,6 +22,26 @@ func NewPipeline(ollama *OllamaProvider, temperature float64) *Pipeline {
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
+	return p.extractChunk(ctx, transcript)
+}
+
+func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
+	chunks := transcriptChunks(transcript)
+	if len(chunks) == 1 {
+		return p.Extract(ctx, transcript)
+	}
+	extractions := make([]*Extraction, 0, len(chunks))
+	for _, chunk := range chunks {
+		extraction, err := p.extractChunk(ctx, chunk)
+		if err != nil {
+			return nil, err
+		}
+		extractions = append(extractions, extraction)
+	}
+	return mergeExtractions(extractions), nil
+}
+
+func (p *Pipeline) extractChunk(ctx context.Context, transcript string) (*Extraction, error) {
 	system, user := Stage1Prompt(transcript)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
 	raw, err := p.ollama.CompleteJSON(ctx, req)
@@ -46,7 +66,7 @@ func (p *Pipeline) Synthesize(ctx context.Context, extraction *Extraction, userN
 }
 
 func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string) (*Extraction, string, error) {
-	extraction, err := p.Extract(ctx, transcript)
+	extraction, err := p.ExtractLong(ctx, transcript)
 	if err != nil {
 		return nil, "", err
 	}
