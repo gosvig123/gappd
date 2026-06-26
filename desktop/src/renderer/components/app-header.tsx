@@ -1,5 +1,5 @@
 import type { UpdateStatus } from '../../shared/contracts'
-import appLogo from '../assets/app-logo.png'
+import { AppLogo } from './app-logo'
 
 const UPDATE_LABEL = 'Update'
 
@@ -18,7 +18,7 @@ type HeaderUpdateAction = { label: string; title: string; disabled?: boolean; in
 export function AppHeader(props: AppHeaderProps) {
   return (
     <header className="app-header">
-      <div className="app-brand-block"><img className="app-logo" src={appLogo} alt="" aria-hidden="true" /><div className="app-brand">Gappd</div><p>Record, review, and search private meeting notes.</p></div>
+      <div className="app-brand-block"><AppLogo className="app-logo" /><div className="app-brand">Gappd</div><p>Record, review, and search private meeting notes.</p></div>
       <div className="app-controls" aria-label="App controls">
         <UpdateControls {...props} />
         {props.developerDebugEnabled ? <button className={props.settingsOpen ? 'app-control settings-control active' : 'app-control settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close developer debug' : 'Open developer debug'} aria-pressed={props.settingsOpen}>⚙<span>Developer Debug</span></button> : null}
