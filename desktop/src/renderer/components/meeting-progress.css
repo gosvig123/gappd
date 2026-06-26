@@ -1,6 +1,6 @@
 .processing-card {
   background: var(--color-accent-tint);
-  border-color: var(--color-accent-border);
+  border: 1px solid var(--color-accent-border);
 }
 
 .processing-card-header {

@@ -38,10 +38,10 @@
   --color-accent: #3d52d5;
   --color-secure: #18935e;
   --color-surface: #f4f6fb;
-  --color-border: #e3e7f0;
+  --color-border: #e9edf4;
   --color-text: #101a33;
   --color-card: #ffffff;
-  --color-bg: var(--color-surface);
+  --color-bg: var(--color-card);
   --color-bg-soft: color-mix(in srgb, var(--color-surface) 84%, var(--color-card));
   --color-surface-soft: color-mix(in srgb, var(--color-surface) 72%, var(--color-card));
   --color-surface-raised: var(--color-card);
@@ -84,8 +84,8 @@
   --gradient-accent: linear-gradient(180deg, var(--color-accent-bright), var(--color-accent));
   --gradient-accent-hover: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 80%, var(--color-card)), color-mix(in srgb, var(--color-accent) 92%, var(--color-brand)));
   --shell-glow:
-    radial-gradient(60rem 30rem at 12% -12%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 60%),
-    radial-gradient(50rem 26rem at 88% -16%, color-mix(in srgb, var(--color-secure) 8%, transparent), transparent 60%);
+    radial-gradient(60rem 30rem at 12% -12%, color-mix(in srgb, var(--color-accent) 4%, transparent), transparent 60%),
+    radial-gradient(50rem 26rem at 88% -16%, color-mix(in srgb, var(--color-secure) 3%, transparent), transparent 60%);
 
   --transition-quick: 140ms ease;
 }

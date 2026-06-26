@@ -1,37 +1,68 @@
 .dashboard-grid {
+  --reading-column: 52rem;
   min-height: 0;
   display: grid;
   flex: 1;
-  gap: 0.625rem;
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
 }
 
-.dashboard-workspace {
-  min-height: 0;
-  display: grid;
-  gap: 0.625rem;
-  grid-template-columns: minmax(17rem, 24rem) minmax(0, 1fr);
+/* One surface: flatten the inner panels, separate regions with hairlines. */
+.dashboard-grid .panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
-.dashboard-workspace.meeting-list-collapsed {
-  grid-template-rows: auto minmax(0, 1fr);
-  grid-template-columns: minmax(0, 1fr);
+.dashboard-grid .record-action-panel {
+  border-top: 1px solid var(--color-border);
 }
 
-.dashboard-inbox-panel,
-.dashboard-detail-column {
+/* Single centered column: the meeting list, or the opened meeting. */
+.dashboard-stage {
   min-width: 0;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.dashboard-detail-column {
-  display: grid;
+.dashboard-stage.is-list {
+  overflow: auto;
+}
+
+.dashboard-stage.is-detail {
   overflow: hidden;
 }
 
-.meeting-list-collapsed .dashboard-detail-column {
+.meeting-list-screen,
+.meeting-detail-screen {
+  width: min(100%, var(--reading-column));
+  margin-inline: auto;
+  padding: var(--space-7) var(--space-7) var(--space-9);
+}
+
+.meeting-list-screen {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.meeting-list-screen .meeting-list {
+  flex: none;
+  overflow: visible;
+}
+
+.meeting-detail-screen {
   min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.meeting-detail-screen > .detail-panel {
+  flex: 1;
+  padding: 0;
 }
 
 .record-action-panel {
@@ -43,6 +74,8 @@
 }
 
 .record-action-bar {
+  width: min(100%, var(--reading-column));
+  margin-inline: auto;
   display: grid;
   grid-template-columns: minmax(12rem, 0.8fr) minmax(24rem, 1.6fr);
   gap: var(--space-3);
@@ -51,11 +84,11 @@
 
 .record-section {
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-surface-soft) 74%, var(--color-card));
-  box-shadow: inset 0 1px 0 var(--highlight-subtle);
+  padding: var(--space-4) var(--space-5);
+}
+
+.record-controls {
+  border-left: 1px solid var(--color-border);
 }
 
 .record-controls {
@@ -146,28 +179,14 @@
   background: color-mix(in srgb, var(--color-warning), var(--color-text) 8%);
 }
 
-.inbox-panel-header {
-  align-items: center;
-}
-
-@media (max-width: 81.25rem) {
-  .dashboard-workspace {
-    grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr);
-  }
-}
-
 @media (max-width: 56rem) {
   .dashboard-grid {
     grid-template-rows: auto;
     overflow: visible;
   }
 
-  .dashboard-workspace,
-  .dashboard-workspace.meeting-list-collapsed {
-    grid-template-columns: 1fr;
-  }
-
-  .dashboard-detail-column {
+  .dashboard-stage.is-list,
+  .dashboard-stage.is-detail {
     overflow: visible;
   }
 }
@@ -183,6 +202,8 @@
 
   .record-controls {
     grid-template-columns: 1fr;
+    border-left: 0;
+    padding-left: 0;
   }
 
   .record-status-copy,
