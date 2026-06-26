@@ -2,6 +2,9 @@ import type { Device, RecordingStatus } from '../../shared/contracts'
 import { Button, Field, Panel } from '../components/ui'
 import { readyState } from './today-model'
 
+const RECORDING_STOPPING: RecordingStatus = 'stopping'
+const RECORDING_PROCESSING: RecordingStatus = 'processing'
+
 type CaptureCardProps = {
   device: number
   devices: Device[]
@@ -14,7 +17,7 @@ type CaptureCardProps = {
 }
 
 export function CaptureCard(props: CaptureCardProps) {
-  const state = readyState(props.canStart, props.canStop, props.devices, props.recordingStatus)
+  const state = readyState(props.canStart, props.devices, props.recordingStatus)
   const action = captureAction(props)
   return (
     <Panel className="record-action-panel">
@@ -30,6 +33,8 @@ export function CaptureCard(props: CaptureCardProps) {
 }
 
 function captureAction(props: CaptureCardProps) {
+  if (props.recordingStatus === RECORDING_STOPPING) return disabledAction('Stopping…', props.onStop)
+  if (props.recordingStatus === RECORDING_PROCESSING) return disabledAction('Processing…', props.onStop)
   return {
     className: props.canStop ? 'record-toggle-button stop-process-button' : 'record-toggle-button',
     disabled: !props.canStop && !props.canStart,
@@ -37,6 +42,10 @@ function captureAction(props: CaptureCardProps) {
     onClick: props.canStop ? props.onStop : props.onStart,
     variant: props.canStop ? ('secondary' as const) : ('primary' as const),
   }
+}
+
+function disabledAction(label: string, onClick: () => void) {
+  return { className: 'record-toggle-button', disabled: true, label, onClick, variant: 'secondary' as const }
 }
 
 function RecordFields({ device, devices, onDeviceChange }: Pick<CaptureCardProps, 'device' | 'devices' | 'onDeviceChange'>) {
