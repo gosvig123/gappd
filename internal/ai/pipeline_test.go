@@ -98,6 +98,7 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 		`{"title":"First Half","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		`{"title":"Second Half","participants":["Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		`{"title":"Wrap Up","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
+		`{"title":"Roadmap Launch Planning","participants":["Ada","Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		"## Meeting Title\nMerged")
 	transcript := strings.Repeat("[Ada] roadmap\n", 1000) + strings.Repeat("[Ben] launch\n", 1000)
 
@@ -105,8 +106,11 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	if len(h.requests) != 4 || notes == "" {
-		t.Fatalf("requests=%d notes=%q, want chunked extraction and synthesis", len(h.requests), notes)
+	if len(h.requests) != 5 || notes == "" {
+		t.Fatalf("requests=%d notes=%q, want chunked extraction, refinement, and synthesis", len(h.requests), notes)
+	}
+	if extraction.Title != "Roadmap Launch Planning" {
+		t.Fatalf("title = %q, want refined global title", extraction.Title)
 	}
 	if strings.Join(extraction.Participants, ",") != "Ada,Ben" {
 		t.Fatalf("participants = %#v, want merged participants", extraction.Participants)
