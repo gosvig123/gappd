@@ -37,6 +37,8 @@ function useDashboardState() {
     recording: { status: IDLE_RECORDING_STATUS } as RecordingState,
     error: null as string | null,
     device: 0,
+    recoveringStale: false,
+    staleRecoveryNotice: null as string | null,
   })
 }
 
@@ -90,7 +92,19 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
     if (!initialMeetingId) clearSelectedMeeting()
   }
 
-  return { refreshMeetings, loadMeeting, deleteMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
+  async function recoverStale() {
+    setState((current) => ({ ...current, recoveringStale: true, staleRecoveryNotice: null }))
+    try {
+      const recovered = await window.gappd.system.startStaleRecordingRecovery()
+      if (recovered > 0) await refreshMeetings(refs.selectedId.current)
+      setState((current) => ({ ...current, recoveringStale: false, staleRecoveryNotice: recoveryNotice(recovered) }))
+    } catch (err) {
+      setState((current) => ({ ...current, recoveringStale: false }))
+      throw err
+    }
+  }
+
+  return { refreshMeetings, loadMeeting, deleteMeeting, loadAppData, recoverStale, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
 }
 
 type DashboardActions = ReturnType<typeof useDashboardActions>
@@ -134,9 +148,14 @@ function useRecordingLifecycle(enabled: boolean, refs: MeetingRefs, actions: Das
   useGuardedEffect((guard) => {
     if (!enabled) return undefined
     const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, refs, actions, setState)))
-    void actions.loadAppData().catch((err) => guard(() => setDashboardError(err, setState)))
+    void loadReadyAppData(actions).catch((err) => guard(() => setDashboardError(err, setState)))
     return dispose
   }, [enabled])
+}
+
+async function loadReadyAppData(actions: DashboardActions) {
+  await actions.loadAppData()
+  await actions.recoverStale()
 }
 
 async function handleRecordingChange(next: RecordingState, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState) {
@@ -205,6 +224,11 @@ function capturePermissionError(permissions: Awaited<ReturnType<typeof window.ga
 function isPermissionDeniedState(state: string): boolean {
   const normalized = state.trim().toLowerCase()
   return normalized.includes('denied') || normalized.includes('restricted')
+}
+
+function recoveryNotice(recovered: number): string | null {
+  if (recovered === 0) return null
+  return recovered === 1 ? 'Recovered 1 previous recording.' : `Recovered ${recovered} previous recordings.`
 }
 
 function buildDashboardViewModel(state: DashboardState, actions: DashboardActions) {

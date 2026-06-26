@@ -104,10 +104,9 @@ export async function saveManagedLocalAIConfig(input: { endpoint: string; model:
   return result.ai
 }
 
-export function startStaleRecordingRecovery(): void {
-  if (staleRecoveryTimer) return
-  void runStaleRecordingRecovery()
-  staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
+export async function startStaleRecordingRecovery(): Promise<number> {
+  if (!staleRecoveryTimer) staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
+  return runStaleRecordingRecovery()
 }
 
 export function stopStaleRecordingRecovery(): void {
@@ -148,13 +147,14 @@ function cleanPermissionDetails(details: Record<string, string>): Record<string,
   return Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'microphone' && key !== 'screen'))
 }
 
-async function runStaleRecordingRecovery(): Promise<void> {
-  if (staleRecoveryRunning) return
+async function runStaleRecordingRecovery(): Promise<number> {
+  if (staleRecoveryRunning) return 0
   staleRecoveryRunning = true
   try {
-    await recoverStaleRecordings()
+    return await recoverStaleRecordings()
   } catch (error) {
     console.error('stale recording recovery failed', error)
+    return 0
   } finally {
     staleRecoveryRunning = false
   }

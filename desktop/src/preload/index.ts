@@ -14,6 +14,7 @@ const api: GappdApi = {
     getDevices: () => ipcRenderer.invoke(IPC_CHANNELS.system.getDevices),
     requestCapturePermissions: () => ipcRenderer.invoke(IPC_CHANNELS.system.requestCapturePermissions),
     openPermissionsSettings: (target) => ipcRenderer.invoke(IPC_CHANNELS.system.openPermissionsSettings, target),
+    startStaleRecordingRecovery: () => ipcRenderer.invoke(IPC_CHANNELS.system.startStaleRecordingRecovery),
   },
   meetings: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.meetings.list),

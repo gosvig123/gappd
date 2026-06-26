@@ -7,6 +7,7 @@ import { useLocalAISettings } from './hooks/use-local-ai-settings'
 import { useOnboarding } from './hooks/use-onboarding'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
 import { useUpdateStatus } from './hooks/use-update-status'
+import { Banner } from './components/ui'
 import { DashboardView } from './routes/dashboard-view'
 import { OnboardingView } from './routes/onboarding-view'
 import { SettingsView } from './routes/settings-view'
@@ -24,7 +25,7 @@ export function App() {
   const settings = useLocalAISettings(appReady && settingsOpen, onboarding.setStatus)
   const update = useUpdateStatus()
 
-  if (onboarding.loading || !onboarding.status) return <div className="screen-center">Loading Gappd…</div>
+  if (onboarding.loading || !onboarding.status) return <div className="screen-center">Starting Gappd…</div>
 
   return (
     <div className="app-shell">
@@ -38,7 +39,13 @@ export function App() {
 }
 
 function ReadyApp({ dashboard }: { dashboard: ReturnType<typeof useDashboardData> }) {
-  return <><PermissionBanner error={dashboard.bannerError} isPermissionError={dashboard.isPermissionError} onRetry={() => void dashboard.actions.start()} onOpenSettings={() => void dashboard.actions.openPermissionsSettings()} /><DashboardView device={dashboard.device} devices={dashboard.devices} meetings={dashboard.meetings} selectedMeetingId={dashboard.selectedMeetingId} selectedMeeting={dashboard.selectedMeeting} selectedMeetingLoading={dashboard.selectedMeetingLoading} selectedMeetingError={dashboard.selectedMeetingError} transcript={dashboard.transcript} recordingStatus={dashboard.recording.status} canStart={dashboard.canStart} canStop={dashboard.canStop} onDeviceChange={dashboard.actions.setDevice} onStart={() => void dashboard.actions.start()} onStop={() => void dashboard.actions.stop()} onSelectMeeting={(id) => void dashboard.actions.loadMeeting(id)} onDeleteMeeting={dashboard.actions.deleteMeeting} /></>
+  return <><PermissionBanner error={dashboard.bannerError} isPermissionError={dashboard.isPermissionError} onRetry={() => void dashboard.actions.start()} onOpenSettings={() => void dashboard.actions.openPermissionsSettings()} /><StaleRecoveryBanner recovering={dashboard.recoveringStale} notice={dashboard.staleRecoveryNotice} /><DashboardView device={dashboard.device} devices={dashboard.devices} meetings={dashboard.meetings} selectedMeetingId={dashboard.selectedMeetingId} selectedMeeting={dashboard.selectedMeeting} selectedMeetingLoading={dashboard.selectedMeetingLoading} selectedMeetingError={dashboard.selectedMeetingError} transcript={dashboard.transcript} recordingStatus={dashboard.recording.status} canStart={dashboard.canStart} canStop={dashboard.canStop} onDeviceChange={dashboard.actions.setDevice} onStart={() => void dashboard.actions.start()} onStop={() => void dashboard.actions.stop()} onSelectMeeting={(id) => void dashboard.actions.loadMeeting(id)} onDeleteMeeting={dashboard.actions.deleteMeeting} /></>
+}
+
+function StaleRecoveryBanner({ recovering, notice }: { recovering: boolean; notice: string | null }) {
+  if (recovering) return <Banner title="Checking previous recordings">Recovering any interrupted recording in the background.</Banner>
+  if (notice) return <Banner>{notice}</Banner>
+  return null
 }
 
 function OnboardingApp({ onboarding, permissions }: { onboarding: ReturnType<typeof useOnboarding>; permissions: ReturnType<typeof useSetupPermissions> }) {
