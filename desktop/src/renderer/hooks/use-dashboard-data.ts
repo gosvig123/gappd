@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState } from '../../shared/contracts'
 import { isPermissionErrorMessage, permissionTarget } from '../components/meeting-status'
-import { ACTIVE_RECORDING_STATUSES, useDynamicRefresh } from './use-dynamic-refresh'
+import { useDynamicRefresh } from './use-dynamic-refresh'
 import { useGuardedEffect } from './use-guarded-effect'
 import { useRequestGate } from './request-gate'
 
@@ -89,9 +89,8 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
   async function loadAppData() {
     const [devices, meetings, recording] = await Promise.all([window.gappd.system.getDevices(), window.gappd.meetings.list(), window.gappd.recording.getStatus()])
     setState((current) => ({ ...current, devices, meetings, recording, device: devices[0]?.index ?? current.device }))
-    const initialMeetingId = recording.meetingId ?? meetings[0]?.id ?? null
-    if (initialMeetingId) await loadMeeting(initialMeetingId)
-    if (!initialMeetingId) clearSelectedMeeting()
+    // List-first: never auto-open a meeting on launch. Selection happens on click.
+    clearSelectedMeeting()
   }
 
   async function recoverStale() {
@@ -106,7 +105,7 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
     }
   }
 
-  return { refreshMeetings, loadMeeting, deleteMeeting, loadAppData, recoverStale, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
+  return { refreshMeetings, loadMeeting, clearSelectedMeeting, deleteMeeting, loadAppData, recoverStale, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
 }
 
 type DashboardActions = ReturnType<typeof useDashboardActions>
@@ -116,9 +115,10 @@ type MeetingRefs = ReturnType<typeof useMeetingRefs>
 type RequestGate = ReturnType<typeof useRequestGate>
 
 async function resolveSelectedMeeting(meetings: MeetingListItem[], preferredId: string | null | undefined, refs: MeetingRefs, loadMeeting: (id: string) => Promise<void>, clear: () => void) {
-  const nextId = preferredId ?? refs.selectedId.current ?? meetings[0]?.id ?? null
+  const nextId = preferredId ?? refs.selectedId.current ?? null
   if (!nextId) return clear()
-  const resolvedId = meetings.some((meeting) => meeting.id === nextId) ? nextId : meetings[0]?.id ?? null
+  // Don't fall back to the first meeting — if the open one is gone, return to the list.
+  const resolvedId = meetings.some((meeting) => meeting.id === nextId) ? nextId : null
   if (resolvedId) await loadMeeting(resolvedId)
   if (!resolvedId) clear()
 }
