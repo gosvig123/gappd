@@ -34,24 +34,25 @@
   --radius-panel: 0.875rem;
   --radius-pill: 999px;
 
-  /* Light slate anchor so every "-strong" mix raises contrast against the dark base. */
-  --color-brand: #aeb9d6;
-  --color-accent: #6d7cf5;
-  --color-secure: #2fb37a;
-  --color-surface: #20242f;
-  --color-border: #2a3040;
-  --color-text: #e7eaf3;
-  --color-card: #15171f;
+  /* Zed "One Dark" inspired: warm charcoal canvas, calm sky-blue accent.
+     Light slate anchor so every "-strong" mix raises contrast on dark. */
+  --color-brand: #c2cad9;
+  --color-accent: #74ade8;
+  --color-secure: #5cba8f;
+  --color-surface: #2f343e;
+  --color-border: #404552;
+  --color-text: #dce0e5;
+  --color-card: #282c33;
   --color-bg: var(--color-card);
   --color-bg-soft: color-mix(in srgb, var(--color-surface) 84%, var(--color-card));
   --color-surface-soft: color-mix(in srgb, var(--color-surface) 72%, var(--color-card));
   --color-surface-raised: var(--color-card);
   --color-border-strong: color-mix(in srgb, var(--color-border) 74%, var(--color-brand));
-  --color-text-muted: color-mix(in srgb, var(--color-text) 56%, var(--color-surface));
-  --color-text-soft: color-mix(in srgb, var(--color-text) 74%, var(--color-surface));
+  --color-text-muted: color-mix(in srgb, var(--color-text) 64%, var(--color-surface));
+  --color-text-soft: color-mix(in srgb, var(--color-text) 80%, var(--color-surface));
   --color-accent-strong: var(--color-accent);
   --color-accent-bright: color-mix(in srgb, var(--color-accent) 86%, #ffffff);
-  --color-accent-contrast: #ffffff;
+  --color-accent-contrast: #f5f9ff;
   --color-accent-soft: color-mix(in srgb, var(--color-accent) 22%, transparent);
   --color-accent-tint: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
   --color-accent-tint-strong: color-mix(in srgb, var(--color-accent) 18%, var(--color-card));
@@ -60,11 +61,11 @@
   --color-success: var(--color-secure);
   --color-success-bg: color-mix(in srgb, var(--color-secure) 16%, var(--color-card));
   --color-success-border: color-mix(in srgb, var(--color-secure) 36%, var(--color-border));
-  --color-warning: color-mix(in srgb, var(--color-secure) 72%, var(--color-brand));
-  --color-warning-contrast: #0b0d12;
+  --color-warning: #d3a259;
+  --color-warning-contrast: #11151c;
   --color-warning-bg: color-mix(in srgb, var(--color-warning) 16%, var(--color-card));
   --color-warning-border: color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
-  --color-danger: #f08099;
+  --color-danger: #e0707b;
   --color-danger-bg: color-mix(in srgb, var(--color-danger) 14%, var(--color-card));
   --color-danger-border: color-mix(in srgb, var(--color-danger) 32%, var(--color-border));
   --color-overlay-scrim: color-mix(in srgb, #05070c 62%, transparent);
@@ -72,7 +73,7 @@
   --surface-panel: var(--color-card);
   --surface-control: var(--color-card);
   --surface-accent: var(--color-accent-tint);
-  --surface-hover: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
+  --surface-hover: color-mix(in srgb, #ffffff 6%, var(--color-card));
   --surface-translucent: color-mix(in srgb, var(--color-card) 86%, transparent);
   --highlight-subtle: color-mix(in srgb, #ffffff 7%, transparent);
   --highlight-strong: color-mix(in srgb, #ffffff 13%, transparent);
@@ -82,11 +83,10 @@
   --shadow-accent: 0 1px 2px color-mix(in srgb, #05070c 50%, transparent), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 50%, transparent);
   --shadow-logo: 0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent);
   --focus-ring: 0 0 0 3px var(--color-accent-soft);
-  --gradient-accent: linear-gradient(180deg, var(--color-accent-bright), var(--color-accent));
-  --gradient-accent-hover: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 86%, #ffffff), var(--color-accent));
-  --shell-glow:
-    radial-gradient(60rem 30rem at 12% -12%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 60%),
-    radial-gradient(50rem 26rem at 88% -16%, color-mix(in srgb, var(--color-secure) 7%, transparent), transparent 60%);
+  --gradient-accent: linear-gradient(180deg, #5e9ce0, #4d87cf);
+  --gradient-accent-hover: linear-gradient(180deg, #6aa6e8, #5690d6);
+  /* Zed is flat and calm — drop the colored glows, keep a whisper of top sheen. */
+  --shell-glow: linear-gradient(180deg, color-mix(in srgb, #ffffff 2.5%, transparent), transparent 22%);
 
   --transition-quick: 140ms ease;
 }

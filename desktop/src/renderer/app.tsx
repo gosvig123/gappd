@@ -20,14 +20,16 @@ const READY_ONBOARDING_PHASE = 'ready'
 export function App() {
   const onboarding = useOnboarding()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const developerDebugEnabled = import.meta.env.DEV
   const aiReady = onboarding.status?.phase === READY_ONBOARDING_PHASE
   const permissions = useSetupPermissions(Boolean(aiReady))
   const appReady = Boolean(aiReady && permissions.ready)
+  const developerDebugOpen = developerDebugEnabled && appReady && settingsOpen
   const dashboard = useDashboardData(appReady)
-  const settings = useLocalAISettings(appReady && settingsOpen, onboarding.setStatus)
+  const settings = useLocalAISettings(developerDebugOpen, onboarding.setStatus)
   const update = useUpdateStatus()
   if (onboarding.loading || !onboarding.status) return <div className="screen-center">Starting Gappd…</div>
-  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsOpen && appReady} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <OnboardingApp onboarding={onboarding} permissions={permissions} />}</main>{settingsOpen && appReady ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView {...settings} onRepair={() => void settings.repair()} /></SettingsSheet> : null}</div>
+  return <div className="app-shell"><AppHeader appReady={appReady} developerDebugEnabled={developerDebugEnabled} settingsOpen={developerDebugOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <OnboardingApp onboarding={onboarding} permissions={permissions} />}</main>{developerDebugOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView {...settings} onRepair={() => void settings.repair()} /></SettingsSheet> : null}</div>
 }
 
 function ReadyApp({ dashboard, update }: { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus> }) {

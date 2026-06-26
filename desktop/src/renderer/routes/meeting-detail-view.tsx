@@ -8,7 +8,6 @@ import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgres
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { TranscriptText } from './transcript-view'
 
-const EXPAND_READING_LABEL = 'More', COLLAPSE_READING_LABEL = 'Less'
 const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
@@ -31,13 +30,11 @@ function CopyArtifactButton({ value, label }: { value: string; label: string }) 
   return <Button className="compact-action" onClick={() => void copyArtifact()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : label}</Button>
 }
 
-function useReadingExpansion(value: string, defaultExpanded: boolean, resetKey: string) {
+function useReadingOverflow(value: string, resetKey: string) {
   const ref = useRef<HTMLDivElement>(null)
-  const [expanded, setExpanded] = useState(defaultExpanded)
   const [overflowing, setOverflowing] = useState(false)
-  useEffect(() => setExpanded(defaultExpanded), [resetKey, defaultExpanded])
-  useLayoutEffect(() => observeOverflow(ref.current, value, setOverflowing), [value, expanded, resetKey])
-  return { ref, expanded, setExpanded, expandable: expanded || overflowing }
+  useLayoutEffect(() => observeOverflow(ref.current, value, setOverflowing), [value, resetKey])
+  return { ref, overflowing }
 }
 
 function observeOverflow(element: HTMLDivElement | null, value: string, setOverflowing: (value: boolean) => void) {
@@ -49,21 +46,16 @@ function observeOverflow(element: HTMLDivElement | null, value: string, setOverf
   return () => observer.disconnect()
 }
 
-function ReadingActions({ value, copyLabel, expanded, expandable, onToggle }: { value: string; copyLabel: string; expanded: boolean; expandable: boolean; onToggle: () => void }) {
-  if (!value && !expandable) return null
-  return (
-    <div className="reading-card-actions">
-      <CopyArtifactButton value={value} label={copyLabel} />
-      {expandable ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
-    </div>
-  )
+function ReadingActions({ value, copyLabel }: { value: string; copyLabel: string }) {
+  if (!value || !canCopyArtifact()) return null
+  return <div className="reading-card-actions"><CopyArtifactButton value={value} label={copyLabel} /></div>
 }
 
-function ReadingCard({ value, emptyText, markdown, reading, children }: { value: string; emptyText: string; markdown?: boolean; reading: ReturnType<typeof useReadingExpansion>; children?: ReactNode }) {
-  const className = markdown ? 'detail-block reading-card markdown-reading-card' : 'detail-block reading-card'
-  const textClassName = reading.expanded ? 'reading-text reading-expanded' : 'reading-text reading-preview'
+function ReadingCard({ value, emptyText, markdown, reading, children }: { value: string; emptyText: string; markdown?: boolean; reading: ReturnType<typeof useReadingOverflow>; children?: ReactNode }) {
+  const cardClassName = markdown ? 'detail-block reading-card markdown-reading-card' : 'detail-block reading-card'
+  const className = reading.overflowing ? `${cardClassName} reading-card-overflow` : cardClassName
   const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
-  return <div className={className}><div ref={reading.ref} className={textClassName}>{body}</div></div>
+  return <div className={className}><div ref={reading.ref} className="reading-text">{body}</div></div>
 }
 
 function DetailShell({ children }: { children: ReactNode }) { return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel> }
@@ -124,9 +116,10 @@ function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }:
     <Panel className="detail-panel readable-detail-panel">
       <div className="panel-header compact meeting-detail-header">
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
-        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}<MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
+        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
       <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
+      <div className="detail-footer-actions"><MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
     </Panel>
   )
 }
@@ -134,8 +127,8 @@ function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }:
 function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
   const recording = selectedMeeting.status.state === RECORDING_STATE
   const copyValue = tabCopyValue(activeTab, selectedMeeting, transcript)
-  const reading = useReadingExpansion(copyValue, false, `${selectedMeeting.id}:${activeTab}`)
-  const actions = <ReadingActions value={copyValue} copyLabel={tabCopyLabel(activeTab)} expanded={reading.expanded} expandable={reading.expandable} onToggle={() => reading.setExpanded((current) => !current)} />
+  const reading = useReadingOverflow(copyValue, `${selectedMeeting.id}:${activeTab}`)
+  const actions = <ReadingActions value={copyValue} copyLabel={tabCopyLabel(activeTab)} />
   return (
     <div className="detail-grid detail-reading-stack">
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
@@ -150,7 +143,7 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
   )
 }
 
-function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingExpansion> }) {
+function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
   if (!selectedMeeting.summary && showPostMeetingProgress(selectedMeeting, progress)) return <PostMeetingProgressCard meeting={progress} />
   return <ReadingCard value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(progress)} reading={reading} markdown />

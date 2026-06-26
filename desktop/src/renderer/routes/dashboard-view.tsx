@@ -4,7 +4,7 @@ import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeti
 import { meetingProgressLabel, type MeetingProgressInput } from '../components/meeting-progress'
 import { EmptyState, ListRow, PageHeader, StatusPill } from '../components/ui'
 import { MeetingDetailPanel } from './meeting-detail-view'
-import { CaptureCard } from './today-cards'
+import { RecordControls } from './today-cards'
 import './meetings.css'
 import './today.css'
 import { dateLabel, EMPTY_TITLE } from './today-model'
@@ -60,22 +60,21 @@ export function DashboardView(props: DashboardViewProps) {
     <div className="dashboard-grid ui-density-compact">
       <div className={open ? 'dashboard-stage is-detail' : 'dashboard-stage is-list'}>
         {open ? (
-          <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} onBack={props.onClearSelection} />
+          <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} onBack={props.onClearSelection} record={props} />
         ) : (
-          <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} />
+          <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} record={props} />
         )}
       </div>
-      <CaptureCard {...props} />
     </div>
   )
 }
 
-function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void }) {
+function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void; record: DashboardViewProps }) {
   const visibleText = props.query ? `${props.meetings.length} of ${props.allMeetingsCount} meetings` : meetingCountLabel(props.allMeetingsCount)
   const groups = groupMeetingsByDate(props.meetings)
   return (
     <div className="meeting-list-screen">
-      <PageHeader className="compact" title="Meetings" description={visibleText} />
+      <PageHeader className="compact meetings-header" title="Meetings" description={visibleText} action={<RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />} />
       <input className="meeting-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search meetings" aria-label="Search meetings" />
       <div className="meeting-list">
         {groups.map((group) => <MeetingDateSection key={group.key} group={group} onSelect={props.onSelectMeeting} />)}
@@ -85,10 +84,13 @@ function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingL
   )
 }
 
-function MeetingDetailScreen(props: { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onDeleteMeeting: (id: string) => Promise<void>; onBack: () => void }) {
+function MeetingDetailScreen(props: { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onDeleteMeeting: (id: string) => Promise<void>; onBack: () => void; record: DashboardViewProps }) {
   return (
     <div className="meeting-detail-screen">
-      <button className="back-link" onClick={props.onBack}><span aria-hidden="true">←</span> All meetings</button>
+      <div className="detail-topbar">
+        <button className="back-link" onClick={props.onBack}><span aria-hidden="true">←</span> All meetings</button>
+        <RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />
+      </div>
       <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} />
     </div>
   )
