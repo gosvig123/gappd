@@ -30,6 +30,7 @@
     "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

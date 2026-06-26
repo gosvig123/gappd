@@ -211,12 +211,18 @@ jobs:
           shopt -s nullglob
           app_paths=(desktop/release/mac*/Gappd.app)
           dmg_paths=(desktop/release/*.dmg)
+          zip_paths=(desktop/release/*.zip)
+          update_paths=(desktop/release/*-mac.yml)
 
           [ ${#app_paths[@]} -gt 0 ] || { echo "No packaged app found at desktop/release/mac*/Gappd.app" >&2; exit 1; }
           [ ${#dmg_paths[@]} -gt 0 ] || { echo "No DMG found at desktop/release/*.dmg" >&2; exit 1; }
+          [ ${#zip_paths[@]} -gt 0 ] || { echo "No update ZIP found at desktop/release/*.zip" >&2; exit 1; }
+          [ ${#update_paths[@]} -gt 0 ] || { echo "No update metadata found at desktop/release/*-mac.yml" >&2; exit 1; }
 
           printf 'Found app bundle: %s\n' "${app_paths[@]}"
           printf 'Found DMG: %s\n' "${dmg_paths[@]}"
+          printf 'Found update ZIP: %s\n' "${zip_paths[@]}"
+          printf 'Found update metadata: %s\n' "${update_paths[@]}"
 
       - name: Write release manifest
         run: node desktop/scripts/write-release-manifest.mjs
@@ -252,10 +258,12 @@ jobs:
 
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
             case "$asset" in
-              *.dmg|latest.json) gh release delete-asset "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
+              *.dmg|*.zip|*.blockmap|*-mac.yml|latest.json) gh release delete-asset "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
             esac
           done
-          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" desktop/release/*.dmg desktop/release/latest.json --clobber
+          shopt -s nullglob
+          release_assets=(desktop/release/*.dmg desktop/release/*.zip desktop/release/*.blockmap desktop/release/*-mac.yml desktop/release/latest.json)
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${release_assets[@]}" --clobber
 
           if [ "$RELEASE_CHANNEL" = "beta" ]; then
             beta_notes="Latest Gappd beta update manifest. Download app builds from versioned beta prereleases."
@@ -279,5 +287,8 @@ jobs:
           if-no-files-found: error
           path: |
             desktop/release/*.dmg
+            desktop/release/*.zip
+            desktop/release/*.blockmap
+            desktop/release/*-mac.yml
             desktop/release/latest.json
             desktop/release/mac*/**
