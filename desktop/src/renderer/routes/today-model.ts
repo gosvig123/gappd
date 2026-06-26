@@ -13,8 +13,8 @@ export function dateLabel(value: string): string {
 }
 
 export function readyState(canStart: boolean, canStop: boolean, devices: Device[], status: RecordingStatus): CaptureReadiness {
-  if (status === RECORDING_RECORDING) return { detail: 'Stop when meeting ends. Notes appear in inbox after processing.' }
-  if (canStop) return { detail: 'Audio handoff is underway. Keep app open.' }
+  if (status === RECORDING_RECORDING) return { detail: 'Stop when meeting ends. Progress appears while notes finish.' }
+  if (canStop) return { detail: 'Meeting saved. Finishing notes locally. Keep app open.' }
   if (!devices.length) return { detail: 'Connect or enable input device before recording.' }
   if (canStart) return { detail: 'Start manual capture when meeting begins.' }
   return { detail: 'Wait for current meeting before starting another.' }

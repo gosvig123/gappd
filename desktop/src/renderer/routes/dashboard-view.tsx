@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
-import { meetingStatusLabel, meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
+import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
+import { meetingProgressLabel, type MeetingProgressInput } from '../components/meeting-progress'
 import { Button, EmptyState, ListRow, PageHeader, Panel, StatusPill } from '../components/ui'
 import { MeetingDetailPanel } from './meeting-detail-view'
 import { CaptureCard } from './today-cards'
@@ -112,11 +113,12 @@ function isMeetingListShortcut(event: KeyboardEvent): boolean {
 }
 
 function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem; selected: boolean; onSelect: (id: string) => void }) {
+  const progress = listProgressInput(meeting)
   return (
     <ListRow className="meeting-row" selected={selected} onClick={() => onSelect(meeting.id)}>
       <div className="meeting-row-top">
         <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div>{meeting.title !== dateLabel(meeting.startedAt) ? <div className="meeting-meta">{dateLabel(meeting.startedAt)}</div> : null}</div>
-        {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingStatusLabel(meeting.status.state)}</StatusPill> : null}
+        {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}
       </div>
       <div className="meeting-row-summary">{artifactSummary(meeting)}</div>
     </ListRow>
@@ -158,11 +160,16 @@ function meetingSearchText(meeting: MeetingListItem): string {
 
 function artifactSummary(meeting: MeetingListItem): string {
   if (meeting.status.state === MEETING_RECORDING) return 'Recording now · transcript after stop…'
-  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio and preparing summary…'
-  if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Transcript ready · creating summary…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio locally…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasSummary) return 'Creating summary locally…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Finalizing notes…'
   if (meeting.status.state === MEETING_CAPTURED) return 'Audio captured · waiting to process'
-  if (meeting.hasSummary && meeting.hasTranscript) return 'Summary + transcript ready'
-  if (meeting.hasSummary) return 'Summary ready'
-  if (meeting.hasTranscript) return 'Transcript ready'
+  if (meeting.hasSummary && meeting.hasTranscript) return 'Notes available'
+  if (meeting.hasSummary) return 'Notes available'
+  if (meeting.hasTranscript) return 'Transcript available'
   return 'Artifacts pending'
+}
+
+function listProgressInput(meeting: MeetingListItem): MeetingProgressInput {
+  return { status: meeting.status, hasTranscript: meeting.hasTranscript, hasSummary: meeting.hasSummary }
 }

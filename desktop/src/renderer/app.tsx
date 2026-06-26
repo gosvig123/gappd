@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AppHeader } from './components/app-header'
+import { MeetingAnnouncements } from './components/meeting-announcements'
 import { PermissionBanner } from './components/permission-banner'
 import { SettingsSheet } from './components/settings-sheet'
 import { useDashboardData } from './hooks/use-dashboard-data'
@@ -39,7 +40,7 @@ export function App() {
 }
 
 function ReadyApp({ dashboard }: { dashboard: ReturnType<typeof useDashboardData> }) {
-  return <><PermissionBanner error={dashboard.bannerError} isPermissionError={dashboard.isPermissionError} onRetry={() => void dashboard.actions.start()} onOpenSettings={() => void dashboard.actions.openPermissionsSettings()} /><StaleRecoveryBanner recovering={dashboard.recoveringStale} notice={dashboard.staleRecoveryNotice} /><DashboardView device={dashboard.device} devices={dashboard.devices} meetings={dashboard.meetings} selectedMeetingId={dashboard.selectedMeetingId} selectedMeeting={dashboard.selectedMeeting} selectedMeetingLoading={dashboard.selectedMeetingLoading} selectedMeetingError={dashboard.selectedMeetingError} transcript={dashboard.transcript} recordingStatus={dashboard.recording.status} canStart={dashboard.canStart} canStop={dashboard.canStop} onDeviceChange={dashboard.actions.setDevice} onStart={() => void dashboard.actions.start()} onStop={() => void dashboard.actions.stop()} onSelectMeeting={(id) => void dashboard.actions.loadMeeting(id)} onDeleteMeeting={dashboard.actions.deleteMeeting} /></>
+  return <><PermissionBanner error={dashboard.bannerError} isPermissionError={dashboard.isPermissionError} onRetry={() => void dashboard.actions.start()} onOpenSettings={() => void dashboard.actions.openPermissionsSettings()} /><StaleRecoveryBanner recovering={dashboard.recoveringStale} notice={dashboard.staleRecoveryNotice} /><MeetingAnnouncements meetings={dashboard.meetings} recording={dashboard.recording} onOpenMeeting={(id) => void dashboard.actions.loadMeeting(id)} /><DashboardView device={dashboard.device} devices={dashboard.devices} meetings={dashboard.meetings} selectedMeetingId={dashboard.selectedMeetingId} selectedMeeting={dashboard.selectedMeeting} selectedMeetingLoading={dashboard.selectedMeetingLoading} selectedMeetingError={dashboard.selectedMeetingError} transcript={dashboard.transcript} recordingStatus={dashboard.recording.status} canStart={dashboard.canStart} canStop={dashboard.canStop} onDeviceChange={dashboard.actions.setDevice} onStart={() => void dashboard.actions.start()} onStop={() => void dashboard.actions.stop()} onSelectMeeting={(id) => void dashboard.actions.loadMeeting(id)} onDeleteMeeting={dashboard.actions.deleteMeeting} /></>
 }
 
 function StaleRecoveryBanner({ recovering, notice }: { recovering: boolean; notice: string | null }) {

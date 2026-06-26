@@ -2,66 +2,33 @@ import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 're
 import type { MeetingDetail } from '../../shared/contracts'
 import './meeting-detail.css'
 import './meeting-reading.css'
-import { meetingStatusLabel, meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
+import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
 import { Markdown } from '../components/markdown'
+import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { TranscriptText } from './transcript-view'
 
-const EXPAND_READING_LABEL = 'More'
-const COLLAPSE_READING_LABEL = 'Less'
-const PROCESSING_STATUS = 'processing'
-const RECORDING_STATE = 'recording'
-const CAPTURED_STATE = 'captured'
-const SUMMARY_TAB = 'summary'
-const TRANSCRIPT_TAB = 'transcript'
+const EXPAND_READING_LABEL = 'More', COLLAPSE_READING_LABEL = 'Less'
+const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
+const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
-type MeetingDetailPanelProps = {
-  selectedMeetingId: string | null
-  selectedMeeting: MeetingDetail | null
-  selectedMeetingLoading: boolean
-  selectedMeetingError: string | null
-  transcript: string
-  onDeleteMeeting: (id: string) => Promise<void>
-}
+type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }
 
-function canCopySummary(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
+function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
-function SummaryCopyButton({ summary }: { summary: string }) {
+function CopyArtifactButton({ value, label }: { value: string; label: string }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  useEffect(() => setCopyState('idle'), [summary])
-  if (!summary || !canCopySummary()) return null
-  async function copySummary() {
+  useEffect(() => setCopyState('idle'), [value, label])
+  if (!value || !canCopyArtifact()) return null
+  async function copyArtifact() {
     try {
-      await navigator.clipboard.writeText(summary)
+      await navigator.clipboard.writeText(value)
       setCopyState('copied')
     } catch {
       setCopyState('failed')
     }
   }
-  return <Button className="compact-action" onClick={() => void copySummary()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : 'Copy summary'}</Button>
-}
-
-function ReadingActions({ primary, value, expanded, expandable, onToggle }: { primary?: boolean; value: string; expanded: boolean; expandable: boolean; onToggle: () => void }) {
-  if (!primary && !expandable) return null
-  return (
-    <div className="reading-card-actions">
-      {primary ? <SummaryCopyButton summary={value} /> : null}
-      {expandable ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
-    </div>
-  )
-}
-
-function ReadingCard({ title, value, emptyText, primary, markdown, defaultExpanded = false, resetKey = value, children }: { title: string; value: string; emptyText: string; primary?: boolean; markdown?: boolean; defaultExpanded?: boolean; resetKey?: string; children?: ReactNode }) {
-  const reading = useReadingExpansion(value, defaultExpanded, resetKey)
-  const className = primary ? 'detail-surface detail-block reading-card primary-reading-card' : 'detail-surface detail-block reading-card'
-  const textClassName = reading.expanded ? 'reading-text reading-expanded' : 'reading-text reading-preview'
-  const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
-  return (
-    <div className={className}>
-      <div className="reading-card-header"><div className="meeting-section-label">{title}</div><ReadingActions primary={primary} value={value} expanded={reading.expanded} expandable={reading.expandable} onToggle={() => reading.setExpanded((current) => !current)} /></div>
-      <div ref={reading.ref} className={textClassName}>{body}</div>
-    </div>
-  )
+  return <Button className="compact-action" onClick={() => void copyArtifact()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : label}</Button>
 }
 
 function useReadingExpansion(value: string, defaultExpanded: boolean, resetKey: string) {
@@ -69,7 +36,7 @@ function useReadingExpansion(value: string, defaultExpanded: boolean, resetKey: 
   const [expanded, setExpanded] = useState(defaultExpanded)
   const [overflowing, setOverflowing] = useState(false)
   useEffect(() => setExpanded(defaultExpanded), [resetKey, defaultExpanded])
-  useLayoutEffect(() => observeOverflow(ref.current, value, setOverflowing), [value, expanded])
+  useLayoutEffect(() => observeOverflow(ref.current, value, setOverflowing), [value, expanded, resetKey])
   return { ref, expanded, setExpanded, expandable: expanded || overflowing }
 }
 
@@ -82,17 +49,37 @@ function observeOverflow(element: HTMLDivElement | null, value: string, setOverf
   return () => observer.disconnect()
 }
 
+function ReadingActions({ value, copyLabel, expanded, expandable, onToggle }: { value: string; copyLabel: string; expanded: boolean; expandable: boolean; onToggle: () => void }) {
+  if (!value && !expandable) return null
+  return (
+    <div className="reading-card-actions">
+      <CopyArtifactButton value={value} label={copyLabel} />
+      {expandable ? <Button className="compact-action reading-toggle" onClick={onToggle} aria-expanded={expanded}>{expanded ? COLLAPSE_READING_LABEL : EXPAND_READING_LABEL}</Button> : null}
+    </div>
+  )
+}
+
+function ReadingCard({ value, emptyText, markdown, reading, children }: { value: string; emptyText: string; markdown?: boolean; reading: ReturnType<typeof useReadingExpansion>; children?: ReactNode }) {
+  const className = markdown ? 'detail-block reading-card markdown-reading-card' : 'detail-block reading-card'
+  const textClassName = reading.expanded ? 'reading-text reading-expanded' : 'reading-text reading-preview'
+  const body = value ? (children ?? (markdown ? <Markdown value={value} /> : value)) : emptyText
+  return <div className={className}><div ref={reading.ref} className={textClassName}>{body}</div></div>
+}
+
 function DetailShell({ children }: { children: ReactNode }) { return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel> }
 
 function MeetingFailureState({ message }: { message?: string }) { return message ? <div className="detail-surface detail-alert">{message}</div> : null }
 
 function meetingIsProcessing(meeting: MeetingDetail): boolean { return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS }
 
-function DetailTabs({ activeTab, onChange }: { activeTab: DetailTab; onChange: (tab: DetailTab) => void }) {
+function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; onChange: (tab: DetailTab) => void; actions?: ReactNode }) {
   return (
-    <div className="detail-tabs" role="tablist" aria-label="Meeting detail sections">
-      <button className={tabClassName(activeTab, SUMMARY_TAB)} onClick={() => onChange(SUMMARY_TAB)} role="tab" aria-selected={activeTab === SUMMARY_TAB}>Summary</button>
-      <button className={tabClassName(activeTab, TRANSCRIPT_TAB)} onClick={() => onChange(TRANSCRIPT_TAB)} role="tab" aria-selected={activeTab === TRANSCRIPT_TAB}>Transcript</button>
+    <div className="detail-tabs-row">
+      <div className="detail-tabs" role="tablist" aria-label="Meeting detail sections">
+        <button className={tabClassName(activeTab, SUMMARY_TAB)} onClick={() => onChange(SUMMARY_TAB)} role="tab" aria-selected={activeTab === SUMMARY_TAB}>Summary</button>
+        <button className={tabClassName(activeTab, TRANSCRIPT_TAB)} onClick={() => onChange(TRANSCRIPT_TAB)} role="tab" aria-selected={activeTab === TRANSCRIPT_TAB}>Transcript</button>
+      </div>
+      {actions}
     </div>
   )
 }
@@ -129,55 +116,77 @@ function confirmMeetingDelete(meeting: MeetingDetail): boolean {
 
 function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }: { selectedMeeting: MeetingDetail; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }) {
   const hasTranscript = Boolean(transcript)
+  const progress = detailProgressInput(selectedMeeting, hasTranscript)
+  const subtitle = detailSubtitle(selectedMeeting, progress)
   const [activeTab, setActiveTab] = useState<DetailTab>(SUMMARY_TAB)
   useEffect(() => setActiveTab(SUMMARY_TAB), [selectedMeeting.id])
   return (
     <Panel className="detail-panel readable-detail-panel">
       <div className="panel-header compact meeting-detail-header">
-        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1><p>{detailSubtitle(selectedMeeting, hasTranscript)}</p></div>
-        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingStatusLabel(selectedMeeting.status.state)}</StatusPill> : null}<MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
+        <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
+        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}<MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
       </div>
-      <DetailTabs activeTab={activeTab} onChange={(tab) => setActiveTab(tab)} />
-      <DetailBody activeTab={activeTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
+      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
     </Panel>
   )
 }
 
-function DetailBody({ activeTab, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
+function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
   const recording = selectedMeeting.status.state === RECORDING_STATE
+  const copyValue = tabCopyValue(activeTab, selectedMeeting, transcript)
+  const reading = useReadingExpansion(copyValue, false, `${selectedMeeting.id}:${activeTab}`)
+  const actions = <ReadingActions value={copyValue} copyLabel={tabCopyLabel(activeTab)} expanded={reading.expanded} expandable={reading.expandable} onToggle={() => reading.setExpanded((current) => !current)} />
   return (
     <div className="detail-grid detail-reading-stack">
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
+      <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body">
-        {activeTab === SUMMARY_TAB ? <ReadingCard title="Summary" value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(selectedMeeting, hasTranscript)} resetKey={selectedMeeting.id} primary markdown /> : null}
+        {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
         {activeTab === TRANSCRIPT_TAB && recording ? <TrackingIndicator /> : null}
-        {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard title="Transcript" value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} resetKey={selectedMeeting.id}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
+        {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} reading={reading}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
       </div>
     </div>
   )
 }
 
+function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingExpansion> }) {
+  const progress = detailProgressInput(selectedMeeting, hasTranscript)
+  if (!selectedMeeting.summary && showPostMeetingProgress(selectedMeeting, progress)) return <PostMeetingProgressCard meeting={progress} />
+  return <ReadingCard value={selectedMeeting.summary ?? ''} emptyText={summaryEmptyText(progress)} reading={reading} markdown />
+}
+
+function tabCopyValue(activeTab: DetailTab, meeting: MeetingDetail, transcript: string): string {
+  return activeTab === SUMMARY_TAB ? meeting.summary ?? '' : transcript
+}
+
+function tabCopyLabel(activeTab: DetailTab): string { return activeTab === SUMMARY_TAB ? 'Copy summary' : 'Copy transcript' }
+
+function showPostMeetingProgress(meeting: MeetingDetail, progress: MeetingProgressInput): boolean {
+  return meeting.status.state !== RECORDING_STATE && (meetingHasWork(progress) || meetingFailed(progress))
+}
+
 function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div> }
 
-function detailSubtitle(meeting: MeetingDetail, hasTranscript: boolean): string {
+function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
-  if (meetingIsProcessing(meeting) && hasTranscript) return 'Transcript ready · summary running.'
-  if (meetingIsProcessing(meeting)) return 'Transcribing audio.'
-  if (hasTranscript) return 'Transcript ready.'
-  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured.'
+  if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary with local AI.'
+  if (meetingHasWork(progress)) return 'Transcribing audio locally.'
+  if (progress.hasTranscript && progress.hasSummary) return ''
+  if (progress.hasTranscript) return 'Transcript available.'
+  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured · waiting to process.'
   return 'Analysis and transcript for selected meeting.'
 }
 
-function summaryEmptyText(meeting: MeetingDetail, hasTranscript: boolean): string {
-  if (meetingIsProcessing(meeting)) return 'Summary appears when local AI finishes.'
-  if (hasTranscript) return 'Transcript ready. Summary not generated yet.'
-  return 'Summary appears after recording is processed.'
-}
+function summaryEmptyText(progress: MeetingProgressInput): string { return progress.hasTranscript ? 'Transcript available. Summary not generated yet.' : 'Summary appears after recording is processed.' }
 
 function transcriptEmptyText(meeting: MeetingDetail): string {
-  if (meetingIsProcessing(meeting)) return 'Transcribing audio…'
+  if (meetingIsProcessing(meeting)) return 'Transcript is being created locally…'
   return 'No transcript yet.'
+}
+
+function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
+  return { status: meeting.status, hasTranscript, hasSummary: Boolean(meeting.summary) }
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {

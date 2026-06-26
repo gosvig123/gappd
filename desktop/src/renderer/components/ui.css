@@ -50,8 +50,7 @@
   background: var(--color-surface-soft);
 }
 
-.ui-card.accent,
-.primary-reading-card {
+.ui-card.accent {
   border-color: var(--color-accent-border);
   background: var(--color-accent-tint);
 }
