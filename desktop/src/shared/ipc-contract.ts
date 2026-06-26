@@ -6,6 +6,7 @@ export const IPC_CHANNELS = {
     getDevices: 'system:getDevices',
     requestCapturePermissions: 'system:requestCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
+    startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
   meetings: {
     list: 'meetings:list',
@@ -54,6 +55,7 @@ export type GappdApi = {
     getDevices(): Promise<Device[]>
     requestCapturePermissions(): Promise<CapturePermissions>
     openPermissionsSettings(target?: CapturePermissionTarget): Promise<void>
+    startStaleRecordingRecovery(): Promise<number>
   }
   meetings: {
     list(): Promise<MeetingListItem[]>

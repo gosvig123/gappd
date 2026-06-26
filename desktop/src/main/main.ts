@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import { startStaleRecordingRecovery, stopStaleRecordingRecovery } from './gappd'
+import { stopStaleRecordingRecovery } from './gappd'
 import { registerIpc } from './ipc'
 import { bootstrapOnboarding } from './onboarding'
 import { stopManagedOllama } from './ollama'
@@ -41,7 +41,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   applyDevDockIcon()
   createWindow()
-  void bootstrapOnboarding().finally(() => startStaleRecordingRecovery())
+  void bootstrapOnboarding()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

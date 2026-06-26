@@ -5,6 +5,7 @@
 .setup-shell {
   display: grid;
   gap: var(--space-5);
+  align-content: start;
   width: min(100%, 72rem);
   height: 100%;
   margin-inline: auto;
@@ -16,16 +17,8 @@
   margin-bottom: 0;
 }
 
-.setup-grid {
-  display: grid;
-  min-height: 0;
-  gap: var(--space-5);
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-
 .setup-primary,
-.setup-rail,
+.setup-main,
 .settings-stack,
 .progress-block,
 .setup-progress-detail,
@@ -34,20 +27,17 @@
   display: grid;
 }
 
-.setup-primary,
-.setup-rail {
-  gap: var(--space-5);
-}
-
 .setup-primary {
   min-height: 0;
-  grid-template-areas:
-    "hero steps"
-    "progress steps"
-    "permissions steps"
-    "actions advanced"
-    "error error";
-  grid-template-columns: minmax(0, 1fr) minmax(17rem, 0.85fr);
+  gap: var(--space-5);
+  align-content: start;
+  align-items: start;
+  grid-template-columns: minmax(0, 1.1fr) minmax(17rem, 0.75fr);
+}
+
+.setup-main {
+  gap: var(--space-5);
+  align-content: start;
 }
 
 .settings-stack {
@@ -66,28 +56,17 @@
   margin-top: var(--space-4);
 }
 
-.setup-card,
 .status-note {
   padding: var(--space-5);
 }
 
 .setup-callout {
-  grid-area: hero;
   gap: var(--space-3);
   padding: var(--space-6);
 }
 
-.setup-steps {
-  grid-area: steps;
-  padding: var(--space-5);
-}
-
-.progress-block {
-  grid-area: progress;
-}
-
+.setup-steps,
 .setup-permissions {
-  grid-area: permissions;
   padding: var(--space-5);
 }
 
@@ -107,17 +86,12 @@
 
 .setup-actions {
   display: grid;
-  grid-area: actions;
   gap: var(--space-3);
   align-content: start;
 }
 
-.setup-advanced {
-  grid-area: advanced;
-}
-
-.setup-error-banner {
-  grid-area: error;
+.setup-actions .actions-row {
+  margin-top: 0;
 }
 
 .setup-callout strong {
@@ -201,13 +175,13 @@
   opacity: 0.62;
 }
 
-.setup-rail {
-  align-content: start;
-}
-
 .setup-advanced {
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-3);
+}
+
+.setup-advanced .field {
+  margin-top: var(--space-3);
 }
 
 .setup-advanced summary {
@@ -216,19 +190,10 @@
   font-weight: var(--font-weight-medium);
 }
 
-.setup-advanced-body {
-  margin-top: var(--space-3);
-}
-
 .setup-model-picker {
   padding: var(--space-4);
 }
 
-.setup-rail .setup-metrics {
-  grid-template-columns: 1fr;
-}
-
-.setup-metrics,
 .settings-grid {
   display: grid;
   gap: var(--space-5);
@@ -295,8 +260,7 @@
 }
 
 @media (max-width: 68.75rem) {
-  .settings-grid,
-  .setup-metrics {
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 
@@ -308,14 +272,6 @@
 
 @media (max-width: 48rem) {
   .setup-primary {
-    grid-template-areas:
-      "hero"
-      "steps"
-      "progress"
-      "permissions"
-      "actions"
-      "advanced"
-      "error";
     grid-template-columns: 1fr;
   }
 }
