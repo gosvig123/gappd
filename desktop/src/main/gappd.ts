@@ -12,6 +12,9 @@ import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
+const RECORDING_STATUS_STOPPING = 'stopping'
+const RECORDING_STATUS_PROCESSING = 'processing'
+const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPING, RECORDING_STATUS_PROCESSING])
 
 let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
@@ -128,7 +131,9 @@ export async function startRecording(input: { title: string; device: number; mod
 
 export function stopRecording(): void {
   if (!recordingChild) return
-  setRecordingState({ ...getRecordingState(), status: 'stopping' })
+  const state = getRecordingState()
+  if (STOP_IGNORED_RECORDING_STATUSES.has(state.status)) return
+  setRecordingState({ ...state, status: RECORDING_STATUS_STOPPING })
   recordingChild.kill('SIGINT')
 }
 

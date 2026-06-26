@@ -7,7 +7,9 @@ import { useRequestGate } from './request-gate'
 
 const IDLE_RECORDING_STATUS: RecordingState['status'] = 'idle'
 const ERROR_RECORDING_STATUS: RecordingState['status'] = 'error'
+const RECORDING_RECORDING_STATUS: RecordingState['status'] = 'recording'
 const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
+const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = [RECORDING_RECORDING_STATUS]
 
 export function useDashboardData(enabled: boolean) {
   const selectedMeetingRequest = useRequestGate()
@@ -233,7 +235,7 @@ function recoveryNotice(recovered: number): string | null {
 
 function buildDashboardViewModel(state: DashboardState, actions: DashboardActions) {
   const canStart = state.devices.length > 0 && STARTABLE_RECORDING_STATUSES.includes(state.recording.status)
-  const canStop = ACTIVE_RECORDING_STATUSES.includes(state.recording.status)
+  const canStop = STOPPABLE_RECORDING_STATUSES.includes(state.recording.status)
   const bannerError = state.error ?? state.recording.error ?? null
   return { ...state, canStart, canStop, bannerError, transcript: state.selectedMeeting?.transcriptText ?? '', isPermissionError: isPermissionErrorMessage(bannerError), actions }
 }
