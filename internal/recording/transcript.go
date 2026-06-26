@@ -89,7 +89,7 @@ func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifa
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
-	return toDBSegments(meetingID, segments), nil
+	return toDBSegments(meetingID, cleanTranscriptionArtifacts(segments)), nil
 }
 
 var errMissingAudio = errors.New("missing audio")
