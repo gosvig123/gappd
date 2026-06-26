@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -36,61 +36,102 @@ func TranscribeFile(ctx context.Context, audioPath, modelPath string) ([]Segment
 	if err != nil {
 		return nil, err
 	}
-	out, err := runWhisper(ctx, bin, audioPath, modelPath)
+	segments, _, err := transcribeWithBounds(ctx, bin, audioPath, modelPath, false)
+	if err != nil || !hasDominantRepeatedText(segments) {
+		return segments, err
+	}
+	return transcribeFallbackWindows(ctx, bin, audioPath, modelPath, segments)
+}
+
+func transcribeFallbackWindows(ctx context.Context, bin, audioPath, modelPath string, original []Segment) ([]Segment, error) {
+	segments, bounded, err := transcribeWithBounds(ctx, bin, audioPath, modelPath, true)
+	if err != nil || !bounded || len(segments) == 0 {
+		return original, err
+	}
+	return segments, nil
+}
+
+func transcribeWithBounds(ctx context.Context, bin, audioPath, modelPath string, allowBounds bool) ([]Segment, bool, error) {
+	windows, ok := activeWindows(audioPath, allowBounds)
+	if !ok {
+		segments, err := transcribeWindow(ctx, bin, audioPath, modelPath, whisperBounds{}, false)
+		return segments, false, err
+	}
+	return transcribeWindows(ctx, bin, audioPath, modelPath, windows)
+}
+
+func activeWindows(audioPath string, allow bool) ([]whisperBounds, bool) {
+	if !allow {
+		return nil, false
+	}
+	return activeWhisperWindows(audioPath)
+}
+
+func transcribeWindows(ctx context.Context, bin, audioPath, modelPath string, windows []whisperBounds) ([]Segment, bool, error) {
+	segments := []Segment{}
+	for _, window := range windows {
+		windowSegments, err := transcribeWindow(ctx, bin, audioPath, modelPath, window, true)
+		if err != nil {
+			return nil, true, err
+		}
+		segments = append(segments, windowSegments...)
+	}
+	return segments, true, nil
+}
+
+func transcribeWindow(ctx context.Context, bin, audioPath, modelPath string, bounds whisperBounds, bounded bool) ([]Segment, error) {
+	out, err := runWhisper(ctx, bin, whisperArgs(audioPath, modelPath, bounds, bounded))
 	if err != nil {
 		return nil, err
 	}
 	return parseWhisperJSON(out)
 }
 
-func findWhisperBinary() (string, error) {
-	if override := strings.TrimSpace(os.Getenv("GAPPD_WHISPER_BIN")); override != "" {
-		if ok, err := isExecutableFile(override); err != nil {
-			return "", fmt.Errorf("whisper binary override not found: %s", override)
-		} else if ok {
-			return override, nil
-		}
-		return "", fmt.Errorf("whisper binary override is not an executable file: %s", override)
-	}
-
-	for _, name := range []string{"whisper-cli", "whisper-cpp", "whisper", "main"} {
-		if path, err := exec.LookPath(name); err == nil {
-			return path, nil
-		}
-	}
-	return "", fmt.Errorf("whisper binary not found (set GAPPD_WHISPER_BIN or install whisper-cpp so whisper-cli, whisper-cpp, whisper, or main is available in PATH)")
-}
-
-func isExecutableFile(path string) (bool, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false, err
-	}
-	mode := info.Mode()
-	if !mode.IsRegular() {
-		return false, nil
-	}
-	return mode&0o111 != 0, nil
-}
-
-func runWhisper(ctx context.Context, bin, audioPath, modelPath string) ([]byte, error) {
-	args := []string{
-		"-m", modelPath,
-		"-f", audioPath,
-		"-oj",
-		"-of", "-",
-		"-np",
-	}
+func runWhisper(ctx context.Context, bin string, args []string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	out, err := cmd.Output()
 	if err != nil {
-		stderr := ""
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			stderr = string(exitErr.Stderr)
-		}
-		return nil, fmt.Errorf("whisper failed: %w\n%s", err, stderr)
+		return nil, whisperError(err)
 	}
 	return out, nil
+}
+
+func whisperError(err error) error {
+	stderr := ""
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		stderr = string(exitErr.Stderr)
+	}
+	return fmt.Errorf("whisper failed: %w\n%s", err, stderr)
+}
+
+func whisperArgs(audioPath, modelPath string, bounds whisperBounds, bounded bool) []string {
+	args := []string{"-m", modelPath, "-f", audioPath, "-oj", "-of", "-", "-np"}
+	if !bounded {
+		return args
+	}
+	args = append(args, "-ml", whisperMaxSegmentRunes, "-sow")
+	return append(args, "-ot", strconv.Itoa(bounds.offsetMS), "-d", strconv.Itoa(bounds.durationMS))
+}
+
+func hasDominantRepeatedText(segments []Segment) bool {
+	if len(segments) < repeatedTextMinSegments {
+		return false
+	}
+	counts := map[string]int{}
+	maxCount := 0
+	for _, segment := range segments {
+		maxCount = max(maxCount, countRepeatedText(counts, segment.Text))
+	}
+	return maxCount >= repeatedTextMinSegments && float64(maxCount)/float64(len(segments)) >= repeatedTextDominance
+}
+
+func countRepeatedText(counts map[string]int, text string) int {
+	text = strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(text)), repeatedTextSeparator))
+	if len([]rune(text)) < repeatedTextMinRunes {
+		return 0
+	}
+	counts[text]++
+	return counts[text]
 }
 
 func parseWhisperJSON(data []byte) ([]Segment, error) {

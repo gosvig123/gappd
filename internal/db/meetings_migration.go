@@ -192,7 +192,7 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 	if _, err := conn.ExecContext(ctx, processingFailureQuery); err != nil {
 		return fmt.Errorf("backfill meetings.processing_failure_message: %w", err)
 	}
-	return nil
+	return syncLegacyMeetingStatus(ctx, conn)
 }
 
 func (d *DB) tableColumns(name string) (map[string]bool, error) {
