@@ -17,7 +17,7 @@ type HeaderUpdateAction = { label: string; title: string; disabled?: boolean; in
 export function AppHeader(props: AppHeaderProps) {
   return (
     <header className="app-header">
-      <div className="app-brand-block"><img className="app-logo" src={appLogo} alt="" aria-hidden="true" /><div className="app-brand">Gappd</div><p>Record, review, and search local meeting notes.</p></div>
+      <div className="app-brand-block"><img className="app-logo" src={appLogo} alt="" aria-hidden="true" /><div className="app-brand">Gappd</div><p>Record, review, and search private meeting notes.</p></div>
       <div className="app-controls" aria-label="App controls">
         <UpdateControls {...props} />
         <button className={props.settingsOpen ? 'app-control settings-control active' : 'app-control settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close settings' : 'Open settings'} aria-pressed={props.settingsOpen}>⚙<span>Settings</span></button>
