@@ -1,117 +1,167 @@
 import { app, shell } from 'electron'
-import { BETA_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateDownloadResult, type UpdateStatus } from '../shared/contracts'
-import { downloadUpdateArtifact } from './update-download'
-import { selectUpdateRelease, type UpdateContext, type UpdateRelease } from './update-manifest'
-import { isNewerVersion, isVersionAtLeast } from './update-version'
+import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
+import { BETA_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateStatus } from '../shared/contracts'
+import { createObservableState } from './observable-state'
+import { getRecordingState } from './state'
 
-const DEFAULT_UPDATE_CHECK_URL = 'https://github.com/gosvig123/gappd/releases/latest/download/latest.json'
-const BETA_UPDATE_CHECK_URL = 'https://github.com/gosvig123/gappd/releases/download/beta/latest.json'
 const DEFAULT_RELEASE_URL = 'https://github.com/gosvig123/gappd/releases/latest'
-const UPDATE_CHECK_URL_ENV = 'GAPPD_UPDATE_CHECK_URL'
 const UPDATE_CHANNEL_ENV = 'GAPPD_UPDATE_CHANNEL'
-const UPDATE_ACCEPT_HEADER = 'application/vnd.github+json, application/json'
-const UPDATE_USER_AGENT = 'gappd-desktop'
+const FORCE_DEV_UPDATE_ENV = 'GAPPD_FORCE_DEV_AUTO_UPDATE'
+const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+const FEED_BETA_CHANNEL = 'beta'
+const RECORDING_IDLE_STATUS = 'idle'
 
-let latestUpdateStatus: UpdateStatus | null = null
+let configured = false
+let silentErrors = false
+let checkTimer: NodeJS.Timeout | null = null
+let checkPromise: Promise<UpdateStatus> | null = null
 
-export async function getUpdateStatus(): Promise<UpdateStatus> {
-  latestUpdateStatus = await resolveUpdateStatus()
-  return latestUpdateStatus
+const updateState = createObservableState<UpdateStatus>(idleStatus())
+
+export const onUpdateStatusChange = updateState.subscribe
+export const getUpdateStatus = updateState.get
+
+export function startAutoUpdateChecks(): void {
+  if (!autoUpdatesEnabled()) return
+  configureAutoUpdater()
+  void checkForUpdate({ silent: true })
+  if (!checkTimer) checkTimer = setInterval(() => void checkForUpdate({ silent: true }), UPDATE_CHECK_INTERVAL_MS)
 }
 
-export async function checkForUpdate(): Promise<UpdateStatus> {
+export function stopAutoUpdateChecks(): void {
+  if (!checkTimer) return
+  clearInterval(checkTimer)
+  checkTimer = null
+}
+
+export async function checkForUpdate(options: { silent?: boolean } = {}): Promise<UpdateStatus> {
+  if (!autoUpdatesEnabled()) return setIdle()
+  configureAutoUpdater()
+  if (checkInProgress()) return getUpdateStatus()
+  if (checkPromise) return checkPromise
+  checkPromise = runUpdateCheck(Boolean(options.silent)).finally(() => { checkPromise = null })
+  return checkPromise
+}
+
+export async function downloadUpdate(): Promise<UpdateStatus> {
+  if (!autoUpdatesEnabled()) return handleUpdateError(new Error('auto updates are unavailable for this build'))
+  configureAutoUpdater()
+  if (getUpdateStatus().phase === 'downloaded') return getUpdateStatus()
+  if (getUpdateStatus().phase !== 'available') return checkForUpdate()
+  try {
+    setStatus({ phase: 'downloading', available: true, progress: 0 })
+    await autoUpdater.downloadUpdate()
+    return getUpdateStatus()
+  } catch (error) {
+    return handleUpdateError(error)
+  }
+}
+
+export async function installAndRestart(): Promise<UpdateStatus> {
+  const blocked = installBlockedMessage()
+  if (blocked) throw new Error(blocked)
+  if (getUpdateStatus().phase !== 'downloaded') throw new Error('Update install failed: no downloaded update is ready. Check for updates and retry.')
+  setStatus({ phase: 'installing', available: true })
+  autoUpdater.quitAndInstall(false, true)
   return getUpdateStatus()
 }
 
 export async function openUpdatePage(): Promise<void> {
-  const status = await availableUpdateStatus()
-  await shell.openExternal(externalUpdateUrl(status.releaseUrl), { activate: true })
+  await shell.openExternal(getUpdateStatus().releaseUrl ?? DEFAULT_RELEASE_URL, { activate: true })
 }
 
-export async function downloadUpdate(): Promise<UpdateDownloadResult> {
-  const status = await availableUpdateStatus()
-  if (!status.downloadUrl) throw new Error('Update download failed: manifest has no downloadUrl. Open the release page and download manually.')
-  return downloadUpdateArtifact({ url: status.downloadUrl, sha256: status.sha256, version: status.latestVersion })
+function configureAutoUpdater(): void {
+  if (configured) return
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.allowPrerelease = updateChannel() === BETA_UPDATE_CHANNEL
+  if (autoUpdater.allowPrerelease) autoUpdater.channel = FEED_BETA_CHANNEL
+  if (process.env[FORCE_DEV_UPDATE_ENV] === '1') autoUpdater.forceDevUpdateConfig = true
+  autoUpdater.on('checking-for-update', () => setStatus({ phase: 'checking', available: false, error: undefined, progress: undefined }))
+  autoUpdater.on('update-not-available', (info) => setIdle(info))
+  autoUpdater.on('update-available', (info) => setAvailable(info))
+  autoUpdater.on('download-progress', (progress) => setDownloading(progress))
+  autoUpdater.on('update-downloaded', (event) => setDownloaded(event))
+  autoUpdater.on('error', (error) => handleUpdateError(error))
+  configured = true
 }
 
-async function resolveUpdateStatus(): Promise<UpdateStatus> {
-  const currentVersion = app.getVersion()
+async function runUpdateCheck(silent: boolean): Promise<UpdateStatus> {
+  silentErrors = silent
   try {
-    const release = await fetchRelease(updateContext())
-    if (!release || !isCompatibleRelease(release, currentVersion) || !isNewerVersion(release.version, currentVersion)) return unavailable(currentVersion, release?.version)
-    return available(currentVersion, release)
-  } catch {
-    return unavailable(currentVersion)
+    const result = await autoUpdater.checkForUpdates()
+    if (!result?.isUpdateAvailable) setIdle(result?.updateInfo)
+    return getUpdateStatus()
+  } catch (error) {
+    return handleUpdateError(error)
+  } finally {
+    silentErrors = false
   }
 }
 
-function available(currentVersion: string, release: UpdateRelease): UpdateStatus {
-  return {
-    available: true,
-    currentVersion,
-    latestVersion: release.version,
-    releaseUrl: release.releaseUrl,
-    downloadUrl: release.downloadUrl,
-    sha256: release.sha256,
-    channel: release.channel,
-    name: release.name,
-  }
+function setAvailable(info: UpdateInfo): UpdateStatus {
+  return setStatus({ ...infoPatch(info), phase: 'available', available: true, error: undefined, progress: undefined })
 }
 
-async function fetchRelease(context: UpdateContext): Promise<UpdateRelease | null> {
-  const response = await fetch(context.sourceUrl, { headers: { Accept: UPDATE_ACCEPT_HEADER, 'User-Agent': UPDATE_USER_AGENT } })
-  if (!response.ok) return null
-  return selectUpdateRelease(await response.json(), context)
+function setDownloading(progress: ProgressInfo): UpdateStatus {
+  return setStatus({ phase: 'downloading', available: true, progress: Math.round(progress.percent), error: undefined })
 }
 
-function updateContext(): UpdateContext {
-  const channel = updateChannel(app.getVersion())
-  const sourceUrl = updateCheckUrl(channel)
-  return {
-    arch: process.arch,
-    channel,
-    defaultReleaseUrl: DEFAULT_RELEASE_URL,
-    defaultUpdateUrl: DEFAULT_UPDATE_CHECK_URL,
-    platform: process.platform,
-    sourceUrl,
-  }
+function setDownloaded(event: UpdateDownloadedEvent): UpdateStatus {
+  return setStatus({ ...infoPatch(event), phase: 'downloaded', available: true, progress: 100, error: undefined })
 }
 
-function updateCheckUrl(channel: UpdateChannel): string {
-  const rawUrl = process.env[UPDATE_CHECK_URL_ENV]?.trim() || defaultUpdateCheckUrl(channel)
-  return httpsUrl(rawUrl, 'Update check URL must use https.')
+function setIdle(info?: UpdateInfo): UpdateStatus {
+  return setStatus({ ...infoPatch(info), phase: 'idle', available: false, error: undefined, progress: undefined })
 }
 
-function defaultUpdateCheckUrl(channel: UpdateChannel): string {
-  return channel === BETA_UPDATE_CHANNEL ? BETA_UPDATE_CHECK_URL : DEFAULT_UPDATE_CHECK_URL
+function handleUpdateError(error: unknown): UpdateStatus {
+  if (silentErrors) return setIdle()
+  return setStatus({ phase: 'error', available: false, error: updateErrorMessage(error), progress: undefined })
 }
 
-function updateChannel(currentVersion: string): UpdateChannel {
+function setStatus(patch: Partial<UpdateStatus>): UpdateStatus {
+  const next = { ...updateState.get(), currentVersion: app.getVersion(), channel: updateChannel(), ...patch }
+  updateState.set(next)
+  return next
+}
+
+function idleStatus(): UpdateStatus {
+  return { phase: 'idle', available: false, currentVersion: app.getVersion(), channel: updateChannel() }
+}
+
+function infoPatch(info?: UpdateInfo): Partial<UpdateStatus> {
+  if (!info) return {}
+  return { latestVersion: info.version, name: info.releaseName ?? undefined, releaseUrl: releaseUrl(info.version) }
+}
+
+function updateChannel(): UpdateChannel {
   const rawChannel = process.env[UPDATE_CHANNEL_ENV]?.trim()
   if (isUpdateChannel(rawChannel)) return rawChannel
-  return currentVersion.includes('-beta.') ? BETA_UPDATE_CHANNEL : DEFAULT_UPDATE_CHANNEL
+  return app.getVersion().includes('-beta.') ? BETA_UPDATE_CHANNEL : DEFAULT_UPDATE_CHANNEL
 }
 
-async function availableUpdateStatus(): Promise<Extract<UpdateStatus, { available: true }>> {
-  const status = latestUpdateStatus?.available ? latestUpdateStatus : await getUpdateStatus()
-  if (!status.available) throw new Error('No update is available. Check for updates again and retry.')
-  return status
+function checkInProgress(): boolean {
+  const phase = getUpdateStatus().phase
+  return phase === 'downloading' || phase === 'downloaded' || phase === 'installing'
 }
 
-function unavailable(currentVersion: string, latestVersion?: string): UpdateStatus {
-  return latestVersion ? { available: false, currentVersion, latestVersion } : { available: false, currentVersion }
+function installBlockedMessage(): string | null {
+  if (getRecordingState().status === RECORDING_IDLE_STATUS) return null
+  return 'Update install blocked: finish the active recording before restarting Gappd.'
 }
 
-function externalUpdateUrl(rawUrl: string): string {
-  return httpsUrl(rawUrl, 'Update URL must use https.')
+function autoUpdatesEnabled(): boolean {
+  return process.platform === 'darwin' && (app.isPackaged || process.env[FORCE_DEV_UPDATE_ENV] === '1')
 }
 
-function httpsUrl(rawUrl: string, message: string): string {
-  const url = new URL(rawUrl)
-  if (url.protocol !== 'https:') throw new Error(message)
-  return url.toString()
+function releaseUrl(version?: string): string {
+  if (!version) return DEFAULT_RELEASE_URL
+  const tag = version.startsWith('v') ? version : `v${version}`
+  return `https://github.com/gosvig123/gappd/releases/tag/${tag}`
 }
 
-function isCompatibleRelease(release: UpdateRelease, currentVersion: string): boolean {
-  return !release.minVersion || isVersionAtLeast(currentVersion, release.minVersion)
+function updateErrorMessage(error: unknown): string {
+  const cause = error instanceof Error ? error.message : String(error)
+  return `Update failed: ${cause}. Retry, or download manually from the release page.`
 }

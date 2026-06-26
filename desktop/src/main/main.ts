@@ -4,6 +4,7 @@ import { stopStaleRecordingRecovery } from './gappd'
 import { registerIpc } from './ipc'
 import { bootstrapOnboarding } from './onboarding'
 import { stopManagedOllama } from './ollama'
+import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -42,6 +43,7 @@ app.whenReady().then(() => {
   applyDevDockIcon()
   createWindow()
   void bootstrapOnboarding()
+  startAutoUpdateChecks()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -51,6 +53,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   stopStaleRecordingRecovery()
   stopManagedOllama()
+  stopAutoUpdateChecks()
 })
 
 app.on('window-all-closed', () => {
