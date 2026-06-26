@@ -45,10 +45,16 @@
   overflow: auto;
 }
 
-.meeting-date-section,
+.meeting-date-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .meeting-date-items {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
 }
 
 .meeting-date-heading {
@@ -68,24 +74,36 @@
 }
 
 .meeting-row {
-  padding: var(--space-3) var(--space-4);
+  min-height: 6rem;
+  padding: var(--space-5);
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   text-align: left;
-  display: grid;
-  gap: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   color: inherit;
-  background: transparent;
-  transition: background var(--transition-quick), box-shadow var(--transition-quick);
+  background: var(--color-surface-soft);
+  transition: background var(--transition-quick), border-color var(--transition-quick);
 }
 
 .meeting-row:hover {
   background-color: var(--surface-hover);
+  border-color: var(--color-border);
 }
 
 .meeting-row.selected {
+  border-color: var(--color-accent-border-strong);
   background: var(--surface-accent);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.meeting-row-summary {
+  margin-top: auto;
+}
+
+.meeting-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
 .meeting-row-top {

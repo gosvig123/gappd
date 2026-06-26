@@ -1,21 +1,18 @@
 .dashboard-grid {
   --reading-column: 52rem;
+  --list-column: 76rem;
   min-height: 0;
   display: grid;
   flex: 1;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
 }
 
-/* One surface: flatten the inner panels, separate regions with hairlines. */
+/* One surface: flatten the inner panels. */
 .dashboard-grid .panel {
   border: 0;
   border-radius: 0;
   background: transparent;
-}
-
-.dashboard-grid .record-action-panel {
-  border-top: 1px solid var(--color-border);
 }
 
 /* Single centered column: the meeting list, or the opened meeting. */
@@ -34,14 +31,10 @@
   overflow: hidden;
 }
 
-.meeting-list-screen,
-.meeting-detail-screen {
-  width: min(100%, var(--reading-column));
-  margin-inline: auto;
-  padding: var(--space-7) var(--space-7) var(--space-9);
-}
-
 .meeting-list-screen {
+  width: min(100%, var(--list-column));
+  margin-inline: auto;
+  padding: var(--space-9) var(--space-7) var(--space-9);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -53,6 +46,9 @@
 }
 
 .meeting-detail-screen {
+  width: min(100%, var(--reading-column));
+  margin-inline: auto;
+  padding: var(--space-7) var(--space-7) var(--space-9);
   min-height: 0;
   flex: 1;
   display: flex;
@@ -65,118 +61,130 @@
   padding: 0;
 }
 
-.record-action-panel {
-  --record-control-height: clamp(2.25rem, 4vw, 2.5rem);
-  --record-button-min: clamp(7rem, 10vw, 10.5rem);
-  position: relative;
-  z-index: 5;
-  padding: clamp(var(--space-2), 1vw, var(--space-3)) clamp(var(--space-3), 2vw, var(--space-5));
-}
-
-.record-action-bar {
-  width: min(100%, var(--reading-column));
-  margin-inline: auto;
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.8fr) minmax(24rem, 1.6fr);
-  gap: var(--space-3);
-  align-items: stretch;
-}
-
-.record-section {
-  min-width: 0;
-  padding: var(--space-4) var(--space-5);
-}
-
-.record-controls {
-  border-left: 1px solid var(--color-border);
-}
-
-.record-controls {
-  display: grid;
-  grid-template-columns: minmax(16rem, 1fr) minmax(var(--record-button-min), auto);
-  gap: var(--space-3);
-  align-items: end;
-}
-
-.record-status-copy {
-  display: grid;
-  align-content: center;
-  gap: var(--space-1);
-}
-
-.record-status-copy strong {
-  white-space: nowrap;
-}
-
-.record-status-copy p {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-tight);
-}
-
-.record-fields {
-  display: grid;
-  align-content: center;
-}
-
-.record-fields label {
-  display: grid;
-  gap: var(--space-2);
-  align-items: stretch;
-}
-
-.record-fields label span {
-  white-space: nowrap;
-}
-
-.record-fields select {
-  min-width: 0;
-  width: 100%;
-  min-height: var(--record-control-height);
-  padding-right: calc(var(--space-5) + 1.25rem);
-  appearance: none;
-  -webkit-appearance: none;
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--color-text-muted) 50%),
-    linear-gradient(135deg, var(--color-text-muted) 50%, transparent 50%);
-  background-position:
-    calc(100% - 1.05rem) 50%,
-    calc(100% - 0.75rem) 50%;
-  background-repeat: no-repeat;
-  background-size: 0.35rem 0.35rem;
-}
-
-.actions-row.record-actions {
-  gap: var(--space-3);
-  margin: 0;
-  align-self: end;
+.detail-topbar {
+  display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
-.record-toggle-button {
-  min-width: var(--record-button-min);
-  width: 100%;
-  min-height: var(--record-control-height);
+/* Record control lives in the Meetings header. */
+.meetings-header {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Record + input merged into one segmented pill. */
+.record-cluster {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-accent-border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  transition: border-color var(--transition-quick);
+}
+
+.record-cluster.is-recording {
+  border-color: var(--color-danger-border);
+}
+
+.record-button {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  white-space: nowrap;
+  gap: var(--space-3);
+  min-height: 2.125rem;
+  padding: var(--space-2) var(--space-5);
+  border: 0;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+  transition: background var(--transition-quick), color var(--transition-quick);
 }
 
-.record-toggle-button.stop-process-button {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning);
-  color: var(--color-warning-contrast);
-  box-shadow: inset 0 1px 0 var(--highlight-strong), var(--shadow-soft);
+.record-button:only-child {
+  border-radius: var(--radius-pill);
 }
 
-.record-toggle-button.stop-process-button:hover:not(:disabled) {
-  border-color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning), var(--color-text) 8%);
+.record-button:hover:not(:disabled) {
+  background: var(--surface-accent);
+}
+
+.record-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.record-cluster.is-recording .record-button {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.record-cluster.is-recording .record-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 22%, var(--color-card));
+}
+
+.record-glyph {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 999px;
+  background: var(--color-danger);
+}
+
+.record-cluster.is-recording .record-glyph.is-stop {
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.record-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--color-accent-border);
+  color: var(--color-text-soft);
+  cursor: pointer;
+}
+
+.record-cluster.is-recording .record-input {
+  border-right-color: var(--color-danger-border);
+  opacity: 0.65;
+}
+
+.record-input-icon {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.record-input-select {
+  max-width: 11rem;
+  min-height: 2.125rem;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.record-input-select:hover {
+  border: 0;
+}
+
+.record-input-select:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.record-input-caret {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 
 @media (max-width: 56rem) {
@@ -192,44 +200,12 @@
 }
 
 @media (max-width: 45rem) {
-  .record-action-panel {
-    padding: clamp(var(--space-2), 2vw, var(--space-3));
-  }
-
-  .record-action-bar {
-    grid-template-columns: 1fr;
-  }
-
-  .record-controls {
-    grid-template-columns: 1fr;
-    border-left: 0;
-    padding-left: 0;
-  }
-
-  .record-status-copy,
-  .record-fields,
-  .record-actions {
+  .record-cluster {
     width: 100%;
   }
 
-  .record-fields label {
-    grid-template-columns: 1fr;
-  }
-
-  .record-status-copy {
-    align-items: flex-start;
-  }
-
-  .record-status-copy p {
-    white-space: normal;
-  }
-
-  .actions-row.record-actions {
-    margin: 0;
-    justify-content: flex-start;
-  }
-
-  .record-toggle-button {
-    width: 100%;
+  .record-button {
+    flex: 1;
+    justify-content: center;
   }
 }
