@@ -17,8 +17,12 @@ type fakeEnhancer struct {
 	err     error
 }
 
-func (e fakeEnhancer) Run(context.Context, string, string) (*ai.Extraction, string, error) {
+func (e fakeEnhancer) RunWithOptions(context.Context, string, ai.RunOptions) (*ai.Extraction, string, error) {
 	return &ai.Extraction{Title: e.title}, e.summary, e.err
+}
+
+func (e fakeEnhancer) RefineNotes(context.Context, *ai.Extraction, string, string) (string, error) {
+	return e.summary, e.err
 }
 
 type fakeStore struct {

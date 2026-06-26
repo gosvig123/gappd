@@ -25,8 +25,10 @@ func TestMeetingLifecycleRoundTrip(t *testing.T) {
 	endedAt := "2026-04-10T12:30:00Z"
 	failure := "enhance failed"
 	transcript := "[You] hello"
+	extractionJSON := `{"title":"Sprint planning"}`
 	meeting.EndedAt = &endedAt
 	meeting.Transcript = &transcript
+	meeting.ExtractionJSON = &extractionJSON
 	meeting.CaptureStatus = CaptureStatusCaptured
 	meeting.CaptureStatusUpdatedAt = endedAt
 	meeting.ProcessingStatus = ProcessingStatusFailed
@@ -51,6 +53,9 @@ func TestMeetingLifecycleRoundTrip(t *testing.T) {
 	}
 	if got.ProcessingFailureMessage == nil || *got.ProcessingFailureMessage != failure {
 		t.Fatalf("processing_failure_message = %v, want %q", got.ProcessingFailureMessage, failure)
+	}
+	if got.ExtractionJSON == nil || *got.ExtractionJSON != extractionJSON {
+		t.Fatalf("extraction_json = %v, want %q", got.ExtractionJSON, extractionJSON)
 	}
 
 	meetings, err := store.ListMeetings(10)
@@ -86,7 +91,7 @@ func TestInitUpgradesExistingMeetingsLifecycle(t *testing.T) {
 		tags TEXT NOT NULL DEFAULT '[]',
 		source TEXT NOT NULL DEFAULT 'manual',
 		created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-	)`) 
+	)`)
 	if err != nil {
 		t.Fatalf("create old meetings table: %v", err)
 	}
@@ -166,7 +171,7 @@ func TestInitPreservesExistingStatusWhenOnlyTimestampNeedsBackfill(t *testing.T)
 		tags TEXT NOT NULL DEFAULT '[]',
 		source TEXT NOT NULL DEFAULT 'manual',
 		created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-	)`) 
+	)`)
 	if err != nil {
 		t.Fatalf("create partially upgraded meetings table: %v", err)
 	}
@@ -213,7 +218,7 @@ func TestInitDoesNotBackfillFailedEndedMeetingAsCapturedWithoutArtifacts(t *test
 		tags TEXT NOT NULL DEFAULT '[]',
 		source TEXT NOT NULL DEFAULT 'manual',
 		created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-	)`) 
+	)`)
 	if err != nil {
 		t.Fatalf("create old meetings table: %v", err)
 	}

@@ -33,6 +33,7 @@ type Meeting struct {
 	AudioPath                 *string
 	Transcript                *string
 	Summary                   *string
+	ExtractionJSON            *string
 	Tags                      string
 	Source                    string
 	CreatedAt                 string
@@ -40,7 +41,7 @@ type Meeting struct {
 
 const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
-	audio_path, transcript, summary, tags, source, created_at
+	audio_path, transcript, summary, extraction_json, tags, source, created_at
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
@@ -55,11 +56,11 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 		`INSERT INTO meetings (
 			id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 			processing_status, processing_status_updated_at, processing_failure_message,
-			audio_path, transcript, summary, tags, source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			audio_path, transcript, summary, extraction_json, tags, source
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		m.ID, m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
 		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage,
-		m.AudioPath, m.Transcript, m.Summary, m.Tags, m.Source,
+		m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Tags, m.Source,
 	)
 	if err != nil {
 		return fmt.Errorf("create meeting: %w", err)
@@ -71,10 +72,10 @@ func (d *DB) UpdateMeeting(m *Meeting) error {
 	_, err := d.Conn.Exec(
 		`UPDATE meetings SET title=?, started_at=?, ended_at=?, capture_status=?, capture_status_updated_at=?,
 		 capture_failure_message=?, processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
-		 audio_path=?, transcript=?, summary=?, tags=?, source=? WHERE id=?`,
+		 audio_path=?, transcript=?, summary=?, extraction_json=?, tags=?, source=? WHERE id=?`,
 		m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt,
 		m.CaptureFailureMessage, m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage,
-		m.AudioPath, m.Transcript, m.Summary, m.Tags, m.Source, m.ID,
+		m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Tags, m.Source, m.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("update meeting: %w", err)
@@ -94,14 +95,14 @@ func (d *DB) GetMeeting(id string) (*Meeting, error) {
 	row := d.Conn.QueryRow(
 		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 		 processing_status, processing_status_updated_at, processing_failure_message,
-		 audio_path, transcript, summary, tags, source, created_at
+		 audio_path, transcript, summary, extraction_json, tags, source, created_at
 		 FROM meetings WHERE id=?`, id,
 	)
 	m := &Meeting{}
 	err := row.Scan(
 		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
 		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.Tags, &m.Source, &m.CreatedAt,
+		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Tags, &m.Source, &m.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get meeting: %w", err)
@@ -166,7 +167,7 @@ func scanMeetings(rows *sql.Rows) ([]Meeting, error) {
 		err := rows.Scan(
 			&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
 			&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-			&m.AudioPath, &m.Transcript, &m.Summary, &m.Tags, &m.Source, &m.CreatedAt,
+			&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Tags, &m.Source, &m.CreatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan meeting: %w", err)

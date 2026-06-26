@@ -12,6 +12,8 @@ import (
 
 func enhanceCmd() *cobra.Command {
 	var notes string
+	var feedback string
+	var refine bool
 	cmd := &cobra.Command{
 		Use:     "enhance [meeting-id]",
 		Aliases: []string{"summarize"},
@@ -24,10 +26,13 @@ func enhanceCmd() *cobra.Command {
 			}
 			defer store.Close()
 			service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
-			return service.Enhance(cmdContext(), args[0], notes)
+			options := recording.EnhanceOptions{Notes: notes, Feedback: feedback, Refine: refine}
+			return service.EnhanceWithOptions(cmdContext(), args[0], options)
 		},
 	}
 	cmd.Flags().StringVarP(&notes, "notes", "n", "", "Your rough notes")
+	cmd.Flags().StringVarP(&feedback, "feedback", "f", "", "Feedback for improving existing notes")
+	cmd.Flags().BoolVar(&refine, "refine", false, "Run a second pass over generated notes")
 	return cmd
 }
 

@@ -123,8 +123,8 @@ func (r recordingSession) saveTranscript(transcript string) error {
 	return r.service.emit(EventProcessing, *r.meeting, nil)
 }
 
-func (r recordingSession) saveEnhancement(title, transcript, summary string) error {
-	lifecycleFor(r.meeting).processingCompleted(title, transcript, summary, nowUTC())
+func (r recordingSession) saveEnhancement(title, transcript, summary, extractionJSON string) error {
+	lifecycleFor(r.meeting).processingCompleted(title, transcript, summary, extractionJSON, nowUTC())
 	if err := r.service.meetings().UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}

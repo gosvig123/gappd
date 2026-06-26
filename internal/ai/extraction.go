@@ -3,37 +3,13 @@ package ai
 import "strings"
 
 const (
-	maxTranscriptChunkChars = 12000
-	maxMergedParticipants   = 30
-	maxMergedTopics         = 80
-	maxMergedDecisions      = 80
-	maxMergedActionItems    = 120
-	maxMergedOpenQuestions  = 80
-	maxExtractionTextRunes  = 500
+	maxMergedParticipants  = 30
+	maxMergedTopics        = 80
+	maxMergedDecisions     = 80
+	maxMergedActionItems   = 120
+	maxMergedOpenQuestions = 80
+	maxExtractionTextRunes = 500
 )
-
-func transcriptChunks(transcript string) []string {
-	if len(transcript) <= maxTranscriptChunkChars {
-		return []string{transcript}
-	}
-	return splitTranscriptLines(strings.SplitAfter(transcript, "\n"))
-}
-
-func splitTranscriptLines(lines []string) []string {
-	var chunks []string
-	var current strings.Builder
-	for _, line := range lines {
-		if current.Len() > 0 && current.Len()+len(line) > maxTranscriptChunkChars {
-			chunks = append(chunks, current.String())
-			current.Reset()
-		}
-		current.WriteString(line)
-	}
-	if current.Len() > 0 {
-		chunks = append(chunks, current.String())
-	}
-	return chunks
-}
 
 func mergeExtractions(extractions []*Extraction) *Extraction {
 	var merged Extraction
@@ -157,13 +133,17 @@ func compactString(value string) string {
 }
 
 func topicKey(value Topic) string {
-	return value.Name + "\n" + value.Summary
+	return normalizedKey(value.Name + "\n" + value.Summary)
 }
 
 func decisionKey(value Decision) string {
-	return value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context
+	return normalizedKey(value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context)
 }
 
 func actionKey(value ExtractedAction) string {
-	return value.Task + "\n" + value.Owner + "\n" + value.Deadline
+	return normalizedKey(value.Task + "\n" + value.Owner + "\n" + value.Deadline)
+}
+
+func normalizedKey(value string) string {
+	return strings.ToLower(compactString(value))
 }

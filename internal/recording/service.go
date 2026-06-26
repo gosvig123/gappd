@@ -48,7 +48,8 @@ type transcriber interface {
 }
 
 type enhancer interface {
-	Run(context.Context, string, string) (*ai.Extraction, string, error)
+	RunWithOptions(context.Context, string, ai.RunOptions) (*ai.Extraction, string, error)
+	RefineNotes(context.Context, *ai.Extraction, string, string) (string, error)
 }
 
 type meetingStore interface {
