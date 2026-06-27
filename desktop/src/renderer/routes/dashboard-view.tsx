@@ -74,8 +74,10 @@ function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingL
   const groups = groupMeetingsByDate(props.meetings)
   return (
     <div className="meeting-list-screen">
-      <PageHeader className="compact meetings-header" title="Meetings" description={visibleText} action={<RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />} />
-      <input className="meeting-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search meetings" aria-label="Search meetings" />
+      <div className="meeting-list-sticky">
+        <PageHeader className="compact meetings-header" title="Meetings" description={visibleText} action={<RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />} />
+        <input className="meeting-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search meetings" aria-label="Search meetings" />
+      </div>
       <div className="meeting-list">
         {groups.map((group) => <MeetingDateSection key={group.key} group={group} onSelect={props.onSelectMeeting} />)}
         {props.meetings.length === 0 ? <EmptyState className="meetings-empty">{props.allMeetingsCount === 0 ? 'No meetings yet. Start recording to capture one.' : 'No matching meetings.'}</EmptyState> : null}
