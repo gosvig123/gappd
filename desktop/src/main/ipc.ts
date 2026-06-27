@@ -5,6 +5,7 @@ import { deleteMeeting, getDevices, listMeetings, requestCapturePermissions, sho
 import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
+import { downloadWhisperModel, getTranscriptionSettings, saveDefaultWhisperModel } from './whisper-model-settings'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
 const LEGACY_PRIVACY_SECURITY_PANE = 'com.apple.preference.security'
@@ -43,6 +44,11 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     ipcMain.handle(IPC_CHANNELS.onboarding.retry, (_event, input?: OnboardingSetupInput) => retryOnboarding(input))
     ipcMain.handle(IPC_CHANNELS.settings.getLocalAIStatus, () => getLocalAIStatus())
     ipcMain.handle(IPC_CHANNELS.settings.repairLocalAI, () => repairLocalAI())
+    ipcMain.handle(IPC_CHANNELS.settings.getTranscriptionSettings, () => getTranscriptionSettings())
+    ipcMain.handle(IPC_CHANNELS.settings.downloadWhisperModel, (event, id: string) => downloadWhisperModel(id, (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send(IPC_EVENTS.settings.whisperModelDownloadProgress, progress)
+    }))
+    ipcMain.handle(IPC_CHANNELS.settings.setDefaultWhisperModel, (_event, id: string) => saveDefaultWhisperModel(id))
     ipcMain.handle(IPC_CHANNELS.update.getStatus, () => getUpdateStatus())
     ipcMain.handle(IPC_CHANNELS.update.checkNow, () => checkForUpdate())
     ipcMain.handle(IPC_CHANNELS.update.downloadUpdate, () => downloadUpdate())

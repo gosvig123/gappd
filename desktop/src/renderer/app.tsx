@@ -8,6 +8,7 @@ import { useDashboardData } from './hooks/use-dashboard-data'
 import { useLocalAISettings } from './hooks/use-local-ai-settings'
 import { useOnboarding } from './hooks/use-onboarding'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
+import { useTranscriptionSettings } from './hooks/use-transcription-settings'
 import { useUpdateStatus } from './hooks/use-update-status'
 import { Banner } from './components/ui'
 import { DashboardView } from './routes/dashboard-view'
@@ -24,12 +25,13 @@ export function App() {
   const aiReady = onboarding.status?.phase === READY_ONBOARDING_PHASE
   const permissions = useSetupPermissions(Boolean(aiReady))
   const appReady = Boolean(aiReady && permissions.ready)
-  const developerDebugOpen = developerDebugEnabled && appReady && settingsOpen
+  const settingsPanelOpen = appReady && settingsOpen
   const dashboard = useDashboardData(appReady)
-  const settings = useLocalAISettings(developerDebugOpen, onboarding.setStatus)
+  const localAI = useLocalAISettings(settingsPanelOpen && developerDebugEnabled, onboarding.setStatus)
+  const transcription = useTranscriptionSettings(settingsPanelOpen)
   const update = useUpdateStatus()
   if (onboarding.loading || !onboarding.status) return <div className="screen-center">Starting Gappd…</div>
-  return <div className="app-shell"><AppHeader appReady={appReady} developerDebugEnabled={developerDebugEnabled} settingsOpen={developerDebugOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <OnboardingApp onboarding={onboarding} permissions={permissions} />}</main>{developerDebugOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView {...settings} onRepair={() => void settings.repair()} /></SettingsSheet> : null}</div>
+  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <OnboardingApp onboarding={onboarding} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView localAI={{ ...localAI, onRepair: () => void localAI.repair() }} transcription={transcription} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
 }
 
 function ReadyApp({ dashboard, update }: { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus> }) {
