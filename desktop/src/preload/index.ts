@@ -14,6 +14,7 @@ const api: GappdApi = {
     getDevices: () => ipcRenderer.invoke(IPC_CHANNELS.system.getDevices),
     requestCapturePermissions: () => ipcRenderer.invoke(IPC_CHANNELS.system.requestCapturePermissions),
     openPermissionsSettings: (target) => ipcRenderer.invoke(IPC_CHANNELS.system.openPermissionsSettings, target),
+    startStaleRecordingRecovery: () => ipcRenderer.invoke(IPC_CHANNELS.system.startStaleRecordingRecovery),
   },
   meetings: {
     list: () => ipcRenderer.invoke(IPC_CHANNELS.meetings.list),
@@ -40,7 +41,9 @@ const api: GappdApi = {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.update.getStatus),
     checkNow: () => ipcRenderer.invoke(IPC_CHANNELS.update.checkNow),
     downloadUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.update.downloadUpdate),
+    installAndRestart: () => ipcRenderer.invoke(IPC_CHANNELS.update.installAndRestart),
     openUpdatePage: () => ipcRenderer.invoke(IPC_CHANNELS.update.openUpdatePage),
+    onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged),
   },
 }
 

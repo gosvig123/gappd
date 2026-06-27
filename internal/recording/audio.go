@@ -5,8 +5,20 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
+)
+
+const (
+	blankAudioMarker            = "blank_audio"
+	silenceMarker               = "silence"
+	markerWrapperCutset         = "[]()"
+	normalizedTextSeparator     = " "
+	segmentStartTieSeconds      = 1.0
+	repeatedArtifactMinRunes    = 16
+	repeatedArtifactMinSegments = 20
+	repeatedArtifactDominance   = 0.8
 )
 
 func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
@@ -15,6 +27,47 @@ func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
 		out[i] = db.Segment{MeetingID: meetingID, Start: s.Start, End: s.End, Text: s.Text, Speaker: s.Speaker}
 	}
 	return out
+}
+
+func cleanTranscriptionArtifacts(segments []transcribe.Segment) []transcribe.Segment {
+	cleaned := make([]transcribe.Segment, 0, len(segments))
+	for _, segment := range segments {
+		if !isTranscriptionArtifact(segment.Text) {
+			cleaned = append(cleaned, segment)
+		}
+	}
+	if hasDominantRepeatedText(cleaned) {
+		return nil
+	}
+	return cleaned
+}
+
+func isTranscriptionArtifact(text string) bool {
+	marker := strings.Trim(normalizedSegmentText(text), markerWrapperCutset)
+	return marker == "" || marker == blankAudioMarker || marker == silenceMarker
+}
+
+func normalizedSegmentText(text string) string {
+	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(text)), normalizedTextSeparator))
+}
+
+func hasDominantRepeatedText(segments []transcribe.Segment) bool {
+	if len(segments) < repeatedArtifactMinSegments {
+		return false
+	}
+	counts := map[string]int{}
+	maxCount := 0
+	for _, segment := range segments {
+		text := normalizedSegmentText(segment.Text)
+		if len([]rune(text)) < repeatedArtifactMinRunes {
+			continue
+		}
+		counts[text]++
+		if counts[text] > maxCount {
+			maxCount = counts[text]
+		}
+	}
+	return maxCount >= repeatedArtifactMinSegments && float64(maxCount)/float64(len(segments)) >= repeatedArtifactDominance
 }
 
 func FormatTranscript(segments []db.Segment) string {
@@ -49,6 +102,9 @@ func indexedSegments(segments []db.Segment) []indexedSegment {
 }
 
 func segmentLess(a, b indexedSegment) bool {
+	if nearStart(a.segment.Start, b.segment.Start) && speakerRank(a.segment.Speaker) != speakerRank(b.segment.Speaker) {
+		return speakerRank(a.segment.Speaker) < speakerRank(b.segment.Speaker)
+	}
 	switch {
 	case a.segment.Start != b.segment.Start:
 		return a.segment.Start < b.segment.Start
@@ -61,4 +117,22 @@ func segmentLess(a, b indexedSegment) bool {
 	default:
 		return a.index < b.index
 	}
+}
+
+func nearStart(left, right float64) bool {
+	delta := left - right
+	if delta < 0 {
+		delta = -delta
+	}
+	return delta <= segmentStartTieSeconds
+}
+
+func speakerRank(speaker string) int {
+	if speaker == audioartifact.SystemSpeaker {
+		return 0
+	}
+	if speaker == audioartifact.MicSpeaker {
+		return 1
+	}
+	return 2
 }

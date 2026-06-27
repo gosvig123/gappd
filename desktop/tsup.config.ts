@@ -11,6 +11,7 @@ export default defineConfig([
     target: 'es2022',
     clean: true,
     external: ['electron'],
+    noExternal: ['electron-updater'],
     splitting: false,
     sourcemap: false,
   },

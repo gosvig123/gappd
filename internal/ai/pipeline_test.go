@@ -93,6 +93,46 @@ func TestPipelineRun(t *testing.T) {
 	}
 }
 
+func TestPipelineRunChunksLongTranscript(t *testing.T) {
+	h := newOllamaTestServer(t,
+		`{"title":"First Half","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
+		`{"title":"Second Half","participants":["Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
+		`{"title":"Wrap Up","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
+		`{"title":"Roadmap Launch Planning","participants":["Ada","Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
+		"## Meeting Title\nMerged")
+	transcript := strings.Repeat("[Ada] roadmap\n", 1000) + strings.Repeat("[Ben] launch\n", 1000)
+
+	extraction, notes, err := h.pipeline(0.3).Run(context.Background(), transcript, "")
+	if err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if len(h.requests) != 5 || notes == "" {
+		t.Fatalf("requests=%d notes=%q, want chunked extraction, refinement, and synthesis", len(h.requests), notes)
+	}
+	if extraction.Title != "Roadmap Launch Planning" {
+		t.Fatalf("title = %q, want refined global title", extraction.Title)
+	}
+	if strings.Join(extraction.Participants, ",") != "Ada,Ben" {
+		t.Fatalf("participants = %#v, want merged participants", extraction.Participants)
+	}
+}
+
+func TestMergeExtractionsBoundsMergedItems(t *testing.T) {
+	extractions := make([]*Extraction, 0, maxMergedTopics+1)
+	for i := 0; i < maxMergedTopics+1; i++ {
+		extractions = append(extractions, &Extraction{Topics: []Topic{{Name: strings.Repeat("topic ", i+1), Summary: "summary"}}})
+	}
+
+	merged := mergeExtractions(extractions)
+	if len(merged.Topics) != maxMergedTopics {
+		t.Fatalf("topics = %d, want bounded topics", len(merged.Topics))
+	}
+	long := mergeExtractions([]*Extraction{{Topics: []Topic{{Name: strings.Repeat("x", maxExtractionTextRunes+1)}}}})
+	if len([]rune(long.Topics[0].Name)) > maxExtractionTextRunes {
+		t.Fatalf("topic name runes = %d, want bounded", len([]rune(long.Topics[0].Name)))
+	}
+}
+
 func TestPipelineRunReturnsExtractionWhenSynthesisFails(t *testing.T) {
 	h := newOllamaTestServer(t, `{"title":"Weekly Sync","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`, `{"error":"ollama offline"}`)
 	h.status = http.StatusOK

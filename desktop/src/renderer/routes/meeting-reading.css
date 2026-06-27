@@ -1,25 +1,10 @@
 .reading-card {
+  position: relative;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  gap: 12px;
   align-content: stretch;
-  --reading-fade-color: var(--color-surface);
-}
-
-.primary-reading-card {
-  --reading-fade-color: var(--color-accent-tint);
-  background: var(--color-accent-tint);
-  border-color: var(--color-accent-border);
-}
-
-.reading-card-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+  --reading-fade-color: var(--surface-panel);
 }
 
 .reading-card-actions {
@@ -30,11 +15,12 @@
 }
 
 .reading-text {
-  position: relative;
   width: 100%;
   min-width: 0;
   min-height: 0;
   justify-self: stretch;
+  padding-right: var(--space-2);
+  overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   color: var(--color-text-soft);
@@ -42,16 +28,7 @@
   font-size: 14px;
 }
 
-.reading-preview {
-  overflow: hidden;
-}
-
-.reading-expanded {
-  overflow: auto;
-  padding-right: var(--space-2);
-}
-
-.reading-preview::after {
+.reading-card-overflow::after {
   content: '';
   position: absolute;
   right: 0;
@@ -62,11 +39,7 @@
   pointer-events: none;
 }
 
-.reading-toggle {
-  align-self: start;
-}
-
-.primary-reading-card .reading-text {
+.markdown-reading-card .reading-text {
   color: var(--color-text);
   font-size: 15px;
   white-space: normal;
@@ -127,21 +100,7 @@
   color: var(--color-accent);
 }
 
-.detail-surface.reading-card {
-  background: transparent;
-}
-
-.detail-surface.primary-reading-card {
-  background: var(--color-accent-tint);
-}
-
 @media (max-width: 45rem) {
-  .reading-card-header {
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-items: start;
-  }
-
   .reading-card-actions {
     justify-content: flex-start;
   }

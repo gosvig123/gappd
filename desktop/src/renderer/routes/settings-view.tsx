@@ -29,7 +29,7 @@ export function SettingsView({ status, loading, busy, onRepair }: SettingsViewPr
   const errorView = onboardingErrorView(status)
   return (
     <section className="settings-stack settings-stack-plain">
-      <PageHeader title="Local AI" description="Runtime health on this Mac." action={<StatusPill tone={status ? onboardingStatusTone(status.phase) : 'processing'}>{loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}</StatusPill>} />
+      <PageHeader title="Developer Debug" description="Local AI runtime health for development." action={<StatusPill tone={status ? onboardingStatusTone(status.phase) : 'processing'}>{loading ? 'Checking' : onboardingPhaseLabel(status?.phase ?? 'checking')}</StatusPill>} />
       <div className="settings-grid">
         {SETTINGS_METRICS.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value(status)} />)}
       </div>

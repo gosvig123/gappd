@@ -57,12 +57,13 @@ func (l meetingLifecycle) transcriptSaved(transcript, at string) {
 	l.processing(db.ProcessingStatusProcessing, at, nil)
 }
 
-func (l meetingLifecycle) processingCompleted(title, transcript, summary, at string) {
+func (l meetingLifecycle) processingCompleted(title, transcript, summary, extractionJSON, at string) {
 	if title = cleanGeneratedMeetingTitle(title); title != "" {
 		l.meeting.Title = title
 	}
 	l.meeting.Transcript = &transcript
 	l.meeting.Summary = &summary
+	l.meeting.ExtractionJSON = &extractionJSON
 	l.processing(db.ProcessingStatusCompleted, at, nil)
 }
 

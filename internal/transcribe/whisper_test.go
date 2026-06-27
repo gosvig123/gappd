@@ -41,6 +41,28 @@ func TestParseWhisperJSONRejectsEndBeforeStart(t *testing.T) {
 	}
 }
 
+func TestHasDominantRepeatedText(t *testing.T) {
+	segments := make([]Segment, 0, 25)
+	for i := 0; i < 25; i++ {
+		segments = append(segments, Segment{Text: "I'm going to go back to the car."})
+	}
+
+	if !hasDominantRepeatedText(segments) {
+		t.Fatal("hasDominantRepeatedText() = false, want true")
+	}
+}
+
+func TestHasDominantRepeatedTextIgnoresShortReplies(t *testing.T) {
+	segments := make([]Segment, 0, 25)
+	for i := 0; i < 25; i++ {
+		segments = append(segments, Segment{Text: "okay"})
+	}
+
+	if hasDominantRepeatedText(segments) {
+		t.Fatal("hasDominantRepeatedText() = true, want false")
+	}
+}
+
 func TestFindWhisperBinaryUsesEnvOverride(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "whisper-bundle")
 	if err := os.WriteFile(bin, []byte("#!/bin/sh\n"), 0o755); err != nil {

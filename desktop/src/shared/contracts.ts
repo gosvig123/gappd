@@ -86,20 +86,17 @@ export function isUpdateChannel(value: string | undefined): value is UpdateChann
   return UPDATE_CHANNELS.some((channel) => channel === value)
 }
 
-export type UpdateStatus =
-  | { available: false; currentVersion: string; latestVersion?: string }
-  | {
-    available: true
-    currentVersion: string
-    latestVersion: string
-    releaseUrl: string
-    downloadUrl?: string
-    sha256?: string
-    channel?: UpdateChannel
-    name?: string
-  }
+export const UPDATE_PHASES = ['idle', 'checking', 'available', 'downloading', 'downloaded', 'installing', 'error'] as const
+export type UpdatePhase = (typeof UPDATE_PHASES)[number]
 
-export type UpdateDownloadResult = {
-  filePath: string
-  fileName: string
+export type UpdateStatus = {
+  phase: UpdatePhase
+  available: boolean
+  currentVersion: string
+  channel: UpdateChannel
+  latestVersion?: string
+  name?: string
+  releaseUrl?: string
+  progress?: number
+  error?: string
 }

@@ -13,6 +13,7 @@ module.exports = {
   directories: {
     output: 'release',
   },
+  publish: [{ provider: 'github', owner: 'gosvig123', repo: 'gappd' }],
   files: ['dist/**', 'dist-electron/**'],
   extraResources: [
     { from: '../build/gappd', to: 'bin/gappd' },
@@ -25,7 +26,7 @@ module.exports = {
   mac: {
     icon: 'assets/app-icon.icns',
     category: 'public.app-category.productivity',
-    target: ['dmg'],
+    target: ['dmg', 'zip'],
     bundleShortVersion: MAC_BUNDLE_SHORT_VERSION,
     minimumSystemVersion: MACOS_MINIMUM_SYSTEM_VERSION,
     identity: MAC_SIGNING_IDENTITY,

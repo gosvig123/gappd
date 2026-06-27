@@ -9,11 +9,12 @@
 }
 
 .meeting-search {
-  margin-bottom: 10px;
+  width: 100%;
 }
 
 .meeting-list-restore {
   justify-self: start;
+  margin: var(--space-4) 0 0 var(--space-4);
   display: grid;
   width: 2.25rem;
   height: 2.25rem;
@@ -44,10 +45,16 @@
   overflow: auto;
 }
 
-.meeting-date-section,
+.meeting-date-section {
+  display: grid;
+  gap: var(--space-4);
+}
+
 .meeting-date-items {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-4);
+  align-items: stretch;
 }
 
 .meeting-date-heading {
@@ -67,25 +74,36 @@
 }
 
 .meeting-row {
-  padding: 10px 11px;
-  border: 1px solid var(--color-border);
-  border-radius: 11px;
+  min-height: 6rem;
+  padding: var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
   text-align: left;
-  display: grid;
-  gap: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   color: inherit;
   background: var(--color-surface-soft);
+  transition: background var(--transition-quick), border-color var(--transition-quick);
 }
 
 .meeting-row:hover {
-  border-color: var(--color-border-strong);
   background-color: var(--surface-hover);
+  border-color: var(--color-border);
 }
 
 .meeting-row.selected {
   border-color: var(--color-accent-border-strong);
   background: var(--surface-accent);
-  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.meeting-row-summary {
+  margin-top: auto;
+}
+
+.meeting-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
 .meeting-row-top {

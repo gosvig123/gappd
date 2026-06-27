@@ -1,11 +1,12 @@
-import type { Device, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
-export type { OnboardingStatus, RecordingState, UpdateDownloadResult, UpdateStatus } from './contracts'
+import type { Device, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
+export type { OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
 
 export const IPC_CHANNELS = {
   system: {
     getDevices: 'system:getDevices',
     requestCapturePermissions: 'system:requestCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
+    startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
   meetings: {
     list: 'meetings:list',
@@ -30,6 +31,7 @@ export const IPC_CHANNELS = {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
     downloadUpdate: 'update:downloadUpdate',
+    installAndRestart: 'update:installAndRestart',
     openUpdatePage: 'update:openUpdatePage',
   },
 } as const
@@ -40,6 +42,9 @@ export const IPC_EVENTS = {
   },
   onboarding: {
     statusChanged: 'onboarding:status-changed',
+  },
+  update: {
+    statusChanged: 'update:status-changed',
   },
 } as const
 
@@ -54,6 +59,7 @@ export type GappdApi = {
     getDevices(): Promise<Device[]>
     requestCapturePermissions(): Promise<CapturePermissions>
     openPermissionsSettings(target?: CapturePermissionTarget): Promise<void>
+    startStaleRecordingRecovery(): Promise<number>
   }
   meetings: {
     list(): Promise<MeetingListItem[]>
@@ -79,7 +85,9 @@ export type GappdApi = {
   update: {
     getStatus(): Promise<UpdateStatus>
     checkNow(): Promise<UpdateStatus>
-    downloadUpdate(): Promise<UpdateDownloadResult>
+    downloadUpdate(): Promise<UpdateStatus>
+    installAndRestart(): Promise<UpdateStatus>
     openUpdatePage(): Promise<void>
+    onStatusChanged(listener: (state: UpdateStatus) => void): () => void
   }
 }

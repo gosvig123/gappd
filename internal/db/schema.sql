@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     audio_path TEXT,
     transcript TEXT,
     summary    TEXT,
+    extraction_json TEXT,
     tags       TEXT NOT NULL DEFAULT '[]',
     source     TEXT NOT NULL DEFAULT 'manual',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
