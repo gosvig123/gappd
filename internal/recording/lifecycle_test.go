@@ -76,7 +76,7 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
 	transcript := "[You] hello\n"
 
-	err := service.processing().enhanceAndSave(context.Background(), testSession(service, meeting), transcript, "")
+	err := service.processing().enhanceAndSave(context.Background(), testSession(service, meeting), transcript, EnhanceOptions{})
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("enhanceAndSave() error = %v, want saved transcript failure", err)
 	}

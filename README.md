@@ -66,23 +66,21 @@ go test ./...
 npm run desktop:typecheck
 ```
 
-## Desktop update checks
+## Desktop updates
 
-Desktop startup checks the latest release manifest at
-`https://github.com/gosvig123/gappd/releases/latest/download/latest.json`.
-The updater accepts legacy flat JSON plus schema-2 channel manifests, then picks
-matching `platform-arch` assets such as `darwin-arm64` or `darwin-universal`.
-Offline or failed checks are ignored so the app remains usable.
+Desktop startup uses `electron-updater` against GitHub Releases. Signed macOS
+builds publish a first-install DMG, updater ZIP, blockmaps, and `*-mac.yml`
+metadata. Updates download in the background and install when the user clicks
+`Restart to update` or quits after the download completes.
 
 The macOS release workflow publishes stable builds only from manual runs with
 an existing `v*` tag. Pushes to the `beta` branch publish prerelease builds named
-`v<next-version>-beta.<run-number>`. Each run writes `latest.json` with schema-2
-channels and legacy top-level fields so older apps can still update.
+`v<next-version>-beta.<run-number>`. Each run still writes `latest.json` so
+older custom-updater apps can bridge onto the Electron updater build.
 
-Beta release assets appear under GitHub Releases as prereleases. Beta builds
-read `https://github.com/gosvig123/gappd/releases/download/beta/latest.json` by
-default, which points at the newest versioned beta prerelease. Set
-`GAPPD_UPDATE_CHECK_URL` or `GAPPD_UPDATE_CHANNEL` only to override this.
+Beta builds use the Electron updater beta channel. Set `GAPPD_UPDATE_CHANNEL`
+only to override the release channel, or `GAPPD_FORCE_DEV_AUTO_UPDATE=1` with a
+local `dev-app-update.yml` when testing updater UI from an unpackaged app.
 
 ## CLI install
 

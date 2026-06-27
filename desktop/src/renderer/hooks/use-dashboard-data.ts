@@ -1,13 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState } from '../../shared/contracts'
 import { isPermissionErrorMessage, permissionTarget } from '../components/meeting-status'
-import { ACTIVE_RECORDING_STATUSES, useDynamicRefresh } from './use-dynamic-refresh'
+import { useDynamicRefresh } from './use-dynamic-refresh'
 import { useGuardedEffect } from './use-guarded-effect'
 import { useRequestGate } from './request-gate'
 
 const IDLE_RECORDING_STATUS: RecordingState['status'] = 'idle'
 const ERROR_RECORDING_STATUS: RecordingState['status'] = 'error'
+const RECORDING_RECORDING_STATUS: RecordingState['status'] = 'recording'
 const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
+const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = [RECORDING_RECORDING_STATUS]
 
 export function useDashboardData(enabled: boolean) {
   const selectedMeetingRequest = useRequestGate()
@@ -37,6 +39,8 @@ function useDashboardState() {
     recording: { status: IDLE_RECORDING_STATUS } as RecordingState,
     error: null as string | null,
     device: 0,
+    recoveringStale: false,
+    staleRecoveryNotice: null as string | null,
   })
 }
 
@@ -85,12 +89,23 @@ function useDashboardActions(state: DashboardState, setState: SetDashboardState,
   async function loadAppData() {
     const [devices, meetings, recording] = await Promise.all([window.gappd.system.getDevices(), window.gappd.meetings.list(), window.gappd.recording.getStatus()])
     setState((current) => ({ ...current, devices, meetings, recording, device: devices[0]?.index ?? current.device }))
-    const initialMeetingId = recording.meetingId ?? meetings[0]?.id ?? null
-    if (initialMeetingId) await loadMeeting(initialMeetingId)
-    if (!initialMeetingId) clearSelectedMeeting()
+    // List-first: never auto-open a meeting on launch. Selection happens on click.
+    clearSelectedMeeting()
   }
 
-  return { refreshMeetings, loadMeeting, deleteMeeting, loadAppData, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
+  async function recoverStale() {
+    setState((current) => ({ ...current, recoveringStale: true, staleRecoveryNotice: null }))
+    try {
+      const recovered = await window.gappd.system.startStaleRecordingRecovery()
+      if (recovered > 0) await refreshMeetings(refs.selectedId.current)
+      setState((current) => ({ ...current, recoveringStale: false, staleRecoveryNotice: recoveryNotice(recovered) }))
+    } catch (err) {
+      setState((current) => ({ ...current, recoveringStale: false }))
+      throw err
+    }
+  }
+
+  return { refreshMeetings, loadMeeting, clearSelectedMeeting, deleteMeeting, loadAppData, recoverStale, start: () => startRecording(state, setState), stop: () => stopRecording(setState), openPermissionsSettings: () => openPermissionsSettings(state, setState), setDevice: (device: number) => setState((current) => ({ ...current, device })), setError: (error: string) => setState((current) => ({ ...current, error })) }
 }
 
 type DashboardActions = ReturnType<typeof useDashboardActions>
@@ -100,9 +115,10 @@ type MeetingRefs = ReturnType<typeof useMeetingRefs>
 type RequestGate = ReturnType<typeof useRequestGate>
 
 async function resolveSelectedMeeting(meetings: MeetingListItem[], preferredId: string | null | undefined, refs: MeetingRefs, loadMeeting: (id: string) => Promise<void>, clear: () => void) {
-  const nextId = preferredId ?? refs.selectedId.current ?? meetings[0]?.id ?? null
+  const nextId = preferredId ?? refs.selectedId.current ?? null
   if (!nextId) return clear()
-  const resolvedId = meetings.some((meeting) => meeting.id === nextId) ? nextId : meetings[0]?.id ?? null
+  // Don't fall back to the first meeting — if the open one is gone, return to the list.
+  const resolvedId = meetings.some((meeting) => meeting.id === nextId) ? nextId : null
   if (resolvedId) await loadMeeting(resolvedId)
   if (!resolvedId) clear()
 }
@@ -134,9 +150,14 @@ function useRecordingLifecycle(enabled: boolean, refs: MeetingRefs, actions: Das
   useGuardedEffect((guard) => {
     if (!enabled) return undefined
     const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, refs, actions, setState)))
-    void actions.loadAppData().catch((err) => guard(() => setDashboardError(err, setState)))
+    void loadReadyAppData(actions).catch((err) => guard(() => setDashboardError(err, setState)))
     return dispose
   }, [enabled])
+}
+
+async function loadReadyAppData(actions: DashboardActions) {
+  await actions.loadAppData()
+  await actions.recoverStale()
 }
 
 async function handleRecordingChange(next: RecordingState, refs: MeetingRefs, actions: DashboardActions, setState: SetDashboardState) {
@@ -207,9 +228,14 @@ function isPermissionDeniedState(state: string): boolean {
   return normalized.includes('denied') || normalized.includes('restricted')
 }
 
+function recoveryNotice(recovered: number): string | null {
+  if (recovered === 0) return null
+  return recovered === 1 ? 'Recovered 1 previous recording.' : `Recovered ${recovered} previous recordings.`
+}
+
 function buildDashboardViewModel(state: DashboardState, actions: DashboardActions) {
   const canStart = state.devices.length > 0 && STARTABLE_RECORDING_STATUSES.includes(state.recording.status)
-  const canStop = ACTIVE_RECORDING_STATUSES.includes(state.recording.status)
+  const canStop = STOPPABLE_RECORDING_STATUSES.includes(state.recording.status)
   const bannerError = state.error ?? state.recording.error ?? null
   return { ...state, canStart, canStop, bannerError, transcript: state.selectedMeeting?.transcriptText ?? '', isPermissionError: isPermissionErrorMessage(bannerError), actions }
 }

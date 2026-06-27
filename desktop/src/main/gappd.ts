@@ -12,6 +12,9 @@ import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
+const RECORDING_STATUS_STOPPING = 'stopping'
+const RECORDING_STATUS_PROCESSING = 'processing'
+const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPING, RECORDING_STATUS_PROCESSING])
 
 let recordingChild: ReturnType<typeof spawn> | null = null
 let staleRecoveryTimer: NodeJS.Timeout | null = null
@@ -104,10 +107,9 @@ export async function saveManagedLocalAIConfig(input: { endpoint: string; model:
   return result.ai
 }
 
-export function startStaleRecordingRecovery(): void {
-  if (staleRecoveryTimer) return
-  void runStaleRecordingRecovery()
-  staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
+export async function startStaleRecordingRecovery(): Promise<number> {
+  if (!staleRecoveryTimer) staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
+  return runStaleRecordingRecovery()
 }
 
 export function stopStaleRecordingRecovery(): void {
@@ -129,7 +131,9 @@ export async function startRecording(input: { title: string; device: number; mod
 
 export function stopRecording(): void {
   if (!recordingChild) return
-  setRecordingState({ ...getRecordingState(), status: 'stopping' })
+  const state = getRecordingState()
+  if (STOP_IGNORED_RECORDING_STATUSES.has(state.status)) return
+  setRecordingState({ ...state, status: RECORDING_STATUS_STOPPING })
   recordingChild.kill('SIGINT')
 }
 
@@ -148,13 +152,14 @@ function cleanPermissionDetails(details: Record<string, string>): Record<string,
   return Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'microphone' && key !== 'screen'))
 }
 
-async function runStaleRecordingRecovery(): Promise<void> {
-  if (staleRecoveryRunning) return
+async function runStaleRecordingRecovery(): Promise<number> {
+  if (staleRecoveryRunning) return 0
   staleRecoveryRunning = true
   try {
-    await recoverStaleRecordings()
+    return await recoverStaleRecordings()
   } catch (error) {
     console.error('stale recording recovery failed', error)
+    return 0
   } finally {
     staleRecoveryRunning = false
   }

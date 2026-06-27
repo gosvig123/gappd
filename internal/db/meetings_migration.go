@@ -19,6 +19,7 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 	needsProcessingStatusBackfill := !columns["processing_status"]
 	needsProcessingStatusUpdatedAtBackfill := !columns["processing_status_updated_at"]
 	needsProcessingFailureBackfill := !columns["processing_failure_message"]
+	needsExtractionJSONBackfill := !columns["extraction_json"]
 
 	if needsStatusBackfill {
 		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN status TEXT NOT NULL DEFAULT 'recording' CHECK (status IN ('recording', 'processing', 'completed', 'failed'))`)
@@ -72,6 +73,12 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN processing_failure_message TEXT`)
 		if err != nil {
 			return fmt.Errorf("add meetings.processing_failure_message: %w", err)
+		}
+	}
+	if needsExtractionJSONBackfill {
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN extraction_json TEXT`)
+		if err != nil {
+			return fmt.Errorf("add meetings.extraction_json: %w", err)
 		}
 	}
 
@@ -185,7 +192,7 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 	if _, err := conn.ExecContext(ctx, processingFailureQuery); err != nil {
 		return fmt.Errorf("backfill meetings.processing_failure_message: %w", err)
 	}
-	return nil
+	return syncLegacyMeetingStatus(ctx, conn)
 }
 
 func (d *DB) tableColumns(name string) (map[string]bool, error) {

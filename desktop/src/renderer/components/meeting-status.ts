@@ -9,21 +9,6 @@ const permissionErrorHints = [
   'privacy & security',
 ]
 
-export function meetingStatusLabel(state: MeetingStatus['state']): string {
-  switch (state) {
-    case 'recording':
-      return 'Recording'
-    case 'captured':
-      return 'Captured'
-    case 'processing':
-      return 'Processing'
-    case 'completed':
-      return 'Completed'
-    case 'failed':
-      return 'Failed'
-  }
-}
-
 export function meetingStatusTone(state: MeetingStatus['state']): 'recording' | 'processing' | 'idle' | 'error' {
   switch (state) {
     case 'recording':

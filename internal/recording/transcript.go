@@ -33,7 +33,7 @@ func (p meetingProcessing) processCaptured(ctx context.Context, session recordin
 	if err != nil {
 		return err
 	}
-	return p.enhanceAndSave(ctx, session, transcript, "")
+	return p.enhanceAndSave(ctx, session, transcript, EnhanceOptions{})
 }
 
 func (session recordingSession) saveSegments(segments []db.Segment) (string, error) {
@@ -57,31 +57,6 @@ func (session recordingSession) printTranscript(transcript string) {
 	}
 	fmt.Fprintln(session.service.Out, "\n── Transcript ──────────────────────────")
 	fmt.Fprintln(session.service.Out, transcript)
-}
-
-// Enhance re-runs the AI pipeline over a stored meeting's transcript and saves the result.
-func (s Service) Enhance(ctx context.Context, meetingID, notes string) error {
-	return s.processing().enhanceStored(ctx, meetingID, notes)
-}
-
-func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID, notes string) error {
-	segments, err := p.service.meetings().GetSegments(meetingID)
-	if err != nil {
-		return fmt.Errorf("get segments: %w", err)
-	}
-	if len(segments) == 0 {
-		return fmt.Errorf("no segments found for meeting %s", meetingID)
-	}
-	transcript := FormatTranscript(segments)
-	meeting, err := p.service.meetings().GetMeeting(meetingID)
-	if err != nil {
-		return fmt.Errorf("get meeting: %w", err)
-	}
-	session := p.service.sessionFor(meeting, audioartifact.Artifacts{})
-	if err := session.markProcessing(); err != nil {
-		return err
-	}
-	return p.enhanceAndSave(ctx, session, transcript, notes)
 }
 
 func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
@@ -114,7 +89,7 @@ func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifa
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
-	return toDBSegments(meetingID, segments), nil
+	return toDBSegments(meetingID, cleanTranscriptionArtifacts(segments)), nil
 }
 
 var errMissingAudio = errors.New("missing audio")
@@ -152,39 +127,6 @@ func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, modelPat
 		segs[i].Speaker = speaker
 	}
 	return segs, nil
-}
-
-func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recordingSession, transcript, notes string) error {
-	if p.service.Events == nil {
-		fmt.Fprintln(p.service.Out, "── Enhancing with AI... ─────────────────")
-	}
-	extraction, summary, err := p.enhancer().Run(ctx, transcript, notes)
-	if err != nil {
-		return session.saveEnhanceFailure(transcript, err)
-	}
-	if err := session.saveEnhancement(extraction.Title, transcript, summary); err != nil {
-		return err
-	}
-	if p.service.Events == nil {
-		printEnhancementResult(p.service, summary, len(extraction.ActionItems), session.meeting.ID)
-	}
-	return nil
-}
-
-func (p meetingProcessing) enhancer() enhancer {
-	if p.service.enhancer != nil {
-		return p.service.enhancer
-	}
-	return p.service.Pipeline
-}
-
-func printEnhancementResult(s Service, summary string, actionItems int, meetingID string) {
-	fmt.Fprintln(s.Out, "\n── Notes ───────────────────────────────")
-	fmt.Fprintln(s.Out, summary)
-	if actionItems > 0 {
-		fmt.Fprintf(s.Out, "\n● %d action items extracted.\n", actionItems)
-	}
-	fmt.Fprintf(s.Out, "● Saved: %s\n", meetingID)
 }
 
 func whisperModelNotFoundError(modelPath, defaultModelPath string) error {

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
-import { meetingStatusLabel, meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
-import { Button, EmptyState, ListRow, PageHeader, Panel, StatusPill } from '../components/ui'
+import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
+import { meetingProgressLabel, type MeetingProgressInput } from '../components/meeting-progress'
+import { EmptyState, ListRow, PageHeader, StatusPill } from '../components/ui'
 import { MeetingDetailPanel } from './meeting-detail-view'
-import { CaptureCard } from './today-cards'
+import { RecordControls } from './today-cards'
 import './meetings.css'
 import './today.css'
 import { dateLabel, EMPTY_TITLE } from './today-model'
@@ -11,7 +12,6 @@ import { dateLabel, EMPTY_TITLE } from './today-model'
 const MEETING_CAPTURED = 'captured'
 const MEETING_RECORDING = 'recording'
 const PROCESSING_PROCESSING = 'processing'
-const MEETING_LIST_SHORTCUT = 'b'
 const DAY_MS = 24 * 60 * 60 * 1000
 const LAST_7_DAYS_WINDOW = 7
 const DATE_SECTION_TODAY = 'today'
@@ -40,6 +40,7 @@ type DashboardViewProps = {
   onStart: () => void
   onStop: () => void
   onSelectMeeting: (id: string) => void
+  onClearSelection: () => void
   onDeleteMeeting: (id: string) => Promise<void>
 }
 
@@ -53,74 +54,72 @@ type MeetingDateGroup = {
 
 export function DashboardView(props: DashboardViewProps) {
   const [query, setQuery] = useState('')
-  const [meetingListOpen, setMeetingListOpen] = useState(true)
   const meetings = useMemo(() => filterMeetings(props.meetings, query), [props.meetings, query])
-  useMeetingListShortcut(() => setMeetingListOpen((current) => !current))
+  const open = Boolean(props.selectedMeetingId)
   return (
     <div className="dashboard-grid ui-density-compact">
-      <div className={meetingListOpen ? 'dashboard-workspace' : 'dashboard-workspace meeting-list-collapsed'}>
-        {meetingListOpen ? <MeetingInboxPanel allMeetingsCount={props.meetings.length} meetings={meetings} query={query} selectedMeetingId={props.selectedMeetingId} onCollapse={() => setMeetingListOpen(false)} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} /> : <MeetingListRestore onExpand={() => setMeetingListOpen(true)} />}
-        <div className="dashboard-detail-column"><MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} /></div>
+      <div className={open ? 'dashboard-stage is-detail' : 'dashboard-stage is-list'}>
+        {open ? (
+          <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} onBack={props.onClearSelection} record={props} />
+        ) : (
+          <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} record={props} />
+        )}
       </div>
-      <CaptureCard {...props} />
     </div>
   )
 }
 
-function useMeetingListShortcut(onToggle: () => void) {
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (!isMeetingListShortcut(event)) return
-      event.preventDefault()
-      onToggle()
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onToggle])
-}
-
-function MeetingListRestore({ onExpand }: { onExpand: () => void }) {
-  return <button className="meeting-list-restore" onClick={onExpand} aria-label="Show meetings" title="Show meetings (⌘B)"><span aria-hidden="true">☰</span></button>
-}
-
-function MeetingInboxPanel(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; selectedMeetingId: string | null; onCollapse: () => void; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void }) {
-  const visibleText = props.query ? `${props.meetings.length} of ${props.allMeetingsCount} meetings` : `${props.allMeetingsCount} meetings`
+function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void; record: DashboardViewProps }) {
+  const visibleText = props.query ? `${props.meetings.length} of ${props.allMeetingsCount} meetings` : meetingCountLabel(props.allMeetingsCount)
   const groups = groupMeetingsByDate(props.meetings)
   return (
-    <Panel className="list-panel dashboard-inbox-panel">
-      <PageHeader className="compact inbox-panel-header" title="Meetings" description={visibleText} action={<Button className="compact-action meeting-list-toggle" onClick={props.onCollapse} title="Hide meetings (⌘B)">Hide</Button>} />
+    <div className="meeting-list-screen">
+      <PageHeader className="compact meetings-header" title="Meetings" description={visibleText} action={<RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />} />
       <input className="meeting-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search meetings" aria-label="Search meetings" />
       <div className="meeting-list">
-        {groups.map((group) => <MeetingDateSection key={group.key} group={group} selectedMeetingId={props.selectedMeetingId} onSelect={props.onSelectMeeting} />)}
-        {props.meetings.length === 0 ? <EmptyState className="meetings-empty">No matching meetings.</EmptyState> : null}
+        {groups.map((group) => <MeetingDateSection key={group.key} group={group} onSelect={props.onSelectMeeting} />)}
+        {props.meetings.length === 0 ? <EmptyState className="meetings-empty">{props.allMeetingsCount === 0 ? 'No meetings yet. Start recording to capture one.' : 'No matching meetings.'}</EmptyState> : null}
       </div>
-    </Panel>
+    </div>
   )
 }
 
-function MeetingDateSection({ group, selectedMeetingId, onSelect }: { group: MeetingDateGroup; selectedMeetingId: string | null; onSelect: (id: string) => void }) {
+function MeetingDetailScreen(props: { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onDeleteMeeting: (id: string) => Promise<void>; onBack: () => void; record: DashboardViewProps }) {
+  return (
+    <div className="meeting-detail-screen">
+      <div className="detail-topbar">
+        <button className="back-link" onClick={props.onBack}><span aria-hidden="true">←</span> All meetings</button>
+        <RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />
+      </div>
+      <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onDeleteMeeting={props.onDeleteMeeting} />
+    </div>
+  )
+}
+
+function MeetingDateSection({ group, onSelect }: { group: MeetingDateGroup; onSelect: (id: string) => void }) {
   return (
     <section className="meeting-date-section" aria-label={group.title}>
       <div className="meeting-date-heading"><span>{group.title}</span><span>{group.meetings.length}</span></div>
-      <div className="meeting-date-items">{group.meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} selected={meeting.id === selectedMeetingId} onSelect={onSelect} />)}</div>
+      <div className="meeting-date-items">{group.meetings.map((meeting) => <MeetingRow key={meeting.id} meeting={meeting} onSelect={onSelect} />)}</div>
     </section>
   )
 }
 
-function isMeetingListShortcut(event: KeyboardEvent): boolean {
-  return (event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === MEETING_LIST_SHORTCUT
-}
-
-function MeetingRow({ meeting, selected, onSelect }: { meeting: MeetingListItem; selected: boolean; onSelect: (id: string) => void }) {
+function MeetingRow({ meeting, onSelect }: { meeting: MeetingListItem; onSelect: (id: string) => void }) {
+  const progress = listProgressInput(meeting)
   return (
-    <ListRow className="meeting-row" selected={selected} onClick={() => onSelect(meeting.id)}>
+    <ListRow className="meeting-row" onClick={() => onSelect(meeting.id)}>
       <div className="meeting-row-top">
         <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div>{meeting.title !== dateLabel(meeting.startedAt) ? <div className="meeting-meta">{dateLabel(meeting.startedAt)}</div> : null}</div>
-        {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingStatusLabel(meeting.status.state)}</StatusPill> : null}
+        {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}
       </div>
       <div className="meeting-row-summary">{artifactSummary(meeting)}</div>
     </ListRow>
   )
+}
+
+function meetingCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'meeting' : 'meetings'}`
 }
 
 function filterMeetings(meetings: MeetingListItem[], query: string): MeetingListItem[] {
@@ -158,11 +157,16 @@ function meetingSearchText(meeting: MeetingListItem): string {
 
 function artifactSummary(meeting: MeetingListItem): string {
   if (meeting.status.state === MEETING_RECORDING) return 'Recording now · transcript after stop…'
-  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio and preparing summary…'
-  if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Transcript ready · creating summary…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio locally…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasSummary) return 'Creating summary locally…'
+  if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Finalizing notes…'
   if (meeting.status.state === MEETING_CAPTURED) return 'Audio captured · waiting to process'
-  if (meeting.hasSummary && meeting.hasTranscript) return 'Summary + transcript ready'
-  if (meeting.hasSummary) return 'Summary ready'
-  if (meeting.hasTranscript) return 'Transcript ready'
+  if (meeting.hasSummary && meeting.hasTranscript) return 'Notes available'
+  if (meeting.hasSummary) return 'Notes available'
+  if (meeting.hasTranscript) return 'Transcript available'
   return 'Artifacts pending'
+}
+
+function listProgressInput(meeting: MeetingListItem): MeetingProgressInput {
+  return { status: meeting.status, hasTranscript: meeting.hasTranscript, hasSummary: meeting.hasSummary }
 }
