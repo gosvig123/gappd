@@ -36,6 +36,10 @@ const api: GappdApi = {
   settings: {
     getLocalAIStatus: () => ipcRenderer.invoke(IPC_CHANNELS.settings.getLocalAIStatus),
     repairLocalAI: () => ipcRenderer.invoke(IPC_CHANNELS.settings.repairLocalAI),
+    getTranscriptionSettings: () => ipcRenderer.invoke(IPC_CHANNELS.settings.getTranscriptionSettings),
+    downloadWhisperModel: (id) => ipcRenderer.invoke(IPC_CHANNELS.settings.downloadWhisperModel, id),
+    setDefaultWhisperModel: (id) => ipcRenderer.invoke(IPC_CHANNELS.settings.setDefaultWhisperModel, id),
+    onWhisperModelDownloadProgress: subscribe(IPC_EVENTS.settings.whisperModelDownloadProgress),
   },
   update: {
     getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.update.getStatus),

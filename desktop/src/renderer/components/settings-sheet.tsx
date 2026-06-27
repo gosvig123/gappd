@@ -28,8 +28,8 @@ export function SettingsSheet({ children, onClose }: SettingsSheetProps) {
 
   return (
     <div className="settings-sheet-layer" onMouseDown={onClose}>
-      <aside className="settings-sheet" role="dialog" aria-label="Developer Debug" onMouseDown={(event) => event.stopPropagation()}>
-        <button ref={closeRef} className="settings-sheet-close" onClick={onClose} aria-label="Close developer debug">Close</button>
+      <aside className="settings-sheet" role="dialog" aria-label="Settings" onMouseDown={(event) => event.stopPropagation()}>
+        <button ref={closeRef} className="settings-sheet-close" onClick={onClose} aria-label="Close settings">✕</button>
         {children}
       </aside>
     </div>
