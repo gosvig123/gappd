@@ -10,7 +10,7 @@ import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
-import { getValidatedManagedWhisperPaths, resolveBundledWhisperBinary, resolveManagedWhisperModelPath } from './whisper'
+import { getValidatedManagedWhisperPaths } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
@@ -121,7 +121,8 @@ export function stopStaleRecordingRecovery(): void {
 }
 
 export async function recoverStaleRecordings(): Promise<number> {
-  const result = await requestCommand('record.recoverStale', { modelPath: resolveManagedWhisperModelPath() }, { GAPPD_WHISPER_BIN: resolveBundledWhisperBinary() })
+  const whisper = await getValidatedManagedWhisperPaths()
+  const result = await requestCommand('record.recoverStale', { modelPath: whisper.modelPath }, { GAPPD_WHISPER_BIN: whisper.binaryPath })
   return result.recovered
 }
 
