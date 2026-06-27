@@ -18,6 +18,7 @@ const PRIVACY_ANCHORS: Record<CapturePermissionTarget, string> = {
 }
 
 let registered = false
+const windowSubscriptions = new WeakMap<BrowserWindow, () => void>()
 
 export function registerIpc(mainWindow: BrowserWindow): void {
   if (!registered) {
@@ -50,9 +51,14 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     registered = true
   }
 
-  forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange)
-  forwardToWindow(mainWindow, IPC_EVENTS.onboarding.statusChanged, onOnboardingStatusChange)
-  forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange)
+  disposeWindowSubscriptions(mainWindow)
+  const disposers = [
+    forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.onboarding.statusChanged, onOnboardingStatusChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
+  ]
+  windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))
+  mainWindow.once('closed', () => disposeWindowSubscriptions(mainWindow))
 }
 
 function privacySettingsUrl(target?: CapturePermissionTarget): string {
@@ -79,8 +85,15 @@ async function openPermissionsSettings(target?: CapturePermissionTarget): Promis
   await shell.openExternal(privacySettingsUrl(target), { activate: true })
 }
 
-function forwardToWindow<T>(mainWindow: BrowserWindow, channel: string, subscribe: (listener: (state: T) => void) => () => void): void {
-  subscribe((state) => {
+function disposeWindowSubscriptions(mainWindow: BrowserWindow): void {
+  const dispose = windowSubscriptions.get(mainWindow)
+  if (!dispose) return
+  dispose()
+  windowSubscriptions.delete(mainWindow)
+}
+
+function forwardToWindow<T>(mainWindow: BrowserWindow, channel: string, subscribe: (listener: (state: T) => void) => () => void): () => void {
+  return subscribe((state) => {
     if (!mainWindow.isDestroyed()) mainWindow.webContents.send(channel, state)
   })
 }
