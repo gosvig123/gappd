@@ -143,15 +143,22 @@
 
 .settings-sheet-close {
   justify-self: end;
-  padding: 0.5rem 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 1.875rem;
+  height: 1.875rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  color: var(--color-text);
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--color-text-muted);
   background: var(--color-surface-raised);
+  transition: border-color var(--transition-quick), background var(--transition-quick), color var(--transition-quick);
 }
 
 .settings-sheet-close:hover {
   border-color: var(--color-accent-border-strong);
+  color: var(--color-text);
   background: var(--surface-hover);
 }
 

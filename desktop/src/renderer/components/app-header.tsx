@@ -5,7 +5,6 @@ const UPDATE_LABEL = 'Update'
 
 type AppHeaderProps = {
   appReady: boolean
-  developerDebugEnabled: boolean
   settingsOpen: boolean
   updateStatus: UpdateStatus | null
   updateBlocked: boolean
@@ -21,7 +20,7 @@ export function AppHeader(props: AppHeaderProps) {
       <div className="app-brand-block"><AppLogo className="app-logo" /><div className="app-brand">Gappd</div><p>Record, review, and search private meeting notes.</p></div>
       <div className="app-controls" aria-label="App controls">
         <UpdateControls {...props} />
-        {props.developerDebugEnabled ? <button className={props.settingsOpen ? 'app-control settings-control active' : 'app-control settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close developer debug' : 'Open developer debug'} aria-pressed={props.settingsOpen}>⚙<span>Developer Debug</span></button> : null}
+        <button className={props.settingsOpen ? 'app-control settings-control active' : 'app-control settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close settings' : 'Open settings'} aria-pressed={props.settingsOpen}>⚙<span>Settings</span></button>
       </div>
     </header>
   )

@@ -26,6 +26,9 @@ export const IPC_CHANNELS = {
   settings: {
     getLocalAIStatus: 'settings:getLocalAIStatus',
     repairLocalAI: 'settings:repairLocalAI',
+    getTranscriptionSettings: 'settings:getTranscriptionSettings',
+    downloadWhisperModel: 'settings:downloadWhisperModel',
+    setDefaultWhisperModel: 'settings:setDefaultWhisperModel',
   },
   update: {
     getStatus: 'update:getStatus',
@@ -46,6 +49,9 @@ export const IPC_EVENTS = {
   update: {
     statusChanged: 'update:status-changed',
   },
+  settings: {
+    whisperModelDownloadProgress: 'settings:whisper-model-download-progress',
+  },
 } as const
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -53,6 +59,22 @@ export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title: string; device: number; mode: string; modelPath?: string }
 export type OnboardingSetupInput = { model?: string }
+export type WhisperModelSettings = {
+  id: string
+  name: string
+  label: string
+  languageSupport: string
+  description: string
+  sizeMB: number
+  installed: boolean
+}
+export type TranscriptionSettings = { defaultModelId: string; models: WhisperModelSettings[] }
+export type WhisperModelDownloadProgress = {
+  modelId: string
+  phase: 'preparing' | 'downloading' | 'verifying' | 'complete'
+  progress?: number
+  message: string
+}
 
 export type GappdApi = {
   system: {
@@ -81,6 +103,10 @@ export type GappdApi = {
   settings: {
     getLocalAIStatus(): Promise<LocalAIStatus>
     repairLocalAI(): Promise<LocalAIStatus>
+    getTranscriptionSettings(): Promise<TranscriptionSettings>
+    downloadWhisperModel(id: string): Promise<TranscriptionSettings>
+    setDefaultWhisperModel(id: string): Promise<TranscriptionSettings>
+    onWhisperModelDownloadProgress(listener: (progress: WhisperModelDownloadProgress) => void): () => void
   }
   update: {
     getStatus(): Promise<UpdateStatus>

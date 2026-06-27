@@ -1,18 +1,16 @@
-import { createHash } from 'node:crypto'
-import { createReadStream, createWriteStream } from 'node:fs'
-import { access, mkdir, rename, rm } from 'node:fs/promises'
-import { once } from 'node:events'
-import path from 'node:path'
 import { app } from 'electron'
 import type { OnboardingPullStage } from '../shared/contracts'
+import type { WhisperModelDownloadProgress } from '../shared/ipc-contract'
 import { isExecutableFile, resolveBinary } from './binaries'
-import {
-  BUNDLED_WHISPER_BINARY_NAME,
-  MANAGED_WHISPER_MODEL,
-  MANAGED_WHISPER_MODEL_SHA256,
-  MANAGED_WHISPER_MODELS_DIRNAME,
-  MANAGED_WHISPER_MODEL_URL,
-} from '../shared/bundled-whisper'
+import { BUNDLED_WHISPER_BINARY_NAME } from '../shared/bundled-whisper'
+import { defaultWhisperModelPath, ensureSelectedWhisperModel, resolveDefaultWhisperModelPath, selectedWhisperModelInstalled } from './whisper-model-settings'
+
+const WHISPER_PULL_STAGE: Record<WhisperModelDownloadProgress['phase'], OnboardingPullStage> = {
+  preparing: 'preparing',
+  downloading: 'downloading',
+  verifying: 'verifying',
+  complete: 'complete',
+}
 
 export type WhisperProgressUpdate = {
   progress?: number
@@ -29,14 +27,13 @@ export function resolveBundledWhisperBinary(): string {
 }
 
 export function resolveManagedWhisperModelPath(): string {
-  return path.join(app.getPath('userData'), MANAGED_WHISPER_MODELS_DIRNAME, MANAGED_WHISPER_MODEL)
+  return defaultWhisperModelPath()
 }
 
 export async function getValidatedManagedWhisperPaths(): Promise<{ binaryPath: string; modelPath: string }> {
   const binaryPath = resolveBundledWhisperBinary()
   if (!(await bundledWhisperAvailable())) throw new Error(missingBundledWhisperMessage(binaryPath))
-  const modelPath = resolveManagedWhisperModelPath()
-  if (!(await managedWhisperModelAvailable())) throw new Error(missingManagedWhisperModelMessage())
+  const modelPath = await resolveDefaultWhisperModelPath()
   return { binaryPath, modelPath }
 }
 
@@ -45,64 +42,17 @@ export async function bundledWhisperAvailable(): Promise<boolean> {
 }
 
 export async function managedWhisperModelAvailable(): Promise<boolean> {
-  return (await fileSha256IfExists(resolveManagedWhisperModelPath())) === MANAGED_WHISPER_MODEL_SHA256
+  return selectedWhisperModelInstalled()
 }
 
 export async function ensureManagedWhisperModel(onProgress?: (update: WhisperProgressUpdate) => void): Promise<string> {
   const binaryPath = resolveBundledWhisperBinary()
   if (!(await bundledWhisperAvailable())) throw new Error(missingBundledWhisperMessage(binaryPath))
-  const modelPath = resolveManagedWhisperModelPath()
-  if (await managedWhisperModelAvailable()) return modelPath
-  await mkdir(path.dirname(modelPath), { recursive: true })
-  onProgress?.({ message: 'Preparing speech model download', pullStage: 'preparing', activity: true })
-  const tempPath = `${modelPath}.download`
-  await rm(tempPath, { force: true })
-  try {
-    const response = await fetch(MANAGED_WHISPER_MODEL_URL)
-    if (!response.ok) throw new Error(`Whisper model download failed with status ${response.status}.`)
-    if (!response.body) throw new Error('Whisper model download stream was unavailable.')
-    await writeModelFile(response, tempPath, onProgress)
-    onProgress?.({ message: 'Verifying speech model', pullStage: 'verifying', progress: 99, activity: true })
-    const actual = await fileSha256(tempPath)
-    if (actual !== MANAGED_WHISPER_MODEL_SHA256) throw new Error(`Whisper model sha256 mismatch: ${actual}`)
-    onProgress?.({ message: 'Finalizing speech model', pullStage: 'finalizing', progress: 100, activity: true })
-    await rename(tempPath, modelPath)
-    onProgress?.({ message: 'Speech model ready', pullStage: 'complete', progress: 100, activity: true })
-    return modelPath
-  } catch (error) {
-    await rm(tempPath, { force: true })
-    throw error
-  }
+  return ensureSelectedWhisperModel((progress) => onProgress?.(downloadProgress(progress)))
 }
 
-async function writeModelFile(response: Response, targetPath: string, onProgress?: (update: WhisperProgressUpdate) => void): Promise<void> {
-  const total = Number.parseInt(response.headers.get('content-length') || '', 10)
-  const input = response.body?.getReader()
-  if (!input) throw new Error('Whisper model download stream was unavailable.')
-  const output = createWriteStream(targetPath, { mode: 0o644 })
-  let written = 0
-  try {
-    for (;;) {
-      const chunk = await input.read()
-      if (chunk.done) break
-      const buffer = Buffer.from(chunk.value)
-      written += buffer.length
-      if (!output.write(buffer)) await once(output, 'drain')
-      onProgress?.(downloadProgress(total, written))
-    }
-    output.end()
-    await once(output, 'finish')
-  } catch (error) {
-    output.destroy()
-    throw error
-  } finally {
-    input.releaseLock()
-  }
-}
-
-function downloadProgress(total: number, written: number): WhisperProgressUpdate {
-  const progress = total > 0 ? Math.max(0, Math.min(99, Math.round((written / total) * 100))) : undefined
-  return { message: 'Downloading speech model', pullStage: 'downloading', progress, activity: true }
+function downloadProgress(progress: WhisperModelDownloadProgress): WhisperProgressUpdate {
+  return { message: progress.message, pullStage: WHISPER_PULL_STAGE[progress.phase], progress: progress.progress, activity: true }
 }
 
 export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperBinary()): string {
@@ -113,23 +63,4 @@ export function missingBundledWhisperMessage(binaryPath = resolveBundledWhisperB
 
 export function missingManagedWhisperModelMessage(): string {
   return 'Speech tool missing. Click Fix setup to download it.'
-}
-
-async function fileSha256IfExists(filePath: string): Promise<string | null> {
-  try {
-    await access(filePath)
-    return fileSha256(filePath)
-  } catch {
-    return null
-  }
-}
-
-function fileSha256(filePath: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const hash = createHash('sha256')
-    const input = createReadStream(filePath)
-    input.on('data', (chunk) => hash.update(chunk))
-    input.on('error', reject)
-    input.on('end', () => resolve(hash.digest('hex')))
-  })
 }
