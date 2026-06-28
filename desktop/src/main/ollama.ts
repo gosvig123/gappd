@@ -24,6 +24,8 @@ const managedOllama: ManagedOllamaRuntime = { process: null, startPromise: null,
 type ManagedStatusContext = { config: LocalAIConfig | null; configError?: string; supported: boolean; bundled: boolean; running: boolean; configured: boolean; modelAvailable: boolean }
 type ManagedReadiness = { running: boolean }
 
+const OLLAMA_SHUTDOWN_TIMEOUT_MS = 5_000
+
 export function resolveBundledOllamaBinary(): string {
   return resolveBinary({
     packaged: ['ollama', BUNDLED_OLLAMA_BINARY_NAME],
@@ -73,10 +75,12 @@ export async function managedModelAvailable(model: string, endpoint = managedOll
     return false
   }
 }
-export function stopManagedOllama(): void {
-  if (!managedOllama.process) return
-  managedOllama.process.kill('SIGTERM')
-  resetManagedOllamaProcess()
+export async function stopManagedOllama(): Promise<void> {
+  const child = managedOllama.process
+  if (!child) return
+  child.kill('SIGTERM')
+  await waitForManagedOllamaExit(child)
+  if (managedOllama.process === child) resetManagedOllamaProcess()
 }
 
 async function startManagedOllama(): Promise<void> {
@@ -89,7 +93,7 @@ async function startManagedOllama(): Promise<void> {
       return
     } catch (error) {
       lastError = error
-      stopManagedOllama()
+      await stopManagedOllama()
       if (!isPortBindError(error)) throw error
     }
   }
@@ -149,6 +153,18 @@ function wireManagedOllamaEvents(child: ReturnType<typeof spawn>, binaryPath: st
 function resetManagedOllamaProcess(): void {
   managedOllama.ownedBySession = false
   managedOllama.process = null
+}
+
+function waitForManagedOllamaExit(child: ReturnType<typeof spawn>): Promise<void> {
+  return new Promise((resolve) => {
+    if (childExited(child)) return resolve()
+    const timer = setTimeout(() => { if (!childExited(child)) child.kill('SIGKILL') }, OLLAMA_SHUTDOWN_TIMEOUT_MS)
+    child.once('exit', () => { clearTimeout(timer); resolve() })
+  })
+}
+
+function childExited(child: ReturnType<typeof spawn>): boolean {
+  return child.exitCode !== null || child.signalCode !== null
 }
 function managedOllamaProcessRunning(child: ReturnType<typeof spawn> | null): child is ReturnType<typeof spawn> & { pid: number } { return Boolean(child?.pid && !child.killed && child.exitCode === null && child.signalCode === null) }
 async function managedOllamaListenerPid(port: number): Promise<number | null> {
