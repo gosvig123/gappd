@@ -2,7 +2,8 @@ import '../components/local-ai.css'
 
 import type { ReactNode } from 'react'
 import type { TranscriptionSettings, WhisperModelDownloadProgress, WhisperModelSettings } from '../../shared/ipc-contract'
-import { Button, Card, cx, PageHeader, ProgressBar, StatusPill } from '../components/ui'
+import { Button, Card, cx, ProgressBar, StatusPill } from '../components/ui'
+import { CheckIcon, DownloadIcon } from '../components/icons'
 import { onboardingErrorView, onboardingPhaseLabel, onboardingStatusTone, type LocalAIStatus } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 
@@ -25,7 +26,6 @@ type TranscriptionViewModel = {
 export function SettingsView({ localAI, transcription, developerDebugEnabled }: SettingsViewProps) {
   return (
     <section className="settings-stack settings-stack-plain">
-      <PageHeader title="Settings" description="Speech-to-text runs entirely on your device — no audio ever leaves your Mac." />
       <TranscriptionSettingsPanel state={transcription} />
       {developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}
     </section>
@@ -41,7 +41,7 @@ function ModelRow({ model, state }: { model: WhisperModelSettings; state: Transc
   const selected = state.settings?.defaultModelId === model.id
   const busy = state.busyModelId === model.id
   const progress = busy ? state.progress : null
-  return <div className={cx('settings-model-row', selected && 'selected')}><div className="settings-model-head"><div className="settings-model-heading"><strong>{model.label}</strong><ModelStatusPill selected={selected} installed={model.installed} /></div><ModelActions model={model} selected={selected} busy={busy} state={state} /></div><p>{model.description}</p><div className="settings-model-meta"><span className="settings-model-tag">{model.languageSupport}</span><span className="settings-model-tag">{model.sizeMB} MB</span></div>{progress ? <DownloadProgress progress={progress} /> : null}</div>
+  return <div className={cx('settings-model-row', selected && 'selected', !model.installed && 'not-installed')}><div className="settings-model-head"><span className={cx('settings-model-marker', selected && 'selected', model.installed && 'installed')} aria-hidden="true">{selected ? <CheckIcon /> : null}</span><div className="settings-model-heading"><strong>{model.label}</strong><ModelStatusPill selected={selected} installed={model.installed} /></div><ModelActions model={model} selected={selected} busy={busy} state={state} /></div><p>{model.description}</p><div className="settings-model-meta"><span className="settings-model-tag">{model.languageSupport}</span><span className="settings-model-tag">{model.sizeMB} MB</span></div>{progress ? <DownloadProgress progress={progress} /> : null}</div>
 }
 
 function ModelStatusPill({ selected, installed }: { selected: boolean; installed: boolean }) {
@@ -51,7 +51,7 @@ function ModelStatusPill({ selected, installed }: { selected: boolean; installed
 }
 
 function ModelActions({ model, selected, busy, state }: { model: WhisperModelSettings; selected: boolean; busy: boolean; state: TranscriptionViewModel }) {
-  if (!model.installed) return <Button variant="primary" onClick={() => state.download(model.id)} disabled={Boolean(state.busyModelId)}>{busy ? progressLabel(state.progress) : 'Download'}</Button>
+  if (!model.installed) return <Button variant="primary" className="settings-model-download" onClick={() => state.download(model.id)} disabled={Boolean(state.busyModelId)}>{busy ? progressLabel(state.progress) : <><DownloadIcon className="settings-model-download-icon" />Download</>}</Button>
   if (selected) return null
   return <Button onClick={() => state.setDefault(model.id)} disabled={Boolean(state.busyModelId)}>Use this model</Button>
 }
