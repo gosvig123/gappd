@@ -8,10 +8,12 @@ import type { RecordingEvent } from '../shared/generated/contracts'
 import type { CapturePermissions } from '../shared/ipc-contract'
 import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
+import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
 import { getValidatedManagedWhisperPaths } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
+const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
 const RECORDING_STATUS_STOPPING = 'stopping'
 const RECORDING_STATUS_PROCESSING = 'processing'
 const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPING, RECORDING_STATUS_PROCESSING])
@@ -127,6 +129,7 @@ export async function recoverStaleRecordings(): Promise<number> {
 export async function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const whisper = await getValidatedManagedWhisperPaths()
+  logMainProcessMemory('recording:start')
   recordingChild = streamCommand('record.start', { ...input, modelPath: whisper.modelPath }, recordingHandlers(input.title), { GAPPD_WHISPER_BIN: whisper.binaryPath })
 }
 
@@ -135,7 +138,28 @@ export function stopRecording(): void {
   const state = getRecordingState()
   if (STOP_IGNORED_RECORDING_STATUSES.has(state.status)) return
   setRecordingState({ ...state, status: RECORDING_STATUS_STOPPING })
+  logMainProcessMemory('recording:stop')
   recordingChild.kill('SIGINT')
+}
+
+export async function stopActiveRecordingForQuit(): Promise<void> {
+  const child = recordingChild
+  if (!child) return
+  logMainProcessMemory('recording:quit-stop')
+  child.kill('SIGINT')
+  await waitForRecordingExit(child)
+}
+
+function waitForRecordingExit(child: ReturnType<typeof spawn>): Promise<void> {
+  return new Promise((resolve) => {
+    if (childExited(child)) return resolve()
+    const timer = setTimeout(() => { if (!childExited(child)) child.kill('SIGKILL') }, RECORDING_SHUTDOWN_TIMEOUT_MS)
+    child.once('exit', () => { clearTimeout(timer); resolve() })
+  })
+}
+
+function childExited(child: ReturnType<typeof spawn>): boolean {
+  return child.exitCode !== null || child.signalCode !== null
 }
 
 function resolvePermissionResult(tmpFile: string, resolve: (value: CapturePermissions) => void, details: Record<string, string>): void {
@@ -173,10 +197,12 @@ function recordingHandlers(title: string) {
     },
     onError(error: string) {
       recordingChild = null
+      logMainProcessMemory('recording:error')
       setRecordingState({ status: 'error', title, error })
     },
     onExitWithoutTerminal() {
       recordingChild = null
+      logMainProcessMemory('recording:exit')
       if (getRecordingState().status !== 'error') setRecordingState({ status: 'idle' })
     },
   }
@@ -193,9 +219,11 @@ function recordingStateFromEvent(event: RecordingEvent) {
       return { ...base, status: 'processing' as const }
     case 'recording.completed':
       recordingChild = null
+      logMainProcessMemory('recording:completed')
       return { ...base, status: 'idle' as const }
     case 'recording.failed':
       recordingChild = null
+      logMainProcessMemory('recording:failed')
       return { ...base, status: 'error' as const, error: event.error ?? protocolFailureMessage(event) }
   }
 }

@@ -8,6 +8,20 @@
   padding-inline: var(--space-4);
 }
 
+.meeting-list-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: grid;
+  gap: var(--space-5);
+  padding-bottom: var(--space-5);
+  background: var(--color-bg);
+}
+
+.meeting-list-sticky .panel-header {
+  margin-bottom: 0;
+}
+
 .meeting-search {
   width: 100%;
 }
