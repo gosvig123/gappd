@@ -1,12 +1,14 @@
 import path from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import { stopStaleRecordingRecovery } from './gappd'
+import { stopActiveRecordingForQuit, stopStaleRecordingRecovery } from './gappd'
 import { registerIpc } from './ipc'
+import { logMainProcessMemory } from './memory'
 import { bootstrapOnboarding } from './onboarding'
 import { stopManagedOllama } from './ollama'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 let mainWindow: BrowserWindow | null = null
+let shutdownStarted = false
 
 function applyDevDockIcon(): void {
   if (process.platform !== 'darwin' || app.isPackaged || !app.dock) return
@@ -14,7 +16,7 @@ function applyDevDockIcon(): void {
 }
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
+  const createdWindow = new BrowserWindow({
     width: 1200,
     height: 780,
     minWidth: 960,
@@ -27,16 +29,23 @@ function createWindow(): void {
     },
   })
 
-  registerIpc(mainWindow)
+  mainWindow = createdWindow
+  registerIpc(createdWindow)
+  createdWindow.on('closed', () => {
+    if (mainWindow === createdWindow) mainWindow = null
+  })
 
+  loadRenderer(createdWindow)
+}
+
+function loadRenderer(createdWindow: BrowserWindow): void {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL
   if (devServerUrl) {
-    void mainWindow.loadURL(devServerUrl)
-    if (process.env.OPEN_DEVTOOLS === '1') mainWindow.webContents.openDevTools({ mode: 'detach' })
+    void createdWindow.loadURL(devServerUrl)
+    if (process.env.OPEN_DEVTOOLS === '1') createdWindow.webContents.openDevTools({ mode: 'detach' })
     return
   }
-
-  void mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
+  void createdWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
 }
 
 app.whenReady().then(() => {
@@ -44,17 +53,28 @@ app.whenReady().then(() => {
   createWindow()
   void bootstrapOnboarding()
   startAutoUpdateChecks()
+  logMainProcessMemory('ready')
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-app.on('before-quit', () => {
-  stopStaleRecordingRecovery()
-  stopManagedOllama()
-  stopAutoUpdateChecks()
+app.on('before-quit', (event) => {
+  if (shutdownStarted) return
+  event.preventDefault()
+  shutdownStarted = true
+  void shutdown().finally(() => app.quit())
 })
+
+async function shutdown(): Promise<void> {
+  logMainProcessMemory('shutdown:start')
+  stopStaleRecordingRecovery()
+  stopAutoUpdateChecks()
+  await stopActiveRecordingForQuit()
+  await stopManagedOllama()
+  logMainProcessMemory('shutdown:done')
+}
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
