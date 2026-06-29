@@ -1,43 +1,34 @@
 import type { Device, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
 export type { OnboardingStatus, RecordingState, UpdateStatus } from './contracts'
 
-export const IPC_CHANNELS = {
-  system: {
-    getDevices: 'system:getDevices',
-    requestCapturePermissions: 'system:requestCapturePermissions',
-    openPermissionsSettings: 'system:openPermissionsSettings',
-    startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
-  },
-  meetings: {
-    list: 'meetings:list',
-    show: 'meetings:show',
-    delete: 'meetings:delete',
-  },
-  recording: {
-    start: 'recording:start',
-    stop: 'recording:stop',
-    getStatus: 'recording:getStatus',
-  },
-  onboarding: {
-    getStatus: 'onboarding:getStatus',
-    start: 'onboarding:start',
-    retry: 'onboarding:retry',
-  },
-  settings: {
-    getLocalAIStatus: 'settings:getLocalAIStatus',
-    repairLocalAI: 'settings:repairLocalAI',
-    getTranscriptionSettings: 'settings:getTranscriptionSettings',
-    downloadWhisperModel: 'settings:downloadWhisperModel',
-    setDefaultWhisperModel: 'settings:setDefaultWhisperModel',
-  },
-  update: {
-    getStatus: 'update:getStatus',
-    checkNow: 'update:checkNow',
-    downloadUpdate: 'update:downloadUpdate',
-    installAndRestart: 'update:installAndRestart',
-    openUpdatePage: 'update:openUpdatePage',
-  },
-} as const
+export const IPC_OPERATIONS = [
+  { group: 'system', name: 'getDevices', channel: 'system:getDevices' },
+  { group: 'system', name: 'requestCapturePermissions', channel: 'system:requestCapturePermissions' },
+  { group: 'system', name: 'openPermissionsSettings', channel: 'system:openPermissionsSettings' },
+  { group: 'system', name: 'startStaleRecordingRecovery', channel: 'system:startStaleRecordingRecovery' },
+  { group: 'meetings', name: 'list', channel: 'meetings:list' },
+  { group: 'meetings', name: 'show', channel: 'meetings:show' },
+  { group: 'meetings', name: 'delete', channel: 'meetings:delete' },
+  { group: 'recording', name: 'start', channel: 'recording:start' },
+  { group: 'recording', name: 'stop', channel: 'recording:stop' },
+  { group: 'recording', name: 'getStatus', channel: 'recording:getStatus' },
+  { group: 'onboarding', name: 'getStatus', channel: 'onboarding:getStatus' },
+  { group: 'onboarding', name: 'start', channel: 'onboarding:start' },
+  { group: 'onboarding', name: 'retry', channel: 'onboarding:retry' },
+  { group: 'settings', name: 'getLocalAIStatus', channel: 'settings:getLocalAIStatus' },
+  { group: 'settings', name: 'repairLocalAI', channel: 'settings:repairLocalAI' },
+  { group: 'settings', name: 'getTranscriptionSettings', channel: 'settings:getTranscriptionSettings' },
+  { group: 'settings', name: 'downloadWhisperModel', channel: 'settings:downloadWhisperModel' },
+  { group: 'settings', name: 'setDefaultWhisperModel', channel: 'settings:setDefaultWhisperModel' },
+  { group: 'update', name: 'getStatus', channel: 'update:getStatus' },
+  { group: 'update', name: 'checkNow', channel: 'update:checkNow' },
+  { group: 'update', name: 'downloadUpdate', channel: 'update:downloadUpdate' },
+  { group: 'update', name: 'installAndRestart', channel: 'update:installAndRestart' },
+  { group: 'update', name: 'openUpdatePage', channel: 'update:openUpdatePage' },
+] as const
+
+export type IpcOperation = typeof IPC_OPERATIONS[number]
+export type IpcOperationChannel = IpcOperation['channel']
 
 export const IPC_EVENTS = {
   recording: {
