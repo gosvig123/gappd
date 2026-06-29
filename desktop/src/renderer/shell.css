@@ -78,9 +78,30 @@
   opacity: 0.55;
 }
 
+.app-control-icon {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  padding: 0;
+  justify-content: center;
+}
+
+.app-control-glyph {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
 .settings-control {
+  color: var(--color-text-soft);
   border-color: var(--color-accent-border);
   background: var(--color-accent-tint-strong);
+}
+
+.settings-control .app-control-glyph {
+  transition: transform var(--transition-quick);
+}
+
+.settings-control:hover:not(:disabled) .app-control-glyph {
+  transform: rotate(35deg);
 }
 
 .settings-control.active,
@@ -88,6 +109,10 @@
   color: var(--color-accent);
   border-color: var(--color-accent-border-strong);
   background: var(--color-accent-tint);
+}
+
+.settings-control.active .app-control-glyph {
+  transform: rotate(35deg);
 }
 
 .app-main {
@@ -121,10 +146,9 @@
   width: min(100%, 28rem);
   max-height: 100%;
   display: grid;
-  gap: 0.875rem;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
-  overflow: auto;
-  padding: 1rem;
+  overflow: hidden;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-panel);
   background: var(--surface-panel);
@@ -133,27 +157,82 @@
 }
 
 @keyframes sheet-in {
-  from { opacity: 0; transform: translateY(-0.5rem); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateX(0.75rem); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .settings-sheet .settings-grid {
   grid-template-columns: 1fr;
 }
 
+.settings-sheet-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.875rem;
+  border-bottom: 1px solid var(--color-border);
+  background: linear-gradient(180deg, var(--color-accent-tint), transparent);
+}
+
+.settings-sheet-mark {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-md);
+  color: var(--color-accent);
+  background: var(--color-accent-tint-strong);
+}
+
+.settings-sheet-mark svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.settings-sheet-titles {
+  min-width: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.settings-sheet-titles h1 {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.settings-sheet-titles p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-base);
+}
+
+.settings-sheet-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 1rem;
+}
+
 .settings-sheet-close {
-  justify-self: end;
   display: grid;
   place-items: center;
   width: 1.875rem;
   height: 1.875rem;
   border: 1px solid var(--color-border);
   border-radius: 999px;
-  font-size: var(--font-size-md);
-  line-height: 1;
   color: var(--color-text-muted);
   background: var(--color-surface-raised);
   transition: border-color var(--transition-quick), background var(--transition-quick), color var(--transition-quick);
+}
+
+.settings-sheet-close svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .settings-sheet-close:hover {

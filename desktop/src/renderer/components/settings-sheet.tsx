@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react'
+import { CloseIcon, GearIcon } from './icons'
 
 const KEYDOWN_EVENT = 'keydown'
 const ESCAPE_KEY = 'Escape'
@@ -29,8 +30,15 @@ export function SettingsSheet({ children, onClose }: SettingsSheetProps) {
   return (
     <div className="settings-sheet-layer" onMouseDown={onClose}>
       <aside className="settings-sheet" role="dialog" aria-label="Settings" onMouseDown={(event) => event.stopPropagation()}>
-        <button ref={closeRef} className="settings-sheet-close" onClick={onClose} aria-label="Close settings">✕</button>
-        {children}
+        <header className="settings-sheet-head">
+          <span className="settings-sheet-mark"><GearIcon /></span>
+          <div className="settings-sheet-titles">
+            <h1>Settings</h1>
+            <p>Speech-to-text runs entirely on your device — no audio ever leaves your Mac.</p>
+          </div>
+          <button ref={closeRef} className="settings-sheet-close" onClick={onClose} aria-label="Close settings"><CloseIcon /></button>
+        </header>
+        <div className="settings-sheet-body">{children}</div>
       </aside>
     </div>
   )
