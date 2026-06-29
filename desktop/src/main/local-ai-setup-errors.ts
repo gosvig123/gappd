@@ -1,17 +1,18 @@
-import type { OnboardingErrorDebug, OnboardingErrorKind, OnboardingPhase, OnboardingStatus, OwnershipConflict } from '../shared/contracts'
+import type { LocalAISetupErrorDebug, LocalAISetupErrorKind, LocalAISetupPhase, LocalAISetupStatus } from '../shared/contracts'
+import { buildErrorDebug, readErrorDebug, readOwnershipConflict } from './local-ai-setup-error-debug'
 
 type ErrorLike = Record<string, unknown>
-type PullFailure = { summary: string; detail?: string; debug?: OnboardingErrorDebug; errorKind?: OnboardingErrorKind }
-type PullFailureError = Error & { detail?: string; debug?: OnboardingErrorDebug; errorKind?: OnboardingErrorKind }
+type PullFailure = { summary: string; detail?: string; debug?: LocalAISetupErrorDebug; errorKind?: LocalAISetupErrorKind }
+type PullFailureError = Error & { detail?: string; debug?: LocalAISetupErrorDebug; errorKind?: LocalAISetupErrorKind }
 type PullStallController = { refresh: () => void; clear: () => void; errorFor: (error: unknown) => Error }
 
-export type OnboardingErrorState = {
+export type LocalAISetupErrorState = {
   error: string
-  errorDetail?: OnboardingStatus['errorDetail']
-  debugDetail?: OnboardingStatus['debugDetail']
-  errorDebug?: OnboardingStatus['errorDebug']
-  errorKind: NonNullable<OnboardingStatus['errorKind']>
-  ownershipConflict?: OnboardingStatus['ownershipConflict']
+  errorDetail?: LocalAISetupStatus['errorDetail']
+  debugDetail?: LocalAISetupStatus['debugDetail']
+  errorDebug?: LocalAISetupStatus['errorDebug']
+  errorKind: NonNullable<LocalAISetupStatus['errorKind']>
+  ownershipConflict?: LocalAISetupStatus['ownershipConflict']
 }
 
 const OLLAMA_PULL_STALL_TIMEOUT_PRE_BYTES_MS = 90_000
@@ -50,16 +51,16 @@ export function createPullFailureError(...details: string[]): Error {
   return buildPullFailureError(describePullFailure(...details))
 }
 
-export function toOnboardingErrorState(error: unknown, phase: OnboardingPhase, fallback: string): OnboardingErrorState {
+export function toLocalAISetupErrorState(error: unknown, phase: LocalAISetupPhase, fallback: string): LocalAISetupErrorState {
   const details = collectErrorDetails(error)
   const summary = normalizeText(readErrorString(error, 'message') || readErrorMessage(error) || fallback) || fallback
   const errorDetail = normalizeText(readErrorString(error, 'detail'))
   const errorDebug = readErrorDebug(error) || buildErrorDebug(details, errorDetail || summary)
   const ownershipConflict = readOwnershipConflict(error)
-  return { error: summary, errorDetail, debugDetail: errorDebug?.rawDetail, errorDebug, errorKind: classifyOnboardingErrorKind(summary, phase, errorDetail, errorDebug), ownershipConflict }
+  return { error: summary, errorDetail, debugDetail: errorDebug?.rawDetail, errorDebug, errorKind: classifyLocalAISetupErrorKind(summary, phase, errorDetail, errorDebug), ownershipConflict }
 }
 
-export function classifyOnboardingErrorKind(message: string | undefined, phase: OnboardingPhase, detail?: string, debug?: OnboardingErrorDebug): OnboardingErrorKind {
+export function classifyLocalAISetupErrorKind(message: string | undefined, phase: LocalAISetupPhase, detail?: string, debug?: LocalAISetupErrorDebug): LocalAISetupErrorKind {
   const value = normalizeErrorText([message, detail, debug?.rawDetail, debug?.host, debug?.url, debug?.ip].filter(Boolean).join(' '))
   if (matchesAny(value, DISK_SPACE_MARKERS)) return 'disk_space'
   if (matchesAny(value, OWNERSHIP_MARKERS)) return 'ownership_mismatch'
@@ -79,7 +80,7 @@ function describePullFailure(...details: string[]): PullFailure {
   return { summary: rawDetail?.startsWith('Managed Ollama') ? rawDetail : 'Managed Ollama model download failed.', debug }
 }
 
-function pullFailure(summary: string, errorKind: OnboardingErrorKind, debug?: OnboardingErrorDebug, label?: string): PullFailure {
+function pullFailure(summary: string, errorKind: LocalAISetupErrorKind, debug?: LocalAISetupErrorDebug, label?: string): PullFailure {
   return { summary, detail: reachabilityDetail(debug, label || 'Reachability target'), debug, errorKind }
 }
 
@@ -114,20 +115,12 @@ function isPullFailureError(error: unknown): error is PullFailureError {
   return error instanceof Error && ('detail' in error || 'debug' in error || 'errorKind' in error)
 }
 
-function buildErrorDebug(details: string[], rawDetail?: string): OnboardingErrorDebug | undefined {
-  const url = firstUrl(details)
-  const host = urlHost(url) || firstHost(details)
-  const ip = firstIp(details)
-  const debug = { rawDetail: rawDetail || preferredDetail(details), url, host, ip }
-  return Object.values(debug).some(Boolean) ? debug : undefined
-}
-
 function isPullBlobHostNetwork(value: string): boolean {
   const normalized = normalizeErrorText(value)
   return matchesAny(normalized, BLOB_HOST_MARKERS) && (matchesAny(normalized, TIMEOUT_MARKERS) || matchesAny(normalized, NETWORK_MARKERS))
 }
 
-function reachabilityDetail(debug: OnboardingErrorDebug | undefined, label: string): string | undefined {
+function reachabilityDetail(debug: LocalAISetupErrorDebug | undefined, label: string): string | undefined {
   if (!debug?.host && !debug?.ip) return undefined
   const target = debug.host && debug.ip ? `${debug.host} (${debug.ip})` : debug.host || debug.ip
   return `${label}: ${target}.`
@@ -143,52 +136,8 @@ function readErrorString(error: unknown, key: 'detail' | 'message'): string | un
   return typeof value === 'string' ? value : undefined
 }
 
-function readOwnershipConflict(error: unknown): OwnershipConflict | undefined {
-  if (!error || typeof error !== 'object' || !('ownershipConflict' in error)) return undefined
-  const value = (error as ErrorLike).ownershipConflict
-  if (!value || typeof value !== 'object') return undefined
-  const pid = readNumber((value as ErrorLike).pid)
-  const port = readNumber((value as ErrorLike).port)
-  if (pid === undefined || port === undefined) return undefined
-  return { pid, port, summary: readString((value as ErrorLike).summary), stopCommand: readString((value as ErrorLike).stopCommand) }
-}
-
-function readErrorDebug(error: unknown): OnboardingErrorDebug | undefined {
-  if (!error || typeof error !== 'object' || !('debug' in error)) return undefined
-  const value = (error as ErrorLike).debug
-  if (!value || typeof value !== 'object') return undefined
-  const debug = { rawDetail: readString((value as ErrorLike).rawDetail), url: readString((value as ErrorLike).url), host: readString((value as ErrorLike).host), ip: readString((value as ErrorLike).ip) }
-  return Object.values(debug).some(Boolean) ? debug : undefined
-}
-
-function firstUrl(details: string[]): string | undefined {
-  return details.join(' ').match(/https?:\/\/[^\s'"`]+/)?.[0]
-}
-
-function urlHost(url: string | undefined): string | undefined {
-  if (!url) return undefined
-  try { return new URL(url).hostname } catch { return undefined }
-}
-
-function firstHost(details: string[]): string | undefined {
-  return details.join(' ').match(/(?:lookup|host)\s+([a-z0-9.-]+\.[a-z]{2,})/i)?.[1]
-}
-
-function firstIp(details: string[]): string | undefined {
-  return details.join(' ').match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/)?.[0]
-}
-
-function firstDetail(details: string[]): string | undefined {
-  return details.map((detail) => detail.trim()).find(Boolean)
-}
-
 function preferredDetail(details: string[]): string | undefined {
-  return details.map((detail) => detail.trim()).find((detail) => detail && !isGenericDetail(detail)) || firstDetail(details)
-}
-
-function isGenericDetail(detail: string): boolean {
-  const value = normalizeErrorText(detail)
-  return value === 'error' || value === 'typeerror' || value === 'fetch failed' || /^[a-z_]+(?:error)?$/.test(value)
+  return details.map((detail) => detail.trim()).find(Boolean)
 }
 
 function stalledPullMessage(lastMessage?: string): string {
@@ -198,14 +147,6 @@ function stalledPullMessage(lastMessage?: string): string {
 
 function pullStallTimeoutMs(hasByteProgress: boolean): number {
   return hasByteProgress ? OLLAMA_PULL_STALL_TIMEOUT_POST_BYTES_MS : OLLAMA_PULL_STALL_TIMEOUT_PRE_BYTES_MS
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isInteger(value) ? value : undefined
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined
 }
 
 function normalizeText(value: string | undefined): string | undefined {

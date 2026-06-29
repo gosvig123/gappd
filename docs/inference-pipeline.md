@@ -3,8 +3,8 @@
 ## Philosophy
 
 Local-first. Zero cloud by default. Your data, your compute.
-Ollama for LLM, whisper.cpp for STT. No API keys needed. No data leaves localhost.
-Cloud providers (OpenAI, Claude, Deepgram) are an upgrade path, not the default.
+**Local AI** uses Ollama for LLM inference and Whisper for speech-to-text. No API keys needed. No data leaves localhost.
+Cloud providers (OpenAI, Claude, Deepgram) are not current architecture.
 
 ## Dependencies
 
@@ -13,7 +13,7 @@ Cloud providers (OpenAI, Claude, Deepgram) are an upgrade path, not the default.
 | Ollama | LLM inference (localhost:11434) | [ollama.com](https://ollama.com) |
 | whisper.cpp | Speech-to-text | Bundled binary or user-built |
 
-### First-Run: `gappd setup`
+### CLI First-Run: `gappd setup`
 
 ```
 $ gappd setup
@@ -24,7 +24,9 @@ $ gappd setup
 Ready. Run `gappd listen` to start.
 ```
 
-Detect Ollama → pull model → locate whisper binary → write config. Idempotent.
+Detect external Ollama → pull model → locate Whisper binary → write config. Idempotent.
+
+Desktop first-run uses the **Local AI Setup Operation** instead: it prepares the **Managed Runtime** before the Meeting Recording Workflow starts.
 
 ## Two-Stage Pipeline
 
@@ -83,7 +85,7 @@ Stage 1 runs per chunk → N partial JSONs → deterministic Go merge
 | **32GB** | `llama3.1:70b-q4` | 8K | Best quality, slower |
 | 32GB (alt) | `mixtral:8x7b` | 32K | Good balance of speed and quality |
 
-Default targets 8GB. `gappd setup` detects available RAM and suggests a model.
+Default targets 8GB. CLI `gappd setup` detects available RAM and suggests a model. Desktop setup uses the **Local AI Setup Operation**.
 
 ## Provider Interface
 
@@ -137,7 +139,7 @@ struct. On failure, retry once with stricter prompt.
 | Scenario | Detection | Response |
 |---|---|---|
 | Ollama not running | TCP connect fails | "Start with `ollama serve`." |
-| Model not pulled | 404 from API | "Run `gappd setup` or `ollama pull llama3.1:8b`." |
+| Model not pulled | 404 from API | "Run Local AI setup in desktop, or `gappd setup` / `ollama pull llama3.1:8b` for CLI." |
 | Inference timeout | 5min/3min limit | Retry once, then save transcript for later. |
 | Invalid JSON | Unmarshal error | Retry with temperature=0. Max 2 retries. |
 | OOM / crash | Connection reset | "Model too large. Try a smaller model." |
