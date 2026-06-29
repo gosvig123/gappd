@@ -8,7 +8,7 @@ import { BUNDLED_OLLAMA_BINARY_NAME, BUNDLED_OLLAMA_CACHE_DIRNAME, BUNDLED_OLLAM
 import { lastLines } from '../shared/subprocess-output'
 import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
-import { type OnboardingErrorState, toOnboardingErrorState } from './onboarding-errors'
+import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-ai-setup-errors'
 import { pullModelFromOllamaApi, type PullProgressUpdate } from './ollama-pull'
 
 type ManagedOllamaRuntime = {
@@ -16,7 +16,7 @@ type ManagedOllamaRuntime = {
   startPromise: Promise<void> | null
   ownedBySession: boolean
   endpoint: string
-  lastError?: OnboardingErrorState
+  lastError?: LocalAISetupErrorState
 }
 
 const managedOllama: ManagedOllamaRuntime = { process: null, startPromise: null, ownedBySession: false, endpoint: MANAGED_OLLAMA_ENDPOINT }
@@ -61,7 +61,7 @@ export async function pullManagedModel(model: string, onProgress?: (update: Pull
     await pullModelFromOllamaApi(pullEndpoint, model, onProgress)
     managedOllama.lastError = undefined
   } catch (error) {
-    managedOllama.lastError = toOnboardingErrorState(error, 'pulling_model', 'Managed Ollama model pull failed')
+    managedOllama.lastError = toLocalAISetupErrorState(error, 'pulling_model', 'Managed Ollama model pull failed')
     throw error
   }
 }
@@ -112,7 +112,7 @@ async function launchManagedOllama(binaryPath: string, port: number): Promise<vo
 }
 function buildLocalAIStatus(context: ManagedStatusContext): LocalAIStatus {
   const phase = localAIPhase(context)
-  const error = context.configError ? toOnboardingErrorState(context.configError, phase, 'Failed to read local AI configuration') : phase === 'error' ? managedOllama.lastError : undefined
+  const error = context.configError ? toLocalAISetupErrorState(context.configError, phase, 'Failed to read local AI configuration') : phase === 'error' ? managedOllama.lastError : undefined
   return {
     phase,
     managed: Boolean(context.config?.managed),
@@ -137,17 +137,17 @@ function managedOllamaEnv(endpoint: string): NodeJS.ProcessEnv { return { ...chi
 function wireManagedOllamaEvents(child: ReturnType<typeof spawn>, binaryPath: string): void {
   child.stderr?.on('data', (chunk) => {
     if (managedOllama.process !== child) return
-    managedOllama.lastError = toOnboardingErrorState(lastLines(chunk.toString()), 'error', 'Managed Ollama reported an error')
+    managedOllama.lastError = toLocalAISetupErrorState(lastLines(chunk.toString()), 'error', 'Managed Ollama reported an error')
   })
   child.on('exit', (code, signal) => {
     if (managedOllama.process !== child) return
     resetManagedOllamaProcess()
-    if (signal !== 'SIGTERM') managedOllama.lastError = toOnboardingErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed Ollama exited before becoming ready')
+    if (signal !== 'SIGTERM') managedOllama.lastError = toLocalAISetupErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed Ollama exited before becoming ready')
   })
   child.on('error', (error) => {
     if (managedOllama.process !== child) return
     resetManagedOllamaProcess()
-    managedOllama.lastError = toOnboardingErrorState(`Failed to start managed Ollama at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed Ollama')
+    managedOllama.lastError = toLocalAISetupErrorState(`Failed to start managed Ollama at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed Ollama')
   })
 }
 function resetManagedOllamaProcess(): void {
@@ -253,12 +253,12 @@ function localAIMessage(context: ManagedStatusContext): string {
   if (context.configError) return 'Failed to read local AI configuration'
   if (!context.supported) return 'Managed Ollama is unavailable on this platform'
   if (!context.bundled) return 'Bundled Ollama runtime is missing. Run `npm run prepare:ollama` before launching the desktop app.'
-  if (context.configured && context.running && !context.modelAvailable) return `Managed Ollama is running, but model ${context.config?.model || MANAGED_OLLAMA_MODEL} is missing. Run setup to pull it again.`
+  if (context.configured && context.running && !context.modelAvailable) return `Managed Ollama is running, but model ${context.config?.model || MANAGED_OLLAMA_MODEL} is missing. Run Local AI setup to pull it again.`
   if (context.configured && context.running) return 'Managed Ollama is running'
   if (context.configured) return 'Managed Ollama is configured but stopped'
-  if (context.config && !context.config.managed) return context.running ? 'Gappd is configured for external Ollama while the managed runtime is running. Run setup to switch to the managed runtime.' : 'Gappd is configured for external Ollama. Run setup to switch to the managed runtime.'
-  if (context.running) return 'Managed Ollama is running but setup has not switched Gappd to it yet.'
-  return 'Managed Ollama is ready for setup'
+  if (context.config && !context.config.managed) return context.running ? 'Gappd is configured for external Ollama while the managed runtime is running. Run Local AI setup to switch to the managed runtime.' : 'Gappd is configured for external Ollama. Run Local AI setup to switch to the managed runtime.'
+  if (context.running) return 'Managed Ollama is running but Local AI setup has not switched Gappd to it yet.'
+  return 'Managed Ollama is ready for Local AI setup'
 }
 function localAIPhase(context: ManagedStatusContext): LocalAIStatus['phase'] {
   if (context.configError || !context.supported || !context.bundled) return 'error'

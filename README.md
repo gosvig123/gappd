@@ -11,7 +11,7 @@ post-processing uses Ollama.
 
 ## Fresh-clone setup for contributors
 
-Most contributors should use the desktop setup. Prereqs: macOS `14+`, Node.js
+Most contributors should use the desktop app and its **Local AI Setup Operation**. Prereqs: macOS `14+`, Node.js
 `22.12.0+`, Go `1.25+`, Xcode Command Line Tools, `cmake`, `tar`, and GitHub
 network access for runtime downloads.
 
@@ -24,7 +24,7 @@ npm run desktop:bootstrap
 npm run desktop:dev
 ```
 
-On first app launch, the in-app local AI onboarding may download the selected
+On first app launch, the **Local AI Setup Operation** may download the selected
 Ollama model and the Whisper model into the app user-data directory. No API keys,
 Apple signing credentials, private packages, or checked-in binary artifacts are
 required for local development.

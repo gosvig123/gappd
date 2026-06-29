@@ -1,19 +1,18 @@
 import '../components/local-ai.css'
-
 import {
-  onboardingErrorView,
-  onboardingMessageView,
-  onboardingPhaseLabel,
-  onboardingStatusTone,
-  type OnboardingStatus,
+  localAISetupErrorView,
+  localAISetupMessageView,
+  localAISetupPhaseLabel,
+  localAISetupStatusTone,
+  type LocalAISetupStatus,
 } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 import { Button, Card, Field, PageHeader, Panel, ProgressBar, StatusPill, cx } from '../components/ui'
 import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
 import type { SetupPermissionState } from '../hooks/use-setup-permissions'
 
-type OnboardingViewProps = {
-  status: OnboardingStatus
+type LocalAISetupViewProps = {
+  status: LocalAISetupStatus
   busy: boolean
   selectedModel: ManagedOllamaModelTag
   modelOptions: readonly ManagedOllamaModelOption[]
@@ -30,9 +29,9 @@ type SetupStep = { label: string; detail: string; state: SetupStepState }
 type ActionModel = { label: string; disabled: boolean; hint?: string; onAction: () => void }
 
 const SHOW_PERMISSION_DEBUG = import.meta.env.DEV
-const ACTIVE_INSTALL_PHASES: OnboardingStatus['phase'][] = ['starting_ollama', 'pulling_model', 'saving_config']
+const ACTIVE_INSTALL_PHASES: LocalAISetupStatus['phase'][] = ['starting_ollama', 'pulling_model', 'saving_config']
 
-const PHASE_COPY: Record<OnboardingStatus['phase'], PhaseCopy> = {
+const PHASE_COPY: Record<LocalAISetupStatus['phase'], PhaseCopy> = {
   checking: { headline: 'Checking this Mac.', detail: 'Gappd is looking for existing local tools.', progress: 'Checking what is already ready.', action: 'Checking setup...' },
   needs_setup: { headline: 'Set up private meeting notes.', detail: 'Install local AI once. Recordings and notes stay on this Mac.', progress: 'Downloads run only after you start setup.', action: 'Install local AI' },
   starting_ollama: { headline: 'Starting local AI.', detail: 'Gappd is starting private tools for meeting notes.', progress: 'This usually finishes quickly.', action: 'Installing...' },
@@ -42,18 +41,18 @@ const PHASE_COPY: Record<OnboardingStatus['phase'], PhaseCopy> = {
   error: { headline: 'Setup needs attention.', detail: 'Gappd stopped before setup finished.', progress: 'Setup paused because something needs attention.', action: 'Fix setup' },
 }
 
-export function OnboardingView(props: OnboardingViewProps) {
+export function LocalAISetupView(props: LocalAISetupViewProps) {
   return (
     <Panel className="panel-large setup-shell">
-      <PageHeader title="Set up Gappd" description="Two steps: install local AI, then allow recording access." action={<StatusPill tone={onboardingStatusTone(props.status.phase)}>{onboardingPhaseLabel(props.status.phase)}</StatusPill>} />
+      <PageHeader title="Set up Gappd" description="Two steps: install local AI, then allow recording access." action={<StatusPill tone={localAISetupStatusTone(props.status.phase)}>{localAISetupPhaseLabel(props.status.phase)}</StatusPill>} />
       <SetupBody {...props} copy={PHASE_COPY[props.status.phase]} />
     </Panel>
   )
 }
 
-function SetupBody(props: OnboardingViewProps & { copy: PhaseCopy }) {
+function SetupBody(props: LocalAISetupViewProps & { copy: PhaseCopy }) {
   const action = setupAction(props)
-  const errorView = onboardingErrorView(props.status)
+  const errorView = localAISetupErrorView(props.status)
   return (
     <div className="setup-primary">
       <div className="setup-main">
@@ -73,7 +72,7 @@ function SetupHero({ copy }: { copy: PhaseCopy }) {
   return <Card className="setup-callout accent"><strong>Private by default</strong><h2>{copy.headline}</h2><p>{copy.detail}</p><ul className="setup-benefits"><li>Downloads happen once.</li><li>No cloud account or API key.</li><li>Meeting audio stays local.</li></ul></Card>
 }
 
-function SetupPlan({ status, permission }: { status: OnboardingStatus; permission: SetupPermissionState }) {
+function SetupPlan({ status, permission }: { status: LocalAISetupStatus; permission: SetupPermissionState }) {
   return <Card className="setup-steps"><div><div className="label">Setup path</div><h3>Two steps</h3></div>{setupSteps(status, permission).map((step) => <SetupStepRow key={step.label} step={step} />)}</Card>
 }
 
@@ -81,22 +80,22 @@ function SetupStepRow({ step }: { step: SetupStep }) {
   return <div className={cx('setup-step', step.state)}><span>{stepIcon(step.state)}</span><div><strong>{step.label}</strong><p>{step.detail}</p></div></div>
 }
 
-function SetupProgressCard({ status, copy }: { status: OnboardingStatus; copy: PhaseCopy }) {
+function SetupProgressCard({ status, copy }: { status: LocalAISetupStatus; copy: PhaseCopy }) {
   const progress = status.phase === 'ready' ? 100 : typeof status.progress === 'number' ? progressValue(status.progress) : null
   return <Card className="progress-block"><ProgressHeader status={status} progress={progress} /><ProgressBar value={progress} label="Local AI setup progress" /><p className="progress-copy">{copy.progress}</p><CurrentStep status={status} /></Card>
 }
 
-function ProgressHeader({ status, progress }: { status: OnboardingStatus; progress: number | null }) {
+function ProgressHeader({ status, progress }: { status: LocalAISetupStatus; progress: number | null }) {
   return <div className="progress-head"><span className="label">Installing local AI</span><span className="progress-copy">{progress === null ? progressLabel(status) : `${progress}%`}</span></div>
 }
 
-function CurrentStep({ status }: { status: OnboardingStatus }) {
-  const message = onboardingMessageView(status)
+function CurrentStep({ status }: { status: LocalAISetupStatus }) {
+  const message = localAISetupMessageView(status)
   if (!message) return null
   return <div className="setup-progress-detail"><div className="label">Current step</div><div className="setup-progress-headline">{message.headline}</div>{message.detail ? <p className="progress-copy">{message.detail}</p> : null}</div>
 }
 
-function PermissionSetupCard({ status, state }: { status: OnboardingStatus; state: SetupPermissionState }) {
+function PermissionSetupCard({ status, state }: { status: LocalAISetupStatus; state: SetupPermissionState }) {
   if (status.phase !== 'ready') return null
   return <Card className="setup-permissions"><div><div className="label">Recording access</div><h3>{permissionTitle(state)}</h3></div><p>{permissionDetail(state)}</p><PermissionDebug state={state} /></Card>
 }
@@ -105,7 +104,7 @@ function SetupActions({ busy, action }: { busy: boolean; action: ActionModel }) 
   return <div className="setup-actions"><div className="actions-row"><Button variant="primary" onClick={action.onAction} disabled={busy || action.disabled}>{busy ? 'Setting up...' : action.label}</Button></div>{action.hint ? <p className="action-copy">{action.hint}</p> : null}</div>
 }
 
-function SetupAdvancedDetails(props: Pick<OnboardingViewProps, 'status' | 'busy' | 'selectedModel' | 'modelOptions' | 'onModelChange'>) {
+function SetupAdvancedDetails(props: Pick<LocalAISetupViewProps, 'status' | 'busy' | 'selectedModel' | 'modelOptions' | 'onModelChange'>) {
   const selected = props.modelOptions.find((option) => option.tag === props.selectedModel)
   return <details className="setup-advanced"><summary>Advanced</summary><Field label="Model quality" className="setup-model-picker" hint={selected?.detail}><select value={props.selectedModel} onChange={(event) => updateSelectedModel(event.currentTarget.value, props.onModelChange)} disabled={modelSelectDisabled(props)}>{props.modelOptions.map((option) => <option key={option.tag} value={option.tag}>{option.label}</option>)}</select></Field></details>
 }
@@ -116,19 +115,19 @@ function PermissionDebug({ state }: { state: SetupPermissionState }) {
   return <details className="permission-debug"><summary>Permission debug</summary>{Object.entries(details).map(([key, value]) => <div key={key}><strong>{key}</strong><span>{value || 'empty'}</span></div>)}</details>
 }
 
-function setupAction(props: OnboardingViewProps & { copy: PhaseCopy }): ActionModel {
+function setupAction(props: LocalAISetupViewProps & { copy: PhaseCopy }): ActionModel {
   if (props.status.phase === 'ready') return permissionAction(props)
   const retry = props.status.phase === 'error' || props.status.canRetry
   return { label: retry ? 'Fix setup' : props.copy.action, disabled: props.status.phase === 'checking' && !props.busy, hint: installHint(props), onAction: retry ? props.onRetry : props.onStart }
 }
 
-function permissionAction(props: OnboardingViewProps): ActionModel {
+function permissionAction(props: LocalAISetupViewProps): ActionModel {
   const status = props.permissionState.status
   const label = status === 'checking' ? 'Checking permissions...' : status === 'granted' ? 'Start using Gappd' : status === 'blocked' || status === 'unknown' || status === 'error' ? 'Open System Settings' : 'Allow recording access'
   return { label, disabled: status === 'checking', onAction: props.onRequestPermissions }
 }
 
-function setupSteps(status: OnboardingStatus, permission: SetupPermissionState): SetupStep[] {
+function setupSteps(status: LocalAISetupStatus, permission: SetupPermissionState): SetupStep[] {
   const aiReady = status.phase === 'ready'
   return [{ label: 'Install local AI', detail: localAIDetail(status), state: localAIState(status) }, permissionStep(aiReady, permission)]
 }
@@ -140,20 +139,20 @@ function permissionStep(aiReady: boolean, permission: SetupPermissionState): Set
   return { label: 'Allow recording access', detail: 'Microphone and screen/system audio', state: 'active' }
 }
 
-function localAIState(status: OnboardingStatus): SetupStepState {
+function localAIState(status: LocalAISetupStatus): SetupStepState {
   if (status.phase === 'ready') return 'done'
   if (status.phase === 'error') return 'blocked'
   return 'active'
 }
 
-function localAIDetail(status: OnboardingStatus): string {
+function localAIDetail(status: LocalAISetupStatus): string {
   if (status.phase === 'ready') return 'Done'
   if (showProgress(status, false)) return 'Installing transcript and summary tools'
   if (status.phase === 'error') return 'Needs attention'
   return 'Transcript and summary tools'
 }
 
-function installHint(props: OnboardingViewProps & { copy: PhaseCopy }): string | undefined {
+function installHint(props: LocalAISetupViewProps & { copy: PhaseCopy }): string | undefined {
   if (props.status.phase === 'needs_setup') return 'Setup starts only when you click. Downloads can be several GB.'
   return showProgress(props.status, props.busy) ? props.copy.hint : undefined
 }
@@ -173,11 +172,11 @@ function permissionDetail(state: SetupPermissionState): string {
   return 'Gappd asks now so recording does not stop during your first meeting.'
 }
 
-function showProgress(status: OnboardingStatus, busy: boolean): boolean {
+function showProgress(status: LocalAISetupStatus, busy: boolean): boolean {
   return busy || ACTIVE_INSTALL_PHASES.includes(status.phase)
 }
 
-function progressLabel(status: OnboardingStatus): string {
+function progressLabel(status: LocalAISetupStatus): string {
   return status.phase === 'error' ? 'Stopped' : 'Working'
 }
 
@@ -192,7 +191,7 @@ function stepIcon(state: SetupStepState): string {
   return '○'
 }
 
-function modelSelectDisabled(props: Pick<OnboardingViewProps, 'status' | 'busy'>): boolean {
+function modelSelectDisabled(props: Pick<LocalAISetupViewProps, 'status' | 'busy'>): boolean {
   return props.busy || (props.status.phase !== 'needs_setup' && props.status.phase !== 'error')
 }
 

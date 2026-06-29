@@ -1,8 +1,8 @@
 import os from 'node:os'
-import { BrowserWindow, ipcMain, shell } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationChannel, type OnboardingSetupInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type LocalAISetupInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { deleteMeeting, getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, startStaleRecordingRecovery, stopRecording } from './gappd'
-import { getLocalAIStatus, getOnboardingStatus, onOnboardingStatusChange, repairLocalAI, retryOnboarding, startOnboarding } from './onboarding'
+import { getLocalAISetupStatus, getLocalAISetupStatusSnapshot, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { downloadWhisperModel, getTranscriptionSettings, saveDefaultWhisperModel } from './whisper-model-settings'
@@ -18,40 +18,55 @@ const PRIVACY_ANCHORS: Record<CapturePermissionTarget, string> = {
   'screen-recording': PRIVACY_SCREEN_CAPTURE_ANCHOR,
 }
 
+type Awaitable<T> = T | Promise<T>
 type IpcHandler = Parameters<typeof ipcMain.handle>[1]
+type MainHandler<G extends IpcOperationGroup, N extends IpcOperationName<G>> = (event: IpcMainInvokeEvent, ...args: IpcOperationArgs<G, N>) => Awaitable<IpcOperationResult<G, N>>
+type MainHandlers = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: MainHandler<G, N> } }
 
-const IPC_HANDLERS: Record<IpcOperationChannel, IpcHandler> = {
-  'system:getDevices': () => getDevices(),
-  'system:requestCapturePermissions': () => requestCapturePermissions(),
-  'system:openPermissionsSettings': (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
-  'system:startStaleRecordingRecovery': () => startStaleRecordingRecovery(),
-  'meetings:list': () => listMeetings(),
-  'meetings:show': (_event, id: string) => showMeeting(id),
-  'meetings:delete': (_event, id: string) => deleteMeeting(id),
-  'recording:start': async (_event, input: StartRecordingInput) => {
-    await startRecording(input)
-    return getRecordingState()
+const IPC_HANDLERS: MainHandlers = {
+  system: {
+    getDevices: () => getDevices(),
+    requestCapturePermissions: () => requestCapturePermissions(),
+    openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
+    startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
   },
-  'recording:stop': () => {
-    stopRecording()
-    return getRecordingState()
+  meetings: {
+    list: () => listMeetings(),
+    show: (_event, id: string) => showMeeting(id),
+    delete: (_event, id: string) => deleteMeeting(id),
   },
-  'recording:getStatus': () => getRecordingState(),
-  'onboarding:getStatus': () => getOnboardingStatus(),
-  'onboarding:start': (_event, input?: OnboardingSetupInput) => startOnboarding(input),
-  'onboarding:retry': (_event, input?: OnboardingSetupInput) => retryOnboarding(input),
-  'settings:getLocalAIStatus': () => getLocalAIStatus(),
-  'settings:repairLocalAI': () => repairLocalAI(),
-  'settings:getTranscriptionSettings': () => getTranscriptionSettings(),
-  'settings:downloadWhisperModel': (event, id: string) => downloadWhisperModel(id, (progress) => {
-    if (!event.sender.isDestroyed()) event.sender.send(IPC_EVENTS.settings.whisperModelDownloadProgress, progress)
-  }),
-  'settings:setDefaultWhisperModel': (_event, id: string) => saveDefaultWhisperModel(id),
-  'update:getStatus': () => getUpdateStatus(),
-  'update:checkNow': () => checkForUpdate(),
-  'update:downloadUpdate': () => downloadUpdate(),
-  'update:installAndRestart': () => installAndRestart(),
-  'update:openUpdatePage': () => openUpdatePage(),
+  recording: {
+    start: async (_event, input: StartRecordingInput) => {
+      await startRecording(input)
+      return getRecordingState()
+    },
+    stop: () => {
+      stopRecording()
+      return getRecordingState()
+    },
+    getStatus: () => getRecordingState(),
+  },
+  localAISetup: {
+    getStatus: () => getLocalAISetupStatus(),
+    start: (_event, input?: LocalAISetupInput) => startLocalAISetup(input),
+    retry: (_event, input?: LocalAISetupInput) => retryLocalAISetup(input),
+  },
+  settings: {
+    getLocalAIStatus: () => getLocalAISetupStatusSnapshot(),
+    repairLocalAI: () => repairLocalAISetup(),
+    getTranscriptionSettings: () => getTranscriptionSettings(),
+    downloadWhisperModel: (event, id: string) => downloadWhisperModel(id, (progress) => {
+      if (!event.sender.isDestroyed()) event.sender.send(IPC_EVENTS.settings.whisperModelDownloadProgress, progress)
+    }),
+    setDefaultWhisperModel: (_event, id: string) => saveDefaultWhisperModel(id),
+  },
+  update: {
+    getStatus: () => getUpdateStatus(),
+    checkNow: () => checkForUpdate(),
+    downloadUpdate: () => downloadUpdate(),
+    installAndRestart: () => installAndRestart(),
+    openUpdatePage: () => openUpdatePage(),
+  },
 }
 
 let registered = false
@@ -66,7 +81,7 @@ export function registerIpc(mainWindow: BrowserWindow): void {
   disposeWindowSubscriptions(mainWindow)
   const disposers = [
     forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
-    forwardToWindow(mainWindow, IPC_EVENTS.onboarding.statusChanged, onOnboardingStatusChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.localAISetup.statusChanged, onLocalAISetupStatusChange),
     forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
   ]
   windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))
@@ -74,7 +89,20 @@ export function registerIpc(mainWindow: BrowserWindow): void {
 }
 
 function registerIpcHandlers(): void {
-  for (const operation of IPC_OPERATIONS) ipcMain.handle(operation.channel, IPC_HANDLERS[operation.channel])
+  for (const group of operationGroups()) registerIpcGroup(group)
+}
+
+function operationGroups(): IpcOperationGroup[] {
+  return Object.keys(IPC_OPERATIONS) as IpcOperationGroup[]
+}
+
+function operationNames<G extends IpcOperationGroup>(group: G): IpcOperationName<G>[] {
+  return Object.keys(IPC_OPERATIONS[group]) as IpcOperationName<G>[]
+}
+
+function registerIpcGroup<G extends IpcOperationGroup>(group: G): void {
+  const channels = IPC_OPERATIONS[group] as Record<IpcOperationName<G>, string>
+  for (const name of operationNames(group)) ipcMain.handle(channels[name], IPC_HANDLERS[group][name] as IpcHandler)
 }
 
 function privacySettingsUrl(target?: CapturePermissionTarget): string {

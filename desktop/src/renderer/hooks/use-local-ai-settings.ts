@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { getLocalAIContract, toStatusError, type LocalAIStatus, type OnboardingStatus } from '../components/local-ai-contract'
+import { getLocalAIContract, toStatusError, type LocalAIStatus, type LocalAISetupStatus } from '../components/local-ai-contract'
 import { useRequestGate } from './request-gate'
 
 const localAI = getLocalAIContract()
 
-export function useLocalAISettings(enabled: boolean, onOnboardingStatus: (status: OnboardingStatus) => void) {
+export function useLocalAISettings(enabled: boolean, onLocalAISetupStatus: (status: LocalAISetupStatus) => void) {
   const request = useRequestGate()
   const [status, setStatus] = useState<LocalAIStatus | null>(null)
   const [loading, setLoading] = useState(false)
@@ -33,7 +33,7 @@ export function useLocalAISettings(enabled: boolean, onOnboardingStatus: (status
     try {
       const nextStatus = await localAI.settings.repairLocalAI()
       setStatus(nextStatus)
-      onOnboardingStatus(nextStatus)
+      onLocalAISetupStatus(nextStatus)
     } catch (err) {
       setStatus(toStatusError(err))
     } finally {

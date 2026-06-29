@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type GappdApi, type IpcOperation } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type GappdApi, type IpcInvokeApi, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult } from '../shared/ipc-contract'
 
 function subscribe<T>(channel: string): (listener: (state: T) => void) => () => void {
   return (listener) => {
@@ -9,30 +9,30 @@ function subscribe<T>(channel: string): (listener: (state: T) => void) => () => 
   }
 }
 
-type OperationApi = {
-  system: GappdApi['system']
-  meetings: GappdApi['meetings']
-  recording: Omit<GappdApi['recording'], 'onStatusChanged'>
-  onboarding: Omit<GappdApi['onboarding'], 'onStatusChanged'>
-  settings: Omit<GappdApi['settings'], 'onWhisperModelDownloadProgress'>
-  update: Omit<GappdApi['update'], 'onStatusChanged'>
+function buildOperationApi(): IpcInvokeApi {
+  return {
+    system: invokeGroup('system'),
+    meetings: invokeGroup('meetings'),
+    recording: invokeGroup('recording'),
+    localAISetup: invokeGroup('localAISetup'),
+    settings: invokeGroup('settings'),
+    update: invokeGroup('update'),
+  }
 }
 
-type OperationInvoker = (...args: unknown[]) => Promise<unknown>
-
-function buildOperationApi(): OperationApi {
-  const api = emptyOperationApi()
-  for (const operation of IPC_OPERATIONS) assignOperation(api, operation)
-  return api
+function invokeGroup<G extends IpcOperationGroup>(group: G): IpcInvokeApi[G] {
+  const api: Partial<Record<IpcOperationName<G>, unknown>> = {}
+  for (const name of operationNames(group)) api[name] = invokeOperation(group, name)
+  return api as IpcInvokeApi[G]
 }
 
-function emptyOperationApi(): OperationApi {
-  return { system: {}, meetings: {}, recording: {}, onboarding: {}, settings: {}, update: {} } as OperationApi
+function operationNames<G extends IpcOperationGroup>(group: G): IpcOperationName<G>[] {
+  return Object.keys(IPC_OPERATIONS[group]) as IpcOperationName<G>[]
 }
 
-function assignOperation(api: OperationApi, operation: IpcOperation): void {
-  const group = api[operation.group] as Record<string, OperationInvoker>
-  group[operation.name] = (...args) => ipcRenderer.invoke(operation.channel, ...args)
+function invokeOperation<G extends IpcOperationGroup, N extends IpcOperationName<G>>(group: G, name: N) {
+  const channels = IPC_OPERATIONS[group] as Record<IpcOperationName<G>, string>
+  return (...args: IpcOperationArgs<G, N>) => ipcRenderer.invoke(channels[name], ...args) as Promise<IpcOperationResult<G, N>>
 }
 
 const operationApi = buildOperationApi()
@@ -40,7 +40,7 @@ const operationApi = buildOperationApi()
 const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
-  onboarding: { ...operationApi.onboarding, onStatusChanged: subscribe(IPC_EVENTS.onboarding.statusChanged) },
+  localAISetup: { ...operationApi.localAISetup, onStatusChanged: subscribe(IPC_EVENTS.localAISetup.statusChanged) },
   settings: { ...operationApi.settings, onWhisperModelDownloadProgress: subscribe(IPC_EVENTS.settings.whisperModelDownloadProgress) },
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
