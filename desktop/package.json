@@ -30,7 +30,11 @@
     "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {
+    "@fontsource/hanken-grotesk": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/newsreader": "^5.2.10",
     "electron-updater": "^6.8.9",
+    "lucide-react": "^1.22.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
