@@ -1,5 +1,6 @@
 import type { UpdateStatus } from '../../shared/contracts'
 import { AppLogo } from './app-logo'
+import { GearIcon } from './icons'
 
 const UPDATE_LABEL = 'Update'
 
@@ -20,7 +21,7 @@ export function AppHeader(props: AppHeaderProps) {
       <div className="app-brand-block"><AppLogo className="app-logo" /><div className="app-brand">Gappd</div><p>Record, review, and search private meeting notes.</p></div>
       <div className="app-controls" aria-label="App controls">
         <UpdateControls {...props} />
-        <button className={props.settingsOpen ? 'app-control settings-control active' : 'app-control settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close settings' : 'Open settings'} aria-pressed={props.settingsOpen}>⚙<span>Settings</span></button>
+        <button className={props.settingsOpen ? 'app-control app-control-icon settings-control active' : 'app-control app-control-icon settings-control'} onClick={props.onToggleSettings} disabled={!props.appReady} aria-label={props.settingsOpen ? 'Close settings' : 'Open settings'} aria-pressed={props.settingsOpen} title="Settings"><GearIcon className="app-control-glyph" /></button>
       </div>
     </header>
   )
