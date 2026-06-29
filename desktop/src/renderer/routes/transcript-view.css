@@ -17,13 +17,18 @@
 
 .transcript-group-plain {
   grid-template-columns: minmax(0, 1fr);
+  font-family: var(--font-reading);
+  line-height: 1.65;
+  max-width: 38rem;
+  margin-inline: auto;
 }
 
 .transcript-speaker {
   position: sticky;
   top: 2.25rem;
-  color: var(--color-accent);
-  font-size: var(--font-size-xs);
+  color: var(--color-text-soft);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-base);
 }
@@ -42,8 +47,8 @@
 .transcript-segment-text {
   margin: 0;
   color: var(--color-text-soft);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: var(--font-size-base);
+  line-height: 1.6;
 }
 
 .transcript-speaker-filter {
@@ -58,10 +63,27 @@
   background: var(--reading-fade-color);
 }
 
+.transcript-chip {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: background var(--transition-smooth), border-color var(--transition-smooth), color var(--transition-smooth);
+}
+
+.transcript-chip:hover:not([aria-pressed='true']) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+}
+
 .transcript-chip[aria-pressed='true'] {
   border-color: var(--color-accent-border);
-  background: var(--color-accent-tint);
-  color: var(--color-text);
+  background: var(--color-accent-tint-strong);
+  color: var(--color-accent);
 }
 
 .transcript-segment {
@@ -75,6 +97,7 @@
 .transcript-time {
   padding-top: 10px;
   color: var(--color-text-muted);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
   line-height: var(--line-height-base);
@@ -87,7 +110,13 @@
   padding: 10px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  background: var(--color-card);
+  background: var(--color-surface-elevated);
+  font-family: var(--font-ui);
+  transition: border-color var(--transition-smooth);
+}
+
+.transcript-segment-body:hover {
+  border-color: var(--color-accent-border);
 }
 
 .transcript-segment-meta {

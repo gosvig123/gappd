@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MeetingListItem, RecordingState } from '../../shared/contracts'
 import { Button } from './ui'
+import { CircleDotIcon, CircleCheckIcon } from './icons'
 import { meetingHasWork, meetingReady, type MeetingProgressInput } from './meeting-progress'
 import './meeting-announcements.css'
 
@@ -35,9 +36,10 @@ export function MeetingAnnouncements({ meetings, recording, onOpenMeeting }: Mee
 
 function MeetingToast({ notice, onDismiss, onOpenMeeting }: { notice: MeetingNotice; onDismiss: () => void; onOpenMeeting: (id: string) => void }) {
   const meetingId = notice.meetingId
+  const ToastIcon = notice.tone === 'ready' ? CircleCheckIcon : CircleDotIcon
   return (
     <div className={`meeting-toast ${notice.tone}`} role="status" aria-live="polite">
-      <div><strong>{notice.title}</strong><p>{notice.message}</p></div>
+      <div className="meeting-toast-body"><ToastIcon aria-hidden="true" /><div><strong>{notice.title}</strong><p>{notice.message}</p></div></div>
       <div className="meeting-toast-actions">{meetingId ? <Button className="compact-action" onClick={() => onOpenMeeting(meetingId)}>Open</Button> : null}<Button className="compact-action" onClick={onDismiss}>Dismiss</Button></div>
     </div>
   )

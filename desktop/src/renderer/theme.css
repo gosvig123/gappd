@@ -2,7 +2,9 @@
   color-scheme: dark;
   font-family: var(--font-ui);
 
-  --font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-ui: "Hanken Grotesk", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-reading: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-size-xs: 11px;
   --font-size-sm: 12px;
   --font-size-md: 13px;
@@ -47,6 +49,11 @@
   --color-bg-soft: color-mix(in srgb, var(--color-surface) 84%, var(--color-card));
   --color-surface-soft: color-mix(in srgb, var(--color-surface) 72%, var(--color-card));
   --color-surface-raised: var(--color-card);
+  --color-surface-elevated: color-mix(in srgb, var(--color-card) 82%, white);
+  /* Reading "paper": warm, lifted sheet that stays dark enough for light text to read cleanly. */
+  --reading-paper: color-mix(in srgb, var(--color-card) 88%, #f4ead6);
+  --reading-paper-border: color-mix(in srgb, var(--color-border) 70%, #f4ead6);
+  --color-surface-sunken: color-mix(in srgb, var(--color-card) 50%, #05070c);
   --color-border-strong: color-mix(in srgb, var(--color-border) 74%, var(--color-brand));
   --color-text-muted: color-mix(in srgb, var(--color-text) 64%, var(--color-surface));
   --color-text-soft: color-mix(in srgb, var(--color-text) 80%, var(--color-surface));
@@ -89,4 +96,9 @@
   --shell-glow: linear-gradient(180deg, color-mix(in srgb, #ffffff 2.5%, transparent), transparent 22%);
 
   --transition-quick: 140ms ease;
+  --transition-smooth: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 340ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --stagger-base: 0ms;
+  --stagger-step: 50ms;
 }

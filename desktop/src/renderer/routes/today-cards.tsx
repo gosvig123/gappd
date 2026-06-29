@@ -1,4 +1,5 @@
 import type { Device, RecordingStatus } from '../../shared/contracts'
+import { ChevronDownIcon, MicIcon, SquareIcon } from '../components/icons'
 import { cx } from '../components/ui'
 
 const RECORDING_STOPPING: RecordingStatus = 'stopping'
@@ -23,36 +24,18 @@ export function RecordControls(props: RecordControlsProps) {
     <div className={cx('record-cluster', action.recording && 'is-recording')}>
       {props.devices.length > 0 ? (
         <label className="record-input" title="Audio input">
-          <MicIcon />
+          <MicIcon className="record-input-icon" aria-hidden="true" />
           <select className="record-input-select" value={props.device} onChange={(event) => props.onDeviceChange(Number(event.target.value))} disabled={action.recording} aria-label="Audio input">
             {props.devices.map((item) => <option key={item.index} value={item.index}>{item.name}</option>)}
           </select>
-          <CaretIcon />
+          <ChevronDownIcon className="record-input-caret" aria-hidden="true" />
         </label>
       ) : null}
       <button className="record-button" onClick={action.onClick} disabled={action.disabled} title={action.title} aria-label={action.label}>
-        <span className={cx('record-glyph', action.recording && 'is-stop')} aria-hidden="true" />
+        {action.recording ? <SquareIcon className="record-button-icon" aria-hidden="true" /> : <MicIcon className="record-button-icon" aria-hidden="true" />}
         {action.label}
       </button>
     </div>
-  )
-}
-
-function MicIcon() {
-  return (
-    <svg className="record-input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="9" y="2" width="6" height="12" rx="3" />
-      <path d="M5 10v1a7 7 0 0 0 14 0v-1" />
-      <path d="M12 18v4" />
-    </svg>
-  )
-}
-
-function CaretIcon() {
-  return (
-    <svg className="record-input-caret" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
   )
 }
 

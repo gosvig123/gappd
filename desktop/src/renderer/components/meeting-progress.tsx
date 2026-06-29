@@ -1,5 +1,7 @@
+import { type ReactNode } from 'react'
 import type { MeetingStatus } from '../../shared/contracts'
 import { cx } from './ui'
+import { CircleCheckIcon, CircleDotIcon, CircleAlertIcon, CircleIcon } from './icons'
 import './meeting-progress.css'
 
 export type MeetingProgressInput = {
@@ -62,7 +64,7 @@ export function PostMeetingProgressCard({ meeting }: { meeting: MeetingProgressI
 }
 
 function ProcessingStep({ step }: { step: ProgressStep }) {
-  return <li className={cx('processing-step', step.tone)}><span className="processing-step-marker">{stepMarker(step.tone)}</span><span><strong>{step.label}</strong><small>{step.detail}</small></span></li>
+  return <li className={cx('processing-step', step.tone)}><span className="processing-step-marker">{stepMarkerIcon(step.tone)}</span><span><strong>{step.label}</strong><small>{step.detail}</small></span></li>
 }
 
 function activeWorkLabel(meeting: MeetingProgressInput): string {
@@ -126,8 +128,9 @@ function summaryFailed(meeting: MeetingProgressInput): boolean {
   return meeting.hasTranscript && !meeting.hasSummary && meeting.status.processing.state === PROCESSING_FAILED
 }
 
-function stepMarker(tone: StepTone): string {
-  if (tone === 'done') return '✓'
-  if (tone === 'failed') return '!'
-  return ''
+function stepMarkerIcon(tone: StepTone): ReactNode {
+  if (tone === 'done') return <CircleCheckIcon aria-hidden="true" />
+  if (tone === 'active') return <CircleDotIcon aria-hidden="true" />
+  if (tone === 'failed') return <CircleAlertIcon aria-hidden="true" />
+  return <CircleIcon aria-hidden="true" />
 }

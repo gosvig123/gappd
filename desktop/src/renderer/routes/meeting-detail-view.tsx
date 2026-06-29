@@ -6,12 +6,13 @@ import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeti
 import { Markdown } from '../components/markdown'
 import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
+import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
 const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
-type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }
+type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
@@ -27,7 +28,7 @@ function CopyArtifactButton({ value, label }: { value: string; label: string }) 
       setCopyState('failed')
     }
   }
-  return <Button className="compact-action" onClick={() => void copyArtifact()}>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : label}</Button>
+  return <Button className="compact-action detail-action" aria-label={copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : label} onClick={() => void copyArtifact()}><CopyIcon aria-hidden="true" /> <span>{copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Copy failed' : label}</span></Button>
 }
 
 function useReadingOverflow(value: string, resetKey: string) {
@@ -68,8 +69,8 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
   return (
     <div className="detail-tabs-row">
       <div className="detail-tabs" role="tablist" aria-label="Meeting detail sections">
-        <button className={tabClassName(activeTab, SUMMARY_TAB)} onClick={() => onChange(SUMMARY_TAB)} role="tab" aria-selected={activeTab === SUMMARY_TAB}>Summary</button>
-        <button className={tabClassName(activeTab, TRANSCRIPT_TAB)} onClick={() => onChange(TRANSCRIPT_TAB)} role="tab" aria-selected={activeTab === TRANSCRIPT_TAB}>Transcript</button>
+        <button className={tabClassName(activeTab, SUMMARY_TAB)} onClick={() => onChange(SUMMARY_TAB)} role="tab" aria-selected={activeTab === SUMMARY_TAB}><AlignLeftIcon aria-hidden="true" /> <span>Summary</span></button>
+        <button className={tabClassName(activeTab, TRANSCRIPT_TAB)} onClick={() => onChange(TRANSCRIPT_TAB)} role="tab" aria-selected={activeTab === TRANSCRIPT_TAB}><FileTextIcon aria-hidden="true" /> <span>Transcript</span></button>
       </div>
       {actions}
     </div>
@@ -78,35 +79,7 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
-function MeetingDeleteButton({ meeting, onDeleteMeeting }: { meeting: MeetingDetail; onDeleteMeeting: (id: string) => Promise<void> }) {
-  const [deleting, setDeleting] = useState(false)
-  const disabled = deleting || !meetingDeleteAllowed(meeting)
-  async function handleDelete() {
-    if (!confirmMeetingDelete(meeting)) return
-    setDeleting(true)
-    try {
-      await onDeleteMeeting(meeting.id)
-    } finally {
-      setDeleting(false)
-    }
-  }
-  return <Button className="compact-action danger-action" disabled={disabled} title={disabled ? deleteDisabledLabel(meeting) : undefined} onClick={() => void handleDelete()}>{deleting ? 'Deleting…' : 'Delete'}</Button>
-}
-
-function meetingDeleteAllowed(meeting: MeetingDetail): boolean { return meeting.status.state !== RECORDING_STATE && meeting.status.processing.state !== PROCESSING_STATUS }
-
-function deleteDisabledLabel(meeting: MeetingDetail): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Stop recording before deleting.'
-  if (meeting.status.processing.state === PROCESSING_STATUS) return 'Wait for processing to finish before deleting.'
-  return ''
-}
-
-function confirmMeetingDelete(meeting: MeetingDetail): boolean {
-  const title = meeting.title || 'this meeting'
-  return window.confirm(`Delete “${title}”?\n\nThis removes summary, transcript, segments, and audio files.`)
-}
-
-function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }: { selectedMeeting: MeetingDetail; transcript: string; onDeleteMeeting: (id: string) => Promise<void> }) {
+function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
   const hasTranscript = Boolean(transcript)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
   const subtitle = detailSubtitle(selectedMeeting, progress)
@@ -119,7 +92,6 @@ function SelectedMeetingDetail({ selectedMeeting, transcript, onDeleteMeeting }:
         <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
       <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
-      <div className="detail-footer-actions"><MeetingDeleteButton meeting={selectedMeeting} onDeleteMeeting={onDeleteMeeting} /></div>
     </Panel>
   )
 }
@@ -134,7 +106,7 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
-      <div className="detail-tab-body">
+      <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
         {activeTab === TRANSCRIPT_TAB && recording ? <TrackingIndicator /> : null}
         {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} reading={reading}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
@@ -183,9 +155,9 @@ function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): Me
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
-  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript, onDeleteMeeting } = props
+  const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript } = props
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><div className="detail-surface detail-alert">{selectedMeetingError}</div></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onDeleteMeeting={onDeleteMeeting} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
 }

@@ -46,12 +46,12 @@
   width: 1.5rem;
   height: 1.5rem;
   place-items: center;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 999px;
   color: var(--color-text-muted);
-  background: var(--color-surface-raised);
-  font-size: var(--font-size-xs);
-  font-weight: 700;
+}
+
+.processing-step-marker svg {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .processing-step strong,
@@ -67,20 +67,14 @@
 
 .processing-step.done .processing-step-marker {
   color: var(--color-success);
-  border-color: var(--color-success-border);
-  background: var(--color-success-bg);
 }
 
 .processing-step.active .processing-step-marker {
-  border-color: var(--color-warning-border);
-  background: var(--color-warning-bg);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-warning), transparent 82%);
+  color: var(--color-accent);
 }
 
 .processing-step.failed .processing-step-marker {
   color: var(--color-danger);
-  border-color: var(--color-danger-border);
-  background: var(--color-danger-bg);
 }
 
 .processing-hint {
