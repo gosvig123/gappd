@@ -13,7 +13,7 @@ export function useDashboardData(enabled: boolean) {
   const [state, setState] = useDashboardState()
 
   const meetingActions = useDashboardActions(setState, refs, selectedMeetingRequest, refreshRequest)
-  const recording = useDashboardRecording(enabled, refs, meetingActions)
+  const recording = useDashboardRecording(enabled, meetingActions)
   const actions = useDashboardViewActions(meetingActions, recording, state)
 
   useMeetingsLifecycle(enabled, meetingActions, setState)
@@ -22,10 +22,8 @@ export function useDashboardData(enabled: boolean) {
   return useMemo(() => buildDashboardViewModel(state, recording, actions), [state, recording, actions])
 }
 
-function useDashboardRecording(enabled: boolean, refs: MeetingRefs, actions: MeetingActions) {
+function useDashboardRecording(enabled: boolean, actions: MeetingActions) {
   return useMeetingRecordingWorkflow(enabled, {
-    selectedMeetingId: () => refs.selectedId.current,
-    selectMeeting: (id) => { refs.selectedId.current = id },
     refreshMeetings: actions.refreshMeetings,
     setError: actions.setError,
   })
