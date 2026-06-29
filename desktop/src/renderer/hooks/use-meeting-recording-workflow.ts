@@ -14,9 +14,7 @@ const VISIBLE_DOCUMENT_STATE = 'visible'
 const VISIBILITY_CHANGE_EVENT = 'visibilitychange'
 const WINDOW_FOCUS_EVENT = 'focus'
 
-type RecordingBridge = {
-  selectedMeetingId(): string | null
-  selectMeeting(id: string): void
+type RecordingWorkflowEffects = {
   refreshMeetings(preferredId?: string | null): Promise<void>
   setError(error: string | null): void
 }
@@ -31,45 +29,45 @@ type RecordingWorkflowState = {
 
 const INITIAL_RECORDING_WORKFLOW_STATE: RecordingWorkflowState = { devices: [], device: 0, recording: { status: IDLE_RECORDING_STATUS }, recoveringStale: false, staleRecoveryNotice: null }
 
-export function useMeetingRecordingWorkflow(enabled: boolean, bridge: RecordingBridge) {
-  const bridgeRef = useRef(bridge)
-  bridgeRef.current = bridge
+export function useMeetingRecordingWorkflow(enabled: boolean, effects: RecordingWorkflowEffects) {
+  const effectsRef = useRef(effects)
+  effectsRef.current = effects
   const [state, setState] = useState<RecordingWorkflowState>(INITIAL_RECORDING_WORKFLOW_STATE)
-  const actions = useRecordingActions(state.device, setState, bridgeRef)
+  const actions = useRecordingActions(state.device, setState, effectsRef)
 
-  useRecordingLifecycle(enabled, bridgeRef, setState)
-  useDeviceRefreshLifecycle(enabled, setState, bridgeRef)
+  useRecordingLifecycle(enabled, effectsRef, setState)
+  useDeviceRefreshLifecycle(enabled, setState, effectsRef)
 
   const canStart = state.devices.length > 0 && STARTABLE_RECORDING_STATUSES.includes(state.recording.status)
   const canStop = STOPPABLE_RECORDING_STATUSES.includes(state.recording.status)
   return { ...state, canStart, canStop, actions }
 }
 
-function useRecordingActions(device: number, setState: SetRecordingWorkflowState, bridge: BridgeRef) {
+function useRecordingActions(device: number, setState: SetRecordingWorkflowState, effects: EffectsRef) {
   return useMemo(() => ({
-    start: () => startRecording(device, setState, bridge.current.setError),
-    stop: () => stopRecording(setState, bridge.current.setError),
+    start: () => startRecording(device, setState, effects.current.setError),
+    stop: () => stopRecording(setState, effects.current.setError),
     setDevice: (next: number) => setState((current) => ({ ...current, device: next })),
-    openPermissionsSettings: (error: string | null) => openPermissionsSettings(error, bridge.current.setError),
-  }), [device, bridge, setState])
+    openPermissionsSettings: (error: string | null) => openPermissionsSettings(error, effects.current.setError),
+  }), [device, effects, setState])
 }
 
 type SetRecordingWorkflowState = Dispatch<SetStateAction<RecordingWorkflowState>>
-type BridgeRef = MutableRefObject<RecordingBridge>
+type EffectsRef = MutableRefObject<RecordingWorkflowEffects>
 
-function useRecordingLifecycle(enabled: boolean, bridge: BridgeRef, setState: SetRecordingWorkflowState) {
+function useRecordingLifecycle(enabled: boolean, effects: EffectsRef, setState: SetRecordingWorkflowState) {
   useGuardedEffect((guard) => {
     if (!enabled) return undefined
-    const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, bridge.current, setState)))
-    void loadReadyRecordingData(bridge, setState).catch((err) => guard(() => bridge.current.setError(errorMessage(err))))
+    const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, effects.current, setState)))
+    void loadReadyRecordingData(effects, setState).catch((err) => guard(() => effects.current.setError(errorMessage(err))))
     return dispose
   }, [enabled])
 }
 
-function useDeviceRefreshLifecycle(enabled: boolean, setState: SetRecordingWorkflowState, bridge: BridgeRef) {
+function useDeviceRefreshLifecycle(enabled: boolean, setState: SetRecordingWorkflowState, effects: EffectsRef) {
   useGuardedEffect((guard) => {
     if (!enabled) return undefined
-    const refresh = () => void refreshDevices(setState).catch((err) => guard(() => bridge.current.setError(errorMessage(err))))
+    const refresh = () => void refreshDevices(setState).catch((err) => guard(() => effects.current.setError(errorMessage(err))))
     const refreshWhenVisible = () => { if (document.visibilityState === VISIBLE_DOCUMENT_STATE) refresh() }
     const mediaDevices = navigator.mediaDevices
     window.addEventListener(WINDOW_FOCUS_EVENT, refresh)
@@ -83,17 +81,17 @@ function useDeviceRefreshLifecycle(enabled: boolean, setState: SetRecordingWorkf
   }, [enabled])
 }
 
-async function loadReadyRecordingData(bridge: BridgeRef, setState: SetRecordingWorkflowState) {
+async function loadReadyRecordingData(effects: EffectsRef, setState: SetRecordingWorkflowState) {
   const [devices, recording] = await Promise.all([window.gappd.system.getDevices(), window.gappd.recording.getStatus()])
   setState((current) => ({ ...reconcileDevices(current, devices), recording }))
-  await recoverStaleRecordings(bridge, setState)
+  await recoverStaleRecordings(effects, setState)
 }
 
-async function recoverStaleRecordings(bridge: BridgeRef, setState: SetRecordingWorkflowState) {
+async function recoverStaleRecordings(effects: EffectsRef, setState: SetRecordingWorkflowState) {
   setState((current) => ({ ...current, recoveringStale: true, staleRecoveryNotice: null }))
   try {
     const recovered = await window.gappd.system.startStaleRecordingRecovery()
-    if (recovered > 0) await bridge.current.refreshMeetings(bridge.current.selectedMeetingId())
+    if (recovered > 0) await effects.current.refreshMeetings()
     setState((current) => ({ ...current, recoveringStale: false, staleRecoveryNotice: recoveryNotice(recovered) }))
   } catch (err) {
     setState((current) => ({ ...current, recoveringStale: false }))
@@ -101,12 +99,10 @@ async function recoverStaleRecordings(bridge: BridgeRef, setState: SetRecordingW
   }
 }
 
-async function handleRecordingChange(next: RecordingState, bridge: RecordingBridge, setState: SetRecordingWorkflowState) {
+async function handleRecordingChange(next: RecordingState, effects: RecordingWorkflowEffects, setState: SetRecordingWorkflowState) {
   setState((current) => ({ ...current, recording: next }))
-  const meetingId = next.meetingId ?? bridge.selectedMeetingId()
-  if (next.meetingId) bridge.selectMeeting(next.meetingId)
-  if (meetingId) return bridge.refreshMeetings(meetingId)
-  if (STARTABLE_RECORDING_STATUSES.includes(next.status)) await bridge.refreshMeetings()
+  if (next.meetingId) return effects.refreshMeetings(next.meetingId)
+  if (STARTABLE_RECORDING_STATUSES.includes(next.status)) await effects.refreshMeetings()
 }
 
 async function startRecording(device: number, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
