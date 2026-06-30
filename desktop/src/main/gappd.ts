@@ -10,6 +10,7 @@ import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
+import { stopManagedOllama } from './ollama'
 import { getValidatedManagedWhisperPaths } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
@@ -197,12 +198,12 @@ function recordingHandlers(title: string) {
     },
     onError(error: string) {
       recordingChild = null
-      logMainProcessMemory('recording:error')
+      void releaseManagedOllamaAfterRecording('recording:error')
       setRecordingState({ status: 'error', title, error })
     },
     onExitWithoutTerminal() {
       recordingChild = null
-      logMainProcessMemory('recording:exit')
+      void releaseManagedOllamaAfterRecording('recording:exit')
       if (getRecordingState().status !== 'error') setRecordingState({ status: 'idle' })
     },
   }
@@ -219,13 +220,19 @@ function recordingStateFromEvent(event: RecordingEvent) {
       return { ...base, status: 'processing' as const }
     case 'recording.completed':
       recordingChild = null
-      logMainProcessMemory('recording:completed')
+      void releaseManagedOllamaAfterRecording('recording:completed')
       return { ...base, status: 'idle' as const }
     case 'recording.failed':
       recordingChild = null
-      logMainProcessMemory('recording:failed')
+      void releaseManagedOllamaAfterRecording('recording:failed')
       return { ...base, status: 'error' as const, error: event.error ?? protocolFailureMessage(event) }
   }
+}
+
+async function releaseManagedOllamaAfterRecording(label: string): Promise<void> {
+  logMainProcessMemory(`${label}:before-ollama-stop`)
+  await stopManagedOllama()
+  logMainProcessMemory(`${label}:after-ollama-stop`)
 }
 
 function protocolFailureMessage(event: RecordingEvent): string {
