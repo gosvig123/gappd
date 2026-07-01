@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { type CSSProperties, useMemo, useState } from 'react'
 import type { MeetingSegment } from '../../shared/contracts'
 import { Button } from '../components/ui'
 import './transcript-view.css'
@@ -8,6 +8,7 @@ const EMPTY_FILTER_TEXT = 'No transcript lines for this speaker yet.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 
 type TranscriptGroup = { speaker: string | null; lines: string[] }
+type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: string }
 
 export function TranscriptText({ value, segments }: { value: string; segments: MeetingSegment[] }) {
   if (segments.length > 0) return <TranscriptSegments segments={segments} />
@@ -23,21 +24,56 @@ function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
 
 function SpeakerFilter({ speakers, speaker, onSpeaker }: { speakers: string[]; speaker: string; onSpeaker: (speaker: string) => void }) {
   if (speakers.length < 2) return null
-  return <div className="transcript-speaker-filter" aria-label="Speaker filter">{[ALL_SPEAKERS, ...speakers].map((option) => <Button key={option} className="compact-action transcript-chip" aria-pressed={speaker === option} onClick={() => onSpeaker(option)}>{option}</Button>)}</div>
+  return (
+    <div className="transcript-speaker-filter" aria-label="Speaker filter">
+      {[ALL_SPEAKERS, ...speakers].map((option) => (
+        <Button key={option} className="compact-action transcript-chip" style={speakerStyle(option)} aria-pressed={speaker === option} onClick={() => onSpeaker(option)}>
+          {option === ALL_SPEAKERS ? null : <span className="transcript-chip-dot" aria-hidden="true" />}
+          {option}
+        </Button>
+      ))}
+    </div>
+  )
 }
 
 function TranscriptSegmentList({ segments }: { segments: MeetingSegment[] }) {
   if (segments.length === 0) return <div className="transcript-empty-filter">{EMPTY_FILTER_TEXT}</div>
-  return <div className="transcript-segments">{segments.map((segment, index) => <TranscriptSegmentRow key={segmentKey(segment, index)} segment={segment} />)}</div>
+  const turns = segmentTurns(segments)
+  return <div className="transcript-segments">{turns.map((turn) => <TranscriptTurnRow key={turn.key} turn={turn} />)}</div>
 }
 
-function TranscriptSegmentRow({ segment }: { segment: MeetingSegment }) {
-  return <div className="transcript-segment"><span className="transcript-time">{formatSegmentTime(segment.startSec)}</span><div className="transcript-segment-body"><div className="transcript-segment-meta"><span className="transcript-speaker">{segment.speaker}</span></div><p className="transcript-segment-text">{segment.text}</p></div></div>
+function TranscriptTurnRow({ turn }: { turn: SegmentTurn }) {
+  return (
+    <article className="transcript-turn" style={speakerStyle(turn.speaker)}>
+      <SpeakerAvatar speaker={turn.speaker} />
+      <div className="transcript-turn-body">
+        <div className="transcript-turn-meta">
+          <span className="transcript-speaker">{turn.speaker}</span>
+          <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>
+        </div>
+        <div className="transcript-turn-lines">{turn.texts.map((text, index) => <p key={index} className="transcript-segment-text">{text}</p>)}</div>
+      </div>
+    </article>
+  )
 }
 
 function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
-  const className = group.speaker ? 'transcript-group' : 'transcript-group transcript-group-plain'
-  return <section className={className}>{group.speaker ? <div className="transcript-speaker">{group.speaker}</div> : null}<div className="transcript-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div></section>
+  if (!group.speaker) {
+    return <section className="transcript-turn transcript-turn-plain"><div className="transcript-turn-lines">{group.lines.map((line, index) => <p key={index}>{line}</p>)}</div></section>
+  }
+  return (
+    <article className="transcript-turn" style={speakerStyle(group.speaker)}>
+      <SpeakerAvatar speaker={group.speaker} />
+      <div className="transcript-turn-body">
+        <div className="transcript-turn-meta"><span className="transcript-speaker">{group.speaker}</span></div>
+        <div className="transcript-turn-lines">{group.lines.map((line, index) => <p key={index} className="transcript-segment-text">{line}</p>)}</div>
+      </div>
+    </article>
+  )
+}
+
+function SpeakerAvatar({ speaker }: { speaker: string }) {
+  return <span className="transcript-avatar" aria-hidden="true">{speakerInitials(speaker)}</span>
 }
 
 function transcriptGroups(value: string): TranscriptGroup[] {
@@ -60,6 +96,15 @@ function appendTranscriptGroup(groups: TranscriptGroup[], speaker: string | null
   return groups
 }
 
+function segmentTurns(segments: MeetingSegment[]): SegmentTurn[] {
+  return segments.reduce<SegmentTurn[]>((turns, segment, index) => {
+    const previous = turns[turns.length - 1]
+    if (previous && previous.speaker === segment.speaker) previous.texts.push(segment.text)
+    else turns.push({ speaker: segment.speaker, startSec: segment.startSec, texts: [segment.text], key: segmentKey(segment, index) })
+    return turns
+  }, [])
+}
+
 function transcriptSpeakers(segments: MeetingSegment[]): string[] {
   return Array.from(new Set(segments.map((segment) => segment.speaker).filter(Boolean)))
 }
@@ -71,6 +116,23 @@ function visibleTranscriptSegments(segments: MeetingSegment[], speaker: string):
 
 function segmentKey(segment: MeetingSegment, index: number): string {
   return segment.id || `${segment.startSec}-${segment.endSec}-${segment.speaker}-${index}`
+}
+
+function speakerStyle(speaker: string): CSSProperties {
+  return { '--speaker-hue': speakerHue(speaker) } as CSSProperties
+}
+
+function speakerHue(speaker: string): number {
+  let hash = 0
+  for (let index = 0; index < speaker.length; index += 1) hash = (hash * 31 + speaker.charCodeAt(index)) | 0
+  return Math.abs(hash) % 360
+}
+
+function speakerInitials(speaker: string): string {
+  const words = speaker.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0) return '?'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
 }
 
 function formatSegmentTime(seconds: number): string {

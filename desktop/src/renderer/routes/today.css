@@ -1,5 +1,5 @@
 .dashboard-grid {
-  --reading-column: 52rem;
+  --reading-column: 60rem;
   --list-column: 76rem;
   min-height: 0;
   display: grid;
