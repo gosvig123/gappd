@@ -24,7 +24,7 @@ export function isManagedLocalAIConfigured(config: LocalAIConfig | null | undefi
   return Boolean(config?.managed && isLocalAIConfigured(config))
 }
 
-export type OnboardingPhase =
+export type LocalAISetupPhase =
   | 'checking'
   | 'needs_setup'
   | 'starting_ollama'
@@ -33,11 +33,11 @@ export type OnboardingPhase =
   | 'ready'
   | 'error'
 
-export type OnboardingPullStage = 'preparing' | 'downloading' | 'verifying' | 'finalizing' | 'complete'
+export type LocalAISetupPullStage = 'preparing' | 'downloading' | 'verifying' | 'finalizing' | 'complete'
 
-export type OnboardingErrorKind = 'pull_timeout' | 'pull_network' | 'pull_blob_host_network' | 'disk_space' | 'permission' | 'ownership_mismatch' | 'runtime'
+export type LocalAISetupErrorKind = 'pull_timeout' | 'pull_network' | 'pull_blob_host_network' | 'disk_space' | 'permission' | 'ownership_mismatch' | 'runtime'
 
-export type OnboardingErrorDebug = {
+export type LocalAISetupErrorDebug = {
   rawDetail?: string
   url?: string
   host?: string
@@ -51,8 +51,8 @@ export type OwnershipConflict = {
   stopCommand?: string
 }
 
-export type OnboardingStatus = {
-  phase: OnboardingPhase
+export type LocalAISetupStatus = {
+  phase: LocalAISetupPhase
   managed: boolean
   endpoint: string
   model: string
@@ -61,14 +61,14 @@ export type OnboardingStatus = {
   error?: string
   errorDetail?: string
   debugDetail?: string
-  errorDebug?: OnboardingErrorDebug
-  pullStage?: OnboardingPullStage
-  errorKind?: OnboardingErrorKind
+  errorDebug?: LocalAISetupErrorDebug
+  pullStage?: LocalAISetupPullStage
+  errorKind?: LocalAISetupErrorKind
   ownershipConflict?: OwnershipConflict
   canRetry: boolean
 }
 
-export type LocalAIStatus = OnboardingStatus & {
+export type LocalAIStatus = LocalAISetupStatus & {
   supported: boolean
   configured: boolean
   bundled: boolean

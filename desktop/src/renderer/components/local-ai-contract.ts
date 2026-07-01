@@ -1,17 +1,17 @@
 import { buildOwnershipHelp, type LocalAIOwnershipHelp } from './local-ai-ownership'
 
-type LocalAIContract = Pick<typeof window.gappd, 'onboarding' | 'settings'>
+type LocalAIContract = Pick<typeof window.gappd, 'localAISetup' | 'settings'>
 
-export type OnboardingStatus = Awaited<ReturnType<LocalAIContract['onboarding']['getStatus']>>
+export type LocalAISetupStatus = Awaited<ReturnType<LocalAIContract['localAISetup']['getStatus']>>
 export type LocalAIStatus = Awaited<ReturnType<LocalAIContract['settings']['getLocalAIStatus']>>
 
-type OnboardingMessageView = {
+type LocalAISetupMessageView = {
   headline: string
   detail?: string
   compact: string
 }
 
-type OnboardingErrorView = {
+type LocalAISetupErrorView = {
   title: string
   detail?: string
   errorDetail?: string
@@ -20,7 +20,7 @@ type OnboardingErrorView = {
   ownershipHelp?: LocalAIOwnershipHelp
 }
 
-const PULL_STAGE_VIEWS: Record<NonNullable<OnboardingStatus['pullStage']>, OnboardingMessageView> = {
+const PULL_STAGE_VIEWS: Record<NonNullable<LocalAISetupStatus['pullStage']>, LocalAISetupMessageView> = {
   preparing: { headline: 'Preparing download', compact: 'Preparing download.' },
   downloading: { headline: 'Downloading tools', compact: 'Downloading tools.' },
   verifying: { headline: 'Checking download', compact: 'Checking download.' },
@@ -28,7 +28,7 @@ const PULL_STAGE_VIEWS: Record<NonNullable<OnboardingStatus['pullStage']>, Onboa
   complete: { headline: 'Download complete', compact: 'Download complete.' },
 }
 
-const ERROR_VIEWS: Record<NonNullable<OnboardingStatus['errorKind']>, Omit<OnboardingErrorView, 'debugDetail' | 'ownershipHelp'>> = {
+const ERROR_VIEWS: Record<NonNullable<LocalAISetupStatus['errorKind']>, Omit<LocalAISetupErrorView, 'debugDetail' | 'ownershipHelp'>> = {
   pull_timeout: { title: 'Download took too long.', detail: 'Check your connection, then click Fix setup.', compact: 'Download timed out.' },
   pull_network: { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' },
   pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Fix setup.', compact: 'Download host unavailable.' },
@@ -38,14 +38,14 @@ const ERROR_VIEWS: Record<NonNullable<OnboardingStatus['errorKind']>, Omit<Onboa
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },
 }
 
-const GENERIC_PHASE_MESSAGES: Record<OnboardingStatus['phase'], string[]> = {
+const GENERIC_PHASE_MESSAGES: Record<LocalAISetupStatus['phase'], string[]> = {
   checking: ['checking managed ollama', 'checking your local ai setup'],
   needs_setup: ['local ai setup is required'],
   starting_ollama: ['managed ollama is running', 'starting the bundled ollama runtime'],
   pulling_model: ['pulling local model', 'downloading the recommended local model'],
   saving_config: ['saving local ai configuration', 'finishing local ai setup'],
   ready: ['local ai is ready'],
-  error: ['managed ollama onboarding failed', 'local ai setup needs attention'],
+  error: ['managed ollama local ai setup failed', 'local ai setup needs attention'],
 }
 
 const STATUS_DELIMITERS = [' -- ', ' - ', ' | ', ': ']
@@ -54,7 +54,7 @@ export function getLocalAIContract(): LocalAIContract {
   return window.gappd
 }
 
-export function onboardingPhaseLabel(phase: OnboardingStatus['phase']): string {
+export function localAISetupPhaseLabel(phase: LocalAISetupStatus['phase']): string {
   switch (phase) {
     case 'checking': return 'Checking'
     case 'needs_setup': return 'Setup needed'
@@ -66,14 +66,14 @@ export function onboardingPhaseLabel(phase: OnboardingStatus['phase']): string {
   }
 }
 
-export function onboardingStatusTone(phase: OnboardingStatus['phase']): 'idle' | 'processing' | 'error' {
+export function localAISetupStatusTone(phase: LocalAISetupStatus['phase']): 'idle' | 'processing' | 'error' {
   if (phase === 'ready') return 'idle'
   if (phase === 'error') return 'error'
   return 'processing'
 }
 
-export function onboardingMessageView(status: Pick<OnboardingStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): OnboardingMessageView | null {
-  const pullView = onboardingPullStageView(status)
+export function localAISetupMessageView(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): LocalAISetupMessageView | null {
+  const pullView = localAISetupPullStageView(status)
   if (pullView) return pullView
   const text = cleanStatusText(status.message, typeof status.progress === 'number')
   if (!text || isGenericPhaseMessage(status.phase, text)) return null
@@ -81,7 +81,7 @@ export function onboardingMessageView(status: Pick<OnboardingStatus, 'phase' | '
   return { headline, detail, compact: truncateText(detail || headline, 72) }
 }
 
-export function onboardingErrorView(status: Pick<OnboardingStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'> | null | undefined): OnboardingErrorView | null {
+export function localAISetupErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'> | null | undefined): LocalAISetupErrorView | null {
   if (!status) return null
   if (status.errorKind) return structuredErrorView(status)
   return legacyErrorView(status.error)
@@ -121,18 +121,18 @@ function cleanDebugDetail(detail: string | undefined): string | undefined {
   return text ? truncateText(text, 1200) : undefined
 }
 
-function onboardingPullStageView(status: Pick<OnboardingStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): OnboardingMessageView | null {
+function localAISetupPullStageView(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): LocalAISetupMessageView | null {
   if (status.phase !== 'pulling_model' || !status.pullStage) return null
   return { ...PULL_STAGE_VIEWS[status.pullStage], detail: cleanPullDetail(status) }
 }
 
-function structuredErrorView(status: Pick<OnboardingStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'>): OnboardingErrorView {
+function structuredErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'>): LocalAISetupErrorView {
   const view = ERROR_VIEWS[status.errorKind!]
   const errorDetail = status.errorDetail || (status.errorKind === 'runtime' ? cleanErrorText(status.error) : undefined)
   return { ...view, detail: errorDetail || view.detail, errorDetail, debugDetail: cleanDebugDetail(status.debugDetail), ownershipHelp: status.errorKind === 'ownership_mismatch' ? buildOwnershipHelp(status.ownershipConflict) : undefined }
 }
 
-function legacyErrorView(error: string | undefined): OnboardingErrorView | null {
+function legacyErrorView(error: string | undefined): LocalAISetupErrorView | null {
   const text = cleanErrorText(error)
   if (!text) return null
   if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' }
@@ -150,7 +150,7 @@ function splitStatusText(text: string): [string, string | undefined] {
   return [text, undefined]
 }
 
-function isGenericPhaseMessage(phase: OnboardingStatus['phase'], text: string): boolean {
+function isGenericPhaseMessage(phase: LocalAISetupStatus['phase'], text: string): boolean {
   return GENERIC_PHASE_MESSAGES[phase].includes(normalizeKey(text))
 }
 
@@ -162,7 +162,7 @@ function normalizeKey(value: string): string {
   return normalizeText(value).toLowerCase()
 }
 
-function cleanPullDetail(status: Pick<OnboardingStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): string | undefined {
+function cleanPullDetail(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): string | undefined {
   const text = cleanStatusText(status.message, typeof status.progress === 'number')
   if (!text || isGenericPhaseMessage(status.phase, text)) return undefined
   if (status.pullStage && normalizeKey(text) === normalizeKey(PULL_STAGE_VIEWS[status.pullStage].headline)) return undefined

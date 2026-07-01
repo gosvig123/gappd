@@ -1,10 +1,20 @@
+/* No inner box — the detail panel itself is the paper sheet. This is just the
+   full-bleed scroll region so the scrollbar sits at the sheet's edge, not nested. */
 .reading-card {
   position: relative;
   min-height: 0;
   display: grid;
   align-content: stretch;
   overflow: hidden;
-  --reading-fade-color: var(--surface-panel);
+  margin-inline: calc(-1 * var(--reading-bleed, var(--space-10)));
+  --reading-fade-color: var(--reading-paper);
+  /* Readable measure for prose transcripts. Summaries override wider below. */
+  --reading-measure: 44rem;
+}
+
+/* Structured summaries (headings + bullets) read fine wider — fill the sheet. */
+.markdown-reading-card {
+  --reading-measure: 100%;
 }
 
 .reading-card-actions {
@@ -18,14 +28,22 @@
   width: 100%;
   min-width: 0;
   min-height: 0;
-  justify-self: stretch;
-  padding-right: var(--space-2);
+  padding: var(--space-4) var(--reading-bleed, var(--space-10)) var(--space-8);
   overflow: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: var(--color-text-soft);
-  line-height: 1.55;
-  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.65;
+  font-size: clamp(15px, 1rem + 0.2vw, 17px);
+  font-family: var(--font-reading);
+  letter-spacing: 0.005em;
+}
+
+/* Keep the readable column centered while the scroll track runs the full sheet width.
+   Two classes so this wins over the `width: 100%` on .markdown / .transcript-* children. */
+.reading-card .reading-text > * {
+  max-width: var(--reading-measure);
+  margin-inline: auto;
 }
 
 .reading-card-overflow::after {
@@ -40,60 +58,150 @@
 }
 
 .markdown-reading-card .reading-text {
-  color: var(--color-text);
-  font-size: 15px;
   white-space: normal;
 }
 
 .markdown {
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
+  font-family: var(--font-reading);
+  color: var(--color-text);
 }
 
 .markdown h3,
 .markdown h4 {
-  margin: 8px 0 0;
-  padding-top: 10px;
-  border-top: 1px solid var(--color-border);
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-tight);
+  color: var(--color-text);
 }
 
 .markdown h3:first-child,
 .markdown h4:first-child {
   margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
 }
 
 .markdown h3 {
-  font-size: var(--font-size-lg);
+  margin-block: var(--space-2) var(--space-5);
+  padding-bottom: var(--space-4);
+  font-size: clamp(22px, 1.25rem + 0.6vw, 30px);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
 }
 
 .markdown h4 {
-  font-size: var(--font-size-base);
-  color: var(--color-accent);
-  font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block: var(--space-7) var(--space-2);
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.markdown h4::before {
+  content: '';
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 4px var(--color-accent-tint);
 }
 
 .markdown p,
-.markdown ul,
-.markdown ol {
-  margin: 0;
+.markdown blockquote {
+  /* Keep prose to a readable measure even when the summary block runs wide. */
+  max-width: 46rem;
+}
+
+.markdown p {
+  margin-block: var(--space-4);
+  color: var(--color-text);
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+/* Lead paragraph: slightly larger, calmer, sets the reading tone. */
+.markdown > p:first-child {
+  margin-top: 0;
   color: var(--color-text-soft);
-  line-height: 1.7;
+  font-size: clamp(16px, 1.05rem + 0.2vw, 18px);
+  line-height: 1.6;
+}
+
+.markdown-rule {
+  height: 0;
+  margin-block: var(--space-8);
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.markdown blockquote {
+  margin-block: var(--space-5);
+  padding: var(--space-3) var(--space-6);
+  border-left: 2px solid var(--color-accent-border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--color-accent-tint);
+  color: var(--color-text-soft);
+  font-style: italic;
+  line-height: 1.6;
 }
 
 .markdown ul,
 .markdown ol {
   display: grid;
-  gap: 8px;
-  padding-left: 1.25rem;
+  gap: var(--space-2);
+  margin-block: var(--space-2) var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-7);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface-soft) 78%, transparent);
+  color: var(--color-text);
+  line-height: 1.6;
+}
+
+.markdown li {
+  margin-block: 0;
+  line-height: 1.6;
 }
 
 .markdown li.nested {
   margin-left: 1rem;
   list-style-type: circle;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-base);
+}
+
+.markdown li.checklist-item {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr);
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.markdown li.checklist-item.checked {
+  color: var(--color-text-soft);
+}
+
+.markdown-checkbox {
+  display: inline-grid;
+  place-items: center;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.28rem;
+  border: 1px solid var(--color-accent-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.markdown strong {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
 .markdown li::marker {

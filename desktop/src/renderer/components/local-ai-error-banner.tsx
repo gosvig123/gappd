@@ -20,12 +20,16 @@ function copyInstructions(instructions: string) {
 
 export function LocalAIErrorBanner({ errorView }: LocalAIErrorBannerProps) {
   return (
-    <Banner tone="error" title={errorView.title} className="setup-error-banner">
+    <Banner tone="error" title={errorView.title} className="setup-error-banner" dismissible dismissKey={localAIErrorKey(errorView)}>
       {errorView.detail ? <div>{errorView.detail}</div> : null}
       {errorView.ownershipHelp ? <OwnershipHelp help={errorView.ownershipHelp} /> : null}
       <LocalAITechnicalDetails detail={errorView.debugDetail} />
     </Banner>
   )
+}
+
+function localAIErrorKey(errorView: LocalAIErrorBannerProps['errorView']): string {
+  return [errorView.title, errorView.detail, errorView.debugDetail, errorView.ownershipHelp?.summary].filter(Boolean).join(':')
 }
 
 function OwnershipHelp({ help }: { help: LocalAIOwnershipHelp }) {

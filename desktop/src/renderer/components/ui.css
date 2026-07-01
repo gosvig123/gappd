@@ -119,6 +119,17 @@
   color: var(--color-success);
 }
 
+.status-pill.recording,
+.status-pill.processing {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 38%, transparent); }
+  70% { box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+}
+
 .field,
 label {
   display: grid;
@@ -191,6 +202,10 @@ button:focus-visible {
 
 .ui-button-primary:hover:not(:disabled) {
   background: var(--gradient-accent-hover);
+}
+
+.ui-button-primary:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
 }
 
 .ui-button-secondary {
@@ -276,6 +291,12 @@ button:focus-visible {
   min-height: 180px;
   padding: var(--space-8);
   text-align: center;
+  animation: empty-reveal var(--transition-slow) backwards;
+}
+
+@keyframes empty-reveal {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .empty-state strong {
@@ -307,6 +328,28 @@ pre {
   color: var(--color-danger);
   border-color: var(--color-danger-border);
   background: var(--color-danger-bg);
+}
+
+.banner-head,
+.dismissible-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.icon-dismiss {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+  padding: 0 var(--space-2);
+}
+
+.icon-dismiss:hover {
+  opacity: 0.72;
 }
 
 .banner-actions {
@@ -369,4 +412,38 @@ pre {
   .status-pill {
     white-space: normal;
   }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-soft) 0%,
+    var(--color-surface-elevated) 50%,
+    var(--color-surface-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-line { height: 0.75rem; margin-block: var(--space-2); }
+.skeleton-line.short { width: 40%; }
+.skeleton-line.medium { width: 65%; }
+.skeleton-line.long { width: 85%; }
+.skeleton-title { height: 1.25rem; width: 50%; margin-block: var(--space-4); }
+.skeleton-card { height: 6rem; border-radius: var(--radius-md); }
+
+@media (prefers-reduced-motion: reduce) {
+  .status-pill.recording,
+  .status-pill.processing { animation: none; }
+
+  .ui-button:active:not(:disabled),
+  .ui-button-primary:active:not(:disabled) { transform: none; }
+
+  .skeleton { animation: none; background: var(--color-surface-soft); }
 }

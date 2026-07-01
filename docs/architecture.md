@@ -29,7 +29,7 @@ Electron UI ──IPC──▶ Go CLI app commands ──▶ SQLite
      └── managed Ollama/Whisper setup
 ```
 
-The desktop app owns user-facing setup and runtime management. It downloads and starts managed Ollama, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
+The desktop app owns the **Local AI Setup Operation** and **Managed Runtime** management. It downloads and starts managed Ollama, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
 
 The Go CLI owns capture orchestration, transcription, AI post-processing, and SQLite persistence. The CLI can also run standalone when the user provides external Ollama and Whisper runtime dependencies.
 
@@ -72,7 +72,7 @@ SQLite storage using `modernc.org/sqlite`. Schema source of truth lives in `inte
 
 ### `desktop/`
 
-Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed Ollama, managed Whisper, onboarding, update checks, and app command IPC.
+Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed Ollama, managed Whisper, the **Local AI Setup Operation**, update checks, and app command IPC.
 
 ## Configuration
 
@@ -97,7 +97,7 @@ Current validation rules:
 
 ## Boundaries
 
-- Desktop setup can manage bundled runtimes; CLI setup only checks externally available dependencies.
+- The **Local AI Setup Operation** can manage bundled runtimes; CLI `gappd setup` only checks externally available dependencies.
 - Transcription is local Whisper only.
 - AI inference is Ollama only.
 - No Bubbletea TUI, cloud STT, OpenAI, or Claude integration exists in current code.

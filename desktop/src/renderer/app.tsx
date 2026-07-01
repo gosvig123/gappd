@@ -6,32 +6,32 @@ import { SettingsSheet } from './components/settings-sheet'
 import { UpdateBanner } from './components/update-banner'
 import { useDashboardData } from './hooks/use-dashboard-data'
 import { useLocalAISettings } from './hooks/use-local-ai-settings'
-import { useOnboarding } from './hooks/use-onboarding'
+import { useLocalAISetupOperation } from './hooks/use-local-ai-setup-operation'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
 import { useTranscriptionSettings } from './hooks/use-transcription-settings'
 import { useUpdateStatus } from './hooks/use-update-status'
 import { Banner } from './components/ui'
 import { DashboardView } from './routes/dashboard-view'
-import { OnboardingView } from './routes/onboarding-view'
+import { LocalAISetupView } from './routes/local-ai-setup-view'
 import { SettingsView } from './routes/settings-view'
 import { MANAGED_OLLAMA_MODEL_OPTIONS } from '../shared/bundled-ollama'
 
-const READY_ONBOARDING_PHASE = 'ready'
+const READY_LOCAL_AI_SETUP_PHASE = 'ready'
 
 export function App() {
-  const onboarding = useOnboarding()
+  const localAISetup = useLocalAISetupOperation()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const developerDebugEnabled = import.meta.env.DEV
-  const aiReady = onboarding.status?.phase === READY_ONBOARDING_PHASE
+  const aiReady = localAISetup.status?.phase === READY_LOCAL_AI_SETUP_PHASE
   const permissions = useSetupPermissions(Boolean(aiReady))
   const appReady = Boolean(aiReady && permissions.ready)
   const settingsPanelOpen = appReady && settingsOpen
   const dashboard = useDashboardData(appReady)
-  const localAI = useLocalAISettings(settingsPanelOpen && developerDebugEnabled, onboarding.setStatus)
+  const localAI = useLocalAISettings(settingsPanelOpen && developerDebugEnabled, localAISetup.setStatus)
   const transcription = useTranscriptionSettings(settingsPanelOpen)
   const update = useUpdateStatus()
-  if (onboarding.loading || !onboarding.status) return <div className="screen-center">Starting Gappd…</div>
-  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <OnboardingApp onboarding={onboarding} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView localAI={{ ...localAI, onRepair: () => void localAI.repair() }} transcription={transcription} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
+  if (localAISetup.loading || !localAISetup.status) return <div className="screen-center">Starting Gappd…</div>
+  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <LocalAISetupApp localAISetup={localAISetup} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView localAI={{ ...localAI, onRepair: () => void localAI.repair() }} transcription={transcription} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
 }
 
 function ReadyApp({ dashboard, update }: { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus> }) {
@@ -45,8 +45,8 @@ function StaleRecoveryBanner({ recovering, notice }: { recovering: boolean; noti
   return null
 }
 
-function OnboardingApp({ onboarding, permissions }: { onboarding: ReturnType<typeof useOnboarding>; permissions: ReturnType<typeof useSetupPermissions> }) {
-  return <div className="single-screen"><OnboardingView status={onboarding.status!} busy={onboarding.busy} selectedModel={onboarding.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={onboarding.setSelectedModel} onStart={() => void onboarding.run('start')} onRetry={() => void onboarding.run('retry')} onRequestPermissions={() => void permissions.request()} /></div>
+function LocalAISetupApp({ localAISetup, permissions }: { localAISetup: ReturnType<typeof useLocalAISetupOperation>; permissions: ReturnType<typeof useSetupPermissions> }) {
+  return <div className="single-screen"><LocalAISetupView status={localAISetup.status!} busy={localAISetup.busy} selectedModel={localAISetup.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={localAISetup.setSelectedModel} onStart={() => void localAISetup.run('start')} onRetry={() => void localAISetup.run('retry')} onRequestPermissions={() => void permissions.request()} /></div>
 }
 
 async function runPrimaryUpdate(update: ReturnType<typeof useUpdateStatus>, reportError: (message: string) => void) {

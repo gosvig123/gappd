@@ -1,10 +1,10 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
+import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useState } from 'react'
 
 type PanelProps = HTMLAttributes<HTMLElement> & { children: ReactNode }
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }
 type FieldProps = { label: string; children: ReactNode; className?: string; hint?: ReactNode }
-type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; className?: string }
-type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string }
+type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; middle?: ReactNode; className?: string }
+type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string; dismissible?: boolean; dismissKey?: string; dismissLabel?: string }
 type ProgressBarProps = { value: number | null; label: string; className?: string }
 type ListRowProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }
 
@@ -20,8 +20,8 @@ export function Card({ className, children, ...props }: HTMLAttributes<HTMLDivEl
   return <div className={cx('ui-card', className)} {...props}>{children}</div>
 }
 
-export function PageHeader({ title, description, action, className }: PageHeaderProps) {
-  return <div className={cx('panel-header', className)}><div><h1>{title}</h1>{description ? <p>{description}</p> : null}</div>{action}</div>
+export function PageHeader({ title, description, action, middle, className }: PageHeaderProps) {
+  return <div className={cx('panel-header', className)}><div><h1>{title}</h1>{description ? <p>{description}</p> : null}</div>{middle}{action}</div>
 }
 
 export function StatusPill({ tone, children }: { tone: string; children: ReactNode }) {
@@ -45,8 +45,15 @@ export function ProgressBar({ value, label, className }: ProgressBarProps) {
   return <progress className={cx('progress-track', className)} value={value} max={100} aria-label={label}>{value}%</progress>
 }
 
-export function Banner({ tone = 'info', title, children, actions, className }: BannerProps) {
-  return <div className={cx('banner', tone, className)}>{title ? <strong>{title}</strong> : null}<div>{children}</div>{actions ? <div className="actions-row banner-actions">{actions}</div> : null}</div>
+export function Banner({ tone = 'info', title, children, actions, className, dismissible, dismissKey, dismissLabel = 'Dismiss message' }: BannerProps) {
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
+  const key = dismissKey ?? fallbackDismissKey(title, children)
+  if (dismissible && dismissedKey === key) return null
+  return <div className={cx('banner', tone, className)}>{title || dismissible ? <div className="banner-head">{title ? <strong>{title}</strong> : <span />}{dismissible ? <button className="icon-dismiss" type="button" aria-label={dismissLabel} onClick={() => setDismissedKey(key)}>×</button> : null}</div> : null}<div>{children}</div>{actions ? <div className="actions-row banner-actions">{actions}</div> : null}</div>
+}
+
+function fallbackDismissKey(title: ReactNode, children: ReactNode): string {
+  return `${typeof title === 'string' ? title : ''}:${typeof children === 'string' ? children : ''}`
 }
 
 export function ListRow({ selected, className, ...props }: ListRowProps) {
@@ -55,4 +62,18 @@ export function ListRow({ selected, className, ...props }: ListRowProps) {
 
 export function EmptyState({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cx('empty-state', className)}>{children}</div>
+}
+
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cx('skeleton', className)} aria-hidden="true" />
+}
+
+export function SkeletonText({ lines = 3 }: { lines?: number }) {
+  return (
+    <div>
+      {Array.from({ length: lines }, (_, i) => (
+        <Skeleton key={i} className={cx('skeleton-line', i === lines - 1 ? 'short' : 'long')} />
+      ))}
+    </div>
+  )
 }
