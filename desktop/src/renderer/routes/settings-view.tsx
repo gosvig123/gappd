@@ -1,6 +1,6 @@
 import '../components/local-ai.css'
 
-import type { ReactNode } from 'react'
+import { type ReactNode, useState } from 'react'
 import type { TranscriptionSettings, WhisperModelDownloadProgress, WhisperModelSettings } from '../../shared/ipc-contract'
 import { Button, Card, cx, ProgressBar, StatusPill } from '../components/ui'
 import { AlertCircleIcon, CheckIcon, CircleCheckIcon, DownloadIcon, InfoIcon, RefreshIcon } from '../components/icons'
@@ -34,7 +34,13 @@ export function SettingsView({ localAI, transcription, developerDebugEnabled }: 
 
 function TranscriptionSettingsPanel({ state }: { state: TranscriptionViewModel }) {
   const models = state.settings?.models ?? []
-  return <Card className="settings-section"><SectionTitle title="Transcription model" note="The model marked In use transcribes your meetings. Larger models are more accurate but slower and use more memory." />{state.error ? <div className="status-note danger">{state.error}</div> : null}<div className="settings-model-list">{models.map((model) => <ModelRow key={model.id} model={model} state={state} />)}</div>{state.loading ? <div className="status-note">Loading speech models…</div> : null}</Card>
+  return <Card className="settings-section"><SectionTitle title="Transcription model" note="The model marked In use transcribes your meetings. Larger models are more accurate but slower and use more memory." /><DismissibleStatusNote message={state.error} /><div className="settings-model-list">{models.map((model) => <ModelRow key={model.id} model={model} state={state} />)}</div>{state.loading ? <div className="status-note">Loading speech models…</div> : null}</Card>
+}
+
+function DismissibleStatusNote({ message }: { message: string | null }) {
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
+  if (!message || dismissedMessage === message) return null
+  return <div className="status-note danger dismissible-note"><span>{message}</span><button className="icon-dismiss" type="button" aria-label="Dismiss error" onClick={() => setDismissedMessage(message)}>×</button></div>
 }
 
 function ModelRow({ model, state }: { model: WhisperModelSettings; state: TranscriptionViewModel }) {

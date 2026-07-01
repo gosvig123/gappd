@@ -9,7 +9,7 @@ type PermissionBannerProps = {
 
 export function PermissionBanner({ error, isPermissionError, onRetry, onOpenSettings }: PermissionBannerProps) {
   if (!error) return null
-  return <Banner tone="error" actions={isPermissionError ? <PermissionActions onRetry={onRetry} onOpenSettings={onOpenSettings} /> : null}>{permissionBody(error, isPermissionError)}</Banner>
+  return <Banner tone="error" dismissible dismissKey={error} actions={isPermissionError ? <PermissionActions onRetry={onRetry} onOpenSettings={onOpenSettings} /> : null}>{permissionBody(error, isPermissionError)}</Banner>
 }
 
 function PermissionActions({ onRetry, onOpenSettings }: Pick<PermissionBannerProps, 'onRetry' | 'onOpenSettings'>) {
