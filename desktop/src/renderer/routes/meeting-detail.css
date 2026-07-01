@@ -9,12 +9,18 @@
   color: var(--color-text-muted);
   background: transparent;
   font-weight: var(--font-weight-medium);
-  transition: color var(--transition-quick), background var(--transition-quick);
+  transition: color var(--transition-smooth), background var(--transition-smooth), transform var(--transition-smooth);
 }
 
 .back-link:hover {
   color: var(--color-accent);
   background: var(--surface-hover);
+  transform: translateX(-2px);
+}
+
+.back-link svg {
+  width: 1rem;
+  height: 1rem;
 }
 
 .detail-tabs-row {
@@ -64,6 +70,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   margin-bottom: -1px;
   padding: 8px 14px 9px;
   border: 1px solid transparent;
@@ -72,6 +79,7 @@
   color: var(--color-text-muted);
   background: transparent;
   font-weight: var(--font-weight-medium);
+  transition: color var(--transition-smooth), background var(--transition-smooth), border-color var(--transition-smooth);
 }
 
 .ui-button.danger-action {
@@ -81,6 +89,24 @@
 
 .ui-button.danger-action:hover:not(:disabled) {
   background: var(--color-danger-bg);
+}
+
+.detail-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: border-color var(--transition-smooth), color var(--transition-smooth), background var(--transition-smooth);
+}
+
+.detail-tab svg,
+.detail-action svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.detail-action:not(.danger-action):hover:not(:disabled) {
+  border-color: var(--color-accent-border);
+  color: var(--color-accent);
 }
 
 .meeting-detail-title {
@@ -108,21 +134,13 @@
   border-color: var(--color-border);
   border-bottom-color: var(--surface-panel);
   box-shadow: none;
+  font-weight: var(--font-weight-semibold);
 }
 
 .detail-grid {
   display: grid;
   gap: 10px;
   align-content: start;
-}
-
-.detail-footer-actions {
-  flex: 0 0 auto;
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--color-border);
 }
 
 .detail-surface {
@@ -147,7 +165,12 @@
 }
 
 .readable-detail-panel {
-  padding: var(--space-10) var(--space-10) var(--space-8);
+  --reading-bleed: var(--space-10);
+  padding: var(--space-10) var(--reading-bleed) var(--space-8);
+  background: var(--reading-paper);
+  border-color: var(--reading-paper-border);
+  /* Lift the sheet off the app background so its edge reads clearly. */
+  box-shadow: inset 0 1px 0 var(--highlight-subtle), var(--shadow-raised);
 }
 
 .detail-panel > .detail-reading-stack,
@@ -167,6 +190,12 @@
   min-height: 0;
   display: grid;
   flex: 1;
+  animation: tab-content-in var(--transition-smooth) backwards;
+}
+
+@keyframes tab-content-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .detail-block {
@@ -175,11 +204,8 @@
 }
 
 .detail-block p {
-  color: var(--color-text-muted);
-}
-
-.detail-block p {
   margin: 0;
+  color: var(--color-text-muted);
   line-height: var(--line-height-base);
 }
 
@@ -199,5 +225,11 @@
   .meeting-detail-actions,
   .meeting-detail-header .status-pill {
     justify-self: start;
+  }
+
+  .back-link span,
+  .detail-tab svg,
+  .detail-action span {
+    display: none;
   }
 }

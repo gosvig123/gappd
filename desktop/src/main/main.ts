@@ -3,7 +3,7 @@ import { app, BrowserWindow } from 'electron'
 import { stopActiveRecordingForQuit, stopStaleRecordingRecovery } from './gappd'
 import { registerIpc } from './ipc'
 import { logMainProcessMemory } from './memory'
-import { bootstrapOnboarding } from './onboarding'
+import { bootstrapLocalAISetup } from './local-ai-setup-operation'
 import { stopManagedOllama } from './ollama'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
@@ -51,7 +51,7 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 app.whenReady().then(() => {
   applyDevDockIcon()
   createWindow()
-  void bootstrapOnboarding()
+  void bootstrapLocalAISetup()
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
 

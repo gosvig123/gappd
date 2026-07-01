@@ -1,11 +1,11 @@
 import { app } from 'electron'
-import type { OnboardingPullStage } from '../shared/contracts'
+import type { LocalAISetupPullStage } from '../shared/contracts'
 import type { WhisperModelDownloadProgress } from '../shared/ipc-contract'
 import { isExecutableFile, resolveBinary } from './binaries'
 import { BUNDLED_WHISPER_BINARY_NAME } from '../shared/bundled-whisper'
 import { defaultWhisperModelPath, ensureSelectedWhisperModel, resolveDefaultWhisperModelPath, selectedWhisperModelInstalled } from './whisper-model-settings'
 
-const WHISPER_PULL_STAGE: Record<WhisperModelDownloadProgress['phase'], OnboardingPullStage> = {
+const WHISPER_PULL_STAGE: Record<WhisperModelDownloadProgress['phase'], LocalAISetupPullStage> = {
   preparing: 'preparing',
   downloading: 'downloading',
   verifying: 'verifying',
@@ -15,7 +15,7 @@ const WHISPER_PULL_STAGE: Record<WhisperModelDownloadProgress['phase'], Onboardi
 export type WhisperProgressUpdate = {
   progress?: number
   message?: string
-  pullStage?: OnboardingPullStage
+  pullStage?: LocalAISetupPullStage
   activity: boolean
 }
 

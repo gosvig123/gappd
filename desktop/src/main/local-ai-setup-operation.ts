@@ -1,19 +1,19 @@
-import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, type OnboardingPullStage, type OnboardingStatus } from '../shared/contracts'
+import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, type LocalAISetupPullStage, type LocalAISetupStatus } from '../shared/contracts'
 import { MANAGED_OLLAMA_MODEL, MANAGED_OLLAMA_MODEL_OPTIONS, isManagedOllamaModel } from '../shared/bundled-ollama'
-import type { OnboardingSetupInput } from '../shared/ipc-contract'
+import type { LocalAISetupInput } from '../shared/ipc-contract'
 import { getLocalAIConfig, saveManagedLocalAIConfig } from './gappd'
 import { createObservableState } from './observable-state'
 import { ensureManagedOllamaRunning, managedModelAvailable, managedOllamaSupported, pullManagedModel } from './ollama'
 import { bundledWhisperAvailable, ensureManagedWhisperModel, managedWhisperModelAvailable, missingBundledWhisperMessage, missingManagedWhisperModelMessage } from './whisper'
-import { errorStatus, localAIStatusFrom, managedModelStatus, managedStatus, missingModelStatus, needsSetupStatus, onboardingStatusFrom } from './local-ai-status'
+import { errorStatus, localAIStatusFrom, managedModelStatus, managedStatus, missingModelStatus, needsSetupStatus, localAISetupStatusFrom } from './local-ai-status'
 import { runtimeLocalAIStatus } from './local-ai-runtime-status'
 
 type ConfigLoadResult = { config: LocalAIConfig | null; error?: string }
-type ProgressUpdate = { progress?: number; message?: string; pullStage?: OnboardingPullStage }
+type ProgressUpdate = { progress?: number; message?: string; pullStage?: LocalAISetupPullStage }
 export type LocalAISetupOptions = { preserveConfigured?: boolean }
 
-const setupState = createObservableState<OnboardingStatus>(needsSetupStatus())
-let setupPromise: Promise<OnboardingStatus> | null = null
+const setupState = createObservableState<LocalAISetupStatus>(needsSetupStatus())
+let setupPromise: Promise<LocalAISetupStatus> | null = null
 let setupRunId = 0
 
 export const getLocalAISetupStatus = setupState.get
@@ -24,11 +24,11 @@ export async function bootstrapLocalAISetup(): Promise<void> {
   await bootstrapFromConfig(setupRunId, await loadLocalAIConfig())
 }
 
-export async function startLocalAISetup(input?: OnboardingSetupInput, options: LocalAISetupOptions = {}): Promise<OnboardingStatus> {
+export async function startLocalAISetup(input?: LocalAISetupInput, options: LocalAISetupOptions = {}): Promise<LocalAISetupStatus> {
   return runSetupSingleFlight(await resolveSetupModel(input, Boolean(options.preserveConfigured)))
 }
 
-export async function retryLocalAISetup(input?: OnboardingSetupInput): Promise<OnboardingStatus> {
+export async function retryLocalAISetup(input?: LocalAISetupInput): Promise<LocalAISetupStatus> {
   return startLocalAISetup(input, { preserveConfigured: true })
 }
 
@@ -83,7 +83,7 @@ async function publishBootstrapReadiness(runId: number, model: string, endpoint:
   setBootstrapStatus(runId, managedStatus('ready', 'Managed Ollama is ready', { endpoint, model }))
 }
 
-async function runSetupSingleFlight(model: string): Promise<OnboardingStatus> {
+async function runSetupSingleFlight(model: string): Promise<LocalAISetupStatus> {
   if (!setupPromise) {
     setupRunId += 1
     setupPromise = runSetup(model)
@@ -95,7 +95,7 @@ async function runSetupSingleFlight(model: string): Promise<OnboardingStatus> {
   }
 }
 
-async function runSetup(model: string): Promise<OnboardingStatus> {
+async function runSetup(model: string): Promise<LocalAISetupStatus> {
   if (!managedOllamaSupported()) return unsupportedStatus(model)
   try {
     await runManagedSetup(model)
@@ -126,9 +126,9 @@ async function downloadWhisperModel(model: string, endpoint: string): Promise<vo
   await ensureManagedWhisperModel((update) => setPullStatus(model, endpoint, 'Downloading speech model', update))
 }
 
-async function localAIStatusFor(operation: OnboardingStatus, refreshOperation: boolean): Promise<LocalAIStatus> {
+async function localAIStatusFor(operation: LocalAISetupStatus, refreshOperation: boolean): Promise<LocalAIStatus> {
   const runtime = await runtimeLocalAIStatus(await loadLocalAIConfig())
-  if (refreshOperation && !setupPromise) setStatus(onboardingStatusFrom(runtime))
+  if (refreshOperation && !setupPromise) setStatus(localAISetupStatusFrom(runtime))
   const status = refreshOperation && !setupPromise ? getLocalAISetupStatus() : operation
   return localAIStatusFrom(runtime, status)
 }
@@ -146,7 +146,7 @@ async function saveManagedEndpoint(config: LocalAIConfig, endpoint: string): Pro
   await saveManagedLocalAIConfig({ endpoint, model: config.model, temperature: config.temperature })
 }
 
-async function resolveSetupModel(input: OnboardingSetupInput | undefined, preserveConfigured: boolean): Promise<string> {
+async function resolveSetupModel(input: LocalAISetupInput | undefined, preserveConfigured: boolean): Promise<string> {
   if (input?.model) return validatedSetupModel(input.model)
   if (!preserveConfigured) return MANAGED_OLLAMA_MODEL
   const { config } = await loadLocalAIConfig()
@@ -159,22 +159,22 @@ function setPullStatus(model: string, endpoint: string, fallback: string, update
   setStatus(managedModelStatus(model, 'pulling_model', update.message || fallback, { endpoint, ...nextProgress, pullStage: update.pullStage }))
 }
 
-function setBootstrapStatus(runId: number, next: OnboardingStatus): boolean {
+function setBootstrapStatus(runId: number, next: LocalAISetupStatus): boolean {
   if (setupPromise || setupRunId !== runId) return false
   setStatus(next)
   return true
 }
 
-function unsupportedStatus(model: string): OnboardingStatus {
-  setStatus(errorStatus('Managed Ollama onboarding is only supported on macOS', getLocalAISetupStatus().phase, model))
+function unsupportedStatus(model: string): LocalAISetupStatus {
+  setStatus(errorStatus('Managed Ollama Local AI setup is only supported on macOS', getLocalAISetupStatus().phase, model))
   return getLocalAISetupStatus()
 }
 
-function externalConfigStatus(config: LocalAIConfig): OnboardingStatus {
-  return needsSetupStatus({ managed: false, endpoint: config.endpoint, model: config.model, message: 'Desktop is configured for external Ollama. Run setup to switch to the managed runtime.' })
+function externalConfigStatus(config: LocalAIConfig): LocalAISetupStatus {
+  return needsSetupStatus({ managed: false, endpoint: config.endpoint, model: config.model, message: 'Desktop is configured for external Ollama. Run Local AI setup to switch to the managed runtime.' })
 }
 
-function missingWhisperStatus(endpoint: string, model: string): OnboardingStatus {
+function missingWhisperStatus(endpoint: string, model: string): LocalAISetupStatus {
   return needsSetupStatus({ endpoint, model, message: missingManagedWhisperModelMessage(), canRetry: true })
 }
 

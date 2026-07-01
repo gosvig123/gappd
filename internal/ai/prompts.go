@@ -60,7 +60,9 @@ Bullet list of topics discussed with key points.
 ### Decisions
 Numbered list of decisions made.
 ### Action Items
-Use checkbox format: - [ ] Task description (@owner, due: date)
+Use one flat checkbox list: - [ ] Task description (due: actual date)
+Omit due date text when deadline is unknown or unspecified.
+Do not add You/Other/person subheadings or use transcript speaker labels as owners.
 ### Open Questions
 Bullet list of unresolved questions.
 If user notes are provided, expand on those topics with additional detail.`
@@ -86,7 +88,8 @@ Keep this markdown format:
 Rules:
 - Apply feedback when provided
 - Improve wording, grouping, and missing emphasis
-- Keep action items checkable with owner and due date when available
+- Keep action items as one flat checklist without You/Other/person subheadings
+- Keep due dates only when actual dates are known; never write unknown or unspecified due dates
 - Do not invent facts not present in extracted data or current notes`
 
 func Stage1Prompt(transcript string) (string, string) {

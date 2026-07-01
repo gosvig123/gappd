@@ -1,5 +1,5 @@
 .dashboard-grid {
-  --reading-column: 52rem;
+  --reading-column: 60rem;
   --list-column: 76rem;
   min-height: 0;
   display: grid;
@@ -100,10 +100,11 @@
   padding: var(--space-2) var(--space-5);
   border: 0;
   border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
-  background: transparent;
-  color: var(--color-accent);
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
   font-weight: var(--font-weight-semibold);
-  transition: background var(--transition-quick), color var(--transition-quick);
+  box-shadow: inset 0 1px 0 var(--highlight-strong);
+  transition: background var(--transition-smooth), color var(--transition-smooth), box-shadow var(--transition-smooth);
 }
 
 .record-button:only-child {
@@ -111,7 +112,7 @@
 }
 
 .record-button:hover:not(:disabled) {
-  background: var(--surface-accent);
+  background: var(--gradient-accent-hover);
 }
 
 .record-button:disabled {
@@ -120,24 +121,25 @@
 }
 
 .record-cluster.is-recording .record-button {
-  color: var(--color-danger);
-  background: var(--color-danger-bg);
+  color: var(--color-accent-contrast);
+  background: var(--color-danger);
+  animation: record-pulse 1.8s ease-in-out infinite;
 }
 
 .record-cluster.is-recording .record-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-danger) 22%, var(--color-card));
+  background: color-mix(in srgb, var(--color-danger) 88%, #ffffff);
 }
 
-.record-glyph {
-  width: 0.5625rem;
-  height: 0.5625rem;
-  border-radius: 999px;
-  background: var(--color-danger);
+.record-button-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex: 0 0 auto;
 }
 
-.record-cluster.is-recording .record-glyph.is-stop {
-  border-radius: 2px;
-  background: currentColor;
+@keyframes record-pulse {
+  0% { box-shadow: inset 0 1px 0 var(--highlight-strong), 0 0 0 0 color-mix(in srgb, var(--color-danger) 40%, transparent); }
+  70% { box-shadow: inset 0 1px 0 var(--highlight-strong), 0 0 0 6px color-mix(in srgb, var(--color-danger) 0%, transparent); }
+  100% { box-shadow: inset 0 1px 0 var(--highlight-strong), 0 0 0 0 color-mix(in srgb, var(--color-danger) 0%, transparent); }
 }
 
 .record-input {
@@ -145,9 +147,16 @@
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-4);
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
   border-right: 1px solid var(--color-accent-border);
+  background: var(--color-surface-elevated);
   color: var(--color-text-soft);
   cursor: pointer;
+  transition: background var(--transition-smooth), border-color var(--transition-smooth);
+}
+
+.record-input:focus-within {
+  background: color-mix(in srgb, var(--color-surface-elevated) 75%, var(--color-accent-tint));
 }
 
 .record-cluster.is-recording .record-input {
@@ -157,6 +166,8 @@
 
 .record-input-icon {
   flex: 0 0 auto;
+  width: 0.875rem;
+  height: 0.875rem;
   color: var(--color-text-muted);
 }
 
@@ -186,6 +197,8 @@
 
 .record-input-caret {
   flex: 0 0 auto;
+  width: 0.6875rem;
+  height: 0.6875rem;
   color: var(--color-text-muted);
   pointer-events: none;
 }

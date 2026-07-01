@@ -1,10 +1,10 @@
-import type { OnboardingPullStage } from '../shared/contracts'
-import { createPullFailureError, createPullStallController } from './onboarding-errors'
+import type { LocalAISetupPullStage } from '../shared/contracts'
+import { createPullFailureError, createPullStallController } from './local-ai-setup-errors'
 
 export type PullProgressUpdate = {
   progress?: number
   message?: string
-  pullStage?: OnboardingPullStage
+  pullStage?: LocalAISetupPullStage
   activity: boolean
 }
 type ParsedPullUpdate = PullProgressUpdate & { validEventSeen: boolean }
@@ -23,7 +23,7 @@ type PullStreamState = {
   sawSuccess: boolean
   lastBytes: number
   lastMessage?: string
-  lastPullStage?: OnboardingPullStage
+  lastPullStage?: LocalAISetupPullStage
   maxProgress?: number
   layers: Map<string, PullLayerProgress>
 }
@@ -152,7 +152,7 @@ function updateLayerProgress(state: PullStreamState, event: OllamaPullEvent): bo
   return true
 }
 
-function aggregateProgress(state: PullStreamState, pullStage?: OnboardingPullStage): number | undefined {
+function aggregateProgress(state: PullStreamState, pullStage?: LocalAISetupPullStage): number | undefined {
   const totals = Array.from(state.layers.values()).reduce((sum, next) => ({ completed: sum.completed + Math.min(next.completed, next.total), total: sum.total + next.total }), { completed: 0, total: 0 })
   if (!totals.total) return pullStage === 'complete' ? 100 : state.maxProgress
   const rawProgress = Math.round((totals.completed / totals.total) * 100)
@@ -161,13 +161,13 @@ function aggregateProgress(state: PullStreamState, pullStage?: OnboardingPullSta
   return nextProgress
 }
 
-function pullEventMessage(event: OllamaPullEvent, pullStage?: OnboardingPullStage): string | undefined {
+function pullEventMessage(event: OllamaPullEvent, pullStage?: LocalAISetupPullStage): string | undefined {
   if (pullStage === 'complete') return 'Download complete'
   if (pullStage === 'downloading') return 'Downloading model'
   return mappedStatusMessage(normalizeStatus(event.status))
 }
 
-function nextPullStage(event: OllamaPullEvent): OnboardingPullStage | undefined {
+function nextPullStage(event: OllamaPullEvent): LocalAISetupPullStage | undefined {
   const status = normalizeStatus(event.status)
   if (status === 'success') return 'complete'
   if (typeof event.completed === 'number' && typeof event.total === 'number' && event.total > 0) return 'downloading'
