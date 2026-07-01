@@ -1,8 +1,9 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type LocalAISetupInput, type StartRecordingInput } from '../shared/ipc-contract'
-import { deleteMeeting, getDevices, listMeetings, requestCapturePermissions, showMeeting, startRecording, startStaleRecordingRecovery, stopRecording } from './gappd'
+import { deleteMeeting, getDevices, listMeetings, requestCapturePermissions, showMeeting } from './gappd'
 import { getLocalAISetupStatus, getLocalAISetupStatusSnapshot, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
+import { startMeetingRecordingWorkflow, startStaleMeetingRecordingRecovery, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { downloadWhisperModel, getTranscriptionSettings, saveDefaultWhisperModel } from './whisper-model-settings'
@@ -28,7 +29,7 @@ const IPC_HANDLERS: MainHandlers = {
     getDevices: () => getDevices(),
     requestCapturePermissions: () => requestCapturePermissions(),
     openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
-    startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
+    startStaleRecordingRecovery: () => startStaleMeetingRecordingRecovery(),
   },
   meetings: {
     list: () => listMeetings(),
@@ -36,14 +37,8 @@ const IPC_HANDLERS: MainHandlers = {
     delete: (_event, id: string) => deleteMeeting(id),
   },
   recording: {
-    start: async (_event, input: StartRecordingInput) => {
-      await startRecording(input)
-      return getRecordingState()
-    },
-    stop: () => {
-      stopRecording()
-      return getRecordingState()
-    },
+    start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
+    stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
   },
   localAISetup: {

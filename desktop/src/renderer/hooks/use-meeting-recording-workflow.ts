@@ -9,7 +9,6 @@ const RECORDING_RECORDING_STATUS: RecordingState['status'] = 'recording'
 const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
 const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = [RECORDING_RECORDING_STATUS]
 const MEDIA_DEVICE_CHANGE_EVENT = 'devicechange'
-const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
 const VISIBLE_DOCUMENT_STATE = 'visible'
 const VISIBILITY_CHANGE_EVENT = 'visibilitychange'
 const WINDOW_FOCUS_EVENT = 'focus'
@@ -108,11 +107,7 @@ async function handleRecordingChange(next: RecordingState, effects: RecordingWor
 async function startRecording(device: number, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
   try {
     setError(null)
-    const selectedDevice = selectedDeviceIndex(await refreshDevices(setState), device)
-    if (selectedDevice === null) return setError(NO_INPUT_DEVICE_ERROR)
-    const permissionError = capturePermissionError(await window.gappd.system.requestCapturePermissions())
-    if (permissionError) return setError(permissionError)
-    const recording = await recordingStartInput(selectedDevice)
+    const recording = await window.gappd.recording.start({ device })
     setState((current) => ({ ...current, recording }))
   } catch (err) {
     setError(errorMessage(err))
@@ -150,23 +145,6 @@ async function refreshDevices(setState: SetRecordingWorkflowState): Promise<Devi
   return devices
 }
 
-async function recordingStartInput(device: number): Promise<RecordingState> {
-  const title = new Date().toLocaleString()
-  return window.gappd.recording.start({ title, device, mode: 'both' })
-}
-
-function capturePermissionError(permissions: Awaited<ReturnType<typeof window.gappd.system.requestCapturePermissions>>): string | null {
-  const microphoneDenied = isPermissionDeniedState(permissions.microphone)
-  const screenDenied = isPermissionDeniedState(permissions.screen)
-  const microphoneGranted = permissions.microphone === 'granted'
-  const screenGranted = permissions.screen === 'granted'
-  if ((!microphoneGranted && !microphoneDenied) || (!screenGranted && !screenDenied)) return 'Could not confirm microphone and screen/system audio permissions. Try again, then check System Settings if the problem continues.'
-  if (microphoneDenied && screenDenied) return 'Microphone and Screen & System Audio Recording access denied. Enable GappdCapture in System Settings to record.'
-  if (microphoneDenied) return 'Microphone access denied. Enable GappdCapture in System Settings to record.'
-  if (screenDenied) return 'Screen & System Audio Recording access required. Enable GappdCapture in System Settings to capture system audio.'
-  return null
-}
-
 function reconcileDevices(state: RecordingWorkflowState, devices: Device[]): RecordingWorkflowState {
   const device = selectedDeviceIndex(devices, state.device)
   return { ...state, devices, device: device ?? state.device }
@@ -175,11 +153,6 @@ function reconcileDevices(state: RecordingWorkflowState, devices: Device[]): Rec
 function selectedDeviceIndex(devices: Device[], currentDevice: number): number | null {
   if (!devices.length) return null
   return devices.some((device) => device.index === currentDevice) ? currentDevice : devices[0].index
-}
-
-function isPermissionDeniedState(state: string): boolean {
-  const normalized = state.trim().toLowerCase()
-  return normalized.includes('denied') || normalized.includes('restricted')
 }
 
 function recoveryNotice(recovered: number): string | null {
