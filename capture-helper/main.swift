@@ -445,7 +445,7 @@ func requestMicrophoneAccessIfNeeded(_ status: AVAuthorizationStatus) -> AVAutho
 }
 
 func activateForPermissionPrompt() {
-    NSApplication.shared.setActivationPolicy(.regular)
+    NSApplication.shared.setActivationPolicy(.accessory)
     NSApp.activate(ignoringOtherApps: true)
 }
 
