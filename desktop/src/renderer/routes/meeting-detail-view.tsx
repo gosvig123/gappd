@@ -61,7 +61,11 @@ function ReadingCard({ value, emptyText, markdown, reading, children }: { value:
 
 function DetailShell({ children }: { children: ReactNode }) { return <Panel className="detail-panel"><div className="detail-reading-stack">{children}</div></Panel> }
 
-function MeetingFailureState({ message }: { message?: string }) { return message ? <div className="detail-surface detail-alert">{message}</div> : null }
+function MeetingFailureState({ message }: { message?: string }) {
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
+  if (!message || dismissedMessage === message) return null
+  return <div className="detail-surface detail-alert dismissible-note"><span>{message}</span><button className="icon-dismiss" type="button" aria-label="Dismiss error" onClick={() => setDismissedMessage(message)}>×</button></div>
+}
 
 function meetingIsProcessing(meeting: MeetingDetail): boolean { return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS }
 
@@ -157,7 +161,13 @@ function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): Me
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
   const { selectedMeetingId, selectedMeeting, selectedMeetingLoading, selectedMeetingError, transcript } = props
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
-  if (selectedMeetingError) return <DetailShell><div className="detail-surface detail-alert">{selectedMeetingError}</div></DetailShell>
+  if (selectedMeetingError) return <DetailShell><SelectedMeetingError message={selectedMeetingError} /></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
   return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
+}
+
+function SelectedMeetingError({ message }: { message: string }) {
+  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
+  if (dismissedMessage === message) return <EmptyState>Select a meeting to view details.</EmptyState>
+  return <div className="detail-surface detail-alert dismissible-note"><span>{message}</span><button className="icon-dismiss" type="button" aria-label="Dismiss error" onClick={() => setDismissedMessage(message)}>×</button></div>
 }

@@ -1,10 +1,10 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode } from 'react'
+import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useState } from 'react'
 
 type PanelProps = HTMLAttributes<HTMLElement> & { children: ReactNode }
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }
 type FieldProps = { label: string; children: ReactNode; className?: string; hint?: ReactNode }
 type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; middle?: ReactNode; className?: string }
-type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string }
+type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string; dismissible?: boolean; dismissKey?: string; dismissLabel?: string }
 type ProgressBarProps = { value: number | null; label: string; className?: string }
 type ListRowProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }
 
@@ -45,8 +45,15 @@ export function ProgressBar({ value, label, className }: ProgressBarProps) {
   return <progress className={cx('progress-track', className)} value={value} max={100} aria-label={label}>{value}%</progress>
 }
 
-export function Banner({ tone = 'info', title, children, actions, className }: BannerProps) {
-  return <div className={cx('banner', tone, className)}>{title ? <strong>{title}</strong> : null}<div>{children}</div>{actions ? <div className="actions-row banner-actions">{actions}</div> : null}</div>
+export function Banner({ tone = 'info', title, children, actions, className, dismissible, dismissKey, dismissLabel = 'Dismiss message' }: BannerProps) {
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
+  const key = dismissKey ?? fallbackDismissKey(title, children)
+  if (dismissible && dismissedKey === key) return null
+  return <div className={cx('banner', tone, className)}>{title || dismissible ? <div className="banner-head">{title ? <strong>{title}</strong> : <span />}{dismissible ? <button className="icon-dismiss" type="button" aria-label={dismissLabel} onClick={() => setDismissedKey(key)}>×</button> : null}</div> : null}<div>{children}</div>{actions ? <div className="actions-row banner-actions">{actions}</div> : null}</div>
+}
+
+function fallbackDismissKey(title: ReactNode, children: ReactNode): string {
+  return `${typeof title === 'string' ? title : ''}:${typeof children === 'string' ? children : ''}`
 }
 
 export function ListRow({ selected, className, ...props }: ListRowProps) {

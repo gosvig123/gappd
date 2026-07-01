@@ -16,7 +16,11 @@ type BannerModel = { title: string; detail: ReactNode; tone?: 'error' | 'info'; 
 export function UpdateBanner(props: UpdateBannerProps) {
   const model = bannerModel(props.status, props.recordingStatus)
   if (!model || !props.status) return null
-  return <Banner tone={model.tone} title={model.title} actions={bannerActions(props)}>{model.detail}{model.progress !== undefined ? <ProgressBar value={model.progress} label="Update download progress" /> : null}</Banner>
+  return <Banner tone={model.tone} title={model.title} dismissible={model.tone === 'error'} dismissKey={updateDismissKey(props.status)} actions={bannerActions(props)}>{model.detail}{model.progress !== undefined ? <ProgressBar value={model.progress} label="Update download progress" /> : null}</Banner>
+}
+
+function updateDismissKey(status: UpdateStatus): string {
+  return `${status.phase}:${status.error ?? ''}:${status.latestVersion ?? ''}`
 }
 
 function bannerModel(status: UpdateStatus | null, recordingStatus: RecordingStatus): BannerModel | null {
