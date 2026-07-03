@@ -37,12 +37,7 @@ func loadDeps() (config.Config, *db.DB, *ai.Pipeline, error) {
 	if err != nil {
 		return cfg, nil, nil, err
 	}
-	provider, err := aiProvider(cfg.AI)
-	if err != nil {
-		store.Close()
-		return cfg, nil, nil, err
-	}
-	pipeline := ai.NewPipeline(provider, cfg.AI.Temp)
+	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
 	return cfg, store, pipeline, nil
 }
 
@@ -56,13 +51,6 @@ func loadStore() (config.Config, *db.DB, error) {
 		return cfg, nil, err
 	}
 	return cfg, store, nil
-}
-
-func aiProvider(cfg config.AI) (ai.Provider, error) {
-	if cfg.Provider != config.ProviderLlamaCpp {
-		return nil, fmt.Errorf("unsupported AI provider %q", cfg.Provider)
-	}
-	return ai.NewOpenAICompat(cfg.Endpoint, cfg.Model), nil
 }
 
 func openDB(cfg config.Config) (*db.DB, error) {
@@ -99,14 +87,11 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Checking AI provider (%s)... ", cfg.AI.Provider)
-			provider, err := aiProvider(cfg.AI)
-			if err != nil {
-				return err
-			}
+			fmt.Print("Checking Local AI... ")
+			provider := ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model)
 			if err := provider.Available(); err != nil {
 				fmt.Println("✗")
-				return fmt.Errorf("%s not reachable: %w", cfg.AI.Provider, err)
+				return fmt.Errorf("Local AI not reachable: %w", err)
 			}
 			fmt.Println("✓ connected to", cfg.AI.Endpoint)
 			fmt.Println("  model:", cfg.AI.Model)
