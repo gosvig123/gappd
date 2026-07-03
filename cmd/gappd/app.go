@@ -140,11 +140,11 @@ func appMeetingsListCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			meetings, err := store.ListMeetings(50)
+			entries, err := store.ListMeetingEntries(50)
 			if err != nil {
 				return err
 			}
-			return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(meetings)})
+			return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(entries)})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
@@ -178,5 +178,5 @@ func appMeetingsShowCmd() *cobra.Command {
 }
 
 func appMeetingDetailFor(store *db.DB, id string) (appprotocol.MeetingDetail, error) {
-	return appprotocol.BuildMeetingDetailView(store, id)
+	return appprotocol.BuildAppMeetingDetailView(store, id)
 }

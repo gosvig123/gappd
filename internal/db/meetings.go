@@ -39,9 +39,20 @@ type Meeting struct {
 	CreatedAt                 string
 }
 
+type MeetingListEntry struct {
+	Meeting
+	HasTranscript bool
+	HasSummary    bool
+}
+
 const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
 	audio_path, transcript, summary, extraction_json, tags, source, created_at
+	FROM meetings`
+
+const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
+	processing_status, processing_status_updated_at, processing_failure_message,
+	audio_path, transcript IS NOT NULL, summary IS NOT NULL, tags, source, created_at
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
@@ -123,6 +134,15 @@ func (d *DB) ListMeetings(limit int) ([]Meeting, error) {
 	return scanMeetings(rows)
 }
 
+func (d *DB) ListMeetingEntries(limit int) ([]MeetingListEntry, error) {
+	rows, err := d.Conn.Query(selectMeetingListEntriesSQL+` ORDER BY started_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list meeting entries: %w", err)
+	}
+	defer rows.Close()
+	return scanMeetingListEntries(rows)
+}
+
 func (d *DB) ListStaleRecordingMeetings(cutoff string, limit int) ([]Meeting, error) {
 	rows, err := d.Conn.Query(selectMeetingsSQL+` WHERE capture_status = ? AND capture_status_updated_at < ? ORDER BY started_at ASC LIMIT ?`, CaptureStatusRecording, cutoff, limit)
 	if err != nil {
@@ -167,16 +187,49 @@ func changed(result sql.Result, err error, operation string) (bool, error) {
 func scanMeetings(rows *sql.Rows) ([]Meeting, error) {
 	var meetings []Meeting
 	for rows.Next() {
-		var m Meeting
-		err := rows.Scan(
-			&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
-			&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-			&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Tags, &m.Source, &m.CreatedAt,
-		)
+		meeting, err := scanMeeting(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan meeting: %w", err)
+			return nil, err
 		}
-		meetings = append(meetings, m)
+		meetings = append(meetings, meeting)
 	}
 	return meetings, rows.Err()
+}
+
+func scanMeeting(rows *sql.Rows) (Meeting, error) {
+	var m Meeting
+	err := rows.Scan(
+		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
+		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
+		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Tags, &m.Source, &m.CreatedAt,
+	)
+	if err != nil {
+		return Meeting{}, fmt.Errorf("scan meeting: %w", err)
+	}
+	return m, nil
+}
+
+func scanMeetingListEntries(rows *sql.Rows) ([]MeetingListEntry, error) {
+	var entries []MeetingListEntry
+	for rows.Next() {
+		entry, err := scanMeetingListEntry(rows)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
+	return entries, rows.Err()
+}
+
+func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
+	var entry MeetingListEntry
+	err := rows.Scan(
+		&entry.ID, &entry.Title, &entry.StartedAt, &entry.EndedAt, &entry.CaptureStatus, &entry.CaptureStatusUpdatedAt, &entry.CaptureFailureMessage,
+		&entry.ProcessingStatus, &entry.ProcessingStatusUpdatedAt, &entry.ProcessingFailureMessage,
+		&entry.AudioPath, &entry.HasTranscript, &entry.HasSummary, &entry.Tags, &entry.Source, &entry.CreatedAt,
+	)
+	if err != nil {
+		return MeetingListEntry{}, fmt.Errorf("scan meeting list entry: %w", err)
+	}
+	return entry, nil
 }
