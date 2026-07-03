@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MANAGED_OLLAMA_MODEL, isManagedOllamaModel, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
+import { MANAGED_LLAMACPP_MODEL, isManagedLlamaCppModel, type ManagedLlamaCppModelTag } from '../../shared/managed-local-ai'
 import { getLocalAIContract, toStatusError, type LocalAISetupStatus } from '../components/local-ai-contract'
 import { useGuardedEffect } from './use-guarded-effect'
 
@@ -9,7 +9,7 @@ export function useLocalAISetupOperation() {
   const [status, setStatus] = useState<LocalAISetupStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<ManagedOllamaModelTag>(MANAGED_OLLAMA_MODEL)
+  const [selectedModel, setSelectedModel] = useState<ManagedLlamaCppModelTag>(MANAGED_LLAMACPP_MODEL)
 
   useLocalAISetupStatus(setStatus, setLoading)
   useSelectedManagedModel(status, busy, setSelectedModel)
@@ -47,8 +47,8 @@ async function loadInitialStatus(onStatus: (status: LocalAISetupStatus) => void,
   }
 }
 
-function useSelectedManagedModel(status: LocalAISetupStatus | null, busy: boolean, setModel: (model: ManagedOllamaModelTag) => void) {
+function useSelectedManagedModel(status: LocalAISetupStatus | null, busy: boolean, setModel: (model: ManagedLlamaCppModelTag) => void) {
   useEffect(() => {
-    if (!busy && status && isManagedOllamaModel(status.model)) setModel(status.model)
+    if (!busy && status && isManagedLlamaCppModel(status.model)) setModel(status.model)
   }, [status?.model, busy])
 }

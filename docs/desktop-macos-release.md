@@ -4,11 +4,11 @@
 
 - `build/gappd` is bundled into `Contents/Resources/bin/gappd`
 - `build/GappdCapture.app` is bundled into `Contents/Resources/GappdCapture.app`
-- Bundled runtimes stay repo-owned: `ollama/ollama` and `whisper/whisper-cli`
+- Bundled runtimes stay repo-owned: `llamacpp/llama-server` and `whisper/whisper-cli`
 
 ## What still downloads on first run
 
-- Ollama models are still downloaded during managed local AI setup
+- The LFM2 meeting model is downloaded during managed Local AI setup
 - The Whisper model file is still downloaded into the app-managed models directory when needed
 
 ## Release workflow inputs

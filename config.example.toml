@@ -5,10 +5,10 @@
 db_path = "~/.gappd/db.sqlite"
 
 [ai]
-# AI provider. Currently supported: "ollama"
-provider = "ollama"
-# Ollama model name
-model = "llama3.1:8b"
-# Ollama HTTP endpoint
-endpoint = "http://localhost:11434"
+# AI provider. Supported: "llamacpp"
+provider = "llamacpp"
+# llama.cpp OpenAI-compatible model alias
+model = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
+# llama.cpp HTTP endpoint
+endpoint = "http://127.0.0.1:11436"
 temperature = 0.3

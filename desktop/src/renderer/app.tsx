@@ -14,7 +14,7 @@ import { Banner } from './components/ui'
 import { DashboardView } from './routes/dashboard-view'
 import { LocalAISetupView } from './routes/local-ai-setup-view'
 import { SettingsView } from './routes/settings-view'
-import { MANAGED_OLLAMA_MODEL_OPTIONS } from '../shared/bundled-ollama'
+import { MANAGED_LLAMACPP_MODEL_OPTIONS } from '../shared/managed-local-ai'
 
 const READY_LOCAL_AI_SETUP_PHASE = 'ready'
 
@@ -46,7 +46,7 @@ function StaleRecoveryBanner({ recovering, notice }: { recovering: boolean; noti
 }
 
 function LocalAISetupApp({ localAISetup, permissions }: { localAISetup: ReturnType<typeof useLocalAISetupOperation>; permissions: ReturnType<typeof useSetupPermissions> }) {
-  return <div className="single-screen"><LocalAISetupView status={localAISetup.status!} busy={localAISetup.busy} selectedModel={localAISetup.selectedModel} modelOptions={MANAGED_OLLAMA_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={localAISetup.setSelectedModel} onStart={() => void localAISetup.run('start')} onRetry={() => void localAISetup.run('retry')} onRequestPermissions={() => void permissions.request()} /></div>
+  return <div className="single-screen"><LocalAISetupView status={localAISetup.status!} busy={localAISetup.busy} selectedModel={localAISetup.selectedModel} modelOptions={MANAGED_LLAMACPP_MODEL_OPTIONS} permissionState={permissions.state} onModelChange={localAISetup.setSelectedModel} onStart={() => void localAISetup.run('start')} onRetry={() => void localAISetup.run('retry')} onRequestPermissions={() => void permissions.request()} /></div>
 }
 
 async function runPrimaryUpdate(update: ReturnType<typeof useUpdateStatus>, reportError: (message: string) => void) {

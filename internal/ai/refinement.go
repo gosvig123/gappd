@@ -11,8 +11,8 @@ func (p *Pipeline) RefineExtraction(ctx context.Context, extraction *Extraction)
 		return nil, err
 	}
 	system, user := Stage1RefinePrompt(data)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	raw, err := p.ollama.CompleteJSON(ctx, req)
+	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
+	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("refine extraction failed: %w", err)
 	}
@@ -30,7 +30,7 @@ func (p *Pipeline) RefineNotes(ctx context.Context, extraction *Extraction, draf
 	}
 	system, user := Stage3Prompt(data, draft, feedback)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	result, err := p.ollama.Complete(ctx, req)
+	result, err := p.provider.Complete(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("refine notes failed: %w", err)
 	}

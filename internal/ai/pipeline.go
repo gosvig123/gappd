@@ -7,12 +7,6 @@ import (
 	"strings"
 )
 
-type CompletionRequest struct {
-	System      string
-	User        string
-	Temperature float64
-}
-
 type ProgressStage string
 
 const (
@@ -37,12 +31,12 @@ type RunOptions struct {
 }
 
 type Pipeline struct {
-	ollama      *OllamaProvider
+	provider    Provider
 	temperature float64
 }
 
-func NewPipeline(ollama *OllamaProvider, temperature float64) *Pipeline {
-	return &Pipeline{ollama: ollama, temperature: temperature}
+func NewPipeline(provider Provider, temperature float64) *Pipeline {
+	return &Pipeline{provider: provider, temperature: temperature}
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
@@ -89,8 +83,8 @@ func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Ex
 
 func (p *Pipeline) extractChunk(ctx context.Context, transcript string) (*Extraction, error) {
 	system, user := Stage1Prompt(transcript)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	raw, err := p.ollama.CompleteJSON(ctx, req)
+	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
+	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
 	}
@@ -104,7 +98,7 @@ func (p *Pipeline) Synthesize(ctx context.Context, extraction *Extraction, userN
 	}
 	system, user := Stage2Prompt(string(data), userNotes)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
-	result, err := p.ollama.Complete(ctx, req)
+	result, err := p.provider.Complete(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("synthesis failed: %w", err)
 	}

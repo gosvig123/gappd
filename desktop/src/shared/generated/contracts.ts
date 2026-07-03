@@ -96,7 +96,7 @@ export type AIConfig = {
   managed: boolean
 }
 
-export type ConfigUseManagedOllamaInput = {
+export type ConfigUseManagedLocalAIInput = {
   endpoint: string
   model: string
   temperature?: number

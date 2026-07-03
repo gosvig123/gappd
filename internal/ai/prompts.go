@@ -29,25 +29,21 @@ type ExtractedAction struct {
 	Deadline string `json:"deadline"`
 }
 
-const extractionSchema = `{
-  "title": "string, 3-8 words, specific, no date, empty if transcript lacks topic context",
-  "participants": ["string"],
-  "topics": [{"name": "string", "summary": "string"}],
-  "decisions": [{"what": "string", "who_decided": ["string"], "context": "string"}],
-  "action_items": [{"task": "string", "owner": "string", "deadline": "string"}],
-  "open_questions": ["string"],
-  "sentiment": "string (productive|tense|neutral|brainstorming|decision-heavy)"
-}`
+const extractionSchema = extractionJSONSchema
 
 const stage1System = `You are a meeting analyst. Extract structured information from the transcript.
 Output valid JSON matching this schema:
 %s
 Rules:
 - Use exact participant names from the transcript
+- Speaker labels like "You" and "Other" are labels, not participant names
 - Title must name the meeting topic, not generic words like "Meeting" or "Recording"
 - Be concise but preserve key details
-- Capture ALL action items with owners and deadlines when mentioned
-- If a deadline is not mentioned, use "unspecified"
+- Only list decisions with clear agreement or commitment
+- Put exploratory discussion under topics or open questions, not decisions
+- Capture only real follow-up action items; omit casual wrap-up comments
+- Leave owner and deadline empty when absent; never write "unspecified" or "unknown"
+- Preserve useful internal codenames, but avoid overstating their role
 - Sentiment must be one of: productive, tense, neutral, brainstorming, decision-heavy`
 
 const stage2System = `You are a meeting note-taker. Write clear, actionable meeting notes in markdown.
@@ -63,6 +59,8 @@ Numbered list of decisions made.
 Use one flat checkbox list: - [ ] Task description (due: actual date)
 Omit due date text when deadline is unknown or unspecified.
 Do not add You/Other/person subheadings or use transcript speaker labels as owners.
+Only list clear decisions; keep exploratory ideas in Key Topics or Open Questions.
+Action Items must be actual follow-up tasks, not meeting wrap-up comments.
 ### Open Questions
 Bullet list of unresolved questions.
 If user notes are provided, expand on those topics with additional detail.`
@@ -75,6 +73,9 @@ Rules:
 - Merge duplicates and near-duplicates
 - Rank topics, decisions, action items, and questions by importance
 - Preserve owners, deadlines, and decision context
+- Speaker labels like "You" and "Other" are labels, not participant names
+- Only list decisions with clear agreement or commitment
+- Leave owner and deadline empty when absent; never write "unspecified" or "unknown"
 - Do not invent facts not present in the input`
 
 const stage3System = `You are a meeting-notes editor. Rewrite notes to be clearer, more actionable, and faithful to the extracted data.
@@ -90,6 +91,7 @@ Rules:
 - Improve wording, grouping, and missing emphasis
 - Keep action items as one flat checklist without You/Other/person subheadings
 - Keep due dates only when actual dates are known; never write unknown or unspecified due dates
+- Do not turn exploratory discussion into decisions
 - Do not invent facts not present in extracted data or current notes`
 
 func Stage1Prompt(transcript string) (string, string) {

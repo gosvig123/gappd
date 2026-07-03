@@ -10,7 +10,7 @@ import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
-import { stopManagedOllama } from './ollama'
+import { stopManagedLlamaCpp } from './llamacpp'
 import { getValidatedManagedWhisperPaths } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
@@ -60,8 +60,6 @@ async function ensureAppMicrophoneAccess(): Promise<Record<string, string>> {
 }
 
 function capturePermissionCommand(tmpFile: string): { bin: string; args: string[] } {
-  const appPath = resolveCaptureApp()
-  if (appPath) return { bin: '/usr/bin/open', args: ['-W', '-n', appPath, '--args', '--request-permissions', '--output', tmpFile] }
   return { bin: resolveCaptureBinary(), args: ['--request-permissions', '--output', tmpFile] }
 }
 
@@ -106,7 +104,7 @@ export async function getLocalAIConfig(): Promise<LocalAIConfig> {
 }
 
 export async function saveManagedLocalAIConfig(input: { endpoint: string; model: string; temperature?: number }): Promise<LocalAIConfig> {
-  const result = await requestCommand('config.useManagedOllama', input)
+  const result = await requestCommand('config.useManagedLocalAI', input)
   return result.ai
 }
 
@@ -198,12 +196,12 @@ function recordingHandlers(title: string) {
     },
     onError(error: string) {
       recordingChild = null
-      void releaseManagedOllamaAfterRecording('recording:error')
+      void releaseManagedRuntimeAfterRecording('recording:error')
       setRecordingState({ status: 'error', title, error })
     },
     onExitWithoutTerminal() {
       recordingChild = null
-      void releaseManagedOllamaAfterRecording('recording:exit')
+      void releaseManagedRuntimeAfterRecording('recording:exit')
       if (getRecordingState().status !== 'error') setRecordingState({ status: 'idle' })
     },
   }
@@ -220,19 +218,19 @@ function recordingStateFromEvent(event: RecordingEvent) {
       return { ...base, status: 'processing' as const }
     case 'recording.completed':
       recordingChild = null
-      void releaseManagedOllamaAfterRecording('recording:completed')
+      void releaseManagedRuntimeAfterRecording('recording:completed')
       return { ...base, status: 'idle' as const }
     case 'recording.failed':
       recordingChild = null
-      void releaseManagedOllamaAfterRecording('recording:failed')
+      void releaseManagedRuntimeAfterRecording('recording:failed')
       return { ...base, status: 'error' as const, error: event.error ?? protocolFailureMessage(event) }
   }
 }
 
-async function releaseManagedOllamaAfterRecording(label: string): Promise<void> {
-  logMainProcessMemory(`${label}:before-ollama-stop`)
-  await stopManagedOllama()
-  logMainProcessMemory(`${label}:after-ollama-stop`)
+async function releaseManagedRuntimeAfterRecording(label: string): Promise<void> {
+  logMainProcessMemory(`${label}:before-runtime-stop`)
+  await stopManagedLlamaCpp()
+  logMainProcessMemory(`${label}:after-runtime-stop`)
 }
 
 function protocolFailureMessage(event: RecordingEvent): string {

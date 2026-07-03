@@ -16,7 +16,7 @@ const entitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.plist
 const inheritEntitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.inherit.plist')
 const nestedCodeLayout = [
   { label: 'gappd binary', relativePath: ['Contents', 'Resources', 'bin', 'gappd'], executable: true },
-  { label: 'Ollama binary', relativePath: ['Contents', 'Resources', 'ollama', 'ollama'], executable: true },
+  { label: 'llama-server binary', relativePath: ['Contents', 'Resources', 'llamacpp', 'llama-server'], executable: true },
   { label: 'Whisper binary', relativePath: ['Contents', 'Resources', 'whisper', 'whisper-cli'], executable: true },
   { label: 'capture helper app', relativePath: ['Contents', 'Resources', 'GappdCapture.app'], executable: false },
   { label: 'capture helper binary', relativePath: ['Contents', 'Resources', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'], executable: true },
