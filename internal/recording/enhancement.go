@@ -3,6 +3,7 @@ package recording
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/ai"
@@ -25,7 +26,7 @@ func (s Service) EnhanceWithOptions(ctx context.Context, meetingID string, optio
 }
 
 func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID string, options EnhanceOptions) error {
-	meeting, err := p.service.meetings().GetMeeting(meetingID)
+	meeting, err := p.store.GetMeeting(meetingID)
 	if err != nil {
 		return fmt.Errorf("get meeting: %w", err)
 	}
@@ -33,7 +34,7 @@ func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID string, 
 	if err != nil {
 		return err
 	}
-	session := p.service.sessionFor(meeting, audioartifact.Artifacts{})
+	session := p.sessionFor(meeting, audioartifact.Artifacts{})
 	if err := session.markProcessing(); err != nil {
 		return err
 	}
@@ -44,7 +45,7 @@ func (p meetingProcessing) storedTranscript(meetingID string, saved *string) (st
 	if saved != nil && *saved != "" {
 		return *saved, nil
 	}
-	segments, err := p.service.meetings().GetSegments(meetingID)
+	segments, err := p.store.GetSegments(meetingID)
 	if err != nil {
 		return "", fmt.Errorf("get segments: %w", err)
 	}
@@ -128,44 +129,44 @@ func previousSummary(session recordingSession, options EnhanceOptions) string {
 }
 
 func (p meetingProcessing) enhancer() enhancer {
-	if p.service.enhancer != nil {
-		return p.service.enhancer
+	if p.notesEnhancer != nil {
+		return p.notesEnhancer
 	}
-	return p.service.Pipeline
+	return p.pipeline
 }
 
 func (p meetingProcessing) printEnhancementStart() {
-	if p.service.Events == nil {
-		fmt.Fprintln(p.service.Out, "── Enhancing with AI... ─────────────────")
+	if p.events == nil {
+		fmt.Fprintln(p.out, "── Enhancing with AI... ─────────────────")
 	}
 }
 
 func (p meetingProcessing) aiProgress() func(ai.Progress) {
-	if p.service.Events != nil {
+	if p.events != nil {
 		return nil
 	}
-	return func(progress ai.Progress) { printAIProgress(p.service, progress) }
+	return func(progress ai.Progress) { printAIProgress(p.out, progress) }
 }
 
-func printAIProgress(s Service, progress ai.Progress) {
+func printAIProgress(out io.Writer, progress ai.Progress) {
 	if progress.Total > 1 {
-		fmt.Fprintf(s.Out, "● AI %s %d/%d\n", progress.Stage, progress.Current, progress.Total)
+		fmt.Fprintf(out, "● AI %s %d/%d\n", progress.Stage, progress.Current, progress.Total)
 		return
 	}
-	fmt.Fprintf(s.Out, "● AI %s\n", progress.Stage)
+	fmt.Fprintf(out, "● AI %s\n", progress.Stage)
 }
 
 func (p meetingProcessing) printEnhancementResult(summary string, actionItems int, meetingID string) {
-	if p.service.Events == nil {
-		printEnhancementResult(p.service, summary, actionItems, meetingID)
+	if p.events == nil {
+		printEnhancementResult(p.out, summary, actionItems, meetingID)
 	}
 }
 
-func printEnhancementResult(s Service, summary string, actionItems int, meetingID string) {
-	fmt.Fprintln(s.Out, "\n── Notes ───────────────────────────────")
-	fmt.Fprintln(s.Out, summary)
+func printEnhancementResult(out io.Writer, summary string, actionItems int, meetingID string) {
+	fmt.Fprintln(out, "\n── Notes ───────────────────────────────")
+	fmt.Fprintln(out, summary)
 	if actionItems > 0 {
-		fmt.Fprintf(s.Out, "\n● %d action items extracted.\n", actionItems)
+		fmt.Fprintf(out, "\n● %d action items extracted.\n", actionItems)
 	}
-	fmt.Fprintf(s.Out, "● Saved: %s\n", meetingID)
+	fmt.Fprintf(out, "● Saved: %s\n", meetingID)
 }

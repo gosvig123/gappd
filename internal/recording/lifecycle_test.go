@@ -85,7 +85,10 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 }
 
 func testSession(service Service, meeting *db.Meeting) recordingSession {
-	return recordingSession{service: service, meeting: meeting}
+	return recordingSession{
+		store: service.meetings(), out: service.Out, errOut: service.ErrOut,
+		events: service.Events, meeting: meeting,
+	}
 }
 
 func failingOllamaServer(t *testing.T, message string) *httptest.Server {

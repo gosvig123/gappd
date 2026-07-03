@@ -134,7 +134,9 @@ func (s Service) record(req Request, session recordingSession, sessionDir string
 	}
 	stopHeartbeat()
 	artifacts := audioartifact.FromPaths(recorder.MicPath(), recorder.SystemPath())
-	return session.withArtifacts(artifacts).finish(req)
+	session = session.withArtifacts(artifacts)
+	s.printRecorded(session.meeting.StartedAt)
+	return session.finish(req, s.processing())
 }
 
 func (s Service) printRecordingStart(req Request, sessionDir string) {
