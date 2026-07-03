@@ -189,7 +189,7 @@ jobs:
         run: |
           export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
           export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
-          npm run dist -- --publish=never
+          npm run dist:mac:arm64 -- --publish=never
         working-directory: desktop
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
