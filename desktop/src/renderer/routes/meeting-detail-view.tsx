@@ -12,6 +12,7 @@ import { TranscriptText } from './transcript-view'
 const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
+type MeetingSegment = MeetingDetail['segments'][number]
 type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
@@ -84,7 +85,8 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
 function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
-  const hasTranscript = Boolean(transcript)
+  const detailTranscriptText = detailTranscript(selectedMeeting, transcript)
+  const hasTranscript = Boolean(detailTranscriptText)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
   const subtitle = detailSubtitle(selectedMeeting, progress)
   const [activeTab, setActiveTab] = useState<DetailTab>(SUMMARY_TAB)
@@ -95,7 +97,7 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
         <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
-      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={transcript} hasTranscript={hasTranscript} />
+      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} />
     </Panel>
   )
 }
@@ -156,6 +158,19 @@ function transcriptEmptyText(meeting: MeetingDetail): string {
 
 function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
   return { status: meeting.status, hasTranscript, hasSummary: Boolean(meeting.summary) }
+}
+
+function detailTranscript(meeting: MeetingDetail, transcript: string): string {
+  return transcript || segmentsTranscript(meeting.segments ?? [])
+}
+
+function segmentsTranscript(segments: MeetingSegment[]): string {
+  return segments.map(segmentTranscriptLine).filter(Boolean).join('\n')
+}
+
+function segmentTranscriptLine(segment: MeetingSegment): string {
+  if (!segment.text) return ''
+  return `${segment.speaker ? `[${segment.speaker}] ` : ''}${segment.text}`
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
