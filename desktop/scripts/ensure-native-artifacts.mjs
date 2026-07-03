@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -46,6 +46,7 @@ async function buildNativeArtifacts() {
     return
   }
 
+  await mkdir(buildDir, { recursive: true })
   await buildGoBinary()
   runMake(['build-capture'], {
     GAPPD_MAC_BUILD: macBuildProfile,
