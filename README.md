@@ -3,6 +3,8 @@
 `gappd` records meeting audio, transcribes it locally, stores transcripts in SQLite,
 and can run Ollama-based summarization and extraction over saved meetings.
 
+[Join the Gappd Discord](https://discord.gg/Xap3vSNM4) for beta access, setup help, bug reports, and roadmap discussion.
+
 ## Surface area
 
 macOS desktop app and CLI. Data lives in local SQLite at `~/.gappd/db.sqlite` by
