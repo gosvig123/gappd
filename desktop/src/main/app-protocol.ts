@@ -7,6 +7,7 @@ import {
   type AppStreamEvent,
   type AppStreamID,
 } from '../shared/generated/app-protocol'
+import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveGappdBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
@@ -18,12 +19,12 @@ type StreamHandlers<ID extends AppStreamID> = {
 type CommandEnv = NodeJS.ProcessEnv
 
 export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}): Promise<AppCommandOutput[ID]> {
-  const output = await runCommand(commandArgs(id, input), env)
-  return JSON.parse(output) as AppCommandOutput[ID]
+  const output = await runCommand(id, commandArgs(id, input), env)
+  return parseCommandOutput(id, output)
 }
 
 export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandInput[ID], handlers: StreamHandlers<ID>, env: CommandEnv = {}): ReturnType<typeof spawn> {
-  const child = spawn(resolveGappdBinary(), commandArgs(id, input), { env: commandEnv(env), stdio: ['ignore', 'pipe', 'pipe'] })
+  const child = spawn(resolveGappdBinary(), commandArgs(id, input), { env: commandEnvFor(id, env), stdio: ['ignore', 'pipe', 'pipe'] })
   wireStream(child, id, handlers)
   return child
 }
@@ -36,11 +37,26 @@ function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommand
   return APP_COMMANDS[id].args(input as never)
 }
 
-function runCommand(args: string[], env: CommandEnv): Promise<string> {
+function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveGappdBinary(), args, { env: commandEnv(env), stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), stdio: ['ignore', 'pipe', 'pipe'] })
     collectCommandOutput(child, resolve, reject)
   })
+}
+
+function commandEnvFor<ID extends keyof AppCommandInput>(id: ID, overrides: CommandEnv): CommandEnv {
+  const env = commandEnv(overrides)
+  const missing = APP_COMMANDS[id].env.filter((name) => !env[name])
+  if (missing.length > 0) throw new Error(`gappd command ${id} missing required env: ${missing.join(', ')}`)
+  return env
+}
+
+function parseCommandOutput<ID extends AppRequestID>(id: ID, output: string): AppCommandOutput[ID] {
+  try {
+    return JSON.parse(output) as AppCommandOutput[ID]
+  } catch (error) {
+    throw new Error(`Invalid JSON from gappd command ${id}: ${errorMessage(error)}. Output: ${preview(output)}`)
+  }
 }
 
 function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void): void {
@@ -73,29 +89,38 @@ type StreamState = { buffer: string; sawEvent: boolean; sawTerminal: boolean; pr
 function readProtocolLine<ID extends AppStreamID>(id: ID, state: StreamState, line: string, handlers: StreamHandlers<ID>): void {
   const trimmed = line.trim()
   if (!trimmed) return
-  const event = parseProtocolEvent<ID>(trimmed)
-  if (!event) {
-    state.protocolError = `Invalid protocol event JSON: ${trimmed}`
+  const result = parseProtocolEvent<ID>(id, trimmed)
+  if (!result.ok) {
+    state.protocolError = result.error
     return
   }
   state.sawEvent = true
-  if (isTerminalEvent(id, event)) state.sawTerminal = true
-  handlers.onEvent(event)
+  if (isTerminalEvent(id, result.event)) state.sawTerminal = true
+  handlers.onEvent(result.event)
 }
 
-function parseProtocolEvent<ID extends AppStreamID>(line: string): AppStreamEvent<ID> | null {
-  try {
-    const parsed = JSON.parse(line) as unknown
-    return hasProtocolEventShape(parsed) ? parsed as AppStreamEvent<ID> : null
-  } catch {
-    return null
-  }
+type ProtocolParseResult<ID extends AppStreamID> = { ok: true; event: AppStreamEvent<ID> } | { ok: false; error: string }
+
+function parseProtocolEvent<ID extends AppStreamID>(id: ID, line: string): ProtocolParseResult<ID> {
+  let parsed: unknown
+  try { parsed = JSON.parse(line) } catch (error) { return { ok: false, error: `Invalid JSON from gappd stream ${id}: ${errorMessage(error)}. Line: ${preview(line)}` } }
+  if (!hasProtocolEventShape(parsed)) return { ok: false, error: `Invalid protocol event from gappd stream ${id}: ${preview(line)}` }
+  if (!isKnownRecordingEvent(parsed.type)) return { ok: false, error: `Unexpected protocol event ${parsed.type} from gappd stream ${id}` }
+  return { ok: true, event: parsed as AppStreamEvent<ID> }
 }
 
-function hasProtocolEventShape(event: unknown): boolean {
+function hasProtocolEventShape(event: unknown): event is { type: string; meetingId: string; title: string; status: object } {
   if (!event || typeof event !== 'object') return false
   const candidate = event as { type?: unknown; meetingId?: unknown; title?: unknown; status?: unknown }
-  return typeof candidate.type === 'string' && typeof candidate.meetingId === 'string' && typeof candidate.title === 'string' && Boolean(candidate.status)
+  return typeof candidate.type === 'string' && typeof candidate.meetingId === 'string' && typeof candidate.title === 'string' && isObject(candidate.status)
+}
+
+function isKnownRecordingEvent(type: string): boolean {
+  return (RECORDING_PROTOCOL_EVENT_TYPES as readonly string[]).includes(type)
+}
+
+function isObject(value: unknown): value is object {
+  return Boolean(value) && typeof value === 'object'
 }
 
 function isTerminalEvent<ID extends AppStreamID>(id: ID, event: AppStreamEvent<ID>): boolean {
@@ -104,8 +129,8 @@ function isTerminalEvent<ID extends AppStreamID>(id: ID, event: AppStreamEvent<I
 }
 
 function finishStream<ID extends AppStreamID>(state: StreamState, stderr: string, code: number | null, signal: NodeJS.Signals | null, handlers: StreamHandlers<ID>): void {
-  if (state.sawTerminal) return
   if (state.protocolError) return handlers.onError(state.protocolError)
+  if (state.sawTerminal) return
   if (state.buffer.trim()) return handlers.onError(`Incomplete recording protocol event: ${state.buffer.trim()}`)
   if (code === 0 && !state.sawEvent) return handlers.onExitWithoutTerminal()
   if (signal === 'SIGINT') return handlers.onExitWithoutTerminal()
@@ -116,4 +141,13 @@ function formatChildError(stderr: string, code: number | null, signal: NodeJS.Si
   const cleaned = stderr.trim()
   if (!cleaned) return code === null ? `Process exited with signal ${signal}` : `Process exited with code ${code}`
   return cleaned.split('\n').filter(Boolean).slice(-8).join('\n')
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function preview(value: string): string {
+  const normalized = value.trim().replace(/\s+/g, ' ')
+  return normalized.length > 240 ? `${normalized.slice(0, 240)}…` : normalized
 }
