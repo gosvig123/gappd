@@ -10,7 +10,7 @@ import { requestCommand, streamCommand } from './app-protocol'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
-import { stopManagedLlamaCpp } from './llamacpp'
+import { ensureManagedLlamaCppRunning, stopManagedLlamaCpp } from './llamacpp'
 import { getValidatedManagedWhisperPaths } from './whisper'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
@@ -108,6 +108,14 @@ export async function saveManagedLocalAIConfig(input: { endpoint: string; model:
   return result.ai
 }
 
+async function ensureManagedLocalAIReady(): Promise<void> {
+  const config = await getLocalAIConfig()
+  if (!config.managed) return
+  const endpoint = await ensureManagedLlamaCppRunning()
+  if (config.endpoint === endpoint) return
+  await saveManagedLocalAIConfig({ endpoint, model: config.model, temperature: config.temperature })
+}
+
 export async function startStaleRecordingRecovery(): Promise<number> {
   if (!staleRecoveryTimer) staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
   return runStaleRecordingRecovery()
@@ -121,6 +129,7 @@ export function stopStaleRecordingRecovery(): void {
 
 export async function recoverStaleRecordings(): Promise<number> {
   const whisper = await getValidatedManagedWhisperPaths()
+  await ensureManagedLocalAIReady()
   const result = await requestCommand('record.recoverStale', { modelPath: whisper.modelPath }, { GAPPD_WHISPER_BIN: whisper.binaryPath })
   return result.recovered
 }
@@ -128,6 +137,7 @@ export async function recoverStaleRecordings(): Promise<number> {
 export async function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const whisper = await getValidatedManagedWhisperPaths()
+  await ensureManagedLocalAIReady()
   logMainProcessMemory('recording:start')
   recordingChild = streamCommand('record.start', { ...input, modelPath: whisper.modelPath }, recordingHandlers(input.title), { GAPPD_WHISPER_BIN: whisper.binaryPath })
 }
