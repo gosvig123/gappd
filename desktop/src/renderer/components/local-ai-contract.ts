@@ -34,18 +34,18 @@ const ERROR_VIEWS: Record<NonNullable<LocalAISetupStatus['errorKind']>, Omit<Loc
   pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Fix setup.', compact: 'Download host unavailable.' },
   disk_space: { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' },
   permission: { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' },
-  ownership_mismatch: { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.' },
+  ownership_mismatch: { title: "Another process is using Gappd's local port.", detail: 'Gappd needs its local port for the managed runtime. Stop the other process manually, then retry setup.', compact: 'Local port already in use.' },
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },
 }
 
 const GENERIC_PHASE_MESSAGES: Record<LocalAISetupStatus['phase'], string[]> = {
-  checking: ['checking managed ollama', 'checking your local ai setup'],
+  checking: ['checking managed runtime', 'checking your local ai setup'],
   needs_setup: ['local ai setup is required'],
-  starting_ollama: ['managed ollama is running', 'starting the bundled ollama runtime'],
+  starting_runtime: ['managed llama.cpp is running', 'starting the bundled runtime'],
   pulling_model: ['pulling local model', 'downloading the recommended local model'],
   saving_config: ['saving local ai configuration', 'finishing local ai setup'],
   ready: ['local ai is ready'],
-  error: ['managed ollama local ai setup failed', 'local ai setup needs attention'],
+  error: ['managed local ai setup failed', 'local ai setup needs attention'],
 }
 
 const STATUS_DELIMITERS = [' -- ', ' - ', ' | ', ': ']
@@ -58,7 +58,7 @@ export function localAISetupPhaseLabel(phase: LocalAISetupStatus['phase']): stri
   switch (phase) {
     case 'checking': return 'Checking'
     case 'needs_setup': return 'Setup needed'
-    case 'starting_ollama': return 'Starting'
+    case 'starting_runtime': return 'Starting'
     case 'pulling_model': return 'Downloading'
     case 'saving_config': return 'Finishing'
     case 'ready': return 'Ready'
@@ -106,14 +106,14 @@ export function toStatusError(error: unknown): LocalAIStatus {
 }
 
 function cleanStatusText(message: string, hasProgress: boolean): string {
-  const withoutOutput = normalizeText(message.split(/recent ollama output:/i)[0] || '')
+  const withoutOutput = normalizeText(message.split(/recent runtime output:/i)[0] || '')
   if (!withoutOutput) return ''
   const withoutPercent = hasProgress ? normalizeText(withoutOutput.replace(/\b\d{1,3}%\b/g, '')) : withoutOutput
   return truncateText(withoutPercent.replace(/\s+[-|:]\s*$/, ''), 120)
 }
 
 function cleanErrorText(message: string | undefined): string {
-  return truncateText(normalizeText((message || '').split(/recent ollama output:/i)[0] || ''), 180)
+  return truncateText(normalizeText((message || '').split(/recent runtime output:/i)[0] || ''), 180)
 }
 
 function cleanDebugDetail(detail: string | undefined): string | undefined {
@@ -138,7 +138,7 @@ function legacyErrorView(error: string | undefined): LocalAISetupErrorView | nul
   if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' }
   if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' }
   if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
-  if (matchesText(text, ['another ollama process', 'app-owned runtime', '127.0.0.1:11435', 'address already in use'])) return { title: "Another Ollama process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11435 for its managed runtime. Stop the other Ollama process manually, then retry setup.', compact: 'Another Ollama is using 11435.', ownershipHelp: buildOwnershipHelp(undefined) }
+  if (matchesText(text, ['another process', 'app-owned runtime', '127.0.0.1:11436', 'address already in use'])) return { title: "Another process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11436 for its managed runtime. Stop the other process manually, then retry setup.', compact: 'Local port already in use.', ownershipHelp: buildOwnershipHelp(undefined) }
   return matchesText(text, ['spawn', 'listen', 'whisper']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
 }
 

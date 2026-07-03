@@ -1,8 +1,16 @@
 {
-  "ollama": {
-    "release": "v0.30.10",
-    "artifact": "ollama-darwin.tgz",
-    "sha256": "ad8a4d2918ed09480b8160419570602b4f49e48c9e3792efb601c0f54619e48e"
+  "llamacpp": {
+    "release": "b9864",
+    "artifacts": {
+      "arm64": {
+        "name": "llama-b9864-bin-macos-arm64.tar.gz",
+        "sha256": "e7b003da9f583223560924bb2cf5fd1f7dc33acc74a30a7c1b2d3c9aceaec6e5"
+      },
+      "x64": {
+        "name": "llama-b9864-bin-macos-x64.tar.gz",
+        "sha256": "a5a52ef0d9f8ed939813965fc82139d319932cbe764004533f19adb34e043952"
+      }
+    }
   },
   "whisper": {
     "release": "v1.7.6",

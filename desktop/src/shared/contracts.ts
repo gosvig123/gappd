@@ -27,7 +27,7 @@ export function isManagedLocalAIConfigured(config: LocalAIConfig | null | undefi
 export type LocalAISetupPhase =
   | 'checking'
   | 'needs_setup'
-  | 'starting_ollama'
+  | 'starting_runtime'
   | 'pulling_model'
   | 'saving_config'
   | 'ready'

@@ -1,11 +1,11 @@
 import type { LocalAIConfig, LocalAIStatus } from '../shared/contracts'
-import { getManagedOllamaStatus } from './ollama'
+import { getManagedLlamaCppStatus } from './llamacpp'
 import { bundledWhisperAvailable, managedWhisperModelAvailable, missingBundledWhisperMessage, missingManagedWhisperModelMessage } from './whisper'
 
 export type LocalAIConfigProbe = { config: LocalAIConfig | null; error?: string }
 
 export async function runtimeLocalAIStatus(probe: LocalAIConfigProbe): Promise<LocalAIStatus> {
-  return withWhisperReadiness(await getManagedOllamaStatus(probe.config, probe.error))
+  return withWhisperReadiness(await getManagedLlamaCppStatus(probe.config, probe.error))
 }
 
 async function withWhisperReadiness(next: LocalAIStatus): Promise<LocalAIStatus> {

@@ -23,7 +23,7 @@ type MeetingDeleteInput struct {
 	ID string `json:"id"`
 }
 
-type ConfigUseManagedOllamaInput struct {
+type ConfigUseManagedLocalAIInput struct {
 	Endpoint    string   `json:"endpoint"`
 	Model       string   `json:"model"`
 	Temperature *float64 `json:"temperature,omitempty"`
@@ -65,8 +65,7 @@ var Commands = []CommandSpec{
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
-	{ID: "config.useManagedOllama", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedOllamaInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-ollama"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
-	{ID: "config.resetManagedOllama", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "reset-managed-ollama")},
+	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[RecoverStaleInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: []CommandArg{lit("app"), lit("record"), lit("recover-stale"), lit("--json"), flag("model", "modelPath", false)}, Env: []string{"GAPPD_WHISPER_BIN"}},
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("model", "modelPath", false)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH", "GAPPD_WHISPER_BIN"}, Terminal: []recording.EventName{recording.EventCompleted, recording.EventFailed}},
 }

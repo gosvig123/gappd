@@ -5,7 +5,7 @@
 `gappd` is botless: it records local Mac audio instead of joining calls.
 
 ```
-Mic/System audio ──▶ capture-helper ──▶ WAV files ──▶ whisper-local ──▶ SQLite segments ──▶ Ollama notes
+Mic/System audio ──▶ capture-helper ──▶ WAV files ──▶ whisper-local ──▶ SQLite segments ──▶ llama.cpp notes
 ```
 
 ## Implemented Design
@@ -28,7 +28,7 @@ Mic/System audio ──▶ capture-helper ──▶ WAV files ──▶ whisper-
 
 ### Enhancement
 
-- Ollama is the only AI provider.
+- llama.cpp is the only AI runtime.
 - Enhancement runs two stages:
   1. extract participants, topics, decisions, actions, questions, and sentiment as JSON;
   2. synthesize meeting notes from extracted JSON and optional user notes.
@@ -46,7 +46,7 @@ start
   ├─ mark capture=captured, processing=processing
   ├─ transcribe mic/system WAV files
   ├─ insert segments
-  ├─ run Ollama extraction/synthesis
+  ├─ run llama.cpp extraction/synthesis
   └─ save transcript, summary, processing=completed
 ```
 
@@ -58,7 +58,7 @@ Failure states are persisted on the meeting row:
 | No captured audio | `capture=failed` |
 | Whisper model missing | `processing=failed` |
 | Transcription error | `processing=failed` |
-| Ollama/enhancement error | `processing=failed`, transcript retained |
+| llama.cpp/enhancement error | `processing=failed`, transcript retained |
 
 ## Storage
 
@@ -84,7 +84,7 @@ internal/transcribe/
 └── whisper.go      # whisper-local execution and parsing
 
 internal/ai/
-├── ollama.go       # Ollama HTTP client
+├── openai_compat.go # llama-server HTTP client
 ├── pipeline.go     # extraction/synthesis orchestration
 └── prompts.go      # prompt templates
 ```

@@ -20,8 +20,8 @@ func TestLoadReturnsDefaultsWhenConfigMissing(t *testing.T) {
 	if cfg.DBPath != wantDBPath {
 		t.Fatalf("cfg.DBPath = %q, want %q", cfg.DBPath, wantDBPath)
 	}
-	if cfg.AI.Provider != "ollama" {
-		t.Fatalf("cfg.AI.Provider = %q, want %q", cfg.AI.Provider, "ollama")
+	if cfg.AI.Provider != ProviderLlamaCpp {
+		t.Fatalf("cfg.AI.Provider = %q, want %q", cfg.AI.Provider, ProviderLlamaCpp)
 	}
 }
 
@@ -49,6 +49,31 @@ func TestLoadToleratesGoogleCalendarConfig(t *testing.T) {
 	writeConfigFile(t, home, "[google]\nclient_id = \"id\"\nclient_secret = \"secret\"\ntoken_path = \"token.json\"\n")
 	if _, err := Load(); err != nil {
 		t.Fatalf("Load returned error: %v", err)
+	}
+}
+
+func TestLoadAcceptsLlamaCppProvider(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	writeConfigFile(t, home, "[ai]\nprovider = \"llamacpp\"\nmodel = \"LiquidAI/LFM2-2.6B-Transcript-GGUF\"\nendpoint = \"http://127.0.0.1:11436\"\ntemperature = 0.3\n")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.AI.Provider != ProviderLlamaCpp {
+		t.Fatalf("cfg.AI.Provider = %q, want %q", cfg.AI.Provider, ProviderLlamaCpp)
+	}
+}
+
+func TestLoadRejectsUnsupportedProvider(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	writeConfigFile(t, home, "[ai]\nprovider = \"remote\"\nmodel = \"x\"\nendpoint = \"http://localhost\"\ntemperature = 0.3\n")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "unsupported AI provider") {
+		t.Fatalf("Load error = %v, want unsupported provider", err)
 	}
 }
 
