@@ -6,7 +6,7 @@
     "dev": "npm run desktop:dev",
     "desktop:install": "npm --prefix ./desktop ci",
     "desktop:preflight": "npm --prefix ./desktop run preflight:macos",
-    "desktop:prepare": "npm --prefix ./desktop run prepare:llamacpp && npm --prefix ./desktop run prepare:whisper && npm --prefix ./desktop run native:prepare -- build",
+    "desktop:prepare": "npm --prefix ./desktop run prepare:llamacpp && npm --prefix ./desktop run native:prepare -- build",
     "desktop:bootstrap": "npm run desktop:install && npm run desktop:preflight && npm run desktop:prepare",
     "desktop:typecheck": "npm --prefix ./desktop run typecheck",
     "desktop:dev:prepare": "npm --prefix ./desktop run dev:prepare",

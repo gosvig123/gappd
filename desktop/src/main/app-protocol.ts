@@ -8,7 +8,7 @@ import {
   type AppStreamID,
 } from '../shared/generated/app-protocol'
 import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
-import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveGappdBinary } from './native-runtime'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
   onEvent(event: AppStreamEvent<ID>): void
@@ -30,7 +30,7 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), ...overrides })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), ...overrides })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {

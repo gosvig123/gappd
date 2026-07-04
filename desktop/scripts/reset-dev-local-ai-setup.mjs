@@ -13,7 +13,6 @@ const TCC_CLIENTS = ['dev.gappd.desktop', 'dev.gappd.capture', 'com.github.Elect
 const TARGETS = [
   [path.join(os.homedir(), '.gappd', 'config.toml'), 'config.toml'],
   [path.join(APP_SUPPORT, 'llamacpp-models'), 'llamacpp-models'],
-  [path.join(APP_SUPPORT, 'whisper-models'), 'whisper-models'],
 ]
 
 await mkdir(BACKUP_DIR, { recursive: true })

@@ -10,6 +10,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 	"github.com/spf13/cobra"
 )
 
@@ -95,6 +96,13 @@ func setupCmd() *cobra.Command {
 			}
 			fmt.Println("✓ connected to", cfg.AI.Endpoint)
 			fmt.Println("  model:", cfg.AI.Model)
+
+			fmt.Print("Preparing Apple speech model... ")
+			if err := transcribe.PrepareSpeechAsset(cmd.Context()); err != nil {
+				fmt.Println("✗")
+				return err
+			}
+			fmt.Println("✓")
 
 			fmt.Print("Initializing database... ")
 			store, err := openDB(cfg)

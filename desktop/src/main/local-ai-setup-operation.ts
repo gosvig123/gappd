@@ -2,10 +2,10 @@ import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, typ
 import { MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
 import type { LocalAISetupInput } from '../shared/ipc-contract'
 import { getLocalAIConfig, saveManagedLocalAIConfig } from './gappd'
+import { appleSpeechAssetAvailable, ensureAppleSpeechAsset, missingAppleSpeechAssetMessage } from './apple-speech'
 import { ensureManagedLanguageModel, managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
 import { ensureManagedLlamaCppRunning, managedLlamaCppSupported } from './llamacpp'
 import { createObservableState } from './observable-state'
-import { bundledWhisperAvailable, ensureManagedWhisperModel, managedWhisperModelAvailable, missingBundledWhisperMessage, missingManagedWhisperModelMessage } from './whisper'
 import { errorStatus, localAISetupStatusFrom, localAIStatusFrom, managedModelStatus, managedStatus, needsSetupStatus } from './local-ai-status'
 import { runtimeLocalAIStatus } from './local-ai-runtime-status'
 
@@ -62,9 +62,8 @@ async function bootstrapManagedLlamaCppConfig(runId: number, config: LocalAIConf
 
 async function publishLlamaCppReadiness(runId: number, model: string, endpoint: string): Promise<void> {
   if (!(await managedLanguageModelAvailable(model))) return void setBootstrapStatus(runId, missingLanguageModelStatus(endpoint, model))
-  if (!(await bundledWhisperAvailable())) return void setBootstrapStatus(runId, errorStatus(missingBundledWhisperMessage(), 'checking', model))
-  if (!(await managedWhisperModelAvailable())) return void setBootstrapStatus(runId, missingWhisperStatus(endpoint, model))
-  setBootstrapStatus(runId, managedStatus('ready', 'Managed llama.cpp is ready', { endpoint, model }))
+  if (!(await appleSpeechAssetAvailable())) return void setBootstrapStatus(runId, missingSpeechStatus(endpoint, model))
+  setBootstrapStatus(runId, managedStatus('ready', 'Managed local AI is ready', { endpoint, model }))
 }
 
 async function runSetupSingleFlight(model: string): Promise<LocalAISetupStatus> {
@@ -82,7 +81,7 @@ async function runManagedLlamaCppSetup(model: string): Promise<void> {
   setStatus(managedModelStatus(model, 'checking', 'Checking managed llama.cpp'))
   await downloadLanguageModel(model)
   const endpoint = await startLlamaCpp(model)
-  await downloadWhisperModel(model, endpoint)
+  await downloadSpeechModel(model, endpoint)
   setStatus(managedModelStatus(model, 'saving_config', 'Saving local AI configuration', { endpoint }))
   const config = await saveManagedLocalAIConfig({ endpoint, model })
   setStatus(managedStatus('ready', 'Local AI is ready', { endpoint: config.endpoint, model: config.model }))
@@ -99,9 +98,9 @@ async function startLlamaCpp(model: string): Promise<string> {
   return endpoint
 }
 
-async function downloadWhisperModel(model: string, endpoint: string): Promise<void> {
-  setStatus(managedModelStatus(model, 'pulling_model', 'Preparing speech model download', { endpoint, progress: undefined, pullStage: 'preparing' }))
-  await ensureManagedWhisperModel((update) => setPullStatus(model, endpoint, 'Downloading speech model', update))
+async function downloadSpeechModel(model: string, endpoint: string): Promise<void> {
+  setStatus(managedModelStatus(model, 'pulling_model', 'Preparing Apple speech model', { endpoint, progress: undefined, pullStage: 'preparing' }))
+  await ensureAppleSpeechAsset((update) => setPullStatus(model, endpoint, 'Downloading Apple speech model', update))
 }
 
 async function localAIStatusFor(operation: LocalAISetupStatus, refreshOperation: boolean): Promise<LocalAIStatus> {
@@ -148,12 +147,12 @@ function externalConfigStatus(config: LocalAIConfig): LocalAISetupStatus {
   return needsSetupStatus({ managed: false, endpoint: config.endpoint, model: config.model, message: 'Desktop is configured for external Local AI. Run Local AI setup to switch to the managed runtime.' })
 }
 
-function missingWhisperStatus(endpoint: string, model: string): LocalAISetupStatus {
-  return needsSetupStatus({ endpoint, model, message: missingManagedWhisperModelMessage(), canRetry: true })
-}
-
 function missingLanguageModelStatus(endpoint: string, model: string): LocalAISetupStatus {
   return needsSetupStatus({ endpoint, model, message: missingManagedLanguageModelMessage(), canRetry: true })
+}
+
+function missingSpeechStatus(endpoint: string, model: string): LocalAISetupStatus {
+  return needsSetupStatus({ endpoint, model, message: missingAppleSpeechAssetMessage(), canRetry: true })
 }
 
 function validatedSetupModel(model: string): string {

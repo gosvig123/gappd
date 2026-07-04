@@ -84,7 +84,7 @@ func (r recordingSession) requireAudio() error {
 func (r recordingSession) process(req Request, processing meetingProcessing) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	err := processing.processCaptured(ctx, r, req.ModelPath, req.DefaultModelPath)
+	err := processing.processCaptured(ctx, r)
 	if err != nil && req.SuppressProcessingFailure {
 		fmt.Fprintf(r.errOut, "warning: post-processing failed after capture: %v\n", err)
 		return nil
