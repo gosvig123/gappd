@@ -1,7 +1,10 @@
 import type { Device, RecordingState } from '../shared/contracts'
 import type { StartRecordingInput } from '../shared/ipc-contract'
-import { getDevices, requestCapturePermissions, startRecording, startStaleRecordingRecovery, stopRecording } from './gappd'
+import { requestCapturePermissions } from './capture-permissions'
+import { getDevices } from './meetings'
+import { startRecording, stopRecording } from './recording-process'
 import { getRecordingState } from './state'
+import { startStaleRecordingRecovery } from './stale-recording-recovery'
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
