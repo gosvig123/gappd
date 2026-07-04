@@ -35,6 +35,7 @@ function useDashboardViewActions(actions: MeetingActions, recording: RecordingWo
     start: recording.actions.start,
     stop: recording.actions.stop,
     setDevice: recording.actions.setDevice,
+    setLanguage: recording.actions.setLanguage,
     openPermissionsSettings: () => recording.actions.openPermissionsSettings(state.error ?? recording.recording.error ?? null),
   }), [actions, recording.actions, recording.recording.error, state.error])
 }
@@ -122,6 +123,7 @@ type DashboardActions = MeetingActions & {
   start(): void
   stop(): void
   setDevice(device: number): void
+  setLanguage(language: string): void
   openPermissionsSettings(): void
 }
 type DashboardState = ReturnType<typeof useDashboardState>[0]
@@ -176,6 +178,7 @@ function buildDashboardViewModel(state: DashboardState, recording: RecordingWork
     ...state,
     devices: recording.devices,
     device: recording.device,
+    language: recording.language,
     recording: recording.recording,
     recoveringStale: recording.recoveringStale,
     staleRecoveryNotice: recording.staleRecoveryNotice,

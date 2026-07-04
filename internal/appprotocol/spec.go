@@ -30,9 +30,10 @@ type ConfigUseManagedLocalAIInput struct {
 }
 
 type RecordStartInput struct {
-	Title  string `json:"title"`
-	Device int    `json:"device"`
-	Mode   string `json:"mode"`
+	Title    string `json:"title"`
+	Device   int    `json:"device"`
+	Mode     string `json:"mode"`
+	Language string `json:"language"`
 }
 
 type CommandArg struct {
@@ -62,7 +63,7 @@ var Commands = []CommandSpec{
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json"), Env: []string{"GAPPD_APPLE_SPEECH_BIN"}},
-	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH", "GAPPD_APPLE_SPEECH_BIN"}, Terminal: []recording.EventName{recording.EventCompleted, recording.EventFailed}},
+	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH", "GAPPD_APPLE_SPEECH_BIN"}, Terminal: []recording.EventName{recording.EventCompleted, recording.EventFailed}},
 }
 
 func RequestCommands() []CommandSpec {

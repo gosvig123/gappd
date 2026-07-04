@@ -24,8 +24,8 @@ type appleSpeechSegment struct {
 	Text  string  `json:"text"`
 }
 
-func TranscribeFile(ctx context.Context, audioPath string) ([]Segment, error) {
-	out, err := runAppleSpeech(ctx, audioPath, speechLocale())
+func TranscribeFile(ctx context.Context, audioPath, locale string) ([]Segment, error) {
+	out, err := runAppleSpeech(ctx, audioPath, speechLocaleOr(locale))
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,13 @@ func TranscribeFile(ctx context.Context, audioPath string) ([]Segment, error) {
 func PrepareSpeechAsset(ctx context.Context) error {
 	_, err := runAppleSpeech(ctx, "--prepare", speechLocale())
 	return err
+}
+
+func speechLocaleOr(locale string) string {
+	if locale != "" {
+		return locale
+	}
+	return speechLocale()
 }
 
 func runAppleSpeech(ctx context.Context, args ...string) ([]byte, error) {

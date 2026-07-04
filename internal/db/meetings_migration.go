@@ -20,6 +20,7 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 	needsProcessingStatusUpdatedAtBackfill := !columns["processing_status_updated_at"]
 	needsProcessingFailureBackfill := !columns["processing_failure_message"]
 	needsExtractionJSONBackfill := !columns["extraction_json"]
+	needsLanguageBackfill := !columns["language"]
 
 	if needsStatusBackfill {
 		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN status TEXT NOT NULL DEFAULT 'recording' CHECK (status IN ('recording', 'processing', 'completed', 'failed'))`)
@@ -79,6 +80,12 @@ func (d *DB) upgradeMeetingsLifecycle(ctx context.Context, conn *sql.Conn) error
 		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN extraction_json TEXT`)
 		if err != nil {
 			return fmt.Errorf("add meetings.extraction_json: %w", err)
+		}
+	}
+	if needsLanguageBackfill {
+		_, err = conn.ExecContext(ctx, `ALTER TABLE meetings ADD COLUMN language TEXT NOT NULL DEFAULT 'en_US'`)
+		if err != nil {
+			return fmt.Errorf("add meetings.language: %w", err)
 		}
 	}
 

@@ -1,5 +1,6 @@
 import type { Device, RecordingState } from '../shared/contracts'
 import type { StartRecordingInput } from '../shared/ipc-contract'
+import { DEFAULT_TRANSCRIPTION_LANGUAGE } from '../shared/transcription-languages'
 import { requestCapturePermissions } from './capture-permissions'
 import { getDevices } from './meetings'
 import { startRecording, stopRecording } from './recording-process'
@@ -13,7 +14,7 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   if (selectedDevice === null) throw new Error(NO_INPUT_DEVICE_ERROR)
   const permissionError = capturePermissionError(await requestCapturePermissions())
   if (permissionError) throw new Error(permissionError)
-  await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE })
+  await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE, language: recordingLanguage(input.language) })
   return getRecordingState()
 }
 
@@ -31,6 +32,10 @@ function selectedDeviceIndex(devices: Device[], requested?: number): number | nu
 function recordingTitle(title?: string): string {
   const trimmed = title?.trim()
   return trimmed || new Date().toLocaleString()
+}
+
+function recordingLanguage(language?: string): string {
+  return language?.trim() || DEFAULT_TRANSCRIPTION_LANGUAGE
 }
 
 function capturePermissionError(permissions: Awaited<ReturnType<typeof requestCapturePermissions>>): string | null {

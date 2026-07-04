@@ -28,6 +28,7 @@ type RunOptions struct {
 	PreviousNotes string
 	RefineNotes   bool
 	OnProgress    func(Progress)
+	Language      string
 }
 
 type Pipeline struct {
@@ -40,33 +41,33 @@ func NewPipeline(provider Provider, temperature float64) *Pipeline {
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractChunk(ctx, transcript)
+	return p.extractChunk(ctx, transcript, "")
 }
 
 func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractLong(ctx, transcript, nil)
+	return p.extractLong(ctx, transcript, nil, "")
 }
 
-func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress)) (*Extraction, error) {
+func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language string) (*Extraction, error) {
 	chunks := transcriptChunks(transcript)
 	if len(chunks) > maxTranscriptChunks {
 		return nil, fmt.Errorf("transcript too large: %d chunks exceeds limit %d", len(chunks), maxTranscriptChunks)
 	}
 	if len(chunks) == 1 {
-		return p.Extract(ctx, transcript)
+		return p.extractChunk(ctx, transcript, language)
 	}
-	extractions, err := p.extractChunks(ctx, chunks, progress)
+	extractions, err := p.extractChunks(ctx, chunks, progress, language)
 	if err != nil {
 		return nil, err
 	}
-	return p.refineMergedExtraction(ctx, extractions, progress)
+	return p.refineMergedExtraction(ctx, extractions, progress, language)
 }
 
-func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress func(Progress)) ([]*Extraction, error) {
+func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress func(Progress), language string) ([]*Extraction, error) {
 	extractions := make([]*Extraction, 0, len(chunks))
 	for index, chunk := range chunks {
 		emitProgress(progress, ProgressExtract, index+1, len(chunks))
-		extraction, err := p.extractChunk(ctx, chunk)
+		extraction, err := p.extractChunk(ctx, chunk, language)
 		if err != nil {
 			return nil, err
 		}
@@ -75,14 +76,14 @@ func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress 
 	return extractions, nil
 }
 
-func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress)) (*Extraction, error) {
+func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress), language string) (*Extraction, error) {
 	merged := mergeExtractions(extractions)
 	emitProgress(progress, ProgressRefineExtraction, 1, 1)
-	return p.RefineExtraction(ctx, merged)
+	return p.refineExtraction(ctx, merged, language)
 }
 
-func (p *Pipeline) extractChunk(ctx context.Context, transcript string) (*Extraction, error) {
-	system, user := Stage1Prompt(transcript)
+func (p *Pipeline) extractChunk(ctx context.Context, transcript string, language string) (*Extraction, error) {
+	system, user := Stage1Prompt(transcript, language)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
 	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
@@ -96,11 +97,15 @@ func (p *Pipeline) extractChunk(ctx context.Context, transcript string) (*Extrac
 }
 
 func (p *Pipeline) Synthesize(ctx context.Context, extraction *Extraction, userNotes string) (string, error) {
+	return p.synthesize(ctx, extraction, userNotes, "")
+}
+
+func (p *Pipeline) synthesize(ctx context.Context, extraction *Extraction, userNotes string, language string) (string, error) {
 	data, err := json.Marshal(extraction)
 	if err != nil {
 		return "", fmt.Errorf("marshal extraction: %w", err)
 	}
-	system, user := Stage2Prompt(string(data), userNotes)
+	system, user := Stage2Prompt(string(data), userNotes, language)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
 	result, err := p.provider.Complete(ctx, req)
 	if err != nil {
@@ -114,7 +119,7 @@ func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string)
 }
 
 func (p *Pipeline) RunWithOptions(ctx context.Context, transcript string, options RunOptions) (*Extraction, string, error) {
-	extraction, err := p.extractLong(ctx, transcript, options.OnProgress)
+	extraction, err := p.extractLong(ctx, transcript, options.OnProgress, options.Language)
 	if err != nil {
 		return nil, "", err
 	}
@@ -134,7 +139,7 @@ func (p *Pipeline) notes(ctx context.Context, extraction *Extraction, options Ru
 		return draft, nil
 	}
 	emitProgress(options.OnProgress, ProgressRefineNotes, 1, 1)
-	return p.RefineNotes(ctx, extraction, draft, options.RefinementGuidance())
+	return p.RefineNotes(ctx, extraction, draft, options.RefinementGuidance(), options.Language)
 }
 
 func (p *Pipeline) draftNotes(ctx context.Context, extraction *Extraction, options RunOptions) (string, error) {
@@ -142,7 +147,7 @@ func (p *Pipeline) draftNotes(ctx context.Context, extraction *Extraction, optio
 		return options.PreviousNotes, nil
 	}
 	emitProgress(options.OnProgress, ProgressSynthesize, 1, 1)
-	return p.Synthesize(ctx, extraction, options.UserNotes)
+	return p.synthesize(ctx, extraction, options.UserNotes, options.Language)
 }
 
 func (o RunOptions) wantsNoteRefinement() bool {

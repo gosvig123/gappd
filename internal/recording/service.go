@@ -12,6 +12,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
@@ -49,7 +50,7 @@ type transcriber interface {
 
 type enhancer interface {
 	RunWithOptions(context.Context, string, ai.RunOptions) (*ai.Extraction, string, error)
-	RefineNotes(context.Context, *ai.Extraction, string, string) (string, error)
+	RefineNotes(context.Context, *ai.Extraction, string, string, string) (string, error)
 }
 
 type meetingStore interface {
@@ -67,6 +68,7 @@ type Request struct {
 	DeviceIdx                 int
 	Title                     string
 	Mode                      capture.CaptureMode
+	Language                  string
 	SuppressProcessingFailure bool
 }
 
@@ -88,11 +90,12 @@ func (s Service) Run(req Request) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
 	}
+	req.Language = meetinglang.Normalize(req.Language)
 	sessionDir, err := s.createSessionDir(req.Title)
 	if err != nil {
 		return err
 	}
-	meeting, err := s.startMeeting(req.Title, sessionDir)
+	meeting, err := s.startMeeting(req.Title, sessionDir, req.Language)
 	if err != nil {
 		return err
 	}

@@ -110,6 +110,7 @@ export type RecordStartInput = {
   title: string
   device: number
   mode: string
+  language: string
 }
 
 export type RecordingEvent = {

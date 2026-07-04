@@ -15,7 +15,7 @@ const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPI
 
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string }): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string; language: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   await ensureManagedLocalAIReady()
   logMainProcessMemory('recording:start')

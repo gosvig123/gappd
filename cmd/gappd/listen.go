@@ -7,6 +7,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/config"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
@@ -15,18 +16,20 @@ func listenCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
 	var mode string
+	var language string
 
 	cmd := &cobra.Command{
 		Use:   "listen",
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := capture.CaptureMode(mode)
-			return runListen(deviceIdx, title, m, false)
+			return runListen(deviceIdx, title, m, language, false)
 		},
 	}
 	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
 	cmd.Flags().StringVarP(&title, "title", "t", "", "Session title")
 	cmd.Flags().StringVar(&mode, "mode", "both", "Capture mode: mic, system, or both (default); \"both\" captures mic + system audio for meetings")
+	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
 	return cmd
 }
 
@@ -47,7 +50,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title string, mode capture.CaptureMode, suppressProcessingFailure bool) error {
+func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, suppressProcessingFailure bool) error {
 	_, store, pipeline, err := loadDeps()
 	if err != nil {
 		return err
@@ -75,6 +78,7 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, suppressPr
 		DeviceIdx:                 deviceIdx,
 		Title:                     title,
 		Mode:                      mode,
+		Language:                  language,
 		SuppressProcessingFailure: suppressProcessingFailure,
 	})
 }

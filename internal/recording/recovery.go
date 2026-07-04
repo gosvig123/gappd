@@ -74,7 +74,7 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
 		return true, err
 	}
-	err := s.processing().processCaptured(ctx, session)
+	err := s.processing().processCaptured(ctx, session, meeting.Language)
 	return s.finishStaleProcessing(err, opts)
 }
 

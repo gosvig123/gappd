@@ -6,13 +6,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 const (
 	appleSpeechBinaryName = "apple-speech-transcriber"
 	appleSpeechBinEnv     = "GAPPD_APPLE_SPEECH_BIN"
 	appleSpeechLocaleEnv  = "GAPPD_SPEECH_LOCALE"
-	defaultSpeechLocale   = "en_US"
 )
 
 func findAppleSpeechBinary() (string, error) {
@@ -58,7 +59,7 @@ func speechLocale() string {
 	if locale := strings.TrimSpace(os.Getenv(appleSpeechLocaleEnv)); locale != "" {
 		return locale
 	}
-	return defaultSpeechLocale
+	return meetinglang.DefaultCode
 }
 
 func isExecutableFile(path string) (bool, error) {

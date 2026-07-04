@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 const (
@@ -17,12 +18,12 @@ type meetingLifecycle struct {
 	meeting *db.Meeting
 }
 
-func newRecordingMeeting(title, sessionDir, at string) *db.Meeting {
+func newRecordingMeeting(title, sessionDir, language, at string) *db.Meeting {
 	return &db.Meeting{
 		Title: title, StartedAt: at, AudioPath: &sessionDir,
 		CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: at,
 		ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: at,
-		Source: "listen",
+		Language: meetinglang.Normalize(language), Source: "listen",
 	}
 }
 
