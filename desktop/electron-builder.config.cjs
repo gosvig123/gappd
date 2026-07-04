@@ -1,6 +1,6 @@
 const hooks = require('./scripts/electron-builder-hooks.cjs')
 
-const MACOS_MINIMUM_SYSTEM_VERSION = '14.0'
+const MACOS_MINIMUM_SYSTEM_VERSION = '26.0'
 const MAC_SIGNING_IDENTITY = process.env.APPLE_SIGNING_IDENTITY || process.env.CSC_NAME || '-'
 const MAC_BUNDLE_SHORT_VERSION = process.env.GAPPD_BUNDLE_SHORT_VERSION
 const MAC_BUILD_VERSION = process.env.GAPPD_BUILD_VERSION
@@ -17,9 +17,9 @@ module.exports = {
   files: ['dist/**', 'dist-electron/**'],
   extraResources: [
     { from: '../build/gappd', to: 'bin/gappd' },
+    { from: '../build/GappdSpeechTranscriber.app', to: 'GappdSpeechTranscriber.app' },
     { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
     { from: 'resources/llamacpp', to: 'llamacpp' },
-    { from: 'resources/whisper/whisper-cli', to: 'whisper/whisper-cli' },
   ],
   afterPack: hooks.afterPack,
   afterSign: hooks.afterSign,
@@ -36,6 +36,7 @@ module.exports = {
       NSAudioCaptureUsageDescription: 'Gappd captures system audio to transcribe your meetings.',
       NSMicrophoneUsageDescription: 'Gappd captures your microphone to transcribe your voice.',
       NSScreenCaptureUsageDescription: 'Gappd uses screen capture to access system audio for meeting transcription.',
+      NSSpeechRecognitionUsageDescription: 'Gappd uses on-device Apple Speech to transcribe meeting audio.',
     },
     entitlements: 'build/entitlements.mac.plist',
     entitlementsInherit: 'build/entitlements.mac.inherit.plist',

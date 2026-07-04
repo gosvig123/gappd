@@ -8,9 +8,9 @@ DB_PATH   := ~/.gappd/db.sqlite
 SCHEMA    := ./internal/db/schema.sql
 UNAME_S   := $(shell uname -s)
 
-export MACOSX_DEPLOYMENT_TARGET ?= 13.0
+export MACOSX_DEPLOYMENT_TARGET ?= 26.0
 
-.PHONY: build build-capture ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
+.PHONY: build build-capture build-speech ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -19,6 +19,9 @@ build:
 
 build-capture: ensure-macos
 	@bash capture-helper/build.sh
+
+build-speech: ensure-macos
+	@bash apple-speech-transcriber/build.sh
 
 ensure-macos:
 	@if [ "$(UNAME_S)" != "Darwin" ]; then \

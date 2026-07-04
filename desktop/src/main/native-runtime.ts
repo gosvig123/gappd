@@ -3,6 +3,7 @@ import { resolveBinary } from './binaries'
 
 const CAPTURE_APP_ENV = 'GAPPD_CAPTURE_APP_PATH'
 const CAPTURE_HELPER_ENV = 'GAPPD_CAPTURE_HELPER_PATH'
+const SPEECH_HELPER_ENV = 'GAPPD_APPLE_SPEECH_BIN'
 const MACOS_EXECUTABLE_MARKER = `${path.sep}Contents${path.sep}MacOS${path.sep}`
 
 export function resolveCaptureBinary(): string {
@@ -31,6 +32,14 @@ export function resolveGappdBinary(): string {
     envVar: 'GAPPD_BINARY_PATH',
     packaged: ['bin', 'gappd'],
     dev: ['..', 'build', 'gappd'],
+  })
+}
+
+export function resolveSpeechTranscriberBinary(): string {
+  return resolveBinary({
+    envVar: SPEECH_HELPER_ENV,
+    packaged: ['GappdSpeechTranscriber.app', 'Contents', 'MacOS', 'apple-speech-transcriber'],
+    dev: ['..', 'build', 'GappdSpeechTranscriber.app', 'Contents', 'MacOS', 'apple-speech-transcriber'],
   })
 }
 

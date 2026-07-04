@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { downloadFile, fileSha256, runCommand } from './bundle-utils.mjs'
 import runtimeManifest from '../src/shared/runtime-manifest.json' with { type: 'json' }
 
-const DEFAULT_MACOS_MIN_VERSION = '14.0'
+const DEFAULT_MACOS_MIN_VERSION = '26.0'
 const MAC_BUILD_ARM64 = 'arm64'
 const MAC_BUILD_X64 = 'x64'
 const MAC_BUILD_UNIVERSAL = 'universal'

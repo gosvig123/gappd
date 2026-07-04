@@ -8,7 +8,6 @@ import type { CapturePermissions } from '../shared/ipc-contract'
 import { requestCommand } from './app-protocol'
 import { ensureManagedLocalAIReady } from './local-ai-config'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
-import { getValidatedManagedWhisperPaths } from './whisper'
 
 export { getLocalAIConfig, saveManagedLocalAIConfig } from './local-ai-config'
 export { startRecording, stopActiveRecordingForQuit, stopRecording } from './recording-process'
@@ -105,21 +104,35 @@ export function stopStaleRecordingRecovery(): void {
 }
 
 export async function recoverStaleRecordings(): Promise<number> {
-  const whisper = await getValidatedManagedWhisperPaths()
   await ensureManagedLocalAIReady()
-  const result = await requestCommand('record.recoverStale', { modelPath: whisper.modelPath }, { GAPPD_WHISPER_BIN: whisper.binaryPath })
+  const result = await requestCommand('record.recoverStale', {})
   return result.recovered
 }
 
 function resolvePermissionResult(tmpFile: string, resolve: (value: CapturePermissions) => void, details: Record<string, string>): void {
   try {
     const result = JSON.parse(fs.readFileSync(tmpFile, 'utf8'))
-    resolve({ ...result, details: cleanPermissionDetails({ ...details, ...result }) })
+    resolve(permissionResult(result, details))
   } catch {
-    resolve({ microphone: 'unknown', screen: 'unknown', details })
+    resolve(permissionFallback(details))
   } finally {
     try { fs.unlinkSync(tmpFile) } catch {}
   }
+}
+
+function permissionResult(result: Record<string, string>, details: Record<string, string>): CapturePermissions {
+  const microphone = result.microphone || permissionFromExit(details.exitCode)
+  const screen = result.screen || permissionFromExit(details.exitCode)
+  return { microphone, screen, details: cleanPermissionDetails({ ...details, ...result, microphone, screen }) }
+}
+
+function permissionFallback(details: Record<string, string>): CapturePermissions {
+  const fallback = permissionFromExit(details.exitCode)
+  return { microphone: fallback, screen: fallback, details }
+}
+
+function permissionFromExit(exitCode: string): string {
+  return exitCode === '0' ? 'granted' : 'unknown'
 }
 
 function cleanPermissionDetails(details: Record<string, string>): Record<string, string> {

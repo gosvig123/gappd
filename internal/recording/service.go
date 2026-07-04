@@ -44,7 +44,7 @@ type audioRecorder interface {
 }
 
 type transcriber interface {
-	Transcribe(context.Context, string, string) ([]transcribe.Segment, error)
+	Transcribe(context.Context, string) ([]transcribe.Segment, error)
 }
 
 type enhancer interface {
@@ -66,8 +66,6 @@ type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 type Request struct {
 	DeviceIdx                 int
 	Title                     string
-	ModelPath                 string
-	DefaultModelPath          string
 	Mode                      capture.CaptureMode
 	SuppressProcessingFailure bool
 }

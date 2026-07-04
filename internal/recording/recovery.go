@@ -20,8 +20,6 @@ type RecoverStaleOptions struct {
 	Now                       time.Time
 	Timeout                   time.Duration
 	Limit                     int
-	ModelPath                 string
-	DefaultModelPath          string
 	SuppressProcessingFailure bool
 }
 
@@ -76,7 +74,7 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
 		return true, err
 	}
-	err := s.processing().processCaptured(ctx, session, opts.ModelPath, opts.DefaultModelPath)
+	err := s.processing().processCaptured(ctx, session)
 	return s.finishStaleProcessing(err, opts)
 }
 

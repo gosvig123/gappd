@@ -41,7 +41,7 @@ const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
   localAISetup: { ...operationApi.localAISetup, onStatusChanged: subscribe(IPC_EVENTS.localAISetup.statusChanged) },
-  settings: { ...operationApi.settings, onWhisperModelDownloadProgress: subscribe(IPC_EVENTS.settings.whisperModelDownloadProgress) },
+  settings: operationApi.settings,
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
 

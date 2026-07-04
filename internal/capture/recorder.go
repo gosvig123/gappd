@@ -22,17 +22,12 @@ const (
 	ModeSystem CaptureMode = "system"
 	ModeBoth   CaptureMode = "both"
 
-	captureAppEnv    = "GAPPD_CAPTURE_APP_PATH"
 	captureHelperEnv = "GAPPD_CAPTURE_HELPER_PATH"
 )
-
-const macOSExecutableMarker = "/Contents/MacOS/"
 
 type captureLaunch struct {
 	command string
 	args    []string
-	stop    string
-	viaOpen bool
 }
 
 type Recorder struct {
@@ -44,7 +39,6 @@ type Recorder struct {
 	stderr    bytes.Buffer
 	stdout    io.Writer
 	stopFile  string
-	viaOpen   bool
 }
 
 func NewRecorder(mode CaptureMode, outputDir string, deviceIdx int) *Recorder {
@@ -68,8 +62,6 @@ func (r *Recorder) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	r.stopFile = launch.stop
-	r.viaOpen = launch.viaOpen
 	r.cmd = exec.Command(launch.command, launch.args...)
 	r.cmd.Stdout = r.stdout
 	r.stderr.Reset()
@@ -90,7 +82,7 @@ func (r *Recorder) Start(ctx context.Context) error {
 			}
 			return fmt.Errorf("permission denied — check System Settings → Privacy & Security")
 		}
-		return fmt.Errorf("capture process failed to start: %v", err)
+		return captureStartFailure(err, r.stderr.String())
 	case <-ctx.Done():
 		_ = r.stopCaptureProcess(syscall.SIGINT)
 		<-errCh
@@ -128,9 +120,6 @@ func (r *Recorder) Stop() error {
 }
 
 func (r *Recorder) stopCaptureProcess(sig syscall.Signal) error {
-	if r.viaOpen {
-		return os.WriteFile(r.stopFile, []byte("stop"), 0o600)
-	}
 	return r.killProcessGroup(sig)
 }
 
@@ -146,30 +135,26 @@ func (r *Recorder) SystemPath() string {
 	return audioartifact.New(r.outputDir).SystemPath()
 }
 
-func findCaptureLaunch(args []string, outputDir string) (captureLaunch, error) {
+func findCaptureLaunch(args []string, _ string) (captureLaunch, error) {
 	bin, err := findCaptureBinary()
 	if err != nil {
 		return captureLaunch{}, err
 	}
-	if appPath, ok := captureAppForBinary(bin); ok {
-		return appLaunch(args, outputDir, appPath), nil
-	}
 	return captureLaunch{command: bin, args: args}, nil
 }
 
-func appLaunch(args []string, outputDir string, appPath string) captureLaunch {
-	stopFile := filepath.Join(outputDir, ".gappd-capture-stop")
-	_ = os.Remove(stopFile)
-	appArgs := append(args, "--stop-file", stopFile)
-	openArgs := append([]string{"-W", "-n", appPath, "--args"}, appArgs...)
-	return captureLaunch{command: "/usr/bin/open", args: openArgs, stop: stopFile, viaOpen: true}
-}
-
-func captureAppForBinary(binaryPath string) (string, bool) {
-	if override, ok := existingPath(os.Getenv(captureAppEnv)); ok {
-		return override, true
+func captureStartFailure(err error, stderr string) error {
+	msg := strings.TrimSpace(stderr)
+	if err == nil && msg != "" {
+		return fmt.Errorf("capture process exited immediately: %s", msg)
 	}
-	return existingPath(appPathFromBinary(binaryPath))
+	if err == nil {
+		return fmt.Errorf("capture process exited immediately")
+	}
+	if msg != "" {
+		return fmt.Errorf("capture process failed to start: %w: %s", err, msg)
+	}
+	return fmt.Errorf("capture process failed to start: %w", err)
 }
 
 func findCaptureBinary() (string, error) {
@@ -194,14 +179,6 @@ func existingPath(path string) (string, bool) {
 	}
 	_, err := os.Stat(cleaned)
 	return cleaned, err == nil
-}
-
-func appPathFromBinary(binaryPath string) string {
-	index := strings.Index(binaryPath, macOSExecutableMarker)
-	if index == -1 {
-		return ""
-	}
-	return binaryPath[:index]
 }
 
 func captureBinaryCandidates() []string {

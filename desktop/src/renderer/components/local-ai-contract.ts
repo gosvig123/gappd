@@ -139,7 +139,7 @@ function legacyErrorView(error: string | undefined): LocalAISetupErrorView | nul
   if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' }
   if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
   if (matchesText(text, ['another process', 'app-owned runtime', '127.0.0.1:11436', 'address already in use'])) return { title: "Another process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11436 for its managed runtime. Stop the other process manually, then retry setup.', compact: 'Local port already in use.', ownershipHelp: buildOwnershipHelp(undefined) }
-  return matchesText(text, ['spawn', 'listen', 'whisper']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
+  return matchesText(text, ['spawn', 'listen', 'speech']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
 }
 
 function splitStatusText(text: string): [string, string | undefined] {
