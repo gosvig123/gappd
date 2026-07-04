@@ -4,7 +4,6 @@ import { requestCapturePermissions } from './capture-permissions'
 import { getDevices } from './meetings'
 import { startRecording, stopRecording } from './recording-process'
 import { getRecordingState } from './state'
-import { startStaleRecordingRecovery } from './stale-recording-recovery'
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
@@ -21,10 +20,6 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
 export function stopMeetingRecordingWorkflow(): RecordingState {
   stopRecording()
   return getRecordingState()
-}
-
-export async function startStaleMeetingRecordingRecovery(): Promise<number> {
-  return startStaleRecordingRecovery()
 }
 
 function selectedDeviceIndex(devices: Device[], requested?: number): number | null {
