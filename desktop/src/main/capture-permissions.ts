@@ -3,19 +3,8 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { systemPreferences } from 'electron'
-import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { CapturePermissions } from '../shared/ipc-contract'
-import { requestCommand } from './app-protocol'
-import { ensureManagedLocalAIReady } from './local-ai-config'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
-
-export { getLocalAIConfig, saveManagedLocalAIConfig } from './local-ai-config'
-export { startRecording, stopActiveRecordingForQuit, stopRecording } from './recording-process'
-
-const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
-
-let staleRecoveryTimer: NodeJS.Timeout | null = null
-let staleRecoveryRunning = false
 
 export async function requestCapturePermissions(): Promise<CapturePermissions> {
   // The capture helper runs as a child of this app, so macOS TCC attributes the
@@ -37,20 +26,16 @@ export async function requestCapturePermissions(): Promise<CapturePermissions> {
   })
 }
 
-// Requests microphone access for this app (dev.gappd.desktop) on macOS. The app
-// is the TCC-responsible process for the capture helper, so granting it here is
-// what lets the helper record. Returns debug fields describing the transition.
 async function ensureAppMicrophoneAccess(): Promise<Record<string, string>> {
   if (process.platform !== 'darwin') return {}
   const before = systemPreferences.getMediaAccessStatus('microphone')
   if (before !== 'not-determined') return { appMicStatusBefore: before, appMicStatusAfter: before }
-  let granted = false
   try {
-    granted = await systemPreferences.askForMediaAccess('microphone')
+    const granted = await systemPreferences.askForMediaAccess('microphone')
+    return { appMicStatusBefore: before, appMicStatusAfter: granted ? 'granted' : 'denied' }
   } catch (error) {
     return { appMicStatusBefore: before, appMicStatusAfter: 'error', appMicError: String(error) }
   }
-  return { appMicStatusBefore: before, appMicStatusAfter: granted ? 'granted' : 'denied' }
 }
 
 function capturePermissionCommand(tmpFile: string): { bin: string; args: string[] } {
@@ -64,49 +49,7 @@ function capturePermissionEnv(): NodeJS.ProcessEnv {
 function capturePermissionDetails(command: { bin: string; args: string[] }): Record<string, string> {
   const appPath = resolveCaptureApp() ?? ''
   const helperPath = resolveCaptureBinary()
-  return {
-    launch: [command.bin, ...command.args].join(' '),
-    appPath,
-    helperPath,
-    appExists: String(Boolean(appPath && fs.existsSync(appPath))),
-    helperExists: String(fs.existsSync(helperPath)),
-  }
-}
-
-export async function getDevices(): Promise<Device[]> {
-  const result = await requestCommand('devices.list', {})
-  return result.devices
-}
-
-export async function listMeetings(): Promise<MeetingListItem[]> {
-  const result = await requestCommand('meetings.list', {})
-  return result.meetings
-}
-
-export async function showMeeting(id: string): Promise<MeetingDetail> {
-  const result = await requestCommand('meetings.show', { id })
-  return result.meeting
-}
-
-export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
-  return requestCommand('meetings.delete', { id })
-}
-
-export async function startStaleRecordingRecovery(): Promise<number> {
-  if (!staleRecoveryTimer) staleRecoveryTimer = setInterval(() => void runStaleRecordingRecovery(), STALE_RECORDING_RECOVERY_INTERVAL_MS)
-  return runStaleRecordingRecovery()
-}
-
-export function stopStaleRecordingRecovery(): void {
-  if (!staleRecoveryTimer) return
-  clearInterval(staleRecoveryTimer)
-  staleRecoveryTimer = null
-}
-
-export async function recoverStaleRecordings(): Promise<number> {
-  await ensureManagedLocalAIReady()
-  const result = await requestCommand('record.recoverStale', {})
-  return result.recovered
+  return { launch: [command.bin, ...command.args].join(' '), appPath, helperPath, appExists: String(Boolean(appPath && fs.existsSync(appPath))), helperExists: String(fs.existsSync(helperPath)) }
 }
 
 function resolvePermissionResult(tmpFile: string, resolve: (value: CapturePermissions) => void, details: Record<string, string>): void {
@@ -137,17 +80,4 @@ function permissionFromExit(exitCode: string): string {
 
 function cleanPermissionDetails(details: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(details).filter(([key]) => key !== 'microphone' && key !== 'screen'))
-}
-
-async function runStaleRecordingRecovery(): Promise<number> {
-  if (staleRecoveryRunning) return 0
-  staleRecoveryRunning = true
-  try {
-    return await recoverStaleRecordings()
-  } catch (error) {
-    console.error('stale recording recovery failed', error)
-    return 0
-  } finally {
-    staleRecoveryRunning = false
-  }
 }

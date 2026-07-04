@@ -1,7 +1,7 @@
 import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus, type LocalAISetupPullStage, type LocalAISetupStatus } from '../shared/contracts'
 import { MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
 import type { LocalAISetupInput } from '../shared/ipc-contract'
-import { getLocalAIConfig, saveManagedLocalAIConfig } from './gappd'
+import { getLocalAIConfig, saveManagedLocalAIConfig } from './local-ai-config'
 import { appleSpeechAssetAvailable, ensureAppleSpeechAsset, missingAppleSpeechAssetMessage } from './apple-speech'
 import { ensureManagedLanguageModel, managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
 import { ensureManagedLlamaCppRunning, managedLlamaCppSupported } from './llamacpp'
