@@ -37,6 +37,7 @@ type Recorder struct {
 	cmd       *exec.Cmd
 	waitCh    chan error
 	stderr    bytes.Buffer
+	stdoutBuf bytes.Buffer
 	stdout    io.Writer
 	stopFile  string
 }
@@ -63,7 +64,8 @@ func (r *Recorder) Start(ctx context.Context) error {
 		return err
 	}
 	r.cmd = exec.Command(launch.command, launch.args...)
-	r.cmd.Stdout = r.stdout
+	r.stdoutBuf.Reset()
+	r.cmd.Stdout = io.MultiWriter(r.stdout, &r.stdoutBuf)
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
 	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -82,7 +84,7 @@ func (r *Recorder) Start(ctx context.Context) error {
 			}
 			return fmt.Errorf("permission denied — check System Settings → Privacy & Security")
 		}
-		return captureStartFailure(err, r.stderr.String())
+		return captureStartFailure(err, r.stderr.String(), r.stdoutBuf.String())
 	case <-ctx.Done():
 		_ = r.stopCaptureProcess(syscall.SIGINT)
 		<-errCh
@@ -143,8 +145,8 @@ func findCaptureLaunch(args []string, _ string) (captureLaunch, error) {
 	return captureLaunch{command: bin, args: args}, nil
 }
 
-func captureStartFailure(err error, stderr string) error {
-	msg := strings.TrimSpace(stderr)
+func captureStartFailure(err error, stderr string, stdout string) error {
+	msg := startupOutput(stderr, stdout)
 	if err == nil && msg != "" {
 		return fmt.Errorf("capture process exited immediately: %s", msg)
 	}
@@ -155,6 +157,17 @@ func captureStartFailure(err error, stderr string) error {
 		return fmt.Errorf("capture process failed to start: %w: %s", err, msg)
 	}
 	return fmt.Errorf("capture process failed to start: %w", err)
+}
+
+func startupOutput(stderr string, stdout string) string {
+	parts := []string{}
+	if msg := strings.TrimSpace(stderr); msg != "" {
+		parts = append(parts, msg)
+	}
+	if msg := strings.TrimSpace(stdout); msg != "" {
+		parts = append(parts, msg)
+	}
+	return strings.Join(parts, "\n")
 }
 
 func findCaptureBinary() (string, error) {
