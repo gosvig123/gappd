@@ -46,7 +46,10 @@ func (r recordingSession) failCapture(captureErr error) error {
 	if err := r.store.UpdateMeeting(r.meeting); err != nil {
 		return fmt.Errorf("mark meeting capture failed: %w", err)
 	}
-	return r.emit(EventFailed, captureErr)
+	if err := r.emit(EventFailed, captureErr); err != nil {
+		return err
+	}
+	return captureErr
 }
 
 func (r recordingSession) failUnexpectedCaptureStop(err error) error {
