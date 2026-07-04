@@ -19,8 +19,8 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	captureErr := errors.New("start capture: boom")
 
-	if err := testSession(service, meeting).failCapture(captureErr); err != nil {
-		t.Fatalf("failCapture() error = %v", err)
+	if err := testSession(service, meeting).failCapture(captureErr); !errors.Is(err, captureErr) {
+		t.Fatalf("failCapture() error = %v, want %v", err, captureErr)
 	}
 
 	stored := getMeeting(t, store, meeting.ID)

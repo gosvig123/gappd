@@ -520,7 +520,7 @@ if let mic = micRecorder {
         try mic.start(outputPath: micPath)
         print("● Mic recording to \(micPath)")
     } catch {
-        print("Error starting mic: \(error)")
+        stderrPrint("error: could not start microphone capture: \(error)")
         exit(1)
     }
 }
@@ -534,7 +534,7 @@ if let sys = systemRecorder {
             try await sys.start(outputPath: sysPath)
             print("● System audio recording to \(sysPath)")
         } catch {
-            print("Error starting system audio: \(error)")
+            stderrPrint("error: could not start system audio capture: \(error)")
             exit(1)
         }
         group.leave()
