@@ -15,39 +15,67 @@ import (
 func (p meetingProcessing) processCaptured(ctx context.Context, session recordingSession) error {
 	segments, err := p.transcribeStreams(ctx, session.artifacts, session.meeting.ID)
 	if err != nil {
-		return session.saveProcessingFailure(err)
+		return p.saveProcessingFailure(session, err)
 	}
 	if len(segments) == 0 {
-		return session.saveProcessingFailure(fmt.Errorf("no audio to transcribe"))
+		return p.saveProcessingFailure(session, fmt.Errorf("no audio to transcribe"))
 	}
-	transcript, err := session.saveSegments(segments)
+	transcript, err := p.saveSegments(session, segments)
 	if err != nil {
 		return err
 	}
 	return p.enhanceAndSave(ctx, session, transcript, EnhanceOptions{})
 }
 
-func (session recordingSession) saveSegments(segments []db.Segment) (string, error) {
-	if session.events == nil {
-		fmt.Fprintf(session.out, "● Got %d segments\n", len(segments))
+func (p meetingProcessing) saveSegments(session recordingSession, segments []db.Segment) (string, error) {
+	if p.events == nil {
+		fmt.Fprintf(p.out, "● Got %d segments\n", len(segments))
 	}
-	if err := session.store.ReplaceSegments(session.meeting.ID, segments); err != nil {
+	if err := p.store.ReplaceSegments(session.meeting.ID, segments); err != nil {
 		return "", fmt.Errorf("save segments: %w", err)
 	}
 	transcript := FormatTranscript(segments)
-	if err := session.saveTranscript(transcript); err != nil {
+	if err := p.saveTranscript(session, transcript); err != nil {
 		return "", err
 	}
-	session.printTranscript(transcript)
+	p.printTranscript(transcript)
 	return transcript, nil
 }
 
-func (session recordingSession) printTranscript(transcript string) {
-	if session.events != nil {
+func (p meetingProcessing) saveTranscript(session recordingSession, transcript string) error {
+	lifecycleFor(session.meeting).transcriptSaved(transcript, nowUTC())
+	if err := p.store.UpdateMeeting(session.meeting); err != nil {
+		return fmt.Errorf("save transcript: %w", err)
+	}
+	return session.emit(EventProcessing, nil)
+}
+
+func (p meetingProcessing) printTranscript(transcript string) {
+	if p.events != nil {
 		return
 	}
-	fmt.Fprintln(session.out, "\n── Transcript ──────────────────────────")
-	fmt.Fprintln(session.out, transcript)
+	fmt.Fprintln(p.out, "\n── Transcript ──────────────────────────")
+	fmt.Fprintln(p.out, transcript)
+}
+
+func (p meetingProcessing) saveProcessingFailure(session recordingSession, origErr error) error {
+	now := nowUTC()
+	lifecycleFor(session.meeting).processingFailed(now, origErr)
+	updateErr := p.store.UpdateMeeting(session.meeting)
+	if updateErr != nil {
+		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", updateErr))
+	}
+	return p.emitProcessingFailure(session, origErr)
+}
+
+func (p meetingProcessing) emitProcessingFailure(session recordingSession, origErr error) error {
+	if session.meeting.AudioPath != nil && p.events == nil {
+		fmt.Fprintf(p.out, "  session saved (audio may be incomplete — check %s)\n", *session.meeting.AudioPath)
+	}
+	if err := session.emit(EventFailed, origErr); err != nil {
+		return err
+	}
+	return fmt.Errorf("transcription failed: %w", origErr)
 }
 
 func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID string) ([]db.Segment, error) {

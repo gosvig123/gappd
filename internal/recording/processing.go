@@ -1,7 +1,11 @@
 package recording
 
 import (
+	"context"
+	"fmt"
 	"io"
+	"os"
+	"os/signal"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
@@ -30,4 +34,15 @@ func (p meetingProcessing) sessionFor(meeting *db.Meeting, artifacts audioartifa
 		store: p.store, out: p.out, errOut: p.errOut,
 		events: p.events, meeting: meeting, artifacts: artifacts,
 	}
+}
+
+func (p meetingProcessing) processAfterCapture(req Request, session recordingSession) error {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	err := p.processCaptured(ctx, session)
+	if err != nil && req.SuppressProcessingFailure {
+		fmt.Fprintf(p.errOut, "warning: post-processing failed after capture: %v\n", err)
+		return nil
+	}
+	return err
 }

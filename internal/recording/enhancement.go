@@ -2,6 +2,7 @@ package recording
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -35,10 +36,18 @@ func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID string, 
 		return err
 	}
 	session := p.sessionFor(meeting, audioartifact.Artifacts{})
-	if err := session.markProcessing(); err != nil {
+	if err := p.markProcessing(session); err != nil {
 		return err
 	}
 	return p.enhanceStoredSession(ctx, session, transcript, options)
+}
+
+func (p meetingProcessing) markProcessing(session recordingSession) error {
+	lifecycleFor(session.meeting).processingStarted(nowUTC())
+	if err := p.store.UpdateMeeting(session.meeting); err != nil {
+		return fmt.Errorf("mark meeting processing: %w", err)
+	}
+	return nil
 }
 
 func (p meetingProcessing) storedTranscript(meetingID string, saved *string) (string, error) {
@@ -82,11 +91,11 @@ func (p meetingProcessing) refineStoredSummary(ctx context.Context, session reco
 	}
 	extraction, err := ai.DecodeExtractionJSON(*session.meeting.ExtractionJSON)
 	if err != nil {
-		return session.saveEnhanceFailure(transcript, err)
+		return p.saveEnhanceFailure(session, transcript, err)
 	}
 	summary, err := p.enhancer().RefineNotes(ctx, extraction, *session.meeting.Summary, options.refinementGuidance())
 	if err != nil {
-		return session.saveEnhanceFailure(transcript, err)
+		return p.saveEnhanceFailure(session, transcript, err)
 	}
 	return p.saveEnhancement(session, extraction, transcript, summary)
 }
@@ -96,7 +105,7 @@ func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recording
 	runOptions := options.runOptions(previousSummary(session, options), p.aiProgress())
 	extraction, summary, err := p.enhancer().RunWithOptions(ctx, transcript, runOptions)
 	if err != nil {
-		return session.saveEnhanceFailure(transcript, err)
+		return p.saveEnhanceFailure(session, transcript, err)
 	}
 	return p.saveEnhancement(session, extraction, transcript, summary)
 }
@@ -104,13 +113,33 @@ func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recording
 func (p meetingProcessing) saveEnhancement(session recordingSession, extraction *ai.Extraction, transcript, summary string) error {
 	extractionJSON, err := ai.EncodeExtraction(extraction)
 	if err != nil {
-		return session.saveEnhanceFailure(transcript, err)
+		return p.saveEnhanceFailure(session, transcript, err)
 	}
-	if err := session.saveEnhancement(extraction.Title, transcript, summary, extractionJSON); err != nil {
+	if err := p.completeProcessing(session, extraction.Title, transcript, summary, extractionJSON); err != nil {
 		return err
 	}
 	p.printEnhancementResult(summary, len(extraction.ActionItems), session.meeting.ID)
 	return nil
+}
+
+func (p meetingProcessing) completeProcessing(session recordingSession, title, transcript, summary, extractionJSON string) error {
+	lifecycleFor(session.meeting).processingCompleted(title, transcript, summary, extractionJSON, nowUTC())
+	if err := p.store.UpdateMeeting(session.meeting); err != nil {
+		return fmt.Errorf("update meeting: %w", err)
+	}
+	return session.emit(EventCompleted, nil)
+}
+
+func (p meetingProcessing) saveEnhanceFailure(session recordingSession, transcript string, err error) error {
+	lifecycleFor(session.meeting).enhancementFailed(transcript, nowUTC(), err)
+	updateErr := p.store.UpdateMeeting(session.meeting)
+	if updateErr != nil {
+		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
+	}
+	if emitErr := session.emit(EventFailed, err); emitErr != nil {
+		return emitErr
+	}
+	return fmt.Errorf("enhance failed (transcript saved): %w", err)
 }
 
 func (o EnhanceOptions) runOptions(previous string, progress func(ai.Progress)) ai.RunOptions {

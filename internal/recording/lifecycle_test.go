@@ -47,7 +47,7 @@ func TestSaveProcessingFailurePreservesCaptureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	processingErr := errors.New("no audio to transcribe")
 
-	err := testSession(service, meeting).saveProcessingFailure(processingErr)
+	err := service.processing().saveProcessingFailure(testSession(service, meeting), processingErr)
 	if err == nil || !strings.Contains(err.Error(), "transcription failed: no audio to transcribe") {
 		t.Fatalf("saveProcessingFailure() error = %v, want transcription failure", err)
 	}
