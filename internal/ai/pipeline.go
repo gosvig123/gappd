@@ -88,7 +88,11 @@ func (p *Pipeline) extractChunk(ctx context.Context, transcript string) (*Extrac
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
 	}
-	return parseExtraction(raw)
+	extraction, err := parseExtraction(raw)
+	if err != nil {
+		return nil, err
+	}
+	return groundExtraction(extraction, transcript), nil
 }
 
 func (p *Pipeline) Synthesize(ctx context.Context, extraction *Extraction, userNotes string) (string, error) {

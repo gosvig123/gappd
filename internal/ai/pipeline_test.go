@@ -49,6 +49,22 @@ func TestPipelineExtract(t *testing.T) {
 	}
 }
 
+func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
+	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers."}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints"}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10"}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
+	transcript := "[Other] Did I do everything right?\n[Other] Did I forget something?\n[Other] Am I prepared?"
+
+	extraction, err := pipeline.Extract(context.Background(), transcript)
+	if err != nil {
+		t.Fatalf("Extract returned error: %v", err)
+	}
+	if extraction.Title != "Transcript Notes" || len(extraction.ActionItems) != 0 || len(extraction.Decisions) != 0 {
+		t.Fatalf("extraction = %#v, want conservative transcript-grounded extraction", extraction)
+	}
+	if len(extraction.OpenQuestions) != 3 {
+		t.Fatalf("open questions = %#v, want transcript questions", extraction.OpenQuestions)
+	}
+}
+
 func TestPipelineSynthesize(t *testing.T) {
 	provider, pipeline := newFakePipeline("## Meeting Title\nDemo sync")
 	extraction := &Extraction{Participants: []string{"Ada"}, Topics: []Topic{{Name: "Roadmap", Summary: "Reviewed next steps"}}}
