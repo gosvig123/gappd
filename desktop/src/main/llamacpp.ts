@@ -2,16 +2,15 @@ import { execFile, spawn } from 'node:child_process'
 import net from 'node:net'
 import path from 'node:path'
 import { app } from 'electron'
-import { isManagedLocalAIConfigured, type LocalAIConfig, type LocalAIStatus } from '../shared/contracts'
-import { BUNDLED_LLAMACPP_BINARY_NAME, LOCAL_AI_PROVIDER_LLAMACPP, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_HOST, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_PORT } from '../shared/managed-local-ai'
+import { BUNDLED_LLAMACPP_BINARY_NAME, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_HOST, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_PORT } from '../shared/managed-local-ai'
 import { lastLines } from '../shared/subprocess-output'
 import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
-import { managedLanguageModelAvailable, managedLanguageModelPath, missingManagedLanguageModelMessage } from './language-model'
+import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
 import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-ai-setup-errors'
 
 type LlamaCppRuntime = { process: ReturnType<typeof spawn> | null; startPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: LocalAISetupErrorState }
-type StatusContext = { config: LocalAIConfig | null; configError?: string; supported: boolean; bundled: boolean; running: boolean; configured: boolean; modelAvailable: boolean }
+export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: LocalAISetupErrorState }
 
 const runtime: LlamaCppRuntime = { process: null, startPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
 const SHUTDOWN_TIMEOUT_MS = 5_000
@@ -22,13 +21,11 @@ export function resolveBundledLlamaCppBinary(): string {
 export function managedLlamaCppSupported(): boolean { return process.platform === 'darwin' }
 export function managedLlamaCppEndpoint(): string { return runtime.endpoint }
 
-export async function getManagedLlamaCppStatus(config: LocalAIConfig | null, configError?: string): Promise<LocalAIStatus> {
+export async function getManagedLlamaCppRuntimeStatus(): Promise<ManagedLlamaCppRuntimeStatus> {
   const supported = managedLlamaCppSupported()
   const bundled = supported ? await bundledLlamaCppAvailable() : false
   const running = bundled ? await managedLlamaCppReadiness() : false
-  const configured = isManagedLlamaCppConfigured(config)
-  const modelAvailable = await managedLanguageModelAvailable(config?.model || MANAGED_LLAMACPP_MODEL)
-  return buildLocalAIStatus({ config, configError, supported, bundled, running, configured, modelAvailable })
+  return { supported, bundled, running, endpoint: runtime.endpoint, error: runtime.lastError }
 }
 
 export async function ensureManagedLlamaCppRunning(): Promise<string> {
@@ -76,12 +73,6 @@ function serverArgs(port: number): string[] {
   return ['--model', managedLanguageModelPath(), '--alias', MANAGED_LLAMACPP_MODEL, '--host', MANAGED_LLAMACPP_HOST, '--port', String(port), '--no-webui', '--ctx-size', '32768', '--gpu-layers', '999', '--cache-type-k', 'q8_0', '--cache-type-v', 'q8_0', '--jinja']
 }
 
-function buildLocalAIStatus(context: StatusContext): LocalAIStatus {
-  const phase = localAIPhase(context)
-  const error = context.configError ? toLocalAISetupErrorState(context.configError, phase, 'Failed to read local AI configuration') : phase === 'error' ? runtime.lastError : undefined
-  return { phase, managed: Boolean(context.config?.managed ?? true), endpoint: context.running ? runtime.endpoint : context.config?.endpoint || MANAGED_LLAMACPP_ENDPOINT, model: context.config?.model || MANAGED_LLAMACPP_MODEL, message: localAIMessage(context), error: error?.error, errorDetail: error?.errorDetail, debugDetail: error?.debugDetail, errorDebug: error?.errorDebug, errorKind: error?.errorKind, ownershipConflict: error?.ownershipConflict, canRetry: phase === 'error' || !context.modelAvailable, supported: context.supported, configured: context.configured, bundled: context.bundled, running: context.running, canRepair: context.supported && context.bundled }
-}
-
 function runtimeEnv(binaryPath: string): NodeJS.ProcessEnv {
   return childEnv({ DYLD_LIBRARY_PATH: [path.dirname(binaryPath), process.env.DYLD_LIBRARY_PATH || ''].filter(Boolean).join(':') })
 }
@@ -94,7 +85,6 @@ function wireEvents(child: ReturnType<typeof spawn>, binaryPath: string): void {
 
 function resetProcess(): void { runtime.ownedBySession = false; runtime.process = null }
 function bundledLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
-function isManagedLlamaCppConfigured(config: LocalAIConfig | null | undefined): boolean { return Boolean(isManagedLocalAIConfigured(config) && config?.provider === LOCAL_AI_PROVIDER_LLAMACPP) }
 async function managedLlamaCppReadiness(): Promise<boolean> { return runtime.ownedBySession && await managedLlamaCppOwnedAndHealthy(runtime.process) }
 
 async function managedLlamaCppOwnedAndHealthy(child: ReturnType<typeof spawn> | null): Promise<boolean> {
@@ -154,6 +144,4 @@ function waitForExit(child: ReturnType<typeof spawn>): Promise<void> {
 }
 
 function childExited(child: ReturnType<typeof spawn>): boolean { return child.exitCode !== null || child.signalCode !== null }
-function missingBundledLlamaCppMessage(): string { return app.isPackaged ? 'Bundled llama.cpp runtime files are missing from this app. Reinstall Gappd.' : `Bundled llama.cpp binary missing at ${resolveBundledLlamaCppBinary()}. Run \`npm run prepare:llamacpp\` before launching the desktop app.` }
-function localAIPhase(context: StatusContext): LocalAIStatus['phase'] { if (context.configError || !context.supported || !context.bundled) return 'error'; if (!context.modelAvailable) return 'needs_setup'; if (context.configured && context.running) return 'ready'; if (context.configured) return 'error'; return 'needs_setup' }
-function localAIMessage(context: StatusContext): string { if (context.configError) return 'Failed to read local AI configuration'; if (!context.supported) return 'Managed llama.cpp is unavailable on this platform'; if (!context.bundled) return missingBundledLlamaCppMessage(); if (!context.modelAvailable) return missingManagedLanguageModelMessage(); if (context.configured && context.running) return 'Managed llama.cpp is running'; if (context.configured) return 'Managed llama.cpp is configured but stopped'; if (context.config && !context.config.managed) return 'Gappd is configured for external Local AI. Run Local AI setup to switch to the managed runtime.'; if (context.running) return 'Managed llama.cpp is running but Local AI setup has not switched Gappd to it yet.'; return 'Managed llama.cpp is ready for Local AI setup' }
+export function missingBundledLlamaCppMessage(): string { return app.isPackaged ? 'Bundled llama.cpp runtime files are missing from this app. Reinstall Gappd.' : `Bundled llama.cpp binary missing at ${resolveBundledLlamaCppBinary()}. Run \`npm run prepare:llamacpp\` before launching the desktop app.` }
