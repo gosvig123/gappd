@@ -4,8 +4,9 @@ import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOpera
 import { requestCapturePermissions } from './capture-permissions'
 import { getLocalAISetupStatus, getLocalAISetupStatusSnapshot, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
 import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings'
-import { startMeetingRecordingWorkflow, startStaleMeetingRecordingRecovery, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
+import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
+import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
@@ -29,7 +30,7 @@ const IPC_HANDLERS: MainHandlers = {
     getDevices: () => getDevices(),
     requestCapturePermissions: () => requestCapturePermissions(),
     openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
-    startStaleRecordingRecovery: () => startStaleMeetingRecordingRecovery(),
+    startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
   },
   meetings: {
     list: () => listMeetings(),

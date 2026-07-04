@@ -17,7 +17,7 @@ export function stopStaleRecordingRecovery(): void {
   staleRecoveryTimer = null
 }
 
-export async function recoverStaleRecordings(): Promise<number> {
+async function recoverStaleRecordings(): Promise<number> {
   await ensureManagedLocalAIReady()
   const result = await requestCommand('record.recoverStale', {})
   return result.recovered
