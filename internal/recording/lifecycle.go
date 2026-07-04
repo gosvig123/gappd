@@ -51,9 +51,9 @@ func (s Service) createSessionDir(title string) (string, error) {
 	return dir, nil
 }
 
-func (s Service) startMeeting(title, sessionDir string) (*db.Meeting, error) {
+func (s Service) startMeeting(title, sessionDir, language string) (*db.Meeting, error) {
 	now := nowUTC()
-	meeting := newRecordingMeeting(title, sessionDir, now)
+	meeting := newRecordingMeeting(title, sessionDir, language, now)
 	if err := s.meetings().CreateMeeting(meeting); err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
 	}

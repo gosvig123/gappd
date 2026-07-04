@@ -6,11 +6,15 @@ import (
 )
 
 func (p *Pipeline) RefineExtraction(ctx context.Context, extraction *Extraction) (*Extraction, error) {
+	return p.refineExtraction(ctx, extraction, "")
+}
+
+func (p *Pipeline) refineExtraction(ctx context.Context, extraction *Extraction, language string) (*Extraction, error) {
 	data, err := EncodeExtraction(extraction)
 	if err != nil {
 		return nil, err
 	}
-	system, user := Stage1RefinePrompt(data)
+	system, user := Stage1RefinePrompt(data, language)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
 	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
@@ -23,12 +27,12 @@ func (p *Pipeline) RefineExtraction(ctx context.Context, extraction *Extraction)
 	return boundExtraction(refined), nil
 }
 
-func (p *Pipeline) RefineNotes(ctx context.Context, extraction *Extraction, draft string, feedback string) (string, error) {
+func (p *Pipeline) RefineNotes(ctx context.Context, extraction *Extraction, draft string, feedback string, language string) (string, error) {
 	data, err := EncodeExtraction(extraction)
 	if err != nil {
 		return "", err
 	}
-	system, user := Stage3Prompt(data, draft, feedback)
+	system, user := Stage3Prompt(data, draft, feedback, language)
 	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
 	result, err := p.provider.Complete(ctx, req)
 	if err != nil {

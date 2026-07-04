@@ -4,7 +4,7 @@ export type { LocalAISetupStatus, RecordingState, UpdateStatus } from './contrac
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
 export type LocalAISetupInput = { model?: string }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }

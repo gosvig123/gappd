@@ -2,21 +2,24 @@ import '../components/local-ai.css'
 
 import { type ReactNode } from 'react'
 import { Button, Card, cx, StatusPill } from '../components/ui'
+import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { localAISetupErrorView, localAISetupPhaseLabel, localAISetupStatusTone, type LocalAIStatus } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 
 type SettingsViewProps = {
+  language: string
+  onLanguageChange: (language: string) => void
   localAI: { status: LocalAIStatus | null; loading: boolean; busy: boolean; onRepair: () => void }
   developerDebugEnabled: boolean
 }
 
-export function SettingsView({ localAI, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><AppleSpeechPanel />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
+  return <section className="settings-stack settings-stack-plain"><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
-function AppleSpeechPanel() {
-  return <Card className="settings-section"><SectionTitle title="Transcription" note="Gappd now uses Apple SpeechTranscriber on device. Speech models are managed by macOS, not downloaded by Gappd." /><div className="status-note">Default locale: English (US). Set GAPPD_SPEECH_LOCALE before launch to try another Apple-supported locale.</div></Card>
+function AppleSpeechPanel({ language, onLanguageChange }: Pick<SettingsViewProps, 'language' | 'onLanguageChange'>) {
+  return <Card className="settings-section"><SectionTitle title="Transcription" note="Apple SpeechTranscriber runs on device. This default applies to new meetings." /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="transcription-language">Default language</label><select id="transcription-language" className="settings-select" value={language} onChange={(event) => onLanguageChange(event.target.value)}>{TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></div><div className="metric-card"><div className="label">Summary language</div><div className="value">Matches transcript</div></div><div className="metric-card"><div className="label">Available options</div><div className="value">{TRANSCRIPTION_LANGUAGES.length}</div></div></div><div className="status-note">English (US) remains the default. Apple-supported availability can vary by macOS language model.</div></Card>
 }
 
 function LocalAIDebug({ status, loading, busy, onRepair }: SettingsViewProps['localAI']) {

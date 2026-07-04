@@ -8,6 +8,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
@@ -67,17 +68,19 @@ func appRecordStartCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
 	var mode string
+	var language string
 
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, capture.CaptureMode(mode), true)
+			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, true)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
 	cmd.Flags().StringVar(&title, "title", "", "Session title")
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
+	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
 	return cmd
 }
 

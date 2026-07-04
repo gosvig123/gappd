@@ -9,12 +9,14 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 type EnhanceOptions struct {
 	Notes    string
 	Feedback string
 	Refine   bool
+	Language string
 }
 
 // Enhance re-runs AI pipeline over stored meeting transcript and saves result.
@@ -93,7 +95,7 @@ func (p meetingProcessing) refineStoredSummary(ctx context.Context, session reco
 	if err != nil {
 		return p.saveEnhanceFailure(session, transcript, err)
 	}
-	summary, err := p.enhancer().RefineNotes(ctx, extraction, *session.meeting.Summary, options.refinementGuidance())
+	summary, err := p.enhancer().RefineNotes(ctx, extraction, *session.meeting.Summary, options.refinementGuidance(), enhanceLanguage(session, options))
 	if err != nil {
 		return p.saveEnhanceFailure(session, transcript, err)
 	}
@@ -102,7 +104,7 @@ func (p meetingProcessing) refineStoredSummary(ctx context.Context, session reco
 
 func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recordingSession, transcript string, options EnhanceOptions) error {
 	p.printEnhancementStart()
-	runOptions := options.runOptions(previousSummary(session, options), p.aiProgress())
+	runOptions := options.runOptions(previousSummary(session, options), p.aiProgress(), enhanceLanguage(session, options))
 	extraction, summary, err := p.enhancer().RunWithOptions(ctx, transcript, runOptions)
 	if err != nil {
 		return p.saveEnhanceFailure(session, transcript, err)
@@ -142,12 +144,19 @@ func (p meetingProcessing) saveEnhanceFailure(session recordingSession, transcri
 	return fmt.Errorf("enhance failed (transcript saved): %w", err)
 }
 
-func (o EnhanceOptions) runOptions(previous string, progress func(ai.Progress)) ai.RunOptions {
-	return ai.RunOptions{UserNotes: o.Notes, Feedback: o.Feedback, PreviousNotes: previous, RefineNotes: o.Refine, OnProgress: progress}
+func (o EnhanceOptions) runOptions(previous string, progress func(ai.Progress), language string) ai.RunOptions {
+	return ai.RunOptions{UserNotes: o.Notes, Feedback: o.Feedback, PreviousNotes: previous, RefineNotes: o.Refine, OnProgress: progress, Language: language}
 }
 
 func (o EnhanceOptions) refinementGuidance() string {
 	return ai.RunOptions{UserNotes: o.Notes, Feedback: o.Feedback}.RefinementGuidance()
+}
+
+func enhanceLanguage(session recordingSession, options EnhanceOptions) string {
+	if options.Language != "" {
+		return meetinglang.Normalize(options.Language)
+	}
+	return meetinglang.Normalize(session.meeting.Language)
 }
 
 func previousSummary(session recordingSession, options EnhanceOptions) string {

@@ -21,7 +21,7 @@ func (e fakeEnhancer) RunWithOptions(context.Context, string, ai.RunOptions) (*a
 	return &ai.Extraction{Title: e.title}, e.summary, e.err
 }
 
-func (e fakeEnhancer) RefineNotes(context.Context, *ai.Extraction, string, string) (string, error) {
+func (e fakeEnhancer) RefineNotes(context.Context, *ai.Extraction, string, string, string) (string, error) {
 	return e.summary, e.err
 }
 

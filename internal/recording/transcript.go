@@ -12,8 +12,8 @@ import (
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
-func (p meetingProcessing) processCaptured(ctx context.Context, session recordingSession) error {
-	segments, err := p.transcribeStreams(ctx, session.artifacts, session.meeting.ID)
+func (p meetingProcessing) processCaptured(ctx context.Context, session recordingSession, language string) error {
+	segments, err := p.transcribeStreams(ctx, session.artifacts, session.meeting.ID, language)
 	if err != nil {
 		return p.saveProcessingFailure(session, err)
 	}
@@ -24,7 +24,7 @@ func (p meetingProcessing) processCaptured(ctx context.Context, session recordin
 	if err != nil {
 		return err
 	}
-	return p.enhanceAndSave(ctx, session, transcript, EnhanceOptions{})
+	return p.enhanceAndSave(ctx, session, transcript, EnhanceOptions{Language: language})
 }
 
 func (p meetingProcessing) saveSegments(session recordingSession, segments []db.Segment) (string, error) {
@@ -78,11 +78,11 @@ func (p meetingProcessing) emitProcessingFailure(session recordingSession, origE
 	return fmt.Errorf("transcription failed: %w", origErr)
 }
 
-func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID string) ([]db.Segment, error) {
+func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID, language string) ([]db.Segment, error) {
 	var all []db.Segment
 	var errs []string
 	for _, src := range artifacts.Sources() {
-		segments, err := p.transcribeSource(ctx, src, meetingID)
+		segments, err := p.transcribeSource(ctx, src, meetingID, language)
 		if errors.Is(err, errMissingAudio) {
 			continue
 		}
@@ -103,8 +103,8 @@ func transcribedSegments(segments []db.Segment, errs []string) ([]db.Segment, er
 	return segments, nil
 }
 
-func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID string) ([]db.Segment, error) {
-	segments, err := p.transcribeStream(ctx, src.Path, src.Speaker)
+func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID, language string) ([]db.Segment, error) {
+	segments, err := p.transcribeStream(ctx, src.Path, src.Speaker, language)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
@@ -113,11 +113,11 @@ func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifa
 
 var errMissingAudio = errors.New("missing audio")
 
-func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, speaker string) ([]transcribe.Segment, error) {
+func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, speaker, language string) ([]transcribe.Segment, error) {
 	if !audioartifact.FileHasAudio(audioPath) {
 		return p.skipMissingAudio(audioPath)
 	}
-	segments, err := p.transcribeAs(ctx, audioPath, speaker)
+	segments, err := p.transcribeAs(ctx, audioPath, speaker, language)
 	if err != nil {
 		fmt.Fprintf(p.errOut, "  error: %s transcription failed: %v\n", speaker, err)
 		return nil, err
@@ -132,11 +132,11 @@ func (p meetingProcessing) skipMissingAudio(audioPath string) ([]transcribe.Segm
 	return nil, errMissingAudio
 }
 
-func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, speaker string) ([]transcribe.Segment, error) {
+func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, speaker, language string) ([]transcribe.Segment, error) {
 	if p.events == nil {
 		fmt.Fprintf(p.out, "● Transcribing %s audio with Apple Speech...\n", speaker)
 	}
-	segs, err := transcribe.TranscribeFile(ctx, audioPath)
+	segs, err := transcribe.TranscribeFile(ctx, audioPath, language)
 	if p.transcriber != nil {
 		segs, err = p.transcriber.Transcribe(ctx, audioPath)
 	}

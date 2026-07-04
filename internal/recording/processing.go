@@ -39,7 +39,7 @@ func (p meetingProcessing) sessionFor(meeting *db.Meeting, artifacts audioartifa
 func (p meetingProcessing) processAfterCapture(req Request, session recordingSession) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	err := p.processCaptured(ctx, session)
+	err := p.processCaptured(ctx, session, req.Language)
 	if err != nil && req.SuppressProcessingFailure {
 		fmt.Fprintf(p.errOut, "warning: post-processing failed after capture: %v\n", err)
 		return nil

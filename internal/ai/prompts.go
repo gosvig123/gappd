@@ -1,6 +1,10 @@
 package ai
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/gappd-dev/gappd/internal/meetinglang"
+)
 
 type Extraction struct {
 	Title         string            `json:"title"`
@@ -47,7 +51,8 @@ Rules:
 - Leave owner and deadline empty when absent; never write "unspecified" or "unknown"
 - Never invent dates, speakers, logistics, budgets, or action owners
 - Preserve useful internal codenames, but avoid overstating their role
-- Sentiment must be one of: productive, tense, neutral, brainstorming, decision-heavy`
+- Sentiment must be one of: productive, tense, neutral, brainstorming, decision-heavy
+%s`
 
 const stage2System = `You are a meeting note-taker. Write clear, actionable meeting notes in markdown.
 Format:
@@ -70,7 +75,8 @@ Never invent names, dates, speakers, logistics, budgets, or action owners.
 If evidence is limited, say the transcript has limited detail.
 ### Open Questions
 Bullet list of unresolved questions.
-If user notes are provided, expand on those topics with additional detail.`
+If user notes are provided, expand on those topics with additional detail.
+%s`
 
 const stage1RefineSystem = `You are a senior meeting analyst. Consolidate chunk-level meeting extraction into one global extraction.
 Output valid JSON matching this schema:
@@ -83,7 +89,8 @@ Rules:
 - Speaker labels like "You" and "Other" are labels, not participant names
 - Only list decisions with clear agreement or commitment
 - Leave owner and deadline empty when absent; never write "unspecified" or "unknown"
-- Do not invent facts not present in the input`
+- Do not invent facts not present in the input
+%s`
 
 const stage3System = `You are a meeting-notes editor. Rewrite notes to be clearer, more actionable, and faithful to the extracted data.
 Keep this markdown format:
@@ -99,30 +106,36 @@ Rules:
 - Keep action items as one flat checklist without You/Other/person subheadings
 - Keep due dates only when actual dates are known; never write unknown or unspecified due dates
 - Do not turn exploratory discussion into decisions
-- Do not invent facts not present in extracted data or current notes`
+- Do not invent facts not present in extracted data or current notes
+%s`
 
-func Stage1Prompt(transcript string) (string, string) {
-	system := fmt.Sprintf(stage1System, extractionSchema)
+func Stage1Prompt(transcript, language string) (string, string) {
+	system := fmt.Sprintf(stage1System, extractionSchema, languageRule(language))
 	return system, transcript
 }
 
-func Stage2Prompt(extraction string, userNotes string) (string, string) {
+func Stage2Prompt(extraction string, userNotes string, language string) (string, string) {
 	user := fmt.Sprintf("## Extracted Data\n%s", extraction)
 	if userNotes != "" {
 		user += fmt.Sprintf("\n\n## User Notes\n%s", userNotes)
 	}
-	return stage2System, user
+	return fmt.Sprintf(stage2System, languageRule(language)), user
 }
 
-func Stage1RefinePrompt(extraction string) (string, string) {
-	system := fmt.Sprintf(stage1RefineSystem, extractionSchema)
+func Stage1RefinePrompt(extraction string, language string) (string, string) {
+	system := fmt.Sprintf(stage1RefineSystem, extractionSchema, languageRule(language))
 	return system, fmt.Sprintf("## Chunk Extractions\n%s", extraction)
 }
 
-func Stage3Prompt(extraction string, draft string, feedback string) (string, string) {
+func Stage3Prompt(extraction string, draft string, feedback string, language string) (string, string) {
 	user := fmt.Sprintf("## Extracted Data\n%s\n\n## Current Notes\n%s", extraction, draft)
 	if feedback != "" {
 		user += fmt.Sprintf("\n\n## Feedback\n%s", feedback)
 	}
-	return stage3System, user
+	return fmt.Sprintf(stage3System, languageRule(language)), user
+}
+
+func languageRule(language string) string {
+	name := meetinglang.Name(language)
+	return fmt.Sprintf("- Write all user-facing title, summary, topics, decisions, action items, and questions in %s", name)
 }
