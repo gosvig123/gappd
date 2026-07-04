@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,8 +12,8 @@ import (
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
-func (p meetingProcessing) processCaptured(ctx context.Context, session recordingSession, modelPath, defaultModelPath string) error {
-	segments, err := p.transcribeStreams(ctx, session.artifacts, session.meeting.ID, modelPath, defaultModelPath)
+func (p meetingProcessing) processCaptured(ctx context.Context, session recordingSession) error {
+	segments, err := p.transcribeStreams(ctx, session.artifacts, session.meeting.ID)
 	if err != nil {
 		return session.saveProcessingFailure(err)
 	}
@@ -51,11 +50,11 @@ func (session recordingSession) printTranscript(transcript string) {
 	fmt.Fprintln(session.out, transcript)
 }
 
-func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
+func (p meetingProcessing) transcribeStreams(ctx context.Context, artifacts audioartifact.Artifacts, meetingID string) ([]db.Segment, error) {
 	var all []db.Segment
 	var errs []string
 	for _, src := range artifacts.Sources() {
-		segments, err := p.transcribeSource(ctx, src, meetingID, modelPath, defaultModelPath)
+		segments, err := p.transcribeSource(ctx, src, meetingID)
 		if errors.Is(err, errMissingAudio) {
 			continue
 		}
@@ -76,8 +75,8 @@ func transcribedSegments(segments []db.Segment, errs []string) ([]db.Segment, er
 	return segments, nil
 }
 
-func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID, modelPath, defaultModelPath string) ([]db.Segment, error) {
-	segments, err := p.transcribeStream(ctx, src.Path, modelPath, defaultModelPath, src.Speaker)
+func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID string) ([]db.Segment, error) {
+	segments, err := p.transcribeStream(ctx, src.Path, src.Speaker)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
@@ -86,14 +85,11 @@ func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifa
 
 var errMissingAudio = errors.New("missing audio")
 
-func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, modelPath, defaultModelPath, speaker string) ([]transcribe.Segment, error) {
+func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, speaker string) ([]transcribe.Segment, error) {
 	if !audioartifact.FileHasAudio(audioPath) {
-		if p.events == nil {
-			fmt.Fprintf(p.out, "  skipping %s: file missing or empty (no audio captured)\n", filepath.Base(audioPath))
-		}
-		return nil, errMissingAudio
+		return p.skipMissingAudio(audioPath)
 	}
-	segments, err := p.transcribeAs(ctx, audioPath, modelPath, defaultModelPath, speaker)
+	segments, err := p.transcribeAs(ctx, audioPath, speaker)
 	if err != nil {
 		fmt.Fprintf(p.errOut, "  error: %s transcription failed: %v\n", speaker, err)
 		return nil, err
@@ -101,16 +97,20 @@ func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, mode
 	return segments, nil
 }
 
-func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, modelPath, defaultModelPath, speaker string) ([]transcribe.Segment, error) {
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return nil, whisperModelNotFoundError(modelPath, defaultModelPath)
-	}
+func (p meetingProcessing) skipMissingAudio(audioPath string) ([]transcribe.Segment, error) {
 	if p.events == nil {
-		fmt.Fprintf(p.out, "● Transcribing %s audio...\n", speaker)
+		fmt.Fprintf(p.out, "  skipping %s: file missing or empty (no audio captured)\n", filepath.Base(audioPath))
 	}
-	segs, err := transcribe.TranscribeFile(ctx, audioPath, modelPath)
+	return nil, errMissingAudio
+}
+
+func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, speaker string) ([]transcribe.Segment, error) {
+	if p.events == nil {
+		fmt.Fprintf(p.out, "● Transcribing %s audio with Apple Speech...\n", speaker)
+	}
+	segs, err := transcribe.TranscribeFile(ctx, audioPath)
 	if p.transcriber != nil {
-		segs, err = p.transcriber.Transcribe(ctx, audioPath, modelPath)
+		segs, err = p.transcriber.Transcribe(ctx, audioPath)
 	}
 	if err != nil {
 		return nil, err
@@ -119,11 +119,4 @@ func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, modelPat
 		segs[i].Speaker = speaker
 	}
 	return segs, nil
-}
-
-func whisperModelNotFoundError(modelPath, defaultModelPath string) error {
-	if modelPath == defaultModelPath {
-		return fmt.Errorf("whisper model not found at %s (run: gappd setup or pass --model)", modelPath)
-	}
-	return fmt.Errorf("whisper model not found at %s", modelPath)
 }

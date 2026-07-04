@@ -17,7 +17,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>LSMinimumSystemVersion</key>
-    <string>13.0</string>
+    <string>26.0</string>
     <key>NSAudioCaptureUsageDescription</key>
     <string>gappd captures system audio to transcribe your meetings</string>
     <key>NSMicrophoneUsageDescription</key>

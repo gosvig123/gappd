@@ -66,39 +66,35 @@ func appRecordCmd() *cobra.Command {
 func appRecordStartCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
-	var modelPath string
 	var mode string
 
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, modelPath, capture.CaptureMode(mode), true)
+			return runListen(deviceIdx, title, capture.CaptureMode(mode), true)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
 	cmd.Flags().StringVar(&title, "title", "", "Session title")
-	cmd.Flags().StringVar(&modelPath, "model", "", "Whisper model path")
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
 	return cmd
 }
 
 func appRecordRecoverStaleCmd() *cobra.Command {
 	var asJSON bool
-	var modelPath string
 	cmd := &cobra.Command{
 		Use:   "recover-stale",
 		Short: "Recover stale desktop recordings",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runAppRecoverStale(asJSON, modelPath)
+			return runAppRecoverStale(asJSON)
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
-	cmd.Flags().StringVar(&modelPath, "model", "", "Whisper model path")
 	return cmd
 }
 
-func runAppRecoverStale(asJSON bool, modelPath string) error {
+func runAppRecoverStale(asJSON bool) error {
 	if !asJSON {
 		return fmt.Errorf("app record recover-stale requires --json")
 	}
@@ -107,23 +103,16 @@ func runAppRecoverStale(asJSON bool, modelPath string) error {
 		return err
 	}
 	defer store.Close()
-	recovered, err := recoverStaleRecordings(store, pipeline, modelPath)
+	recovered, err := recoverStaleRecordings(store, pipeline)
 	if err != nil {
 		return err
 	}
 	return writeJSON(appprotocol.RecoverStaleRecordingsResponse{Recovered: recovered})
 }
 
-func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline, modelPath string) (int, error) {
-	defaultPath, err := defaultModelPath()
-	if err != nil {
-		return 0, err
-	}
-	if modelPath == "" {
-		modelPath = defaultPath
-	}
+func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
 	service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
-	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{ModelPath: modelPath, DefaultModelPath: defaultPath, SuppressProcessingFailure: true})
+	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{SuppressProcessingFailure: true})
 }
 
 func appMeetingsListCmd() *cobra.Command {

@@ -1,76 +1,22 @@
 import '../components/local-ai.css'
 
-import { type ReactNode, useState } from 'react'
-import type { TranscriptionSettings, WhisperModelDownloadProgress, WhisperModelSettings } from '../../shared/ipc-contract'
-import { Button, Card, cx, ProgressBar, StatusPill } from '../components/ui'
-import { AlertCircleIcon, CheckIcon, CircleCheckIcon, DownloadIcon, InfoIcon, RefreshIcon } from '../components/icons'
+import { type ReactNode } from 'react'
+import { Button, Card, cx, StatusPill } from '../components/ui'
+import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { localAISetupErrorView, localAISetupPhaseLabel, localAISetupStatusTone, type LocalAIStatus } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 
 type SettingsViewProps = {
   localAI: { status: LocalAIStatus | null; loading: boolean; busy: boolean; onRepair: () => void }
-  transcription: TranscriptionViewModel
   developerDebugEnabled: boolean
 }
 
-type TranscriptionViewModel = {
-  settings: TranscriptionSettings | null
-  loading: boolean
-  busyModelId: string | null
-  error: string | null
-  progress: WhisperModelDownloadProgress | null
-  download: (id: string) => Promise<void> | void
-  setDefault: (id: string) => Promise<void> | void
+export function SettingsView({ localAI, developerDebugEnabled }: SettingsViewProps) {
+  return <section className="settings-stack settings-stack-plain"><AppleSpeechPanel />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
-export function SettingsView({ localAI, transcription, developerDebugEnabled }: SettingsViewProps) {
-  return (
-    <section className="settings-stack settings-stack-plain">
-      <TranscriptionSettingsPanel state={transcription} />
-      {developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}
-    </section>
-  )
-}
-
-function TranscriptionSettingsPanel({ state }: { state: TranscriptionViewModel }) {
-  const models = state.settings?.models ?? []
-  return <Card className="settings-section"><SectionTitle title="Transcription model" note="The model marked In use transcribes your meetings. Larger models are more accurate but slower and use more memory." /><DismissibleStatusNote message={state.error} /><div className="settings-model-list">{models.map((model) => <ModelRow key={model.id} model={model} state={state} />)}</div>{state.loading ? <div className="status-note">Loading speech models…</div> : null}</Card>
-}
-
-function DismissibleStatusNote({ message }: { message: string | null }) {
-  const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
-  if (!message || dismissedMessage === message) return null
-  return <div className="status-note danger dismissible-note"><span>{message}</span><button className="icon-dismiss" type="button" aria-label="Dismiss error" onClick={() => setDismissedMessage(message)}>×</button></div>
-}
-
-function ModelRow({ model, state }: { model: WhisperModelSettings; state: TranscriptionViewModel }) {
-  const selected = state.settings?.defaultModelId === model.id
-  const busy = state.busyModelId === model.id
-  const progress = busy ? state.progress : null
-  return <div className={cx('settings-model-row', selected && 'selected', !model.installed && 'not-installed')}><div className="settings-model-head"><span className={cx('settings-model-marker', selected && 'selected', model.installed && 'installed')} aria-hidden="true">{selected ? <CheckIcon /> : null}</span><div className="settings-model-heading"><strong>{model.label}</strong><ModelStatusPill selected={selected} installed={model.installed} /></div><ModelActions model={model} selected={selected} busy={busy} state={state} /></div><p>{model.description}</p><div className="settings-model-meta"><span className="settings-model-tag">{model.languageSupport}</span><span className={cx('settings-model-tag', 'is-mono')}>{model.sizeMB} MB</span></div>{progress ? <DownloadProgress progress={progress} /> : null}</div>
-}
-
-function ModelStatusPill({ selected, installed }: { selected: boolean; installed: boolean }) {
-  if (selected) return <CircleCheckIcon className="settings-model-in-use" aria-label="In use" />
-  if (installed) return <span className="settings-model-tag is-installed">Installed</span>
-  return <span className="settings-model-tag is-not-installed">Not installed</span>
-}
-
-function ModelActions({ model, selected, busy, state }: { model: WhisperModelSettings; selected: boolean; busy: boolean; state: TranscriptionViewModel }) {
-  if (!model.installed) return <Button variant="primary" className="settings-model-download" onClick={() => state.download(model.id)} disabled={Boolean(state.busyModelId)}>{busy ? progressLabel(state.progress) : <><DownloadIcon className="settings-model-download-icon" />Download</>}</Button>
-  if (selected) return null
-  return <Button variant="primary" onClick={() => state.setDefault(model.id)} disabled={Boolean(state.busyModelId)}>Use this model</Button>
-}
-
-function DownloadProgress({ progress }: { progress: WhisperModelDownloadProgress }) {
-  const value = Number.isFinite(progress.progress) ? progress.progress ?? null : null
-  return <div className="settings-model-progress"><ProgressBar value={value} label={progress.message} /><span className="settings-model-progress-text">{progress.message}{typeof progress.progress === 'number' ? <span className="settings-model-progress-pct"> · {progress.progress}%</span> : '…'}</span></div>
-}
-
-function progressLabel(progress: WhisperModelDownloadProgress | null): string {
-  if (progress?.phase === 'verifying') return 'Verifying…'
-  if (progress?.phase === 'complete') return 'Done'
-  return typeof progress?.progress === 'number' ? `${progress.progress}%` : 'Downloading…'
+function AppleSpeechPanel() {
+  return <Card className="settings-section"><SectionTitle title="Transcription" note="Gappd now uses Apple SpeechTranscriber on device. Speech models are managed by macOS, not downloaded by Gappd." /><div className="status-note">Default locale: English (US). Set GAPPD_SPEECH_LOCALE before launch to try another Apple-supported locale.</div></Card>
 }
 
 function LocalAIDebug({ status, loading, busy, onRepair }: SettingsViewProps['localAI']) {

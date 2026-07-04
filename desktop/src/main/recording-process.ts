@@ -5,7 +5,6 @@ import { ensureManagedLocalAIReady } from './local-ai-config'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
 import { stopManagedLlamaCpp } from './llamacpp'
-import { getValidatedManagedWhisperPaths } from './whisper'
 
 type RecordingChild = ReturnType<typeof spawn>
 
@@ -16,12 +15,11 @@ const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPI
 
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string; modelPath?: string }): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
-  const whisper = await getValidatedManagedWhisperPaths()
   await ensureManagedLocalAIReady()
   logMainProcessMemory('recording:start')
-  recordingChild = streamCommand('record.start', { ...input, modelPath: whisper.modelPath }, recordingHandlers(input.title), { GAPPD_WHISPER_BIN: whisper.binaryPath })
+  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title))
 }
 
 export function stopRecording(): void {

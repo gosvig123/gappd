@@ -102,10 +102,6 @@ export type ConfigUseManagedLocalAIInput = {
   temperature?: number
 }
 
-export type RecoverStaleInput = {
-  modelPath: string
-}
-
 export type RecoverStaleRecordingsResponse = {
   recovered: number
 }
@@ -114,7 +110,6 @@ export type RecordStartInput = {
   title: string
   device: number
   mode: string
-  modelPath: string
 }
 
 export type RecordingEvent = {
