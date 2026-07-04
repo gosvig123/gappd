@@ -14,7 +14,6 @@ import (
 func listenCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
-	var modelPath string
 	var mode string
 
 	cmd := &cobra.Command{
@@ -22,12 +21,11 @@ func listenCmd() *cobra.Command {
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := capture.CaptureMode(mode)
-			return runListen(deviceIdx, title, modelPath, m, false)
+			return runListen(deviceIdx, title, m, false)
 		},
 	}
 	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
 	cmd.Flags().StringVarP(&title, "title", "t", "", "Session title")
-	cmd.Flags().StringVarP(&modelPath, "model", "m", "", "Whisper model path")
 	cmd.Flags().StringVar(&mode, "mode", "both", "Capture mode: mic, system, or both (default); \"both\" captures mic + system audio for meetings")
 	return cmd
 }
@@ -49,20 +47,13 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode, suppressProcessingFailure bool) error {
+func runListen(deviceIdx int, title string, mode capture.CaptureMode, suppressProcessingFailure bool) error {
 	_, store, pipeline, err := loadDeps()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
 
-	defaultPath, err := defaultModelPath()
-	if err != nil {
-		return err
-	}
-	if modelPath == "" {
-		modelPath = defaultPath
-	}
 	baseDir, err := config.GappdDir()
 	if err != nil {
 		return fmt.Errorf("resolve gappd dir for session path: %w", err)
@@ -83,8 +74,6 @@ func runListen(deviceIdx int, title, modelPath string, mode capture.CaptureMode,
 	return service.Run(recording.Request{
 		DeviceIdx:                 deviceIdx,
 		Title:                     title,
-		ModelPath:                 modelPath,
-		DefaultModelPath:          defaultPath,
 		Mode:                      mode,
 		SuppressProcessingFailure: suppressProcessingFailure,
 	})

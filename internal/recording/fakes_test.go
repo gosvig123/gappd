@@ -96,6 +96,6 @@ func (r *fakeRecorder) SystemPath() string {
 
 type fakeTranscriber struct{}
 
-func (fakeTranscriber) Transcribe(_ context.Context, audioPath, _ string) ([]transcribe.Segment, error) {
+func (fakeTranscriber) Transcribe(_ context.Context, audioPath string) ([]transcribe.Segment, error) {
 	return []transcribe.Segment{{Start: 0, End: 1, Text: filepath.Base(audioPath) + " hello"}}, nil
 }

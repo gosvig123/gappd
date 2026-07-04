@@ -6,7 +6,6 @@ import { getLocalAISetupStatus, getLocalAISetupStatusSnapshot, onLocalAISetupSta
 import { startMeetingRecordingWorkflow, startStaleMeetingRecordingRecovery, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
-import { downloadWhisperModel, getTranscriptionSettings, saveDefaultWhisperModel } from './whisper-model-settings'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
 const LEGACY_PRIVACY_SECURITY_PANE = 'com.apple.preference.security'
@@ -49,11 +48,6 @@ const IPC_HANDLERS: MainHandlers = {
   settings: {
     getLocalAIStatus: () => getLocalAISetupStatusSnapshot(),
     repairLocalAI: () => repairLocalAISetup(),
-    getTranscriptionSettings: () => getTranscriptionSettings(),
-    downloadWhisperModel: (event, id: string) => downloadWhisperModel(id, (progress) => {
-      if (!event.sender.isDestroyed()) event.sender.send(IPC_EVENTS.settings.whisperModelDownloadProgress, progress)
-    }),
-    setDefaultWhisperModel: (_event, id: string) => saveDefaultWhisperModel(id),
   },
   update: {
     getStatus: () => getUpdateStatus(),

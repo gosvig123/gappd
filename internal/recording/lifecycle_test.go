@@ -91,8 +91,12 @@ func testSession(service Service, meeting *db.Meeting) recordingSession {
 
 type failingProvider struct{ err error }
 
-func (p failingProvider) Complete(context.Context, ai.CompletionRequest) (string, error) { return "", p.err }
-func (p failingProvider) CompleteJSON(context.Context, ai.CompletionRequest) (json.RawMessage, error) { return nil, p.err }
+func (p failingProvider) Complete(context.Context, ai.CompletionRequest) (string, error) {
+	return "", p.err
+}
+func (p failingProvider) CompleteJSON(context.Context, ai.CompletionRequest) (json.RawMessage, error) {
+	return nil, p.err
+}
 func (p failingProvider) Available() error { return p.err }
 
 func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr string) {

@@ -8,7 +8,6 @@ import { useDashboardData } from './hooks/use-dashboard-data'
 import { useLocalAISettings } from './hooks/use-local-ai-settings'
 import { useLocalAISetupOperation } from './hooks/use-local-ai-setup-operation'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
-import { useTranscriptionSettings } from './hooks/use-transcription-settings'
 import { useUpdateStatus } from './hooks/use-update-status'
 import { Banner } from './components/ui'
 import { DashboardView } from './routes/dashboard-view'
@@ -28,10 +27,9 @@ export function App() {
   const settingsPanelOpen = appReady && settingsOpen
   const dashboard = useDashboardData(appReady)
   const localAI = useLocalAISettings(settingsPanelOpen && developerDebugEnabled, localAISetup.setStatus)
-  const transcription = useTranscriptionSettings(settingsPanelOpen)
   const update = useUpdateStatus()
   if (localAISetup.loading || !localAISetup.status) return <div className="screen-center">Starting Gappd…</div>
-  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <LocalAISetupApp localAISetup={localAISetup} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView localAI={{ ...localAI, onRepair: () => void localAI.repair() }} transcription={transcription} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
+  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <LocalAISetupApp localAISetup={localAISetup} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView localAI={{ ...localAI, onRepair: () => void localAI.repair() }} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
 }
 
 function ReadyApp({ dashboard, update }: { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus> }) {

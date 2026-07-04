@@ -6,37 +6,5 @@
       "url": "https://github.com/ggml-org/llama.cpp/archive/refs/tags/b9867.tar.gz",
       "sha256": "8a7529e0daab76960314f0e04da06015ddcbe6ed4cab6556c00e75689abf5258"
     }
-  },
-  "whisper": {
-    "release": "v1.7.6",
-    "sourceSha256": "166140e9a6d8a36f787a2bd77f8f44dd64874f12dd8359ff7c1f4f9acb86202e",
-    "model": {
-      "name": "ggml-small.en-q5_1.bin",
-      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin?download=true",
-      "sha256": "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30"
-    },
-    "models": [
-      {
-        "id": "small.en-q5_1",
-        "name": "ggml-small.en-q5_1.bin",
-        "label": "English",
-        "languageSupport": "English only",
-        "description": "Best balance of speed and accuracy for English meetings. Recommended for most people.",
-        "sizeMB": 190,
-        "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin?download=true",
-        "sha256": "bfdff4894dcb76bbf647d56263ea2a96645423f1669176f4844a1bf8e478ad30",
-        "default": true
-      },
-      {
-        "id": "medium-q5_0",
-        "name": "ggml-medium-q5_0.bin",
-        "label": "Multilingual",
-        "languageSupport": "Multilingual",
-        "description": "Higher accuracy across many languages, including Korean. Slower and uses more memory.",
-        "sizeMB": 539,
-        "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium-q5_0.bin?download=true",
-        "sha256": "19fea4b380c3a618ec4723c3eef2eb785ffba0d0538cf43f8f235e7b3b34220f"
-      }
-    ]
   }
 }

@@ -1,8 +1,6 @@
 package recording
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -14,10 +12,6 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 	store := newFakeStore()
 	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir()}
 	events := &recordingEvents{onEvent: interruptOnStarted(t)}
-	modelPath := filepath.Join(t.TempDir(), "model.bin")
-	if err := os.WriteFile(modelPath, []byte("model"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
 	service := Service{
 		BaseDir:     t.TempDir(),
 		Events:      events,
@@ -27,7 +21,7 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 		enhancer:    fakeEnhancer{title: "Lifecycle Planning", summary: "summary"},
 	}
 
-	err := service.Run(Request{Title: "Lifecycle", ModelPath: modelPath})
+	err := service.Run(Request{Title: "Lifecycle"})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}

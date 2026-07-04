@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process'
 
 const MIN_NODE_VERSION = '22.12.0'
 const MIN_GO_VERSION = '1.25'
-const MIN_MACOS_VERSION = '14.0'
+const MIN_MACOS_VERSION = '26.0'
 const COMMANDS = [
   ['npm', 'Install Node.js 22.12.0 or newer, which includes npm.'],
   ['go', 'Install Go 1.25 or newer.'],
@@ -18,7 +18,7 @@ const COMMANDS = [
 const failures = []
 
 if (process.platform !== 'darwin') failures.push('Desktop macOS bootstrap requires macOS.')
-else if (!hasMacOSVersion(MIN_MACOS_VERSION)) failures.push('macOS 14+ required because desktop packaging targets macOS 14.0. Upgrade macOS, then rerun preflight.')
+else if (!hasMacOSVersion(MIN_MACOS_VERSION)) failures.push('macOS 26+ required because Apple SpeechTranscriber requires macOS 26. Upgrade macOS, then rerun preflight.')
 
 if (!hasNodeVersion(MIN_NODE_VERSION)) failures.push(`Node.js ${MIN_NODE_VERSION}+ required. Found ${process.version}.`)
 
