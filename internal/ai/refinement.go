@@ -38,5 +38,5 @@ func (p *Pipeline) RefineNotes(ctx context.Context, extraction *Extraction, draf
 	if err != nil {
 		return "", fmt.Errorf("refine notes failed: %w", err)
 	}
-	return normalizeActionItemsMarkdown(result), nil
+	return normalizeNotesMarkdown(result, extraction), nil
 }

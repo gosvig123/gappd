@@ -62,12 +62,13 @@ Brief 2-3 sentence overview.
 ### Key Topics
 Bullet list of topics discussed with key points.
 ### Decisions
-Numbered list of decisions made.
+Use only the Extracted Data decisions array; if it is empty, write exactly "None identified".
+Do not infer decisions from title, topics, action items, open questions, transcript wording, or user notes.
 ### Action Items
 Use one flat checkbox list: - [ ] Task description (due: actual date)
 Omit due date text when deadline is unknown or unspecified.
 Do not add You/Other/person subheadings or use transcript speaker labels as owners.
-Only list clear decisions; keep exploratory ideas in Key Topics or Open Questions.
+Only list decisions present in Extracted Data decisions; keep exploratory ideas in Key Topics or Open Questions.
 Action Items must be actual follow-up tasks, not meeting wrap-up comments.
 Use "None identified" for empty Decisions, Action Items, or Open Questions sections.
 Do not add facts absent from Extracted Data.
@@ -105,6 +106,7 @@ Rules:
 - Improve wording, grouping, and missing emphasis
 - Keep action items as one flat checklist without You/Other/person subheadings
 - Keep due dates only when actual dates are known; never write unknown or unspecified due dates
+- Keep Decisions as an exact projection of Extracted Data decisions; if empty, write exactly "None identified"
 - Do not turn exploratory discussion into decisions
 - Do not invent facts not present in extracted data or current notes
 %s`

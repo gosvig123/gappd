@@ -67,7 +67,7 @@ func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
 
 func TestPipelineSynthesize(t *testing.T) {
 	provider, pipeline := newFakePipeline("## Meeting Title\nDemo sync")
-	extraction := &Extraction{Participants: []string{"Ada"}, Topics: []Topic{{Name: "Roadmap", Summary: "Reviewed next steps"}}}
+	extraction := &Extraction{Participants: []string{"Ada"}, Topics: []Topic{{Name: "Roadmap", Summary: "Reviewed next steps"}}, Decisions: []Decision{{What: "Ship beta"}}}
 
 	notes, err := pipeline.Synthesize(context.Background(), extraction, "Emphasize launch blockers")
 	if err != nil {
@@ -77,6 +77,21 @@ func TestPipelineSynthesize(t *testing.T) {
 		t.Fatalf("Synthesize result = %q, want provider output", notes)
 	}
 	assertRequestContains(t, provider.requests, 0, 0.3, "## Extracted Data", "Emphasize launch blockers")
+}
+
+func TestPipelineSynthesizeClearsEmptyDecisionSection(t *testing.T) {
+	provider, pipeline := newFakePipeline("### Summary\nMerge approval discussed.\n### Decisions\n- Approve PR")
+
+	extraction := &Extraction{Decisions: []Decision{}, ActionItems: []ExtractedAction{}, OpenQuestions: []string{}}
+	notes, err := pipeline.Synthesize(context.Background(), extraction, "")
+	if err != nil {
+		t.Fatalf("Synthesize returned error: %v", err)
+	}
+	want := "### Summary\nMerge approval discussed.\n### Decisions\nNone identified"
+	if notes != want {
+		t.Fatalf("Synthesize result = %q, want %q", notes, want)
+	}
+	assertRequestContains(t, provider.requests, 0, 0.3, `"decisions":[]`)
 }
 
 func TestPipelineRun(t *testing.T) {

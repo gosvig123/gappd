@@ -22,6 +22,20 @@ func TestPipelineRunRefinesExistingNotes(t *testing.T) {
 	assertRequestContains(t, provider.requests, 1, 0.3, "## Current Notes", "focus action items")
 }
 
+func TestPipelineRefineNotesClearsEmptyDecisionSection(t *testing.T) {
+	_, pipeline := newFakePipeline("### Summary\nMerge approval discussed.\n### Decisions\n- Approve PR")
+	extraction := &Extraction{Decisions: []Decision{}, ActionItems: []ExtractedAction{}, OpenQuestions: []string{}}
+
+	notes, err := pipeline.RefineNotes(context.Background(), extraction, "draft", "", "")
+	if err != nil {
+		t.Fatalf("RefineNotes returned error: %v", err)
+	}
+	want := "### Summary\nMerge approval discussed.\n### Decisions\nNone identified"
+	if notes != want {
+		t.Fatalf("RefineNotes result = %q, want %q", notes, want)
+	}
+}
+
 func TestPipelineRejectsTooManyChunks(t *testing.T) {
 	_, pipeline := newFakePipeline()
 	transcript := strings.Repeat(strings.Repeat("x", maxTranscriptChunkChars)+"\n", maxTranscriptChunks+1)

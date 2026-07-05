@@ -111,7 +111,7 @@ func (p *Pipeline) synthesize(ctx context.Context, extraction *Extraction, userN
 	if err != nil {
 		return "", fmt.Errorf("synthesis failed: %w", err)
 	}
-	return normalizeActionItemsMarkdown(result), nil
+	return normalizeNotesMarkdown(result, extraction), nil
 }
 
 func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string) (*Extraction, string, error) {
