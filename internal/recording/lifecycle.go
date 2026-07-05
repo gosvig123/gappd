@@ -11,74 +11,78 @@ import (
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
-func (s Service) startCaptureHeartbeat(meeting *db.Meeting) func() {
+func (w meetingRecordingWorkflow) startCaptureHeartbeat(meeting *db.Meeting) func() {
 	done := make(chan struct{})
 	stopped := make(chan struct{})
-	go s.runCaptureHeartbeat(meeting, done, stopped)
+	go w.runCaptureHeartbeat(meeting, done, stopped)
 	return func() {
 		close(done)
 		<-stopped
 	}
 }
 
-func (s Service) runCaptureHeartbeat(meeting *db.Meeting, done <-chan struct{}, stopped chan<- struct{}) {
+func (w meetingRecordingWorkflow) runCaptureHeartbeat(meeting *db.Meeting, done <-chan struct{}, stopped chan<- struct{}) {
 	defer close(stopped)
 	ticker := time.NewTicker(recordingHeartbeatInterval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			s.saveCaptureHeartbeat(meeting)
+			w.saveCaptureHeartbeat(meeting)
 		case <-done:
 			return
 		}
 	}
 }
 
-func (s Service) saveCaptureHeartbeat(meeting *db.Meeting) {
+func (w meetingRecordingWorkflow) saveCaptureHeartbeat(meeting *db.Meeting) {
 	updatedAt := nowUTC()
-	if err := s.meetings().UpdateRecordingHeartbeat(meeting.ID, updatedAt); err != nil && s.ErrOut != nil {
-		fmt.Fprintf(s.ErrOut, "warning: update recording heartbeat: %v\n", err)
+	if err := w.meetings().UpdateRecordingHeartbeat(meeting.ID, updatedAt); err != nil && w.errOut != nil {
+		fmt.Fprintf(w.errOut, "warning: update recording heartbeat: %v\n", err)
 	}
 	meeting.CaptureStatusUpdatedAt = updatedAt
 }
 
-func (s Service) createSessionDir(title string) (string, error) {
-	dir := filepath.Join(s.BaseDir, "sessions", fmt.Sprintf("%s-%s", time.Now().Format("2006-01-02T1504"), sanitize(title)))
+func (w meetingRecordingWorkflow) createSessionDir(title string) (string, error) {
+	dir := filepath.Join(w.baseDir, "sessions", fmt.Sprintf("%s-%s", time.Now().Format("2006-01-02T1504"), sanitize(title)))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("create session dir: %w", err)
 	}
 	return dir, nil
 }
 
-func (s Service) startMeeting(title, sessionDir, language string) (*db.Meeting, error) {
+func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string) (*db.Meeting, error) {
 	now := nowUTC()
 	meeting := db.NewRecordingMeeting(title, sessionDir, language, now)
-	if err := s.meetings().CreateMeeting(meeting); err != nil {
+	if err := w.meetings().CreateMeeting(meeting); err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
 	}
 	return meeting, nil
 }
 
-func (s Service) printRecorded(startedAt string) {
+func (w meetingRecordingWorkflow) printRecorded(startedAt string) {
 	started, err := time.Parse(time.RFC3339, startedAt)
 	if err != nil {
-		fmt.Fprintf(s.ErrOut, "warning: could not parse start time: %v\n", err)
-		if s.Events == nil {
-			fmt.Fprintln(s.Out, "● Recorded")
+		fmt.Fprintf(w.errOut, "warning: could not parse start time: %v\n", err)
+		if w.events == nil {
+			fmt.Fprintln(w.out, "● Recorded")
 		}
 		return
 	}
-	if s.Events == nil {
-		fmt.Fprintf(s.Out, "● Recorded %s\n", time.Since(started).Truncate(time.Second))
+	if w.events == nil {
+		fmt.Fprintf(w.out, "● Recorded %s\n", time.Since(started).Truncate(time.Second))
 	}
 }
 
 func (s Service) emit(name EventName, meeting db.Meeting, err error) error {
-	if s.Events == nil {
+	return s.recordingWorkflow().emit(name, meeting, err)
+}
+
+func (w meetingRecordingWorkflow) emit(name EventName, meeting db.Meeting, err error) error {
+	if w.events == nil {
 		return nil
 	}
-	return s.Events.EmitRecordingEvent(name, meeting, err)
+	return w.events.EmitRecordingEvent(name, meeting, err)
 }
 
 func sanitize(s string) string {

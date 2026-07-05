@@ -14,8 +14,8 @@ type recordingSession struct {
 	artifacts audioartifact.Artifacts
 }
 
-func (s Service) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
-	return recordingSession{store: s.meetings(), events: s.Events, meeting: meeting, artifacts: artifacts}
+func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
+	return recordingSession{store: w.meetings(), events: w.events, meeting: meeting, artifacts: artifacts}
 }
 
 func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recordingSession {
@@ -51,11 +51,11 @@ func (r recordingSession) failUnexpectedCaptureStop(err error) error {
 	return unexpectedErr
 }
 
-func (r recordingSession) finish(req Request, processing meetingProcessing) error {
+func (r recordingSession) finish(processing meetingProcessing, req processingRequest) error {
 	if err := r.requireAudio(); err != nil {
 		return err
 	}
-	return processing.processAfterCapture(req, r)
+	return processing.processAfterCapture(r, req)
 }
 
 func (r recordingSession) requireAudio() error {
