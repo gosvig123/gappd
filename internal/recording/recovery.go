@@ -70,11 +70,9 @@ func (s Service) recoverStaleMeeting(ctx context.Context, meeting *db.Meeting, c
 	if ok, err := s.claimStaleRecording(meeting, cutoff, opts.Now); !ok || err != nil {
 		return ok, err
 	}
-	session := s.sessionFor(meeting, audioartifact.New(*meeting.AudioPath))
-	if err := s.emit(EventProcessing, *meeting, nil); err != nil {
-		return true, err
-	}
-	err := s.processing().processCaptured(ctx, session, meeting.Language)
+	processing := s.processing()
+	session := processing.sessionFor(meeting, audioartifact.New(*meeting.AudioPath))
+	err := processing.processClaimedCaptured(ctx, session, meeting.Language)
 	return s.finishStaleProcessing(err, opts)
 }
 

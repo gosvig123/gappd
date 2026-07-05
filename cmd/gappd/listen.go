@@ -73,6 +73,7 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 		Out:      os.Stdout,
 		ErrOut:   os.Stderr,
 		Events:   events,
+		Reporter: processingReporter(suppressProcessingFailure),
 	}
 	return service.Run(recording.Request{
 		DeviceIdx:                 deviceIdx,
@@ -81,4 +82,11 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 		Language:                  language,
 		SuppressProcessingFailure: suppressProcessingFailure,
 	})
+}
+
+func processingReporter(machineReadable bool) recording.ProcessingReporter {
+	if machineReadable {
+		return nil
+	}
+	return recording.NewConsoleProcessingReporter(os.Stdout, os.Stderr)
 }

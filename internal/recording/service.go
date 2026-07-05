@@ -79,6 +79,7 @@ type Service struct {
 	Out      io.Writer
 	ErrOut   io.Writer
 	Events   EventSink
+	Reporter ProcessingReporter
 
 	store       meetingStore
 	recorder    recorderFactory

@@ -83,10 +83,7 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 }
 
 func testSession(service Service, meeting *db.Meeting) recordingSession {
-	return recordingSession{
-		store: service.meetings(), out: service.Out, errOut: service.ErrOut,
-		events: service.Events, meeting: meeting,
-	}
+	return recordingSession{store: service.meetings(), events: service.Events, meeting: meeting}
 }
 
 type failingProvider struct{ err error }
