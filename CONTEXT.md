@@ -25,7 +25,7 @@ Shared workflow that turns captured audio or stored transcript into persisted tr
 _Avoid_: post-processing helper, enhancer wrapper
 
 **Meeting Lifecycle**:
-Rules that create, transition, and derive meeting capture, processing, and user-facing state.
+Rules that create, transition, and derive meeting capture, processing, and user-facing state from persisted meeting rows.
 _Avoid_: legacy status mirror, status helper
 
 ## Relationships
@@ -33,7 +33,7 @@ _Avoid_: legacy status mirror, status helper
 - A **Local AI Setup Operation** prepares one **Managed Runtime**.
 - A **Managed Runtime** provides **Local AI** for meeting transcription and summarization.
 - A **Meeting Recording Workflow** uses **Meeting Processing** after capture.
-- A **Meeting Lifecycle** defines valid meeting capture and processing state transitions.
+- A **Meeting Lifecycle** defines valid meeting capture and processing state transitions and user-facing state derived from persisted meeting rows.
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
 - `llama-server` provides meeting summarization through **Local AI**.
 
