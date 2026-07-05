@@ -31,10 +31,8 @@ func (r recordingSession) emit(name EventName, err error) error {
 }
 
 func (r recordingSession) failCapture(captureErr error) error {
-	now := nowUTC()
-	db.LifecycleFor(r.meeting).CaptureFailed(now, captureErr)
-	if err := r.store.UpdateMeeting(r.meeting); err != nil {
-		return fmt.Errorf("mark meeting capture failed: %w", err)
+	if err := r.store.MarkCaptureFailed(r.meeting, nowUTC(), captureErr); err != nil {
+		return err
 	}
 	if err := r.emit(EventFailed, captureErr); err != nil {
 		return err

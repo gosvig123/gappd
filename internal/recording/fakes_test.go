@@ -47,6 +47,41 @@ func (s *fakeStore) UpdateMeeting(meeting *db.Meeting) error {
 	return nil
 }
 
+func (s *fakeStore) MarkCaptureFailed(meeting *db.Meeting, at string, failure error) error {
+	db.LifecycleFor(meeting).CaptureFailed(at, failure)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) MarkCaptured(meeting *db.Meeting, at string) error {
+	db.LifecycleFor(meeting).Captured(at)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) MarkProcessingStarted(meeting *db.Meeting, at string) error {
+	db.LifecycleFor(meeting).ProcessingStarted(at)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) MarkProcessingFailed(meeting *db.Meeting, at string, failure error) error {
+	db.LifecycleFor(meeting).ProcessingFailed(at, failure)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) SaveTranscript(meeting *db.Meeting, transcript, at string) error {
+	db.LifecycleFor(meeting).TranscriptSaved(transcript, at)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) CompleteProcessing(meeting *db.Meeting, completion db.MeetingProcessingCompletion) error {
+	db.LifecycleFor(meeting).ProcessingCompleted(completion.Title, completion.Transcript, completion.Summary, completion.ExtractionJSON, completion.At)
+	return s.UpdateMeeting(meeting)
+}
+
+func (s *fakeStore) FailProcessingWithTranscript(meeting *db.Meeting, transcript, at string, failure error) error {
+	db.LifecycleFor(meeting).EnhancementFailed(transcript, at, failure)
+	return s.UpdateMeeting(meeting)
+}
+
 func (s *fakeStore) UpdateRecordingHeartbeat(_ string, updatedAt string) error {
 	s.meeting.CaptureStatusUpdatedAt = updatedAt
 	return nil
@@ -64,6 +99,24 @@ func (s *fakeStore) GetMeeting(string) (*db.Meeting, error) {
 
 func (s *fakeStore) GetSegments(string) ([]db.Segment, error) {
 	return append([]db.Segment(nil), s.segments...), nil
+}
+
+func (s *fakeStore) ListStaleRecordingMeetings(string, int) ([]db.Meeting, error) {
+	return nil, nil
+}
+
+func (s *fakeStore) ClaimStaleRecordingForProcessing(meeting *db.Meeting, _ string, endedAt string) (bool, error) {
+	if err := s.MarkCaptured(meeting, endedAt); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *fakeStore) FailStaleRecording(meeting *db.Meeting, _ string, endedAt string, failure error) (bool, error) {
+	if err := s.MarkCaptureFailed(meeting, endedAt, failure); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 type fakeRecorder struct {
