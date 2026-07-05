@@ -1,7 +1,6 @@
 package db
 
 import (
-	"database/sql"
 	"fmt"
 
 	"github.com/gappd-dev/gappd/internal/meetinglang"
@@ -155,86 +154,4 @@ func (d *DB) ListStaleRecordingMeetings(cutoff string, limit int) ([]Meeting, er
 	}
 	defer rows.Close()
 	return scanMeetings(rows)
-}
-
-func (d *DB) ClaimStaleRecordingForProcessing(id, cutoff, endedAt string) (bool, error) {
-	result, err := d.Conn.Exec(claimStaleRecordingSQL, endedAt, CaptureStatusCaptured, endedAt,
-		ProcessingStatusProcessing, endedAt, id, CaptureStatusRecording, cutoff)
-	return changed(result, err, "claim stale recording for processing")
-}
-
-func (d *DB) FailStaleRecording(id, cutoff, endedAt, message string) (bool, error) {
-	result, err := d.Conn.Exec(failStaleRecordingSQL, endedAt, CaptureStatusFailed, endedAt, message,
-		id, CaptureStatusRecording, cutoff)
-	return changed(result, err, "fail stale recording")
-}
-
-const claimStaleRecordingSQL = `UPDATE meetings SET ended_at = COALESCE(ended_at, ?),
-	capture_status = ?, capture_status_updated_at = ?, capture_failure_message = NULL,
-	processing_status = ?, processing_status_updated_at = ?, processing_failure_message = NULL
-	WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`
-
-const failStaleRecordingSQL = `UPDATE meetings SET ended_at = COALESCE(ended_at, ?),
-	capture_status = ?, capture_status_updated_at = ?, capture_failure_message = ?
-	WHERE id = ? AND capture_status = ? AND capture_status_updated_at < ?`
-
-func changed(result sql.Result, err error, operation string) (bool, error) {
-	if err != nil {
-		return false, fmt.Errorf("%s: %w", operation, err)
-	}
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return false, fmt.Errorf("%s rows affected: %w", operation, err)
-	}
-	return rows > 0, nil
-}
-
-func scanMeetings(rows *sql.Rows) ([]Meeting, error) {
-	var meetings []Meeting
-	for rows.Next() {
-		meeting, err := scanMeeting(rows)
-		if err != nil {
-			return nil, err
-		}
-		meetings = append(meetings, meeting)
-	}
-	return meetings, rows.Err()
-}
-
-func scanMeeting(rows *sql.Rows) (Meeting, error) {
-	var m Meeting
-	err := rows.Scan(
-		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
-		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
-	)
-	if err != nil {
-		return Meeting{}, fmt.Errorf("scan meeting: %w", err)
-	}
-	return m, nil
-}
-
-func scanMeetingListEntries(rows *sql.Rows) ([]MeetingListEntry, error) {
-	var entries []MeetingListEntry
-	for rows.Next() {
-		entry, err := scanMeetingListEntry(rows)
-		if err != nil {
-			return nil, err
-		}
-		entries = append(entries, entry)
-	}
-	return entries, rows.Err()
-}
-
-func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
-	var entry MeetingListEntry
-	err := rows.Scan(
-		&entry.ID, &entry.Title, &entry.StartedAt, &entry.EndedAt, &entry.CaptureStatus, &entry.CaptureStatusUpdatedAt, &entry.CaptureFailureMessage,
-		&entry.ProcessingStatus, &entry.ProcessingStatusUpdatedAt, &entry.ProcessingFailureMessage,
-		&entry.AudioPath, &entry.HasTranscript, &entry.HasSummary, &entry.Language, &entry.Tags, &entry.Source, &entry.CreatedAt,
-	)
-	if err != nil {
-		return MeetingListEntry{}, fmt.Errorf("scan meeting list entry: %w", err)
-	}
-	return entry, nil
 }

@@ -46,11 +46,7 @@ func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID string, 
 }
 
 func (p meetingProcessing) markProcessing(session recordingSession) error {
-	db.LifecycleFor(session.meeting).ProcessingStarted(nowUTC())
-	if err := p.store.UpdateMeeting(session.meeting); err != nil {
-		return fmt.Errorf("mark meeting processing: %w", err)
-	}
-	return nil
+	return p.store.MarkProcessingStarted(session.meeting, nowUTC())
 }
 
 func (p meetingProcessing) storedTranscript(meetingID string, saved *string) (string, error) {
@@ -126,16 +122,15 @@ func (p meetingProcessing) saveEnhancement(session recordingSession, extraction 
 }
 
 func (p meetingProcessing) completeProcessing(session recordingSession, title, transcript, summary, extractionJSON string) error {
-	db.LifecycleFor(session.meeting).ProcessingCompleted(title, transcript, summary, extractionJSON, nowUTC())
-	if err := p.store.UpdateMeeting(session.meeting); err != nil {
-		return fmt.Errorf("update meeting: %w", err)
+	completion := db.MeetingProcessingCompletion{Title: title, Transcript: transcript, Summary: summary, ExtractionJSON: extractionJSON, At: nowUTC()}
+	if err := p.store.CompleteProcessing(session.meeting, completion); err != nil {
+		return err
 	}
 	return session.emit(EventCompleted, nil)
 }
 
 func (p meetingProcessing) saveEnhanceFailure(session recordingSession, transcript string, err error) error {
-	db.LifecycleFor(session.meeting).EnhancementFailed(transcript, nowUTC(), err)
-	updateErr := p.store.UpdateMeeting(session.meeting)
+	updateErr := p.store.FailProcessingWithTranscript(session.meeting, transcript, nowUTC(), err)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
 	}

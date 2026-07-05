@@ -55,8 +55,17 @@ type enhancer interface {
 
 type meetingStore interface {
 	CreateMeeting(*db.Meeting) error
-	UpdateMeeting(*db.Meeting) error
+	MarkCaptureFailed(*db.Meeting, string, error) error
+	MarkCaptured(*db.Meeting, string) error
+	MarkProcessingStarted(*db.Meeting, string) error
+	MarkProcessingFailed(*db.Meeting, string, error) error
+	SaveTranscript(*db.Meeting, string, string) error
+	CompleteProcessing(*db.Meeting, db.MeetingProcessingCompletion) error
+	FailProcessingWithTranscript(*db.Meeting, string, string, error) error
 	UpdateRecordingHeartbeat(id, updatedAt string) error
+	ListStaleRecordingMeetings(cutoff string, limit int) ([]db.Meeting, error)
+	ClaimStaleRecordingForProcessing(*db.Meeting, string, string) (bool, error)
+	FailStaleRecording(*db.Meeting, string, string, error) (bool, error)
 	ReplaceSegments(meetingID string, segments []db.Segment) error
 	GetMeeting(id string) (*db.Meeting, error)
 	GetSegments(meetingID string) ([]db.Segment, error)

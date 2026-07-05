@@ -24,12 +24,13 @@ type RecoverStaleOptions struct {
 }
 
 func (s Service) RecoverStale(ctx context.Context, opts RecoverStaleOptions) (int, error) {
-	if s.Store == nil {
+	store := s.meetings()
+	if store == nil {
 		return 0, fmt.Errorf("recover stale recordings: store is required")
 	}
 	opts = opts.withDefaults()
 	cutoff := opts.Now.Add(-opts.Timeout).UTC().Format(time.RFC3339)
-	meetings, err := s.Store.ListStaleRecordingMeetings(cutoff, opts.Limit)
+	meetings, err := store.ListStaleRecordingMeetings(cutoff, opts.Limit)
 	if err != nil {
 		return 0, err
 	}
@@ -88,22 +89,16 @@ func (s Service) finishStaleProcessing(err error, opts RecoverStaleOptions) (boo
 
 func (s Service) claimStaleRecording(meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {
 	endedAt := now.UTC().Format(time.RFC3339)
-	ok, err := s.Store.ClaimStaleRecordingForProcessing(meeting.ID, cutoff, endedAt)
-	if !ok || err != nil {
-		return ok, err
-	}
-	db.LifecycleFor(meeting).Captured(endedAt)
-	return true, nil
+	return s.meetings().ClaimStaleRecordingForProcessing(meeting, cutoff, endedAt)
 }
 
 func (s Service) failStaleRecording(meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {
 	endedAt := now.UTC().Format(time.RFC3339)
 	failureErr := errors.New(staleNoAudioMessage)
-	ok, err := s.Store.FailStaleRecording(meeting.ID, cutoff, endedAt, failureErr.Error())
+	ok, err := s.meetings().FailStaleRecording(meeting, cutoff, endedAt, failureErr)
 	if !ok || err != nil {
 		return ok, err
 	}
-	db.LifecycleFor(meeting).CaptureFailed(endedAt, failureErr)
 	if err := s.emit(EventFailed, *meeting, failureErr); err != nil {
 		return true, err
 	}
