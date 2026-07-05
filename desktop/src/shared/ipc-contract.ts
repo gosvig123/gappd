@@ -28,12 +28,10 @@ export type IpcInvokeContract = {
   }
   localAISetup: {
     getStatus: OperationSpec<[], LocalAISetupStatus>
+    getDetails: OperationSpec<[], LocalAIStatus>
     start: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
     retry: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-  }
-  settings: {
-    getLocalAIStatus: OperationSpec<[], LocalAIStatus>
-    repairLocalAI: OperationSpec<[], LocalAIStatus>
+    repair: OperationSpec<[], LocalAIStatus>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -61,11 +59,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: { list: 'meetings:list', show: 'meetings:show', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
-  localAISetup: { getStatus: 'localAISetup:getStatus', start: 'localAISetup:start', retry: 'localAISetup:retry' },
-  settings: {
-    getLocalAIStatus: 'settings:getLocalAIStatus',
-    repairLocalAI: 'settings:repairLocalAI',
-  },
+  localAISetup: { getStatus: 'localAISetup:getStatus', getDetails: 'localAISetup:getDetails', start: 'localAISetup:start', retry: 'localAISetup:retry', repair: 'localAISetup:repair' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',

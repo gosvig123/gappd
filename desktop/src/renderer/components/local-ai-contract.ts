@@ -1,9 +1,9 @@
 import { buildOwnershipHelp, type LocalAIOwnershipHelp } from './local-ai-ownership'
 
-type LocalAIContract = Pick<typeof window.gappd, 'localAISetup' | 'settings'>
+type LocalAIContract = Pick<typeof window.gappd, 'localAISetup'>
 
 export type LocalAISetupStatus = Awaited<ReturnType<LocalAIContract['localAISetup']['getStatus']>>
-export type LocalAIStatus = Awaited<ReturnType<LocalAIContract['settings']['getLocalAIStatus']>>
+export type LocalAIStatus = Awaited<ReturnType<LocalAIContract['localAISetup']['getDetails']>>
 
 type LocalAISetupMessageView = {
   headline: string
@@ -82,9 +82,8 @@ export function localAISetupMessageView(status: Pick<LocalAISetupStatus, 'phase'
 }
 
 export function localAISetupErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'> | null | undefined): LocalAISetupErrorView | null {
-  if (!status) return null
-  if (status.errorKind) return structuredErrorView(status)
-  return legacyErrorView(status.error)
+  if (!status?.error || !status.errorKind) return null
+  return structuredErrorView(status)
 }
 
 export function toStatusError(error: unknown): LocalAIStatus {
@@ -132,16 +131,6 @@ function structuredErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'e
   return { ...view, detail: errorDetail || view.detail, errorDetail, debugDetail: cleanDebugDetail(status.debugDetail), ownershipHelp: status.errorKind === 'ownership_mismatch' ? buildOwnershipHelp(status.ownershipConflict) : undefined }
 }
 
-function legacyErrorView(error: string | undefined): LocalAISetupErrorView | null {
-  const text = cleanErrorText(error)
-  if (!text) return null
-  if (matchesText(text, ['network', 'connection', 'timed out', 'timeout', 'dns', 'econn', 'socket', 'fetch', 'download', 'pull stalled', 'could not reach', 'registry'])) return { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' }
-  if (matchesText(text, ['no space', 'disk full', 'enospc', 'not enough space'])) return { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' }
-  if (matchesText(text, ['permission denied', 'operation not permitted', 'access denied', 'eacces'])) return { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' }
-  if (matchesText(text, ['another process', 'app-owned runtime', '127.0.0.1:11436', 'address already in use'])) return { title: "Another process is using Gappd's local port.", detail: 'Gappd needs 127.0.0.1:11436 for its managed runtime. Stop the other process manually, then retry setup.', compact: 'Local port already in use.', ownershipHelp: buildOwnershipHelp(undefined) }
-  return matchesText(text, ['spawn', 'listen', 'speech']) ? { title: 'Bundled runtime could not finish setup.', detail: truncateText(text, 120), compact: 'Bundled runtime needs attention.' } : { title: truncateText(text, 120), compact: truncateText(text, 72) }
-}
-
 function splitStatusText(text: string): [string, string | undefined] {
   for (const delimiter of STATUS_DELIMITERS) {
     const parts = text.split(delimiter)
@@ -167,11 +156,6 @@ function cleanPullDetail(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 
   if (!text || isGenericPhaseMessage(status.phase, text)) return undefined
   if (status.pullStage && normalizeKey(text) === normalizeKey(PULL_STAGE_VIEWS[status.pullStage].headline)) return undefined
   return text
-}
-
-function matchesText(text: string, needles: string[]): boolean {
-  const normalized = normalizeKey(text)
-  return needles.some((needle) => normalized.includes(needle))
 }
 
 function truncateText(value: string, limit: number): string {

@@ -3,15 +3,14 @@ import { MANAGED_LLAMACPP_MODEL, isManagedLlamaCppModel, type ManagedLlamaCppMod
 import { getLocalAIContract, toStatusError, type LocalAISetupStatus } from '../components/local-ai-contract'
 import { useGuardedEffect } from './use-guarded-effect'
 
-const localAI = getLocalAIContract()
-
 export function useLocalAISetupOperation() {
+  const localAI = getLocalAIContract()
   const [status, setStatus] = useState<LocalAISetupStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [selectedModel, setSelectedModel] = useState<ManagedLlamaCppModelTag>(MANAGED_LLAMACPP_MODEL)
 
-  useLocalAISetupStatus(setStatus, setLoading)
+  useLocalAISetupStatus(localAI, setStatus, setLoading)
   useSelectedManagedModel(status, busy, setSelectedModel)
 
   async function run(action: 'start' | 'retry') {
@@ -29,15 +28,15 @@ export function useLocalAISetupOperation() {
   return { status, loading, busy, selectedModel, setSelectedModel, run, setStatus }
 }
 
-function useLocalAISetupStatus(onStatus: (status: LocalAISetupStatus) => void, onLoading: (loading: boolean) => void) {
+function useLocalAISetupStatus(localAI: ReturnType<typeof getLocalAIContract>, onStatus: (status: LocalAISetupStatus) => void, onLoading: (loading: boolean) => void) {
   useGuardedEffect((guard) => {
     const dispose = localAI.localAISetup.onStatusChanged((status) => guard(() => onStatus(status)))
-    void loadInitialStatus((status) => guard(() => onStatus(status)), () => guard(() => onLoading(false)))
+    void loadInitialStatus(localAI, (status) => guard(() => onStatus(status)), () => guard(() => onLoading(false)))
     return dispose
   }, [])
 }
 
-async function loadInitialStatus(onStatus: (status: LocalAISetupStatus) => void, onDone: () => void) {
+async function loadInitialStatus(localAI: ReturnType<typeof getLocalAIContract>, onStatus: (status: LocalAISetupStatus) => void, onDone: () => void) {
   try {
     onStatus(await localAI.localAISetup.getStatus())
   } catch (err) {

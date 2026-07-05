@@ -15,7 +15,6 @@ function buildOperationApi(): IpcInvokeApi {
     meetings: invokeGroup('meetings'),
     recording: invokeGroup('recording'),
     localAISetup: invokeGroup('localAISetup'),
-    settings: invokeGroup('settings'),
     update: invokeGroup('update'),
   }
 }
@@ -41,7 +40,6 @@ const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
   localAISetup: { ...operationApi.localAISetup, onStatusChanged: subscribe(IPC_EVENTS.localAISetup.statusChanged) },
-  settings: operationApi.settings,
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
 
