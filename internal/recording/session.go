@@ -2,7 +2,6 @@ package recording
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -10,18 +9,13 @@ import (
 
 type recordingSession struct {
 	store     meetingStore
-	out       io.Writer
-	errOut    io.Writer
 	events    EventSink
 	meeting   *db.Meeting
 	artifacts audioartifact.Artifacts
 }
 
 func (s Service) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
-	return recordingSession{
-		store: s.meetings(), out: s.Out, errOut: s.ErrOut,
-		events: s.Events, meeting: meeting, artifacts: artifacts,
-	}
+	return recordingSession{store: s.meetings(), events: s.Events, meeting: meeting, artifacts: artifacts}
 }
 
 func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recordingSession {
@@ -63,9 +57,6 @@ func (r recordingSession) finish(req Request, processing meetingProcessing) erro
 	if err := r.requireAudio(); err != nil {
 		return err
 	}
-	if err := r.markCaptured(nowUTC()); err != nil {
-		return err
-	}
 	return processing.processAfterCapture(req, r)
 }
 
@@ -78,12 +69,4 @@ func (r recordingSession) requireAudio() error {
 		return err
 	}
 	return captureErr
-}
-
-func (r recordingSession) markCaptured(at string) error {
-	lifecycleFor(r.meeting).captured(at)
-	if err := r.store.UpdateMeeting(r.meeting); err != nil {
-		return fmt.Errorf("mark meeting captured: %w", err)
-	}
-	return r.emit(EventProcessing, nil)
 }

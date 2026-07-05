@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
@@ -28,9 +27,7 @@ func (p meetingProcessing) processCaptured(ctx context.Context, session recordin
 }
 
 func (p meetingProcessing) saveSegments(session recordingSession, segments []db.Segment) (string, error) {
-	if p.events == nil {
-		fmt.Fprintf(p.out, "● Got %d segments\n", len(segments))
-	}
+	p.report().SegmentsSaved(len(segments))
 	if err := p.store.ReplaceSegments(session.meeting.ID, segments); err != nil {
 		return "", fmt.Errorf("save segments: %w", err)
 	}
@@ -38,7 +35,7 @@ func (p meetingProcessing) saveSegments(session recordingSession, segments []db.
 	if err := p.saveTranscript(session, transcript); err != nil {
 		return "", err
 	}
-	p.printTranscript(transcript)
+	p.report().TranscriptSaved(transcript)
 	return transcript, nil
 }
 
@@ -47,15 +44,7 @@ func (p meetingProcessing) saveTranscript(session recordingSession, transcript s
 	if err := p.store.UpdateMeeting(session.meeting); err != nil {
 		return fmt.Errorf("save transcript: %w", err)
 	}
-	return session.emit(EventProcessing, nil)
-}
-
-func (p meetingProcessing) printTranscript(transcript string) {
-	if p.events != nil {
-		return
-	}
-	fmt.Fprintln(p.out, "\n── Transcript ──────────────────────────")
-	fmt.Fprintln(p.out, transcript)
+	return nil
 }
 
 func (p meetingProcessing) saveProcessingFailure(session recordingSession, origErr error) error {
@@ -69,9 +58,7 @@ func (p meetingProcessing) saveProcessingFailure(session recordingSession, origE
 }
 
 func (p meetingProcessing) emitProcessingFailure(session recordingSession, origErr error) error {
-	if session.meeting.AudioPath != nil && p.events == nil {
-		fmt.Fprintf(p.out, "  session saved (audio may be incomplete — check %s)\n", *session.meeting.AudioPath)
-	}
+	p.report().ProcessingFailure(session.meeting.AudioPath)
 	if err := session.emit(EventFailed, origErr); err != nil {
 		return err
 	}
@@ -119,23 +106,19 @@ func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, spea
 	}
 	segments, err := p.transcribeAs(ctx, audioPath, speaker, language)
 	if err != nil {
-		fmt.Fprintf(p.errOut, "  error: %s transcription failed: %v\n", speaker, err)
+		p.report().TranscriptionFailed(speaker, err)
 		return nil, err
 	}
 	return segments, nil
 }
 
 func (p meetingProcessing) skipMissingAudio(audioPath string) ([]transcribe.Segment, error) {
-	if p.events == nil {
-		fmt.Fprintf(p.out, "  skipping %s: file missing or empty (no audio captured)\n", filepath.Base(audioPath))
-	}
+	p.report().TranscriptionSkipped(audioPath)
 	return nil, errMissingAudio
 }
 
 func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, speaker, language string) ([]transcribe.Segment, error) {
-	if p.events == nil {
-		fmt.Fprintf(p.out, "● Transcribing %s audio with Apple Speech...\n", speaker)
-	}
+	p.report().Transcribing(speaker)
 	segs, err := transcribe.TranscribeFile(ctx, audioPath, language)
 	if p.transcriber != nil {
 		segs, err = p.transcriber.Transcribe(ctx, audioPath)

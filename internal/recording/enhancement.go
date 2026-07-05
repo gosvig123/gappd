@@ -86,8 +86,8 @@ func filled(value *string) bool {
 }
 
 func (p meetingProcessing) refineStoredSummary(ctx context.Context, session recordingSession, transcript string, options EnhanceOptions) error {
-	p.printEnhancementStart()
-	progress := p.aiProgress()
+	p.report().EnhancementStarted()
+	progress := p.report().AIProgress
 	if progress != nil {
 		progress(ai.Progress{Stage: ai.ProgressRefineNotes, Current: 1, Total: 1})
 	}
@@ -103,8 +103,8 @@ func (p meetingProcessing) refineStoredSummary(ctx context.Context, session reco
 }
 
 func (p meetingProcessing) enhanceAndSave(ctx context.Context, session recordingSession, transcript string, options EnhanceOptions) error {
-	p.printEnhancementStart()
-	runOptions := options.runOptions(previousSummary(session, options), p.aiProgress(), enhanceLanguage(session, options))
+	p.report().EnhancementStarted()
+	runOptions := options.runOptions(previousSummary(session, options), p.report().AIProgress, enhanceLanguage(session, options))
 	extraction, summary, err := p.enhancer().RunWithOptions(ctx, transcript, runOptions)
 	if err != nil {
 		return p.saveEnhanceFailure(session, transcript, err)
@@ -120,7 +120,7 @@ func (p meetingProcessing) saveEnhancement(session recordingSession, extraction 
 	if err := p.completeProcessing(session, extraction.Title, transcript, summary, extractionJSON); err != nil {
 		return err
 	}
-	p.printEnhancementResult(summary, len(extraction.ActionItems), session.meeting.ID)
+	p.report().EnhancementCompleted(summary, len(extraction.ActionItems), session.meeting.ID)
 	return nil
 }
 
@@ -173,31 +173,12 @@ func (p meetingProcessing) enhancer() enhancer {
 	return p.pipeline
 }
 
-func (p meetingProcessing) printEnhancementStart() {
-	if p.events == nil {
-		fmt.Fprintln(p.out, "── Enhancing with AI... ─────────────────")
-	}
-}
-
-func (p meetingProcessing) aiProgress() func(ai.Progress) {
-	if p.events != nil {
-		return nil
-	}
-	return func(progress ai.Progress) { printAIProgress(p.out, progress) }
-}
-
 func printAIProgress(out io.Writer, progress ai.Progress) {
 	if progress.Total > 1 {
 		fmt.Fprintf(out, "● AI %s %d/%d\n", progress.Stage, progress.Current, progress.Total)
 		return
 	}
 	fmt.Fprintf(out, "● AI %s\n", progress.Stage)
-}
-
-func (p meetingProcessing) printEnhancementResult(summary string, actionItems int, meetingID string) {
-	if p.events == nil {
-		printEnhancementResult(p.out, summary, actionItems, meetingID)
-	}
 }
 
 func printEnhancementResult(out io.Writer, summary string, actionItems int, meetingID string) {
