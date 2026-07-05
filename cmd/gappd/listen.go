@@ -2,11 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
-	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
@@ -56,24 +53,9 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 		return err
 	}
 	defer store.Close()
-
-	baseDir, err := config.GappdDir()
+	service, err := newRecordingWorkflowService(store, pipeline, recordingOutputForListen(suppressProcessingFailure), suppressProcessingFailure)
 	if err != nil {
-		return fmt.Errorf("resolve gappd dir for session path: %w", err)
-	}
-
-	var events recording.EventSink
-	if emitter := appprotocol.NewRecordingEventEmitter(os.Stdout, suppressProcessingFailure); emitter != nil {
-		events = emitter
-	}
-	service := recording.Service{
-		Store:    store,
-		Pipeline: pipeline,
-		BaseDir:  baseDir,
-		Out:      os.Stdout,
-		ErrOut:   os.Stderr,
-		Events:   events,
-		Reporter: processingReporter(suppressProcessingFailure),
+		return err
 	}
 	return service.Run(recording.Request{
 		DeviceIdx:                 deviceIdx,
@@ -84,9 +66,9 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 	})
 }
 
-func processingReporter(machineReadable bool) recording.ProcessingReporter {
+func recordingOutputForListen(machineReadable bool) recordingOutput {
 	if machineReadable {
-		return nil
+		return recordingOutputEvents
 	}
-	return recording.NewConsoleProcessingReporter(os.Stdout, os.Stderr)
+	return recordingOutputConsole
 }
