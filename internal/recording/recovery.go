@@ -92,7 +92,7 @@ func (s Service) claimStaleRecording(meeting *db.Meeting, cutoff string, now tim
 	if !ok || err != nil {
 		return ok, err
 	}
-	lifecycleFor(meeting).captured(endedAt)
+	db.LifecycleFor(meeting).Captured(endedAt)
 	return true, nil
 }
 
@@ -103,7 +103,7 @@ func (s Service) failStaleRecording(meeting *db.Meeting, cutoff string, now time
 	if !ok || err != nil {
 		return ok, err
 	}
-	lifecycleFor(meeting).captureFailed(endedAt, failureErr)
+	db.LifecycleFor(meeting).CaptureFailed(endedAt, failureErr)
 	if err := s.emit(EventFailed, *meeting, failureErr); err != nil {
 		return true, err
 	}

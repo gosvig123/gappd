@@ -24,11 +24,16 @@ _Avoid_: recorder service, capture command
 Shared workflow that turns captured audio or stored transcript into persisted transcript, title, and summary through **Local AI**.
 _Avoid_: post-processing helper, enhancer wrapper
 
+**Meeting Lifecycle**:
+Rules that create, transition, and derive meeting capture, processing, and user-facing state.
+_Avoid_: legacy status mirror, status helper
+
 ## Relationships
 
 - A **Local AI Setup Operation** prepares one **Managed Runtime**.
 - A **Managed Runtime** provides **Local AI** for meeting transcription and summarization.
 - A **Meeting Recording Workflow** uses **Meeting Processing** after capture.
+- A **Meeting Lifecycle** defines valid meeting capture and processing state transitions.
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
 - `llama-server` provides meeting summarization through **Local AI**.
 

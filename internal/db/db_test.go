@@ -56,8 +56,8 @@ func TestInitWaitsForLockedLegacyDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tableColumns() error = %v", err)
 	}
-	if !columns["status"] {
-		t.Fatal("status column missing after Init()")
+	if columns["status"] {
+		t.Fatal("legacy status column present after one-way lifecycle migration")
 	}
 	if !columns["processing_status"] {
 		t.Fatal("processing_status column missing after Init()")

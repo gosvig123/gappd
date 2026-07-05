@@ -60,7 +60,7 @@ func (p meetingProcessing) report() ProcessingReporter {
 }
 
 func (p meetingProcessing) beginCaptured(session recordingSession, at string) error {
-	lifecycleFor(session.meeting).captured(at)
+	db.LifecycleFor(session.meeting).Captured(at)
 	if err := p.store.UpdateMeeting(session.meeting); err != nil {
 		return fmt.Errorf("mark meeting captured: %w", err)
 	}

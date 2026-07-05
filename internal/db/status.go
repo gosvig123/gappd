@@ -46,28 +46,3 @@ func UsesProcessingTimestamp(meeting Meeting) bool {
 	state := MeetingStateFor(meeting)
 	return meeting.ProcessingStatus == ProcessingStatusFailed || state == MeetingStateProcessing || state == MeetingStateCompleted
 }
-
-func legacyStatusFor(meeting Meeting) MeetingState {
-	state := MeetingStateFor(meeting)
-	if state == MeetingStateCaptured {
-		return MeetingStateProcessing
-	}
-	return state
-}
-
-func legacyStatusUpdatedAtFor(meeting Meeting) string {
-	if UsesProcessingTimestamp(meeting) {
-		return meeting.ProcessingStatusUpdatedAt
-	}
-	return meeting.CaptureStatusUpdatedAt
-}
-
-func legacyFailureMessageFor(meeting Meeting) *string {
-	if meeting.CaptureStatus == CaptureStatusFailed {
-		return meeting.CaptureFailureMessage
-	}
-	if meeting.ProcessingStatus == ProcessingStatusFailed {
-		return meeting.ProcessingFailureMessage
-	}
-	return nil
-}

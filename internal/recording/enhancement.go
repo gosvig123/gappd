@@ -9,6 +9,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
@@ -45,7 +46,7 @@ func (p meetingProcessing) enhanceStored(ctx context.Context, meetingID string, 
 }
 
 func (p meetingProcessing) markProcessing(session recordingSession) error {
-	lifecycleFor(session.meeting).processingStarted(nowUTC())
+	db.LifecycleFor(session.meeting).ProcessingStarted(nowUTC())
 	if err := p.store.UpdateMeeting(session.meeting); err != nil {
 		return fmt.Errorf("mark meeting processing: %w", err)
 	}
@@ -125,7 +126,7 @@ func (p meetingProcessing) saveEnhancement(session recordingSession, extraction 
 }
 
 func (p meetingProcessing) completeProcessing(session recordingSession, title, transcript, summary, extractionJSON string) error {
-	lifecycleFor(session.meeting).processingCompleted(title, transcript, summary, extractionJSON, nowUTC())
+	db.LifecycleFor(session.meeting).ProcessingCompleted(title, transcript, summary, extractionJSON, nowUTC())
 	if err := p.store.UpdateMeeting(session.meeting); err != nil {
 		return fmt.Errorf("update meeting: %w", err)
 	}
@@ -133,7 +134,7 @@ func (p meetingProcessing) completeProcessing(session recordingSession, title, t
 }
 
 func (p meetingProcessing) saveEnhanceFailure(session recordingSession, transcript string, err error) error {
-	lifecycleFor(session.meeting).enhancementFailed(transcript, nowUTC(), err)
+	db.LifecycleFor(session.meeting).EnhancementFailed(transcript, nowUTC(), err)
 	updateErr := p.store.UpdateMeeting(session.meeting)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
