@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
@@ -114,7 +113,7 @@ func runAppRecoverStale(asJSON bool) error {
 }
 
 func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
-	service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+	service := newRecordingService(store, pipeline, recordingOutputQuiet)
 	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{SuppressProcessingFailure: true})
 }
 
