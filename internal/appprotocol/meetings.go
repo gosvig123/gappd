@@ -1,8 +1,10 @@
 package appprotocol
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gappd-dev/gappd/internal/db"
-	"github.com/gappd-dev/gappd/internal/recording"
 )
 
 type MeetingListItem struct {
@@ -48,31 +50,6 @@ func BuildMeetingListView(entry db.MeetingListEntry) MeetingListItem {
 	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary}
 }
 
-func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
-	meeting, segments, err := loadMeetingDetail(store, id)
-	if err != nil {
-		return MeetingDetail{}, err
-	}
-	return BuildMeetingDetail(*meeting, segments), nil
-}
-
-func BuildAppMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
-	meeting, segments, err := loadMeetingDetail(store, id)
-	if err != nil {
-		return MeetingDetail{}, err
-	}
-	return BuildAppMeetingDetail(*meeting, segments), nil
-}
-
-func loadMeetingDetail(store *db.DB, id string) (*db.Meeting, []db.Segment, error) {
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return nil, nil, err
-	}
-	segments, err := store.GetSegments(id)
-	return meeting, segments, err
-}
-
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {
 	return buildMeetingDetail(meeting, segments, transcriptText(meeting, segments))
 }
@@ -100,7 +77,15 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if len(segments) == 0 {
 		return ""
 	}
-	return recording.FormatTranscript(segments)
+	return formatTranscript(segments)
+}
+
+func formatTranscript(segments []db.Segment) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
+	}
+	return b.String()
 }
 
 func buildSegmentViews(segments []db.Segment) []MeetingSegment {

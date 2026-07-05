@@ -169,5 +169,18 @@ func appMeetingsShowCmd() *cobra.Command {
 }
 
 func appMeetingDetailFor(store *db.DB, id string) (appprotocol.MeetingDetail, error) {
-	return appprotocol.BuildAppMeetingDetailView(store, id)
+	meeting, segments, err := loadMeetingDetail(store, id)
+	if err != nil {
+		return appprotocol.MeetingDetail{}, err
+	}
+	return appprotocol.BuildAppMeetingDetail(*meeting, segments), nil
+}
+
+func loadMeetingDetail(store *db.DB, id string) (*db.Meeting, []db.Segment, error) {
+	meeting, err := store.GetMeeting(id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("meeting not found: %w", err)
+	}
+	segments, err := store.GetSegments(id)
+	return meeting, segments, err
 }
