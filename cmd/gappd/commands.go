@@ -82,11 +82,7 @@ func showCmd() *cobra.Command {
 }
 
 func showMeeting(store *db.DB, id string) error {
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return fmt.Errorf("meeting not found: %w", err)
-	}
-	segments, err := store.GetSegments(id)
+	meeting, segments, err := loadMeetingDetail(store, id)
 	if err != nil {
 		return err
 	}
