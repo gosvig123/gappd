@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
@@ -125,10 +126,11 @@ type fakeRecorder struct {
 }
 
 func (r *fakeRecorder) Start(context.Context) error {
-	if err := os.WriteFile(r.MicPath(), []byte(strings.Repeat("m", 45)), 0o644); err != nil {
+	artifacts := r.Artifacts()
+	if err := os.WriteFile(artifacts.MicPath(), []byte(strings.Repeat("m", 45)), 0o644); err != nil {
 		return err
 	}
-	return os.WriteFile(r.SystemPath(), []byte(strings.Repeat("s", 45)), 0o644)
+	return os.WriteFile(artifacts.SystemPath(), []byte(strings.Repeat("s", 45)), 0o644)
 }
 
 func (r *fakeRecorder) Stop() error {
@@ -139,12 +141,8 @@ func (r *fakeRecorder) Done() <-chan error {
 	return r.done
 }
 
-func (r *fakeRecorder) MicPath() string {
-	return filepath.Join(r.dir, "mic.wav")
-}
-
-func (r *fakeRecorder) SystemPath() string {
-	return filepath.Join(r.dir, "system.wav")
+func (r *fakeRecorder) Artifacts() audioartifact.Artifacts {
+	return audioartifact.New(r.dir)
 }
 
 type fakeTranscriber struct{}

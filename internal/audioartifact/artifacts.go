@@ -24,11 +24,11 @@ type Source struct {
 }
 
 func New(dir string) Artifacts {
-	return FromPaths(filepath.Join(dir, MicFilename), filepath.Join(dir, SystemFilename))
+	return Artifacts{micPath: pathFor(dir, MicFilename), systemPath: pathFor(dir, SystemFilename)}
 }
 
-func FromPaths(micPath, systemPath string) Artifacts {
-	return Artifacts{micPath: micPath, systemPath: systemPath}
+func pathFor(dir, filename string) string {
+	return filepath.Join(dir, filename)
 }
 
 func (a Artifacts) MicPath() string {
@@ -44,10 +44,15 @@ func (a Artifacts) Sources() []Source {
 }
 
 func (a Artifacts) HasAudio() bool {
-	return FileHasAudio(a.MicPath()) || FileHasAudio(a.SystemPath())
+	for _, source := range a.Sources() {
+		if source.HasAudio() {
+			return true
+		}
+	}
+	return false
 }
 
-func FileHasAudio(path string) bool {
-	info, err := os.Stat(path)
+func (s Source) HasAudio() bool {
+	info, err := os.Stat(s.Path)
 	return err == nil && info.Size() > wavHeaderBytes
 }

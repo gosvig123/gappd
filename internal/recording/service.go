@@ -40,8 +40,7 @@ type audioRecorder interface {
 	Start(context.Context) error
 	Stop() error
 	Done() <-chan error
-	MicPath() string
-	SystemPath() string
+	Artifacts() audioartifact.Artifacts
 }
 
 type transcriber interface {
@@ -174,8 +173,7 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 }
 
 func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {
-	artifacts := audioartifact.FromPaths(recorder.MicPath(), recorder.SystemPath())
-	session = session.withArtifacts(artifacts)
+	session = session.withArtifacts(recorder.Artifacts())
 	w.printRecorded(session.meeting.StartedAt)
 	return session
 }
