@@ -85,7 +85,10 @@ func transcribedSegments(segments []db.Segment, errs []string) ([]db.Segment, er
 }
 
 func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifact.Source, meetingID, language string) ([]db.Segment, error) {
-	segments, err := p.transcribeStream(ctx, src.Path, src.Speaker, language)
+	if !src.HasAudio() {
+		return p.skipMissingAudio(src)
+	}
+	segments, err := p.transcribeAs(ctx, src, language)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
@@ -94,34 +97,23 @@ func (p meetingProcessing) transcribeSource(ctx context.Context, src audioartifa
 
 var errMissingAudio = errors.New("missing audio")
 
-func (p meetingProcessing) transcribeStream(ctx context.Context, audioPath, speaker, language string) ([]transcribe.Segment, error) {
-	if !audioartifact.FileHasAudio(audioPath) {
-		return p.skipMissingAudio(audioPath)
-	}
-	segments, err := p.transcribeAs(ctx, audioPath, speaker, language)
-	if err != nil {
-		p.report().TranscriptionFailed(speaker, err)
-		return nil, err
-	}
-	return segments, nil
-}
-
-func (p meetingProcessing) skipMissingAudio(audioPath string) ([]transcribe.Segment, error) {
-	p.report().TranscriptionSkipped(audioPath)
+func (p meetingProcessing) skipMissingAudio(src audioartifact.Source) ([]db.Segment, error) {
+	p.report().TranscriptionSkipped(src.Path)
 	return nil, errMissingAudio
 }
 
-func (p meetingProcessing) transcribeAs(ctx context.Context, audioPath, speaker, language string) ([]transcribe.Segment, error) {
-	p.report().Transcribing(speaker)
-	segs, err := transcribe.TranscribeFile(ctx, audioPath, language)
+func (p meetingProcessing) transcribeAs(ctx context.Context, src audioartifact.Source, language string) ([]transcribe.Segment, error) {
+	p.report().Transcribing(src.Speaker)
+	segs, err := transcribe.TranscribeFile(ctx, src.Path, language)
 	if p.transcriber != nil {
-		segs, err = p.transcriber.Transcribe(ctx, audioPath)
+		segs, err = p.transcriber.Transcribe(ctx, src.Path)
 	}
 	if err != nil {
+		p.report().TranscriptionFailed(src.Speaker, err)
 		return nil, err
 	}
 	for i := range segs {
-		segs[i].Speaker = speaker
+		segs[i].Speaker = src.Speaker
 	}
 	return segs, nil
 }

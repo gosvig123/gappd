@@ -129,12 +129,8 @@ func (r *Recorder) killProcessGroup(sig syscall.Signal) error {
 	return syscall.Kill(-r.cmd.Process.Pid, sig)
 }
 
-func (r *Recorder) MicPath() string {
-	return audioartifact.New(r.outputDir).MicPath()
-}
-
-func (r *Recorder) SystemPath() string {
-	return audioartifact.New(r.outputDir).SystemPath()
+func (r *Recorder) Artifacts() audioartifact.Artifacts {
+	return audioartifact.New(r.outputDir)
 }
 
 func findCaptureLaunch(args []string, _ string) (captureLaunch, error) {
