@@ -53,7 +53,7 @@ func createCapturedMeeting(t *testing.T, store *db.DB) *db.Meeting {
 	t.Helper()
 	meeting := createRecordingMeeting(t, store)
 	now := "2026-04-10T12:30:00Z"
-	lifecycleFor(meeting).captured(now)
+	db.LifecycleFor(meeting).Captured(now)
 	if err := store.UpdateMeeting(meeting); err != nil {
 		t.Fatalf("UpdateMeeting() error = %v", err)
 	}

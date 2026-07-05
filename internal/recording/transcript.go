@@ -40,7 +40,7 @@ func (p meetingProcessing) saveSegments(session recordingSession, segments []db.
 }
 
 func (p meetingProcessing) saveTranscript(session recordingSession, transcript string) error {
-	lifecycleFor(session.meeting).transcriptSaved(transcript, nowUTC())
+	db.LifecycleFor(session.meeting).TranscriptSaved(transcript, nowUTC())
 	if err := p.store.UpdateMeeting(session.meeting); err != nil {
 		return fmt.Errorf("save transcript: %w", err)
 	}
@@ -49,7 +49,7 @@ func (p meetingProcessing) saveTranscript(session recordingSession, transcript s
 
 func (p meetingProcessing) saveProcessingFailure(session recordingSession, origErr error) error {
 	now := nowUTC()
-	lifecycleFor(session.meeting).processingFailed(now, origErr)
+	db.LifecycleFor(session.meeting).ProcessingFailed(now, origErr)
 	updateErr := p.store.UpdateMeeting(session.meeting)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", updateErr))
