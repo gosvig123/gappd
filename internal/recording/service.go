@@ -96,21 +96,41 @@ type Service struct {
 	enhancer    enhancer
 }
 
+type meetingRecordingWorkflow struct {
+	store    meetingStore
+	recorder recorderFactory
+	baseDir  string
+	out      io.Writer
+	errOut   io.Writer
+	events   EventSink
+}
+
 func (s Service) Run(req Request) error {
+	return s.recordingWorkflow().run(req, s.processing())
+}
+
+func (s Service) recordingWorkflow() meetingRecordingWorkflow {
+	return meetingRecordingWorkflow{
+		store: s.meetings(), recorder: s.recorder, baseDir: s.BaseDir,
+		out: s.Out, errOut: s.ErrOut, events: s.Events,
+	}
+}
+
+func (w meetingRecordingWorkflow) run(req Request, processing meetingProcessing) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
 	}
 	req.Language = meetinglang.Normalize(req.Language)
-	sessionDir, err := s.createSessionDir(req.Title)
+	sessionDir, err := w.createSessionDir(req.Title)
 	if err != nil {
 		return err
 	}
-	meeting, err := s.startMeeting(req.Title, sessionDir, req.Language)
+	meeting, err := w.startMeeting(req.Title, sessionDir, req.Language)
 	if err != nil {
 		return err
 	}
-	session := s.sessionFor(meeting, audioartifact.New(sessionDir))
-	return s.record(req, session, sessionDir)
+	session := w.sessionFor(meeting, audioartifact.New(sessionDir))
+	return w.record(req, session, sessionDir, processing)
 }
 
 func (s Service) meetings() meetingStore {
@@ -120,70 +140,80 @@ func (s Service) meetings() meetingStore {
 	return s.Store
 }
 
-func (s Service) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
-	if s.recorder != nil {
-		return s.recorder(mode, dir, device)
+func (w meetingRecordingWorkflow) meetings() meetingStore {
+	return w.store
+}
+
+func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
+	if w.recorder != nil {
+		return w.recorder(mode, dir, device)
 	}
-	if s.Events != nil {
+	if w.events != nil {
 		return capture.NewRecorderWithOutput(mode, dir, device, io.Discard)
 	}
 	return capture.NewRecorder(mode, dir, device)
 }
 
-func (s Service) record(req Request, session recordingSession, sessionDir string) error {
-	s.printRecordingStart(req, sessionDir)
+func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingProcessing) error {
+	w.printRecordingStart(req, sessionDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	recorder := s.newRecorder(req.Mode, sessionDir, req.DeviceIdx)
-	if err := s.startCapture(ctx, recorder, session); err != nil {
+	recorder := w.newRecorder(req.Mode, sessionDir, req.DeviceIdx)
+	if err := w.startCapture(ctx, recorder, session); err != nil {
 		return err
 	}
-	stopHeartbeat := s.startCaptureHeartbeat(session.meeting)
-	if err := s.waitForStop(ctx, recorder, session); err != nil {
+	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
+	if err := w.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
 		return err
 	}
 	stopHeartbeat()
+	session = w.completeCapture(session, recorder)
+	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure}
+	return session.finish(processing, request)
+}
+
+func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {
 	artifacts := audioartifact.FromPaths(recorder.MicPath(), recorder.SystemPath())
 	session = session.withArtifacts(artifacts)
-	s.printRecorded(session.meeting.StartedAt)
-	return session.finish(req, s.processing())
+	w.printRecorded(session.meeting.StartedAt)
+	return session
 }
 
-func (s Service) printRecordingStart(req Request, sessionDir string) {
-	if s.Events != nil {
+func (w meetingRecordingWorkflow) printRecordingStart(req Request, sessionDir string) {
+	if w.events != nil {
 		return
 	}
-	fmt.Fprintf(s.Out, "● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
-	fmt.Fprintf(s.Out, "  mode: %s, device: [%d]\n\n", req.Mode, req.DeviceIdx)
+	fmt.Fprintf(w.out, "● Recording to %s (press Ctrl-C to stop)\n", sessionDir)
+	fmt.Fprintf(w.out, "  mode: %s, device: [%d]\n\n", req.Mode, req.DeviceIdx)
 }
 
-func (s Service) startCapture(ctx context.Context, recorder audioRecorder, session recordingSession) error {
+func (w meetingRecordingWorkflow) startCapture(ctx context.Context, recorder audioRecorder, session recordingSession) error {
 	if err := recorder.Start(ctx); err != nil {
 		return session.failCapture(err)
 	}
-	return s.emit(EventStarted, *session.meeting, nil)
+	return w.emit(EventStarted, *session.meeting, nil)
 }
 
-func (s Service) waitForStop(ctx context.Context, recorder audioRecorder, session recordingSession) error {
+func (w meetingRecordingWorkflow) waitForStop(ctx context.Context, recorder audioRecorder, session recordingSession) error {
 	select {
 	case <-ctx.Done():
-		return s.stopCapture(recorder, session)
+		return w.stopCapture(recorder, session)
 	case err := <-recorder.Done():
 		return session.failUnexpectedCaptureStop(err)
 	}
 }
 
-func (s Service) stopCapture(recorder audioRecorder, session recordingSession) error {
-	if s.Events == nil {
-		fmt.Fprintln(s.Out, "\n● Stopping...")
+func (w meetingRecordingWorkflow) stopCapture(recorder audioRecorder, session recordingSession) error {
+	if w.events == nil {
+		fmt.Fprintln(w.out, "\n● Stopping...")
 	}
-	if err := s.emit(EventStopping, *session.meeting, nil); err != nil {
+	if err := w.emit(EventStopping, *session.meeting, nil); err != nil {
 		return err
 	}
 	if err := recorder.Stop(); err != nil {
-		fmt.Fprintf(s.ErrOut, "warning: capture did not exit cleanly: %v\n", err)
-		fmt.Fprintln(s.ErrOut, "  audio files may be incomplete")
+		fmt.Fprintf(w.errOut, "warning: capture did not exit cleanly: %v\n", err)
+		fmt.Fprintln(w.errOut, "  audio files may be incomplete")
 	}
 	return nil
 }

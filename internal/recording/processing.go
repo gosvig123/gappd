@@ -34,6 +34,11 @@ type meetingProcessing struct {
 	events        EventSink
 }
 
+type processingRequest struct {
+	language        string
+	suppressFailure bool
+}
+
 func (s Service) processing() meetingProcessing {
 	return meetingProcessing{
 		store: s.meetings(), transcriber: s.transcriber, notesEnhancer: s.enhancer,
@@ -124,14 +129,14 @@ func (noopProcessingReporter) EnhancementStarted()                      {}
 func (noopProcessingReporter) AIProgress(ai.Progress)                   {}
 func (noopProcessingReporter) EnhancementCompleted(string, int, string) {}
 
-func (p meetingProcessing) processAfterCapture(req Request, session recordingSession) error {
+func (p meetingProcessing) processAfterCapture(session recordingSession, req processingRequest) error {
 	if err := p.beginCaptured(session, nowUTC()); err != nil {
 		return err
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
-	err := p.processCaptured(ctx, session, req.Language)
-	if err != nil && req.SuppressProcessingFailure {
+	err := p.processCaptured(ctx, session, req.language)
+	if err != nil && req.suppressFailure {
 		return nil
 	}
 	return err
