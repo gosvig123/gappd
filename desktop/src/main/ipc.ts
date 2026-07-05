@@ -2,7 +2,7 @@ import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type LocalAISetupInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
-import { getLocalAISetupStatus, getLocalAISetupStatusSnapshot, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
+import { getLocalAISetupDetails, getLocalAISetupStatus, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
 import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -44,12 +44,10 @@ const IPC_HANDLERS: MainHandlers = {
   },
   localAISetup: {
     getStatus: () => getLocalAISetupStatus(),
+    getDetails: () => getLocalAISetupDetails(),
     start: (_event, input?: LocalAISetupInput) => startLocalAISetup(input),
     retry: (_event, input?: LocalAISetupInput) => retryLocalAISetup(input),
-  },
-  settings: {
-    getLocalAIStatus: () => getLocalAISetupStatusSnapshot(),
-    repairLocalAI: () => repairLocalAISetup(),
+    repair: () => repairLocalAISetup(),
   },
   update: {
     getStatus: () => getUpdateStatus(),

@@ -6,8 +6,7 @@ import { appleSpeechAssetAvailable, ensureAppleSpeechAsset, missingAppleSpeechAs
 import { ensureManagedLanguageModel, managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
 import { ensureManagedLlamaCppRunning, managedLlamaCppSupported } from './llamacpp'
 import { createObservableState } from './observable-state'
-import { errorStatus, localAISetupStatusFrom, localAIStatusFrom, managedModelStatus, managedStatus, needsSetupStatus } from './local-ai-status'
-import { runtimeLocalAIStatus } from './local-ai-runtime-status'
+import { errorStatus, localAISetupStatusFrom, localAIStatusFrom, managedModelStatus, managedStatus, needsSetupStatus, runtimeLocalAIStatus } from './local-ai-setup-status'
 
 type ConfigLoadResult = { config: LocalAIConfig | null; error?: string }
 type ProgressUpdate = { progress?: number; message?: string; pullStage?: LocalAISetupPullStage }
@@ -33,7 +32,7 @@ export async function retryLocalAISetup(input?: LocalAISetupInput): Promise<Loca
   return startLocalAISetup(input, { preserveConfigured: true })
 }
 
-export async function getLocalAISetupStatusSnapshot(): Promise<LocalAIStatus> {
+export async function getLocalAISetupDetails(): Promise<LocalAIStatus> {
   return localAIStatusFor(getLocalAISetupStatus(), true)
 }
 
