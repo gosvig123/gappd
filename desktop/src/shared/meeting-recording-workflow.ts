@@ -1,4 +1,6 @@
-import type { MeetingStatus, RecordingEvent } from './generated/contracts'
+import type { RecordingEvent } from './generated/contracts'
+
+export { meetingStatusPillVisible, meetingStatusTone } from './generated/lifecycle'
 
 export const RECORDING_STATUS_IDLE = 'idle'
 export const RECORDING_STATUS_RECORDING = 'recording'
@@ -15,8 +17,6 @@ export type RecordingState = {
   title?: string
   error?: string
 }
-
-type MeetingStatusTone = 'recording' | 'processing' | 'idle' | 'error'
 
 type RecordingEventOutcome = {
   state: RecordingState
@@ -61,20 +61,6 @@ export function postStopNoticeVisible(status: RecordingStatus): boolean {
 export function recordingRefreshTarget(state: RecordingState): string | null | undefined {
   if (state.meetingId) return state.meetingId
   return canStartRecordingStatus(state.status) ? null : undefined
-}
-
-export function meetingStatusTone(state: MeetingStatus['state']): MeetingStatusTone {
-  switch (state) {
-    case 'recording': return 'recording'
-    case 'processing': return 'processing'
-    case 'failed': return 'error'
-    case 'captured':
-    case 'completed': return 'idle'
-  }
-}
-
-export function meetingStatusPillVisible(state: MeetingStatus['state']): boolean {
-  return meetingStatusTone(state) !== 'idle'
 }
 
 function isTerminalRecordingEvent(event: RecordingEvent): boolean {
