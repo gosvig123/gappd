@@ -45,11 +45,11 @@ Thumbs.db
 /youtube-meetings/
 
 /gappd
-# Desktop Ollama artifacts
-desktop/.cache/ollama/
+# Desktop generated artifacts
+desktop/.cache/
+desktop/resources/llamacpp/
 desktop/resources/ollama/
-desktop/.cache/whisper/
-desktop/resources/whisper/whisper-cli
+desktop/assets/test-media/
 desktop/release/
 desktop/src/**/*.js
 !desktop/build/
