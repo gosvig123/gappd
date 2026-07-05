@@ -1,5 +1,3 @@
-import type { MeetingStatus } from '../../shared/contracts'
-
 const permissionErrorHints = [
   'permission denied',
   'microphone access denied',
@@ -8,24 +6,6 @@ const permissionErrorHints = [
   'grant permission:',
   'privacy & security',
 ]
-
-export function meetingStatusTone(state: MeetingStatus['state']): 'recording' | 'processing' | 'idle' | 'error' {
-  switch (state) {
-    case 'recording':
-      return 'recording'
-    case 'processing':
-      return 'processing'
-    case 'failed':
-      return 'error'
-    case 'captured':
-    case 'completed':
-      return 'idle'
-  }
-}
-
-export function meetingStatusPillVisible(state: MeetingStatus['state']): boolean {
-  return meetingStatusTone(state) !== 'idle'
-}
 
 export function artifactLabel(ready: boolean, present: string, missing: string): string {
   return ready ? present : missing

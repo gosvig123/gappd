@@ -1,6 +1,6 @@
 import { type MouseEvent, useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
-import { meetingStatusPillVisible, meetingStatusTone } from '../components/meeting-status'
+import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import { meetingProgressLabel, type MeetingProgressInput } from '../components/meeting-progress'
 import { ArrowLeftIcon, SearchIcon, CloseIcon, TrashIcon } from '../components/icons'
 import { EmptyState, ListRow, PageHeader, StatusPill } from '../components/ui'

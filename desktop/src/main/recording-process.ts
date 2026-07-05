@@ -1,5 +1,6 @@
 import type { spawn } from 'node:child_process'
 import type { RecordingEvent } from '../shared/generated/contracts'
+import { ignoresStopRequest, recordingEventOutcome, RECORDING_STATUS_ERROR, RECORDING_STATUS_IDLE, RECORDING_STATUS_STOPPING } from '../shared/meeting-recording-workflow'
 import { streamCommand } from './app-protocol'
 import { ensureManagedLocalAIReady } from './local-ai-config'
 import { logMainProcessMemory } from './memory'
@@ -9,10 +10,6 @@ import { stopManagedLlamaCpp } from './llamacpp'
 type RecordingChild = ReturnType<typeof spawn>
 
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
-const RECORDING_STATUS_STOPPING = 'stopping'
-const RECORDING_STATUS_PROCESSING = 'processing'
-const STOP_IGNORED_RECORDING_STATUSES = new Set<string>([RECORDING_STATUS_STOPPING, RECORDING_STATUS_PROCESSING])
-
 let recordingChild: RecordingChild | null = null
 
 export async function startRecording(input: { title: string; device: number; mode: string; language: string }): Promise<void> {
@@ -25,7 +22,7 @@ export async function startRecording(input: { title: string; device: number; mod
 export function stopRecording(): void {
   if (!recordingChild) return
   const state = getRecordingState()
-  if (STOP_IGNORED_RECORDING_STATUSES.has(state.status)) return
+  if (ignoresStopRequest(state.status)) return
   setRecordingState({ ...state, status: RECORDING_STATUS_STOPPING })
   logMainProcessMemory('recording:stop')
   recordingChild.kill('SIGINT')
@@ -54,47 +51,28 @@ function childExited(child: RecordingChild): boolean {
 function recordingHandlers(title: string) {
   return {
     onEvent(event: RecordingEvent) {
-      setRecordingState(recordingStateFromEvent(event))
+      const outcome = recordingEventOutcome(event)
+      if (outcome.releaseRuntime) finishRecording(event.type)
+      setRecordingState(outcome.state)
     },
     onError(error: string) {
-      recordingChild = null
-      void releaseManagedRuntimeAfterRecording('recording:error')
-      setRecordingState({ status: 'error', title, error })
+      finishRecording('recording:error')
+      setRecordingState({ status: RECORDING_STATUS_ERROR, title, error })
     },
     onExitWithoutTerminal() {
-      recordingChild = null
-      void releaseManagedRuntimeAfterRecording('recording:exit')
-      if (getRecordingState().status !== 'error') setRecordingState({ status: 'idle' })
+      finishRecording('recording:exit')
+      if (getRecordingState().status !== RECORDING_STATUS_ERROR) setRecordingState({ status: RECORDING_STATUS_IDLE })
     },
   }
 }
 
-function recordingStateFromEvent(event: RecordingEvent) {
-  const base = { meetingId: event.meetingId, title: event.title }
-  switch (event.type) {
-    case 'recording.started':
-      return { ...base, status: 'recording' as const }
-    case 'recording.stopping':
-      return { ...base, status: 'stopping' as const }
-    case 'recording.processing':
-      return { ...base, status: 'processing' as const }
-    case 'recording.completed':
-      recordingChild = null
-      void releaseManagedRuntimeAfterRecording('recording:completed')
-      return { ...base, status: 'idle' as const }
-    case 'recording.failed':
-      recordingChild = null
-      void releaseManagedRuntimeAfterRecording('recording:failed')
-      return { ...base, status: 'error' as const, error: event.error ?? protocolFailureMessage(event) }
-  }
+function finishRecording(label: string): void {
+  recordingChild = null
+  void releaseManagedRuntimeAfterRecording(label)
 }
 
 async function releaseManagedRuntimeAfterRecording(label: string): Promise<void> {
   logMainProcessMemory(`${label}:before-runtime-stop`)
   await stopManagedLlamaCpp()
   logMainProcessMemory(`${label}:after-runtime-stop`)
-}
-
-function protocolFailureMessage(event: RecordingEvent): string {
-  return event.status.capture.failureMessage ?? event.status.processing.failureMessage ?? 'Recording failed'
 }

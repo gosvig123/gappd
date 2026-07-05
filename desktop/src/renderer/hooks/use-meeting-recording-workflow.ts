@@ -1,14 +1,10 @@
 import { useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
+import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { permissionTarget } from '../components/meeting-status'
 import { useGuardedEffect } from './use-guarded-effect'
 
-const IDLE_RECORDING_STATUS: RecordingState['status'] = 'idle'
-const ERROR_RECORDING_STATUS: RecordingState['status'] = 'error'
-const RECORDING_RECORDING_STATUS: RecordingState['status'] = 'recording'
-const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
-const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = [RECORDING_RECORDING_STATUS]
 const MEDIA_DEVICE_CHANGE_EVENT = 'devicechange'
 const VISIBLE_DOCUMENT_STATE = 'visible'
 const VISIBILITY_CHANGE_EVENT = 'visibilitychange'
@@ -29,7 +25,7 @@ type RecordingWorkflowState = {
   staleRecoveryNotice: string | null
 }
 
-const INITIAL_RECORDING_WORKFLOW_STATE: RecordingWorkflowState = { devices: [], device: 0, language: savedTranscriptionLanguage(), recording: { status: IDLE_RECORDING_STATUS }, recoveringStale: false, staleRecoveryNotice: null }
+const INITIAL_RECORDING_WORKFLOW_STATE: RecordingWorkflowState = { devices: [], device: 0, language: savedTranscriptionLanguage(), recording: { status: RECORDING_STATUS_IDLE }, recoveringStale: false, staleRecoveryNotice: null }
 
 export function useMeetingRecordingWorkflow(enabled: boolean, effects: RecordingWorkflowEffects) {
   const effectsRef = useRef(effects)
@@ -40,8 +36,8 @@ export function useMeetingRecordingWorkflow(enabled: boolean, effects: Recording
   useRecordingLifecycle(enabled, effectsRef, setState)
   useDeviceRefreshLifecycle(enabled, setState, effectsRef)
 
-  const canStart = state.devices.length > 0 && STARTABLE_RECORDING_STATUSES.includes(state.recording.status)
-  const canStop = STOPPABLE_RECORDING_STATUSES.includes(state.recording.status)
+  const canStart = state.devices.length > 0 && canStartRecordingStatus(state.recording.status)
+  const canStop = canStopRecordingStatus(state.recording.status)
   return { ...state, canStart, canStop, actions }
 }
 
@@ -104,8 +100,8 @@ async function recoverStaleRecordings(effects: EffectsRef, setState: SetRecordin
 
 async function handleRecordingChange(next: RecordingState, effects: RecordingWorkflowEffects, setState: SetRecordingWorkflowState) {
   setState((current) => ({ ...current, recording: next }))
-  if (next.meetingId) return effects.refreshMeetings(next.meetingId)
-  if (STARTABLE_RECORDING_STATUSES.includes(next.status)) await effects.refreshMeetings()
+  const target = recordingRefreshTarget(next)
+  if (target !== undefined) await effects.refreshMeetings(target)
 }
 
 async function startRecording(device: number, language: string, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
