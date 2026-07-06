@@ -1,15 +1,11 @@
-package recording
+package meetingprocessing
 
 import (
 	"context"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
@@ -17,9 +13,9 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
 	meeting := createStaleRecordingMeeting(t, store, true)
-	service := staleRecoveryTestService(store)
+	recovery := staleRecoveryTestService(store)
 
-	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions())
+	recovered, err := recovery.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() error = %v", err)
 	}
@@ -28,7 +24,7 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	}
 	assertRecoveredMeetingCompleted(t, store, meeting.ID)
 
-	recovered, err = service.RecoverStale(context.Background(), staleRecoveryTestOptions())
+	recovered, err = recovery.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() second error = %v", err)
 	}
@@ -42,9 +38,9 @@ func TestRecoverStaleRecordingWithoutAudioFailsCapture(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
 	meeting := createStaleRecordingMeeting(t, store, false)
-	service := staleRecoveryTestService(store)
+	recovery := staleRecoveryTestService(store)
 
-	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions())
+	recovered, err := recovery.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() error = %v", err)
 	}
@@ -68,22 +64,13 @@ func createStaleRecordingMeeting(t *testing.T, store *db.DB, withAudio bool) *db
 	return meeting
 }
 
-func writeUsableAudio(t *testing.T) *string {
-	t.Helper()
-	dir := t.TempDir()
-	path := filepath.Join(dir, audioartifact.MicFilename)
-	if err := os.WriteFile(path, []byte(strings.Repeat("m", 45)), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	return &dir
+func staleRecoveryTestService(store *db.DB) Recovery {
+	processor := Service{Store: store, Transcriber: fakeTranscriber{}, Notes: &fakeNotes{summary: "summary"}}
+	return Recovery{Store: store, Processor: processor}
 }
 
-func staleRecoveryTestService(store *db.DB) Service {
-	return Service{Store: store, Out: io.Discard, ErrOut: io.Discard, transcriber: fakeTranscriber{}, enhancer: fakeEnhancer{summary: "summary"}}
-}
-
-func staleRecoveryTestOptions() RecoverStaleOptions {
-	return RecoverStaleOptions{Now: time.Date(2026, 4, 10, 12, 10, 0, 0, time.UTC), Timeout: StaleRecordingTimeout}
+func staleRecoveryTestOptions() RecoveryOptions {
+	return RecoveryOptions{Now: time.Date(2026, 4, 10, 12, 10, 0, 0, time.UTC), Timeout: StaleRecordingTimeout}
 }
 
 func assertRecoveredMeetingCompleted(t *testing.T, store *db.DB, id string) {
@@ -106,7 +93,7 @@ func assertRecoveredMeetingFailed(t *testing.T, store *db.DB, id string) {
 	if db.MeetingStateFor(*meeting) != db.MeetingStateFailed {
 		t.Fatalf("state = %q, want %q", db.MeetingStateFor(*meeting), db.MeetingStateFailed)
 	}
-	if meeting.CaptureFailureMessage == nil || *meeting.CaptureFailureMessage != staleNoAudioMessage {
+	if meeting.CaptureFailureMessage == nil || *meeting.CaptureFailureMessage != StaleNoAudioMessage {
 		t.Fatalf("capture_failure_message = %v, want stale message", meeting.CaptureFailureMessage)
 	}
 }

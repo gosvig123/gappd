@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
-	"github.com/gappd-dev/gappd/internal/recording"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
 
@@ -113,8 +114,9 @@ func runAppRecoverStale(asJSON bool) error {
 }
 
 func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
-	service := newRecordingService(store, pipeline, recordingOutputQuiet)
-	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{SuppressProcessingFailure: true})
+	processor := newMeetingProcessingService(store, pipeline, recordingOutputQuiet, true)
+	recovery := meetingprocessing.Recovery{Store: store, Processor: processor, Events: processor.Events}
+	return recovery.RecoverStale(cmdContext(), meetingprocessing.RecoveryOptions{SuppressProcessingFailure: true, ErrOut: os.Stderr})
 }
 
 func appMeetingsListCmd() *cobra.Command {

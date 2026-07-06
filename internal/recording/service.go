@@ -13,7 +13,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
-	"github.com/gappd-dev/gappd/internal/transcribe"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
 type EventName string
@@ -43,34 +43,14 @@ type audioRecorder interface {
 	Artifacts() audioartifact.Artifacts
 }
 
-type transcriber interface {
-	Transcribe(context.Context, string) ([]transcribe.Segment, error)
-}
-
-type enhancer interface {
-	RunWithOptions(context.Context, string, ai.RunOptions) (*ai.Extraction, string, error)
-	RefineNotes(context.Context, *ai.Extraction, string, string, string) (string, error)
-}
+type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
 type meetingStore interface {
 	CreateMeeting(*db.Meeting) error
 	MarkCaptureFailed(*db.Meeting, string, error) error
 	MarkCaptured(*db.Meeting, string) error
-	MarkProcessingStarted(*db.Meeting, string) error
-	MarkProcessingFailed(*db.Meeting, string, error) error
-	SaveTranscript(*db.Meeting, string, string) error
-	CompleteProcessing(*db.Meeting, db.MeetingProcessingCompletion) error
-	FailProcessingWithTranscript(*db.Meeting, string, string, error) error
 	UpdateRecordingHeartbeat(id, updatedAt string) error
-	ListStaleRecordingMeetings(cutoff string, limit int) ([]db.Meeting, error)
-	ClaimStaleRecordingForProcessing(*db.Meeting, string, string) (bool, error)
-	FailStaleRecording(*db.Meeting, string, string, error) (bool, error)
-	ReplaceSegments(meetingID string, segments []db.Segment) error
-	GetMeeting(id string) (*db.Meeting, error)
-	GetSegments(meetingID string) ([]db.Segment, error)
 }
-
-type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
 type Request struct {
 	DeviceIdx                 int
@@ -81,18 +61,17 @@ type Request struct {
 }
 
 type Service struct {
-	Store    *db.DB
-	Pipeline *ai.Pipeline
-	BaseDir  string
-	Out      io.Writer
-	ErrOut   io.Writer
-	Events   EventSink
-	Reporter ProcessingReporter
+	Store     *db.DB
+	Pipeline  *ai.Pipeline
+	BaseDir   string
+	Out       io.Writer
+	ErrOut    io.Writer
+	Events    EventSink
+	Reporter  meetingprocessing.Reporter
+	Processor meetingprocessing.CapturedProcessor
 
-	store       meetingStore
-	recorder    recorderFactory
-	transcriber transcriber
-	enhancer    enhancer
+	store    meetingStore
+	recorder recorderFactory
 }
 
 type meetingRecordingWorkflow struct {
@@ -105,7 +84,7 @@ type meetingRecordingWorkflow struct {
 }
 
 func (s Service) Run(req Request) error {
-	return s.recordingWorkflow().run(req, s.processing())
+	return s.recordingWorkflow().run(req, s.capturedProcessor())
 }
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
@@ -115,7 +94,7 @@ func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 	}
 }
 
-func (w meetingRecordingWorkflow) run(req Request, processing meetingProcessing) error {
+func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.CapturedProcessor) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
 	}
@@ -153,7 +132,7 @@ func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir stri
 	return capture.NewRecorder(mode, dir, device)
 }
 
-func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingProcessing) error {
+func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingprocessing.CapturedProcessor) error {
 	w.printRecordingStart(req, sessionDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -168,8 +147,10 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 	}
 	stopHeartbeat()
 	session = w.completeCapture(session, recorder)
-	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure}
-	return session.finish(processing, request)
+	processingCtx, stopProcessing := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stopProcessing()
+	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure, audioDir: sessionDir}
+	return session.finish(processingCtx, processing, request)
 }
 
 func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {

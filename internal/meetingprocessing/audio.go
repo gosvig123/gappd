@@ -1,4 +1,4 @@
-package recording
+package meetingprocessing
 
 import (
 	"fmt"
@@ -55,19 +55,31 @@ func hasDominantRepeatedText(segments []transcribe.Segment) bool {
 	if len(segments) < repeatedArtifactMinSegments {
 		return false
 	}
+	return dominantRepeatedText(segments) >= repeatedArtifactMinSegments
+}
+
+func dominantRepeatedText(segments []transcribe.Segment) int {
 	counts := map[string]int{}
 	maxCount := 0
 	for _, segment := range segments {
-		text := normalizedSegmentText(segment.Text)
-		if len([]rune(text)) < repeatedArtifactMinRunes {
-			continue
-		}
-		counts[text]++
-		if counts[text] > maxCount {
-			maxCount = counts[text]
-		}
+		maxCount = countRepeatedSegment(counts, maxCount, segment)
 	}
-	return maxCount >= repeatedArtifactMinSegments && float64(maxCount)/float64(len(segments)) >= repeatedArtifactDominance
+	if float64(maxCount)/float64(len(segments)) < repeatedArtifactDominance {
+		return 0
+	}
+	return maxCount
+}
+
+func countRepeatedSegment(counts map[string]int, maxCount int, segment transcribe.Segment) int {
+	text := normalizedSegmentText(segment.Text)
+	if len([]rune(text)) < repeatedArtifactMinRunes {
+		return maxCount
+	}
+	counts[text]++
+	if counts[text] > maxCount {
+		return counts[text]
+	}
+	return maxCount
 }
 
 func FormatTranscript(segments []db.Segment) string {
@@ -80,9 +92,7 @@ func FormatTranscript(segments []db.Segment) string {
 
 func sortSegmentsChronologically(segments []db.Segment) {
 	indexed := indexedSegments(segments)
-	sort.Slice(indexed, func(i, j int) bool {
-		return segmentLess(indexed[i], indexed[j])
-	})
+	sort.Slice(indexed, func(i, j int) bool { return segmentLess(indexed[i], indexed[j]) })
 	for i, segment := range indexed {
 		segments[i] = segment.segment
 	}
@@ -102,9 +112,17 @@ func indexedSegments(segments []db.Segment) []indexedSegment {
 }
 
 func segmentLess(a, b indexedSegment) bool {
-	if nearStart(a.segment.Start, b.segment.Start) && speakerRank(a.segment.Speaker) != speakerRank(b.segment.Speaker) {
+	if speakerTieBreaks(a.segment, b.segment) {
 		return speakerRank(a.segment.Speaker) < speakerRank(b.segment.Speaker)
 	}
+	return segmentNaturalLess(a, b)
+}
+
+func speakerTieBreaks(a, b db.Segment) bool {
+	return nearStart(a.Start, b.Start) && speakerRank(a.Speaker) != speakerRank(b.Speaker)
+}
+
+func segmentNaturalLess(a, b indexedSegment) bool {
 	switch {
 	case a.segment.Start != b.segment.Start:
 		return a.segment.Start < b.segment.Start
