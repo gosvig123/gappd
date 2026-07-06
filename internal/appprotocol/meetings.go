@@ -1,8 +1,10 @@
 package appprotocol
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gappd-dev/gappd/internal/db"
-	"github.com/gappd-dev/gappd/internal/recording"
 )
 
 type MeetingListItem struct {
@@ -35,37 +37,37 @@ type MeetingSegment struct {
 	Text     string  `json:"text"`
 }
 
-func BuildMeetingListViews(meetings []db.Meeting) []MeetingListItem {
-	views := make([]MeetingListItem, 0, len(meetings))
-	for _, meeting := range meetings {
-		views = append(views, BuildMeetingListView(meeting))
+func BuildMeetingListViews(entries []db.MeetingListEntry) []MeetingListItem {
+	views := make([]MeetingListItem, 0, len(entries))
+	for _, entry := range entries {
+		views = append(views, BuildMeetingListView(entry))
 	}
 	return views
 }
 
-func BuildMeetingListView(meeting db.Meeting) MeetingListItem {
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: meeting.Transcript != nil, HasSummary: meeting.Summary != nil, SearchText: meetingSearchText(meeting)}
-}
-
-func meetingSearchText(meeting db.Meeting) string {
-	return meeting.Title + "\n" + stringValue(meeting.Summary) + "\n" + stringValue(meeting.Transcript)
-}
-
-func BuildMeetingDetailView(store *db.DB, id string) (MeetingDetail, error) {
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return MeetingDetail{}, err
-	}
-	segments, err := store.GetSegments(id)
-	if err != nil {
-		return MeetingDetail{}, err
-	}
-	return BuildMeetingDetail(*meeting, segments), nil
+func BuildMeetingListView(entry db.MeetingListEntry) MeetingListItem {
+	meeting := entry.Meeting
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary}
 }
 
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {
+	return buildMeetingDetail(meeting, segments, transcriptText(meeting, segments))
+}
+
+func BuildAppMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {
+	return buildMeetingDetail(meeting, segments, appTranscriptText(meeting, segments))
+}
+
+func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript string) MeetingDetail {
 	status := MeetingStatusFor(meeting)
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcriptText(meeting, segments), Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+}
+
+func appTranscriptText(meeting db.Meeting, segments []db.Segment) string {
+	if len(segments) > 0 {
+		return ""
+	}
+	return transcriptText(meeting, segments)
 }
 
 func transcriptText(meeting db.Meeting, segments []db.Segment) string {
@@ -75,7 +77,15 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if len(segments) == 0 {
 		return ""
 	}
-	return recording.FormatTranscript(segments)
+	return formatTranscript(segments)
+}
+
+func formatTranscript(segments []db.Segment) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
+	}
+	return b.String()
 }
 
 func buildSegmentViews(segments []db.Segment) []MeetingSegment {

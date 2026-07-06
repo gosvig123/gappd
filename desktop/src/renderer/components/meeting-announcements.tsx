@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MeetingListItem, RecordingState } from '../../shared/contracts'
+import { postStopNoticeVisible } from '../../shared/meeting-recording-workflow'
 import { Button } from './ui'
 import { CircleDotIcon, CircleCheckIcon } from './icons'
 import { meetingHasWork, meetingReady, type MeetingProgressInput } from './meeting-progress'
@@ -22,9 +23,6 @@ type MeetingAnnouncementsProps = {
 type MeetingSnapshot = { ready: boolean; working: boolean }
 
 const TOAST_MS = 7000
-const PROCESSING_STATUS: RecordingState['status'] = 'processing'
-const POST_STOP_STATUSES: RecordingState['status'][] = [PROCESSING_STATUS]
-
 export function MeetingAnnouncements({ meetings, recording, onOpenMeeting }: MeetingAnnouncementsProps) {
   const [notice, setNotice] = useState<MeetingNotice | null>(null)
   usePostStopNotice(recording, setNotice)
@@ -48,7 +46,7 @@ function MeetingToast({ notice, onDismiss, onOpenMeeting }: { notice: MeetingNot
 function usePostStopNotice(recording: RecordingState, setNotice: (notice: MeetingNotice) => void) {
   const lastMeetingId = useRef<string | null>(null)
   useEffect(() => {
-    if (!recording.meetingId || !POST_STOP_STATUSES.includes(recording.status)) return
+    if (!recording.meetingId || !postStopNoticeVisible(recording.status)) return
     if (lastMeetingId.current === recording.meetingId) return
     lastMeetingId.current = recording.meetingId
     setNotice(postStopNotice(recording))

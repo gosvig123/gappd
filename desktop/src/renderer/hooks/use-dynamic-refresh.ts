@@ -1,7 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import type { MeetingListItem, RecordingState } from '../../shared/contracts'
-
-export const ACTIVE_RECORDING_STATUSES: RecordingState['status'][] = ['recording', 'stopping', 'processing']
+import { needsRecordingRefresh } from '../../shared/meeting-recording-workflow'
 
 const DYNAMIC_REFRESH_INTERVAL_MS = 5000
 const DYNAMIC_REFRESH_MEETING_STATES: MeetingListItem['status']['state'][] = ['recording', 'processing']
@@ -38,6 +37,6 @@ function useIntervalRefresh(enabled: boolean, recordingMeetingId: string | undef
 }
 
 function needsDynamicRefresh(meetings: MeetingListItem[], recording: RecordingState): boolean {
-  if (ACTIVE_RECORDING_STATUSES.includes(recording.status)) return true
+  if (needsRecordingRefresh(recording.status)) return true
   return meetings.some((meeting) => DYNAMIC_REFRESH_MEETING_STATES.includes(meeting.status.state))
 }

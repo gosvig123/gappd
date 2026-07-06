@@ -20,7 +20,7 @@ func (e *trackingEnhancer) RunWithOptions(context.Context, string, ai.RunOptions
 	return &ai.Extraction{Title: "New"}, "new", nil
 }
 
-func (e *trackingEnhancer) RefineNotes(_ context.Context, _ *ai.Extraction, _ string, feedback string) (string, error) {
+func (e *trackingEnhancer) RefineNotes(_ context.Context, _ *ai.Extraction, _ string, feedback string, _ string) (string, error) {
 	e.feedback = feedback
 	return "refined", nil
 }

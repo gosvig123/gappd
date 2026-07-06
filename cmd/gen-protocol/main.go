@@ -31,9 +31,10 @@ func main() {
 	protocolOut := flag.String("out", "desktop/src/shared/generated/protocol.ts", "enum output path")
 	contractsOut := flag.String("contracts-out", "desktop/src/shared/generated/contracts.ts", "contract output path")
 	appOut := flag.String("app-out", "desktop/src/shared/generated/app-protocol.ts", "app protocol output path")
+	lifecycleOut := flag.String("lifecycle-out", "desktop/src/shared/generated/lifecycle.ts", "lifecycle helper output path")
 	flag.Parse()
 
-	files := map[string]string{*protocolOut: renderProtocol(), *contractsOut: renderContracts(), *appOut: renderAppProtocol()}
+	files := map[string]string{*protocolOut: renderProtocol(), *contractsOut: renderContracts(), *appOut: renderAppProtocol(), *lifecycleOut: renderLifecycle()}
 	if *check {
 		checkFiles(files)
 		return
@@ -95,6 +96,32 @@ func renderContracts() string {
 		writeType(&b, typ)
 	}
 	return b.String()
+}
+
+func renderLifecycle() string {
+	var b strings.Builder
+	b.WriteString(protocolHeader)
+	b.WriteString("\nimport type { MeetingState } from './protocol'\n")
+	writeStatusToneType(&b)
+	writeStatusToneFunction(&b)
+	writeStatusPillFunction(&b)
+	return b.String()
+}
+
+func writeStatusToneType(b *strings.Builder) {
+	fmt.Fprintf(b, "\nexport type MeetingStatusTone = %s\n", union(values(db.AllMeetingStatusTones)))
+}
+
+func writeStatusToneFunction(b *strings.Builder) {
+	b.WriteString("\nexport function meetingStatusTone(state: MeetingState): MeetingStatusTone {\n  switch (state) {\n")
+	for _, state := range db.AllMeetingStates {
+		fmt.Fprintf(b, "    case %s: return %s\n", quote(string(state)), quote(string(db.MeetingStatusToneFor(state))))
+	}
+	b.WriteString("  }\n}\n")
+}
+
+func writeStatusPillFunction(b *strings.Builder) {
+	b.WriteString("\nexport function meetingStatusPillVisible(state: MeetingState): boolean {\n  return meetingStatusTone(state) !== 'idle'\n}\n")
 }
 
 func collectCommandTypes() typeCollector {
@@ -367,6 +394,14 @@ func stringList(items []string) string {
 
 func eventList(items []recording.EventName) string {
 	return stringList(values(items))
+}
+
+func union(items []string) string {
+	quoted := make([]string, len(items))
+	for i, item := range items {
+		quoted[i] = quote(item)
+	}
+	return strings.Join(quoted, " | ")
 }
 
 func quote(value string) string {

@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: macos-26
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
@@ -189,7 +189,7 @@ jobs:
         run: |
           export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
           export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
-          npm run dist -- --publish=never
+          npm run dist:mac:universal -- --publish=never
         working-directory: desktop
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}

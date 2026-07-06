@@ -4,12 +4,24 @@ package db
 // capture and processing statuses stored on a meeting.
 type MeetingState string
 
+type MeetingStatusTone string
+
+type MeetingLifecycleStatus struct {
+	State     MeetingState
+	UpdatedAt string
+}
+
 const (
 	MeetingStateRecording  MeetingState = "recording"
 	MeetingStateCaptured   MeetingState = "captured"
 	MeetingStateProcessing MeetingState = "processing"
 	MeetingStateCompleted  MeetingState = "completed"
 	MeetingStateFailed     MeetingState = "failed"
+
+	MeetingStatusToneRecording  MeetingStatusTone = "recording"
+	MeetingStatusToneProcessing MeetingStatusTone = "processing"
+	MeetingStatusToneIdle       MeetingStatusTone = "idle"
+	MeetingStatusToneError      MeetingStatusTone = "error"
 )
 
 // The All* slices are the canonical enumerations of each status enum. They are
@@ -19,7 +31,13 @@ var (
 	AllCaptureStatuses    = []CaptureStatus{CaptureStatusRecording, CaptureStatusCaptured, CaptureStatusFailed}
 	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusNotStarted, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
 	AllMeetingStates      = []MeetingState{MeetingStateRecording, MeetingStateCaptured, MeetingStateProcessing, MeetingStateCompleted, MeetingStateFailed}
+	AllMeetingStatusTones = []MeetingStatusTone{MeetingStatusToneRecording, MeetingStatusToneProcessing, MeetingStatusToneIdle, MeetingStatusToneError}
 )
+
+// MeetingLifecycleStatusFor derives the user-facing Meeting Lifecycle state.
+func MeetingLifecycleStatusFor(meeting Meeting) MeetingLifecycleStatus {
+	return MeetingLifecycleStatus{State: MeetingStateFor(meeting), UpdatedAt: meetingLifecycleUpdatedAt(meeting)}
+}
 
 // MeetingStateFor derives the user-facing state: capture outcomes win over
 // processing outcomes, and a capture in progress masks processing entirely.
@@ -40,34 +58,27 @@ func MeetingStateFor(meeting Meeting) MeetingState {
 	}
 }
 
-// UsesProcessingTimestamp reports whether the meeting's display timestamp
-// should come from the processing status rather than the capture status.
-func UsesProcessingTimestamp(meeting Meeting) bool {
-	state := MeetingStateFor(meeting)
-	return meeting.ProcessingStatus == ProcessingStatusFailed || state == MeetingStateProcessing || state == MeetingStateCompleted
-}
-
-func legacyStatusFor(meeting Meeting) MeetingState {
-	state := MeetingStateFor(meeting)
-	if state == MeetingStateCaptured {
-		return MeetingStateProcessing
+func MeetingStatusToneFor(state MeetingState) MeetingStatusTone {
+	switch state {
+	case MeetingStateRecording:
+		return MeetingStatusToneRecording
+	case MeetingStateProcessing:
+		return MeetingStatusToneProcessing
+	case MeetingStateFailed:
+		return MeetingStatusToneError
+	default:
+		return MeetingStatusToneIdle
 	}
-	return state
 }
 
-func legacyStatusUpdatedAtFor(meeting Meeting) string {
-	if UsesProcessingTimestamp(meeting) {
+func meetingLifecycleUpdatedAt(meeting Meeting) string {
+	if usesProcessingTimestamp(meeting) {
 		return meeting.ProcessingStatusUpdatedAt
 	}
 	return meeting.CaptureStatusUpdatedAt
 }
 
-func legacyFailureMessageFor(meeting Meeting) *string {
-	if meeting.CaptureStatus == CaptureStatusFailed {
-		return meeting.CaptureFailureMessage
-	}
-	if meeting.ProcessingStatus == ProcessingStatusFailed {
-		return meeting.ProcessingFailureMessage
-	}
-	return nil
+func usesProcessingTimestamp(meeting Meeting) bool {
+	state := MeetingStateFor(meeting)
+	return meeting.ProcessingStatus == ProcessingStatusFailed || state == MeetingStateProcessing || state == MeetingStateCompleted
 }

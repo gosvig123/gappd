@@ -1,20 +1,11 @@
 import type { AIConfig } from './generated/contracts'
 
 export * from './generated/protocol'
+export { RECORDING_STATUSES } from './meeting-recording-workflow'
 export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
+export type { RecordingState, RecordingStatus } from './meeting-recording-workflow'
 
 export type LocalAIConfig = AIConfig
-
-// Desktop-only UI state for the recorder; not part of the gappd wire protocol.
-export const RECORDING_STATUSES = ['idle', 'recording', 'stopping', 'processing', 'error'] as const
-export type RecordingStatus = (typeof RECORDING_STATUSES)[number]
-
-export type RecordingState = {
-  status: RecordingStatus
-  meetingId?: string
-  title?: string
-  error?: string
-}
 
 export function isLocalAIConfigured(config: LocalAIConfig | null | undefined): boolean {
   return Boolean(config?.provider && config.endpoint && config.model)
@@ -27,7 +18,7 @@ export function isManagedLocalAIConfigured(config: LocalAIConfig | null | undefi
 export type LocalAISetupPhase =
   | 'checking'
   | 'needs_setup'
-  | 'starting_ollama'
+  | 'starting_runtime'
   | 'pulling_model'
   | 'saving_config'
   | 'ready'

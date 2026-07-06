@@ -1,13 +1,15 @@
 # gappd — Meeting intelligence from your Mac
 
 `gappd` records meeting audio, transcribes it locally, stores transcripts in SQLite,
-and can run Ollama-based summarization and extraction over saved meetings.
+and can run llama.cpp-based summarization and extraction over saved meetings.
+
+[Join the Gappd Discord](https://discord.gg/Xap3vSNM4) for beta access, setup help, bug reports, and roadmap discussion.
 
 ## Surface area
 
 macOS desktop app and CLI. Data lives in local SQLite at `~/.gappd/db.sqlite` by
 default. Transcription uses bundled desktop Whisper or CLI `whisper-local`; AI
-post-processing uses Ollama.
+post-processing uses managed `llama-server`.
 
 ## Fresh-clone setup for contributors
 
@@ -25,12 +27,12 @@ npm run desktop:dev
 ```
 
 On first app launch, the **Local AI Setup Operation** may download the selected
-Ollama model and the Whisper model into the app user-data directory. No API keys,
+meeting model and the Whisper model into the app user-data directory. No API keys,
 Apple signing credentials, private packages, or checked-in binary artifacts are
 required for local development.
 
 Bootstrap installs desktop npm dependencies, checks macOS prerequisites,
-downloads Ollama/Whisper runtimes, and builds native Go/capture artifacts.
+downloads llama.cpp/Whisper runtimes, and builds native Go/capture artifacts.
 Generated paths stay ignored: `build/`, `desktop/resources/`,
 `desktop/.cache/`, `desktop/dist*`, and `desktop/release/`. There are no local
 npm `file:`, `link:`, or `workspace:` dependencies, and no Go `replace`
@@ -105,12 +107,12 @@ That installs `GappdCapture.app` to `~/.gappd/GappdCapture.app`.
 
 ### CLI runtime requirements
 
-The CLI does not bundle Whisper or Ollama. For `gappd listen` and AI commands,
+The CLI does not bundle Whisper or the Local AI language runtime. For `gappd listen` and AI commands,
 provide these separately:
 
 - Whisper CLI binary in `PATH`, or set `GAPPD_WHISPER_BIN`
 - Whisper model at `~/.gappd/models/ggml-small.en-q5_1.bin`, or pass `--model`
-- Ollama running locally with configured model available, for example `llama3.1:8b`
+- `llama-server` running at the configured endpoint with `LiquidAI/LFM2-2.6B-Transcript-GGUF`
 
 ## CLI commands
 
@@ -141,11 +143,10 @@ Notes:
    cp config.example.toml ~/.gappd/config.toml
    ```
 
-2. Make sure Ollama is running and the configured model is available.
+2. Make sure `llama-server` is running with the configured model.
 
    ```bash
-   ollama serve
-   ollama pull llama3.1:8b
+   llama-server --hf-repo LiquidAI/LFM2-2.6B-Transcript-GGUF --hf-file LFM2-2.6B-Transcript-Q4_K_M.gguf --alias LiquidAI/LFM2-2.6B-Transcript-GGUF --port 11436
    ```
 
 3. Run setup:
@@ -169,16 +170,16 @@ Config lives at `~/.gappd/config.toml`. Unknown keys are rejected.
 db_path = "~/.gappd/db.sqlite"
 
 [ai]
-provider = "ollama"
-model = "llama3.1:8b"
-endpoint = "http://localhost:11434"
+provider = "llamacpp"
+model = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
+endpoint = "http://127.0.0.1:11436"
 temperature = 0.3
 ```
 
 Current validation rules:
 
 - `db_path` must be set; `~` and `~/...` are expanded
-- `ai.provider` must be `ollama`
+- `ai.provider` must be `llamacpp`
 - `ai.model` and `ai.endpoint` must be non-empty
 - `ai.temperature` must be between `0` and `2`
 

@@ -96,14 +96,10 @@ export type AIConfig = {
   managed: boolean
 }
 
-export type ConfigUseManagedOllamaInput = {
+export type ConfigUseManagedLocalAIInput = {
   endpoint: string
   model: string
   temperature?: number
-}
-
-export type RecoverStaleInput = {
-  modelPath: string
 }
 
 export type RecoverStaleRecordingsResponse = {
@@ -114,7 +110,7 @@ export type RecordStartInput = {
   title: string
   device: number
   mode: string
-  modelPath: string
+  language: string
 }
 
 export type RecordingEvent = {

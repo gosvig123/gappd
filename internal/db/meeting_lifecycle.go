@@ -1,9 +1,9 @@
-package recording
+package db
 
 import (
 	"strings"
 
-	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 const (
@@ -13,58 +13,63 @@ const (
 	genericMeetingTitleRecordedDialogue = "recorded conversation"
 )
 
-type meetingLifecycle struct {
-	meeting *db.Meeting
+type MeetingLifecycle struct {
+	meeting *Meeting
 }
 
-func newRecordingMeeting(title, sessionDir, at string) *db.Meeting {
-	return &db.Meeting{
+func NewRecordingMeeting(title, sessionDir, language, at string) *Meeting {
+	return &Meeting{
 		Title: title, StartedAt: at, AudioPath: &sessionDir,
-		CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: at,
-		ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: at,
-		Source: "listen",
+		CaptureStatus: CaptureStatusRecording, CaptureStatusUpdatedAt: at,
+		ProcessingStatus: ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: at,
+		Language: meetinglang.Normalize(language), Source: "listen",
 	}
 }
 
-func lifecycleFor(meeting *db.Meeting) meetingLifecycle {
-	return meetingLifecycle{meeting: meeting}
+func LifecycleFor(meeting *Meeting) MeetingLifecycle {
+	return MeetingLifecycle{meeting: meeting}
 }
 
-func (l meetingLifecycle) captureFailed(at string, err error) {
+func (l MeetingLifecycle) CaptureFailed(at string, err error) {
 	l.end(at)
-	l.capture(db.CaptureStatusFailed, at, err)
+	l.capture(CaptureStatusFailed, at, err)
 }
 
-func (l meetingLifecycle) captured(at string) {
+func (l MeetingLifecycle) Captured(at string) {
 	l.end(at)
-	l.capture(db.CaptureStatusCaptured, at, nil)
-	l.processing(db.ProcessingStatusProcessing, at, nil)
+	l.capture(CaptureStatusCaptured, at, nil)
+	l.processing(ProcessingStatusProcessing, at, nil)
 }
 
-func (l meetingLifecycle) processingStarted(at string) {
-	l.processing(db.ProcessingStatusProcessing, at, nil)
+func (l MeetingLifecycle) ProcessingStarted(at string) {
+	l.processing(ProcessingStatusProcessing, at, nil)
 }
 
-func (l meetingLifecycle) processingFailed(at string, err error) {
+func (l MeetingLifecycle) ProcessingFailed(at string, err error) {
 	if l.meeting.EndedAt == nil {
 		l.end(at)
 	}
-	l.processing(db.ProcessingStatusFailed, at, err)
+	l.processing(ProcessingStatusFailed, at, err)
 }
 
-func (l meetingLifecycle) transcriptSaved(transcript, at string) {
+func (l MeetingLifecycle) TranscriptSaved(transcript, at string) {
 	l.meeting.Transcript = &transcript
-	l.processing(db.ProcessingStatusProcessing, at, nil)
+	l.processing(ProcessingStatusProcessing, at, nil)
 }
 
-func (l meetingLifecycle) processingCompleted(title, transcript, summary, extractionJSON, at string) {
+func (l MeetingLifecycle) ProcessingCompleted(title, transcript, summary, extractionJSON, at string) {
 	if title = cleanGeneratedMeetingTitle(title); title != "" {
 		l.meeting.Title = title
 	}
 	l.meeting.Transcript = &transcript
 	l.meeting.Summary = &summary
 	l.meeting.ExtractionJSON = &extractionJSON
-	l.processing(db.ProcessingStatusCompleted, at, nil)
+	l.processing(ProcessingStatusCompleted, at, nil)
+}
+
+func (l MeetingLifecycle) EnhancementFailed(transcript, at string, err error) {
+	l.meeting.Transcript = &transcript
+	l.processing(ProcessingStatusFailed, at, err)
 }
 
 func cleanGeneratedMeetingTitle(title string) string {
@@ -94,22 +99,17 @@ func trimRunes(value string, limit int) string {
 	return string(runes[:limit])
 }
 
-func (l meetingLifecycle) enhancementFailed(transcript, at string, err error) {
-	l.meeting.Transcript = &transcript
-	l.processing(db.ProcessingStatusFailed, at, err)
-}
-
-func (l meetingLifecycle) end(at string) {
+func (l MeetingLifecycle) end(at string) {
 	l.meeting.EndedAt = &at
 }
 
-func (l meetingLifecycle) capture(status db.CaptureStatus, at string, err error) {
+func (l MeetingLifecycle) capture(status CaptureStatus, at string, err error) {
 	l.meeting.CaptureStatus = status
 	l.meeting.CaptureStatusUpdatedAt = at
 	l.meeting.CaptureFailureMessage = failureMessage(err)
 }
 
-func (l meetingLifecycle) processing(status db.ProcessingStatus, at string, err error) {
+func (l MeetingLifecycle) processing(status ProcessingStatus, at string, err error) {
 	l.meeting.ProcessingStatus = status
 	l.meeting.ProcessingStatusUpdatedAt = at
 	l.meeting.ProcessingFailureMessage = failureMessage(err)

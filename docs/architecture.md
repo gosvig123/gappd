@@ -6,13 +6,13 @@
 gappd/
 ├── cmd/gappd/             # Cobra CLI and desktop app subcommands
 ├── internal/
-│   ├── ai/                # Ollama client, prompts, extraction/synthesis pipeline
+│   ├── ai/                # llama.cpp client, prompts, extraction/synthesis pipeline
 │   ├── capture/           # macOS recording wrapper around capture-helper
 │   ├── config/            # TOML config loading and validation
 │   ├── db/                # SQLite schema, migrations, meeting/segment queries
 │   ├── recording/         # recording lifecycle: capture → transcribe → enhance
 │   └── transcribe/        # local whisper CLI wrapper
-├── desktop/               # Electron app, managed Ollama/Whisper runtime setup
+├── desktop/               # Electron app, managed llama.cpp/Whisper runtime setup
 ├── capture-helper/        # Swift ScreenCaptureKit helper app
 ├── docs/                  # Architecture and release docs
 └── Makefile               # Go/capture-helper build helpers
@@ -25,13 +25,13 @@ Electron UI ──IPC──▶ Go CLI app commands ──▶ SQLite
      │                    │                     ▲
      │                    ├── capture-helper ───┘
      │                    ├── whisper-local ───▶ segments
-     │                    └── Ollama ──────────▶ summary
-     └── managed Ollama/Whisper setup
+     │                    └── llama.cpp ────────▶ summary
+     └── managed llama.cpp/Whisper setup
 ```
 
-The desktop app owns the **Local AI Setup Operation** and **Managed Runtime** management. It downloads and starts managed Ollama, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
+The desktop app owns the **Local AI Setup Operation** and **Managed Runtime** management. It downloads and starts managed llama.cpp, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
 
-The Go CLI owns capture orchestration, transcription, AI post-processing, and SQLite persistence. The CLI can also run standalone when the user provides external Ollama and Whisper runtime dependencies.
+The Go CLI owns capture orchestration, transcription, AI post-processing, and SQLite persistence. The CLI can also run standalone when the user provides local llama.cpp and Whisper runtime dependencies.
 
 ## Data Flow
 
@@ -41,7 +41,7 @@ The Go CLI owns capture orchestration, transcription, AI post-processing, and SQ
 4. Stop signal marks capture `captured` and processing `processing`.
 5. `whisper-local` transcribes available audio streams into timestamped segments.
 6. Segments are stored in SQLite.
-7. Ollama runs extraction then synthesis prompts over the transcript.
+7. llama.cpp runs extraction then synthesis prompts over the transcript.
 8. Summary, transcript text, and lifecycle status are saved on the meeting.
 
 ## Component Responsibilities
@@ -64,7 +64,7 @@ Shells out to the configured local `whisper-local` binary. It parses Whisper out
 
 ### `internal/ai`
 
-Ollama-only inference. The pipeline runs two prompts: extraction to JSON, then synthesis to human-readable meeting notes.
+llama.cpp-only inference. The pipeline runs two prompts: extraction to JSON, then synthesis to human-readable meeting notes.
 
 ### `internal/db`
 
@@ -72,7 +72,7 @@ SQLite storage using `modernc.org/sqlite`. Schema source of truth lives in `inte
 
 ### `desktop/`
 
-Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed Ollama, managed Whisper, the **Local AI Setup Operation**, update checks, and app command IPC.
+Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed llama.cpp, managed Whisper, the **Local AI Setup Operation**, update checks, and app command IPC.
 
 ## Configuration
 
@@ -82,15 +82,15 @@ Config lives at `~/.gappd/config.toml`; missing config falls back to defaults.
 db_path = "~/.gappd/db.sqlite"
 
 [ai]
-provider = "ollama"
-model = "llama3.1:8b"
-endpoint = "http://localhost:11434"
+provider = "llamacpp"
+model = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
+endpoint = "http://127.0.0.1:11436"
 temperature = 0.3
 ```
 
 Current validation rules:
 
-- `ai.provider` must be `ollama`
+- `ai.provider` must be `llamacpp`
 - `ai.model` and `ai.endpoint` must be non-empty
 - `ai.temperature` must be between `0` and `2`
 - `db_path` must be set and may use `~`
@@ -99,5 +99,5 @@ Current validation rules:
 
 - The **Local AI Setup Operation** can manage bundled runtimes; CLI `gappd setup` only checks externally available dependencies.
 - Transcription is local Whisper only.
-- AI inference is Ollama only.
+- AI inference is llama.cpp only.
 - No Bubbletea TUI, cloud STT, OpenAI, or Claude integration exists in current code.

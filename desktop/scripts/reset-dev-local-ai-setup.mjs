@@ -12,8 +12,7 @@ const TCC_CLIENTS = ['dev.gappd.desktop', 'dev.gappd.capture', 'com.github.Elect
 
 const TARGETS = [
   [path.join(os.homedir(), '.gappd', 'config.toml'), 'config.toml'],
-  [path.join(APP_SUPPORT, 'ollama-models'), 'ollama-models'],
-  [path.join(APP_SUPPORT, 'whisper-models'), 'whisper-models'],
+  [path.join(APP_SUPPORT, 'llamacpp-models'), 'llamacpp-models'],
 ]
 
 await mkdir(BACKUP_DIR, { recursive: true })
@@ -26,7 +25,7 @@ function quitGappd() {
   runQuiet('osascript', ['-e', 'tell application id "dev.gappd.desktop" to quit'])
   runQuiet('osascript', ['-e', 'tell application "Gappd" to quit'])
   runQuiet('pkill', ['-f', '/Applications/Gappd.app/Contents/MacOS/Gappd'])
-  runQuiet('pkill', ['-f', '/Applications/Gappd.app/Contents/Resources/ollama/ollama serve'])
+  runQuiet('pkill', ['-f', '/Applications/Gappd.app/Contents/Resources/llamacpp/llama-server'])
 }
 
 async function moveTargets() {
