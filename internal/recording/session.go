@@ -1,11 +1,20 @@
 package recording
 
 import (
+	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
+
+type processingRequest struct {
+	language        string
+	suppressFailure bool
+	audioDir        string
+}
 
 type recordingSession struct {
 	store     meetingStore
@@ -51,11 +60,25 @@ func (r recordingSession) failUnexpectedCaptureStop(err error) error {
 	return unexpectedErr
 }
 
-func (r recordingSession) finish(processing meetingProcessing, req processingRequest) error {
+func (r recordingSession) finish(ctx context.Context, processing meetingprocessing.CapturedProcessor, req processingRequest) error {
 	if err := r.requireAudio(); err != nil {
 		return err
 	}
-	return processing.processAfterCapture(r, req)
+	if err := r.store.MarkCaptured(r.meeting, nowUTC()); err != nil {
+		return err
+	}
+	err := processing.ProcessCaptured(ctx, meetingprocessing.CapturedRequest{MeetingID: r.meeting.ID, AudioDir: r.audioDir(req), Language: req.language})
+	if err != nil && req.suppressFailure {
+		return nil
+	}
+	return err
+}
+
+func (r recordingSession) audioDir(req processingRequest) string {
+	if r.artifacts.MicPath() != "" {
+		return filepath.Dir(r.artifacts.MicPath())
+	}
+	return req.audioDir
 }
 
 func (r recordingSession) requireAudio() error {

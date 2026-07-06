@@ -6,31 +6,49 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
 func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
-	store := newFakeStore()
+	store := openTestDB(t)
+	defer store.Close()
 	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir()}
 	events := &recordingEvents{onEvent: interruptOnStarted(t)}
-	service := Service{
-		BaseDir:     t.TempDir(),
-		Events:      events,
-		store:       store,
-		recorder:    func(capture.CaptureMode, string, int) audioRecorder { return recorder },
-		transcriber: fakeTranscriber{},
-		enhancer:    fakeEnhancer{title: "Lifecycle Planning", summary: "summary"},
-	}
+	processor := meetingprocessing.Service{Store: store, Transcriber: fakeTranscriber{}, Notes: fakeEnhancer{title: "Lifecycle Planning", summary: "summary"}, Events: processingEventAdapter{events}}
+	service := Service{BaseDir: t.TempDir(), Events: events, Store: store, Processor: processor, recorder: func(capture.CaptureMode, string, int) audioRecorder { return recorder }}
 
 	err := service.Run(Request{Title: "Lifecycle"})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
-	assertCompletedMeeting(t, store.meeting)
-	if len(store.segments) != 2 {
-		t.Fatalf("segments = %d, want 2", len(store.segments))
-	}
+	meeting := latestMeeting(t, store)
+	assertCompletedMeeting(t, meeting)
+	assertStoredSegmentCount(t, store, meeting.ID, 2)
 	assertEventNames(t, events, EventStarted, EventStopping, EventProcessing, EventCompleted)
+}
+
+func latestMeeting(t *testing.T, store *db.DB) *db.Meeting {
+	t.Helper()
+	meetings, err := store.ListMeetings(1)
+	if err != nil {
+		t.Fatalf("ListMeetings() error = %v", err)
+	}
+	if len(meetings) != 1 {
+		t.Fatalf("meetings = %d, want 1", len(meetings))
+	}
+	return &meetings[0]
+}
+
+func assertStoredSegmentCount(t *testing.T, store *db.DB, id string, want int) {
+	t.Helper()
+	segments, err := store.GetSegments(id)
+	if err != nil {
+		t.Fatalf("GetSegments() error = %v", err)
+	}
+	if len(segments) != want {
+		t.Fatalf("segments = %d, want %d", len(segments), want)
+	}
 }
 
 func assertCompletedMeeting(t *testing.T, meeting *db.Meeting) {

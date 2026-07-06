@@ -1,4 +1,4 @@
-package recording
+package meetingprocessing
 
 import (
 	"testing"
