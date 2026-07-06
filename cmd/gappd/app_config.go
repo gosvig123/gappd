@@ -46,7 +46,7 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 		Use:   "use-managed-local-ai",
 		Short: "Persist managed Local AI settings for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadAppConfig()
+			cfg, err := loadManagedLocalAIRepairConfig()
 			if err != nil {
 				return err
 			}
@@ -67,6 +67,14 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 
 func loadAppConfig() (config.Config, error) {
 	cfg, err := config.Load()
+	if err != nil {
+		return config.Config{}, fmt.Errorf("load config: %w", err)
+	}
+	return cfg, nil
+}
+
+func loadManagedLocalAIRepairConfig() (config.Config, error) {
+	cfg, err := config.LoadForManagedLocalAIRepair()
 	if err != nil {
 		return config.Config{}, fmt.Errorf("load config: %w", err)
 	}
