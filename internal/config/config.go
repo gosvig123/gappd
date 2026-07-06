@@ -28,6 +28,7 @@ const (
 
 	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
 	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
+	DefaultAITemperature    = 0.3
 
 	toleratedGoogleConfigTable = "google"
 )
@@ -43,63 +44,71 @@ func defaults() (Config, error) {
 			Provider: ProviderLlamaCpp,
 			Model:    DefaultLlamaCppModel,
 			Endpoint: DefaultLlamaCppEndpoint,
-			Temp:     0.3,
+			Temp:     DefaultAITemperature,
 		},
 	}, nil
 }
 
 func Load() (Config, error) {
+	return load(validate)
+}
+
+func LoadForManagedLocalAIRepair() (Config, error) {
+	return load(validateManagedLocalAIRepair)
+}
+
+func load(validateConfig func(*Config) error) (Config, error) {
 	cfg, err := defaults()
 	if err != nil {
 		return Config{}, err
 	}
-
 	path, err := configPath()
 	if err != nil {
 		return Config{}, err
 	}
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if err := validate(&cfg); err != nil {
-			return Config{}, err
-		}
-		return cfg, nil
-	} else if err != nil {
-		return Config{}, fmt.Errorf("stat config: %w", err)
-	}
-
-	meta, err := toml.DecodeFile(path, &cfg)
-	if err != nil {
+	if err := readConfig(path, &cfg); err != nil {
 		return Config{}, err
 	}
-	if undecoded := meta.Undecoded(); len(undecoded) > 0 {
-		keys := make([]string, 0, len(undecoded))
-		for _, key := range undecoded {
-			if toleratedUndecodedKey(key) {
-				continue
-			}
-			keys = append(keys, key.String())
-		}
-		if len(keys) > 0 {
-			return Config{}, fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
-		}
-	}
-	if err := validate(&cfg); err != nil {
+	if err := validateConfig(&cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
+func readConfig(path string, cfg *Config) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("stat config: %w", err)
+	}
+	meta, err := toml.DecodeFile(path, cfg)
+	if err != nil {
+		return err
+	}
+	return rejectUnknownConfigKeys(path, meta.Undecoded())
+}
+
+func rejectUnknownConfigKeys(path string, undecoded []toml.Key) error {
+	keys := collectUnknownConfigKeys(undecoded)
+	if len(keys) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
+}
+
+func collectUnknownConfigKeys(undecoded []toml.Key) []string {
+	keys := make([]string, 0, len(undecoded))
+	for _, key := range undecoded {
+		if !toleratedUndecodedKey(key) {
+			keys = append(keys, key.String())
+		}
+	}
+	return keys
+}
+
 func toleratedUndecodedKey(key toml.Key) bool {
 	name := key.String()
 	return name == toleratedGoogleConfigTable || strings.HasPrefix(name, toleratedGoogleConfigTable+".")
-}
-
-func DefaultAI() (AI, error) {
-	cfg, err := defaults()
-	if err != nil {
-		return AI{}, err
-	}
-	return cfg.AI, nil
 }
 
 func Save(cfg Config) error {
@@ -118,19 +127,9 @@ func Save(cfg Config) error {
 }
 
 func validate(cfg *Config) error {
-	cfg.DBPath = strings.TrimSpace(cfg.DBPath)
-	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
-	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
-	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
-
-	if cfg.DBPath == "" {
-		return fmt.Errorf("config db_path must not be empty")
-	}
-	path, err := normalizeDBPath(cfg.DBPath)
-	if err != nil {
+	if err := normalizeConfig(cfg); err != nil {
 		return err
 	}
-	cfg.DBPath = path
 	if !supportedProvider(cfg.AI.Provider) {
 		return fmt.Errorf("unsupported AI provider %q (supported: %s)", cfg.AI.Provider, ProviderLlamaCpp)
 	}
@@ -140,7 +139,37 @@ func validate(cfg *Config) error {
 	if cfg.AI.Endpoint == "" {
 		return fmt.Errorf("config ai.endpoint must not be empty")
 	}
-	if cfg.AI.Temp < 0 || cfg.AI.Temp > 2 {
+	return validateTemperature(cfg.AI.Temp)
+}
+
+func validateManagedLocalAIRepair(cfg *Config) error {
+	if err := normalizeConfig(cfg); err != nil {
+		return err
+	}
+	if err := validateTemperature(cfg.AI.Temp); err != nil {
+		cfg.AI.Temp = DefaultAITemperature
+	}
+	return nil
+}
+
+func normalizeConfig(cfg *Config) error {
+	cfg.DBPath = strings.TrimSpace(cfg.DBPath)
+	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
+	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
+	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
+	if cfg.DBPath == "" {
+		return fmt.Errorf("config db_path must not be empty")
+	}
+	path, err := normalizeDBPath(cfg.DBPath)
+	if err != nil {
+		return err
+	}
+	cfg.DBPath = path
+	return nil
+}
+
+func validateTemperature(temp float64) error {
+	if temp < 0 || temp > 2 {
 		return fmt.Errorf("config ai.temperature must be between 0 and 2")
 	}
 	return nil
