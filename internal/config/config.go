@@ -50,14 +50,14 @@ func defaults() (Config, error) {
 }
 
 func Load() (Config, error) {
-	return load(validate)
+	return load(validate, toleratedUndecodedKey)
 }
 
 func LoadForManagedLocalAIRepair() (Config, error) {
-	return load(validateManagedLocalAIRepair)
+	return load(validateManagedLocalAIRepair, toleratedRepairUndecodedKey)
 }
 
-func load(validateConfig func(*Config) error) (Config, error) {
+func load(validateConfig func(*Config) error, tolerateUnknown func(toml.Key) bool) (Config, error) {
 	cfg, err := defaults()
 	if err != nil {
 		return Config{}, err
@@ -66,7 +66,7 @@ func load(validateConfig func(*Config) error) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	if err := readConfig(path, &cfg); err != nil {
+	if err := readConfig(path, &cfg, tolerateUnknown); err != nil {
 		return Config{}, err
 	}
 	if err := validateConfig(&cfg); err != nil {
@@ -75,7 +75,7 @@ func load(validateConfig func(*Config) error) (Config, error) {
 	return cfg, nil
 }
 
-func readConfig(path string, cfg *Config) error {
+func readConfig(path string, cfg *Config, tolerateUnknown func(toml.Key) bool) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	} else if err != nil {
@@ -85,21 +85,21 @@ func readConfig(path string, cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	return rejectUnknownConfigKeys(path, meta.Undecoded())
+	return rejectUnknownConfigKeys(path, meta.Undecoded(), tolerateUnknown)
 }
 
-func rejectUnknownConfigKeys(path string, undecoded []toml.Key) error {
-	keys := collectUnknownConfigKeys(undecoded)
+func rejectUnknownConfigKeys(path string, undecoded []toml.Key, tolerateUnknown func(toml.Key) bool) error {
+	keys := collectUnknownConfigKeys(undecoded, tolerateUnknown)
 	if len(keys) == 0 {
 		return nil
 	}
 	return fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
 }
 
-func collectUnknownConfigKeys(undecoded []toml.Key) []string {
+func collectUnknownConfigKeys(undecoded []toml.Key, tolerateUnknown func(toml.Key) bool) []string {
 	keys := make([]string, 0, len(undecoded))
 	for _, key := range undecoded {
-		if !toleratedUndecodedKey(key) {
+		if !tolerateUnknown(key) {
 			keys = append(keys, key.String())
 		}
 	}
@@ -109,6 +109,29 @@ func collectUnknownConfigKeys(undecoded []toml.Key) []string {
 func toleratedUndecodedKey(key toml.Key) bool {
 	name := key.String()
 	return name == toleratedGoogleConfigTable || strings.HasPrefix(name, toleratedGoogleConfigTable+".")
+}
+
+func toleratedRepairUndecodedKey(key toml.Key) bool {
+	return toleratedUndecodedKey(key) || toleratedLegacyAIKey(key) || toleratedLegacyTable(key)
+}
+
+func toleratedLegacyAIKey(key toml.Key) bool {
+	switch key.String() {
+	case "ai.api_key", "ai.base_url", "ai.max_tokens":
+		return true
+	default:
+		return false
+	}
+}
+
+func toleratedLegacyTable(key toml.Key) bool {
+	name := key.String()
+	for _, table := range []string{"audio", "ci", "integrations", "storage", "transcription"} {
+		if name == table || strings.HasPrefix(name, table+".") {
+			return true
+		}
+	}
+	return false
 }
 
 func Save(cfg Config) error {
