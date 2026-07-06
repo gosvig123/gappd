@@ -32,7 +32,33 @@ func TestManagedLocalAISetupRepairsLegacyOllamaConfig(t *testing.T) {
 }
 
 func legacyOllamaConfig() string {
-	return "db_path = \"~/.gappd/legacy.sqlite\"\n\n[ai]\nprovider = \"ollama\"\nmodel = \"llama3.1:8b\"\nendpoint = \"http://localhost:11434\"\ntemperature = 0.3\nmanaged = true\n"
+	return `db_path = "~/.gappd/legacy.sqlite"
+
+[audio]
+backend = "screencapturekit"
+sample_rate = 16000
+
+[transcription]
+engine = "whisper-local"
+language = "en"
+
+[ai]
+provider = "ollama"
+model = "llama3.1:8b"
+endpoint = "http://localhost:11434"
+temperature = 0.3
+managed = true
+max_tokens = 4096
+
+[ci]
+enabled = false
+
+[integrations.github]
+enabled = false
+
+[storage]
+db_path = "~/.gappd/db.sqlite"
+`
 }
 
 func writeAppConfigFile(t *testing.T, home, content string) {
