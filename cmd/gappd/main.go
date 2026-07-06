@@ -10,6 +10,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 	"github.com/spf13/cobra"
 )
 
@@ -37,7 +38,7 @@ func loadDeps() (config.Config, *db.DB, *ai.Pipeline, error) {
 	if err != nil {
 		return cfg, nil, nil, err
 	}
-	pipeline := ai.NewPipeline(ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
+	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
 	return cfg, store, pipeline, nil
 }
 
@@ -87,14 +88,21 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Checking AI provider (%s)... ", cfg.AI.Provider)
-			ollama := ai.NewOllama(cfg.AI.Endpoint, cfg.AI.Model)
-			if err := ollama.Available(); err != nil {
+			fmt.Print("Checking Local AI... ")
+			provider := ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model)
+			if err := provider.Available(); err != nil {
 				fmt.Println("✗")
-				return fmt.Errorf("%s not reachable: %w", cfg.AI.Provider, err)
+				return fmt.Errorf("Local AI not reachable: %w", err)
 			}
 			fmt.Println("✓ connected to", cfg.AI.Endpoint)
 			fmt.Println("  model:", cfg.AI.Model)
+
+			fmt.Print("Preparing Apple speech model... ")
+			if err := transcribe.PrepareSpeechAsset(cmd.Context()); err != nil {
+				fmt.Println("✗")
+				return err
+			}
+			fmt.Println("✓")
 
 			fmt.Print("Initializing database... ")
 			store, err := openDB(cfg)

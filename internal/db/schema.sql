@@ -9,10 +9,6 @@ CREATE TABLE IF NOT EXISTS meetings (
     title      TEXT NOT NULL,
     started_at TEXT NOT NULL,
     ended_at   TEXT,
-    status     TEXT NOT NULL DEFAULT 'recording'
-               CHECK (status IN ('recording', 'processing', 'completed', 'failed')),
-    status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    failure_message TEXT,
     capture_status TEXT NOT NULL DEFAULT 'recording'
                CHECK (capture_status IN ('recording', 'captured', 'failed')),
     capture_status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
@@ -25,6 +21,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     transcript TEXT,
     summary    TEXT,
     extraction_json TEXT,
+    language   TEXT NOT NULL DEFAULT 'en_US',
     tags       TEXT NOT NULL DEFAULT '[]',
     source     TEXT NOT NULL DEFAULT 'manual',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))

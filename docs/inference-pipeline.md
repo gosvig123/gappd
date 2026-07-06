@@ -3,28 +3,28 @@
 ## Philosophy
 
 Local-first. Zero cloud by default. Your data, your compute.
-**Local AI** uses Ollama for LLM inference and Whisper for speech-to-text. No API keys needed. No data leaves localhost.
+**Local AI** uses llama.cpp for LLM inference and Whisper for speech-to-text. No API keys needed. No data leaves localhost.
 Cloud providers (OpenAI, Claude, Deepgram) are not current architecture.
 
 ## Dependencies
 
 | Dependency | Purpose | Install |
 |---|---|---|
-| Ollama | LLM inference (localhost:11434) | [ollama.com](https://ollama.com) |
+| llama.cpp | LLM inference (`llama-server` on localhost:11436) | [llama.cpp](https://github.com/ggml-org/llama.cpp) |
 | whisper.cpp | Speech-to-text | Bundled binary or user-built |
 
 ### CLI First-Run: `gappd setup`
 
 ```
 $ gappd setup
-✓ Ollama found at localhost:11434
-✓ Pulling llama3.1:8b... done (4.7GB)
+✓ llama-server found at localhost:11436
+✓ LFM2 meeting model available
 ✓ whisper.cpp binary found at ~/.gappd/bin/whisper
 ✓ Config written to ~/.gappd/config.toml
 Ready. Run `gappd listen` to start.
 ```
 
-Detect external Ollama → pull model → locate Whisper binary → write config. Idempotent.
+Detect managed llama.cpp → download model → locate Whisper binary → write config. Idempotent.
 
 Desktop first-run uses the **Local AI Setup Operation** instead: it prepares the **Managed Runtime** before the Meeting Recording Workflow starts.
 
@@ -40,7 +40,7 @@ Transcript → [EXTRACT] → JSON → [SYNTHESIZE] → Markdown → DB
 
 ### Stage 1: EXTRACT
 
-Input: full transcript. Output: structured JSON via Ollama's `format: "json"` mode.
+Input: full transcript. Output: structured JSON via OpenAI-compatible JSON schema response format.
 
 **Prompt shape:** `SYSTEM:` role as meeting analyst, schema definition.
 `USER:` raw transcript text.
@@ -78,14 +78,9 @@ Stage 1 runs per chunk → N partial JSONs → deterministic Go merge
 
 | RAM | Model | Context | Notes |
 |---|---|---|---|
-| **8GB** (default) | `llama3.1:8b` | 8K | Works well for meetings ≤1hr. Default. |
-| 8GB (alt) | `mistral:7b` | 8K | Slightly faster, comparable quality |
-| **16GB** | `llama3.1:8b` | 32K | Same model, larger context window |
-| 16GB (alt) | `gemma2:9b` | 8K | Strong extraction quality |
-| **32GB** | `llama3.1:70b-q4` | 8K | Best quality, slower |
-| 32GB (alt) | `mixtral:8x7b` | 32K | Good balance of speed and quality |
+| **8GB+** (default) | `LiquidAI/LFM2-2.6B-Transcript-GGUF` | 32K | Meeting-focused local model. Default. |
 
-Default targets 8GB. CLI `gappd setup` detects available RAM and suggests a model. Desktop setup uses the **Local AI Setup Operation**.
+Default targets 8GB machines. Desktop setup uses the **Local AI Setup Operation**.
 
 ## Provider Interface
 
@@ -104,9 +99,8 @@ type CompletionRequest struct {
 }
 ```
 
-Default: `OllamaProvider` hitting `localhost:11434/api/chat`.
-Ollama/OpenAI/Claude all use similar chat completion shapes — swapping
-providers means implementing this interface (~100 lines). Selected via `[ai]` config.
+Default: `OpenAICompatProvider` hitting `localhost:11436/v1/chat/completions`.
+The provider is llama.cpp-only and selected via `[ai]` config.
 
 ## Template System
 
@@ -129,7 +123,7 @@ instructions — gappd wraps them into the full Stage 2 prompt.
 
 ## Output Parsing
 
-**Stage 1:** Ollama `format: "json"` guarantees valid JSON. Unmarshal into typed
+**Stage 1:** JSON schema response format constrains output. Unmarshal into typed
 struct. On failure, retry once with stricter prompt.
 
 **Stage 2:** Markdown is stored as the meeting summary.
@@ -138,8 +132,8 @@ struct. On failure, retry once with stricter prompt.
 
 | Scenario | Detection | Response |
 |---|---|---|
-| Ollama not running | TCP connect fails | "Start with `ollama serve`." |
-| Model not pulled | 404 from API | "Run Local AI setup in desktop, or `gappd setup` / `ollama pull llama3.1:8b` for CLI." |
+| llama-server not running | TCP connect fails | "Run Local AI setup or start `llama-server`." |
+| Model missing | 404 or empty model list | "Run Local AI setup in desktop or start llama-server with LFM2." |
 | Inference timeout | 5min/3min limit | Retry once, then save transcript for later. |
 | Invalid JSON | Unmarshal error | Retry with temperature=0. Max 2 retries. |
 | OOM / crash | Connection reset | "Model too large. Try a smaller model." |
@@ -151,7 +145,6 @@ Transcripts and audio are always preserved. Re-run with `gappd enhance <meeting-
 
 > **Not now.** Potential directions, not commitments.
 
-- **Cloud providers**: OpenAI/Claude — `InferenceProvider` interface supports this already.
 - **Fine-tuned models**: Train on user's past meetings for personalized extraction.
 - **Live context**: Partial transcript to LLM during meeting for real-time topic detection.
 - **Multi-language**: Whisper supports it; prompts need localization.

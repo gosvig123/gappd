@@ -1,17 +1,15 @@
 import { useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
+import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
+import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { permissionTarget } from '../components/meeting-status'
 import { useGuardedEffect } from './use-guarded-effect'
 
-const IDLE_RECORDING_STATUS: RecordingState['status'] = 'idle'
-const ERROR_RECORDING_STATUS: RecordingState['status'] = 'error'
-const RECORDING_RECORDING_STATUS: RecordingState['status'] = 'recording'
-const STARTABLE_RECORDING_STATUSES: RecordingState['status'][] = [IDLE_RECORDING_STATUS, ERROR_RECORDING_STATUS]
-const STOPPABLE_RECORDING_STATUSES: RecordingState['status'][] = [RECORDING_RECORDING_STATUS]
 const MEDIA_DEVICE_CHANGE_EVENT = 'devicechange'
 const VISIBLE_DOCUMENT_STATE = 'visible'
 const VISIBILITY_CHANGE_EVENT = 'visibilitychange'
 const WINDOW_FOCUS_EVENT = 'focus'
+const TRANSCRIPTION_LANGUAGE_STORAGE_KEY = 'gappd.transcriptionLanguage'
 
 type RecordingWorkflowEffects = {
   refreshMeetings(preferredId?: string | null): Promise<void>
@@ -21,34 +19,36 @@ type RecordingWorkflowEffects = {
 type RecordingWorkflowState = {
   devices: Device[]
   device: number
+  language: string
   recording: RecordingState
   recoveringStale: boolean
   staleRecoveryNotice: string | null
 }
 
-const INITIAL_RECORDING_WORKFLOW_STATE: RecordingWorkflowState = { devices: [], device: 0, recording: { status: IDLE_RECORDING_STATUS }, recoveringStale: false, staleRecoveryNotice: null }
+const INITIAL_RECORDING_WORKFLOW_STATE: RecordingWorkflowState = { devices: [], device: 0, language: savedTranscriptionLanguage(), recording: { status: RECORDING_STATUS_IDLE }, recoveringStale: false, staleRecoveryNotice: null }
 
 export function useMeetingRecordingWorkflow(enabled: boolean, effects: RecordingWorkflowEffects) {
   const effectsRef = useRef(effects)
   effectsRef.current = effects
   const [state, setState] = useState<RecordingWorkflowState>(INITIAL_RECORDING_WORKFLOW_STATE)
-  const actions = useRecordingActions(state.device, setState, effectsRef)
+  const actions = useRecordingActions(state.device, state.language, setState, effectsRef)
 
   useRecordingLifecycle(enabled, effectsRef, setState)
   useDeviceRefreshLifecycle(enabled, setState, effectsRef)
 
-  const canStart = state.devices.length > 0 && STARTABLE_RECORDING_STATUSES.includes(state.recording.status)
-  const canStop = STOPPABLE_RECORDING_STATUSES.includes(state.recording.status)
+  const canStart = state.devices.length > 0 && canStartRecordingStatus(state.recording.status)
+  const canStop = canStopRecordingStatus(state.recording.status)
   return { ...state, canStart, canStop, actions }
 }
 
-function useRecordingActions(device: number, setState: SetRecordingWorkflowState, effects: EffectsRef) {
+function useRecordingActions(device: number, language: string, setState: SetRecordingWorkflowState, effects: EffectsRef) {
   return useMemo(() => ({
-    start: () => startRecording(device, setState, effects.current.setError),
+    start: () => startRecording(device, language, setState, effects.current.setError),
     stop: () => stopRecording(setState, effects.current.setError),
     setDevice: (next: number) => setState((current) => ({ ...current, device: next })),
+    setLanguage: (next: string) => setLanguage(next, setState),
     openPermissionsSettings: (error: string | null) => openPermissionsSettings(error, effects.current.setError),
-  }), [device, effects, setState])
+  }), [device, language, effects, setState])
 }
 
 type SetRecordingWorkflowState = Dispatch<SetStateAction<RecordingWorkflowState>>
@@ -100,14 +100,14 @@ async function recoverStaleRecordings(effects: EffectsRef, setState: SetRecordin
 
 async function handleRecordingChange(next: RecordingState, effects: RecordingWorkflowEffects, setState: SetRecordingWorkflowState) {
   setState((current) => ({ ...current, recording: next }))
-  if (next.meetingId) return effects.refreshMeetings(next.meetingId)
-  if (STARTABLE_RECORDING_STATUSES.includes(next.status)) await effects.refreshMeetings()
+  const target = recordingRefreshTarget(next)
+  if (target !== undefined) await effects.refreshMeetings(target)
 }
 
-async function startRecording(device: number, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
+async function startRecording(device: number, language: string, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
   try {
     setError(null)
-    const recording = await window.gappd.recording.start({ device })
+    const recording = await window.gappd.recording.start({ device, language })
     setState((current) => ({ ...current, recording }))
   } catch (err) {
     setError(errorMessage(err))
@@ -158,6 +158,32 @@ function selectedDeviceIndex(devices: Device[], currentDevice: number): number |
 function recoveryNotice(recovered: number): string | null {
   if (recovered === 0) return null
   return recovered === 1 ? 'Recovered 1 previous recording.' : `Recovered ${recovered} previous recordings.`
+}
+
+function setLanguage(language: string, setState: SetRecordingWorkflowState) {
+  const next = supportedLanguage(language)
+  saveTranscriptionLanguage(next)
+  setState((current) => ({ ...current, language: next }))
+}
+
+function savedTranscriptionLanguage(): string {
+  try {
+    return supportedLanguage(localStorage.getItem(TRANSCRIPTION_LANGUAGE_STORAGE_KEY) ?? '')
+  } catch {
+    return DEFAULT_TRANSCRIPTION_LANGUAGE
+  }
+}
+
+function saveTranscriptionLanguage(language: string) {
+  try {
+    localStorage.setItem(TRANSCRIPTION_LANGUAGE_STORAGE_KEY, language)
+  } catch {
+    // Ignore unavailable storage; current session state still applies.
+  }
+}
+
+function supportedLanguage(language: string): string {
+  return TRANSCRIPTION_LANGUAGES.some((item) => item.code === language) ? language : DEFAULT_TRANSCRIPTION_LANGUAGE
 }
 
 function errorMessage(err: unknown): string {

@@ -1,6 +1,7 @@
 import { app, shell } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
 import { BETA_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateStatus } from '../shared/contracts'
+import { RECORDING_STATUS_IDLE } from '../shared/meeting-recording-workflow'
 import { createObservableState } from './observable-state'
 import { getRecordingState } from './state'
 
@@ -9,7 +10,6 @@ const UPDATE_CHANNEL_ENV = 'GAPPD_UPDATE_CHANNEL'
 const FORCE_DEV_UPDATE_ENV = 'GAPPD_FORCE_DEV_AUTO_UPDATE'
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 const FEED_BETA_CHANNEL = 'beta'
-const RECORDING_IDLE_STATUS = 'idle'
 
 let configured = false
 let silentErrors = false
@@ -147,7 +147,7 @@ function checkInProgress(): boolean {
 }
 
 function installBlockedMessage(): string | null {
-  if (getRecordingState().status === RECORDING_IDLE_STATUS) return null
+  if (getRecordingState().status === RECORDING_STATUS_IDLE) return null
   return 'Update install blocked: finish the active recording before restarting Gappd.'
 }
 

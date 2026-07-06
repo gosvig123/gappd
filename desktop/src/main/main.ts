@@ -1,10 +1,11 @@
 import path from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import { stopActiveRecordingForQuit, stopStaleRecordingRecovery } from './gappd'
 import { registerIpc } from './ipc'
 import { logMainProcessMemory } from './memory'
 import { bootstrapLocalAISetup } from './local-ai-setup-operation'
-import { stopManagedOllama } from './ollama'
+import { stopManagedLlamaCpp } from './llamacpp'
+import { stopActiveRecordingForQuit } from './recording-process'
+import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 let mainWindow: BrowserWindow | null = null
@@ -72,7 +73,7 @@ async function shutdown(): Promise<void> {
   stopStaleRecordingRecovery()
   stopAutoUpdateChecks()
   await stopActiveRecordingForQuit()
-  await stopManagedOllama()
+  await stopManagedLlamaCpp()
   logMainProcessMemory('shutdown:done')
 }
 

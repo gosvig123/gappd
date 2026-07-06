@@ -18,8 +18,8 @@ const {
 
 const COMPATIBILITY_LIMITS = {
   'gappd binary': DEFAULT_MACOS_MIN_VERSION,
-  'Ollama binary': DEFAULT_MACOS_MIN_VERSION,
-  'Whisper binary': DEFAULT_MACOS_MIN_VERSION,
+  'Apple speech transcriber': DEFAULT_MACOS_MIN_VERSION,
+  'llama-server binary': DEFAULT_MACOS_MIN_VERSION,
   'capture helper binary': DEFAULT_MACOS_MIN_VERSION,
 }
 

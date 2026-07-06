@@ -4,24 +4,8 @@ export type { LocalAISetupStatus, RecordingState, UpdateStatus } from './contrac
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string; modelPath?: string }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
 export type LocalAISetupInput = { model?: string }
-export type WhisperModelSettings = {
-  id: string
-  name: string
-  label: string
-  languageSupport: string
-  description: string
-  sizeMB: number
-  installed: boolean
-}
-export type TranscriptionSettings = { defaultModelId: string; models: WhisperModelSettings[] }
-export type WhisperModelDownloadProgress = {
-  modelId: string
-  phase: 'preparing' | 'downloading' | 'verifying' | 'complete'
-  progress?: number
-  message: string
-}
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -44,15 +28,10 @@ export type IpcInvokeContract = {
   }
   localAISetup: {
     getStatus: OperationSpec<[], LocalAISetupStatus>
+    getDetails: OperationSpec<[], LocalAIStatus>
     start: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
     retry: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-  }
-  settings: {
-    getLocalAIStatus: OperationSpec<[], LocalAIStatus>
-    repairLocalAI: OperationSpec<[], LocalAIStatus>
-    getTranscriptionSettings: OperationSpec<[], TranscriptionSettings>
-    downloadWhisperModel: OperationSpec<[id: string], TranscriptionSettings>
-    setDefaultWhisperModel: OperationSpec<[id: string], TranscriptionSettings>
+    repair: OperationSpec<[], LocalAIStatus>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -80,14 +59,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: { list: 'meetings:list', show: 'meetings:show', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
-  localAISetup: { getStatus: 'localAISetup:getStatus', start: 'localAISetup:start', retry: 'localAISetup:retry' },
-  settings: {
-    getLocalAIStatus: 'settings:getLocalAIStatus',
-    repairLocalAI: 'settings:repairLocalAI',
-    getTranscriptionSettings: 'settings:getTranscriptionSettings',
-    downloadWhisperModel: 'settings:downloadWhisperModel',
-    setDefaultWhisperModel: 'settings:setDefaultWhisperModel',
-  },
+  localAISetup: { getStatus: 'localAISetup:getStatus', getDetails: 'localAISetup:getDetails', start: 'localAISetup:start', retry: 'localAISetup:retry', repair: 'localAISetup:repair' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -107,9 +79,7 @@ export const IPC_EVENTS = {
   update: {
     statusChanged: 'update:status-changed',
   },
-  settings: {
-    whisperModelDownloadProgress: 'settings:whisper-model-download-progress',
-  },
+
 } as const
 
 export type GappdApi = IpcInvokeApi & {
@@ -118,9 +88,6 @@ export type GappdApi = IpcInvokeApi & {
   }
   localAISetup: IpcInvokeApi['localAISetup'] & {
     onStatusChanged(listener: (state: LocalAISetupStatus) => void): () => void
-  }
-  settings: IpcInvokeApi['settings'] & {
-    onWhisperModelDownloadProgress(listener: (progress: WhisperModelDownloadProgress) => void): () => void
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void

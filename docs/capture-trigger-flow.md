@@ -280,7 +280,7 @@ you take that?", "As the PM I think...". We rely on this for v1.
                   ▼
              ┌──────────┐
              │ ENHANCE  │  collect transcript, prompt for notes,
-             │          │  run Stage 1 + Stage 2 via Ollama
+             │          │  run Stage 1 + Stage 2 via llama.cpp
              └────┬─────┘
                   │
                   ▼

@@ -17,10 +17,9 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
 	meeting := createStaleRecordingMeeting(t, store, true)
-	modelPath := writeTestModel(t)
 	service := staleRecoveryTestService(store)
 
-	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions(modelPath))
+	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() error = %v", err)
 	}
@@ -29,7 +28,7 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	}
 	assertRecoveredMeetingCompleted(t, store, meeting.ID)
 
-	recovered, err = service.RecoverStale(context.Background(), staleRecoveryTestOptions(modelPath))
+	recovered, err = service.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() second error = %v", err)
 	}
@@ -45,7 +44,7 @@ func TestRecoverStaleRecordingWithoutAudioFailsCapture(t *testing.T) {
 	meeting := createStaleRecordingMeeting(t, store, false)
 	service := staleRecoveryTestService(store)
 
-	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions(""))
+	recovered, err := service.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
 		t.Fatalf("RecoverStale() error = %v", err)
 	}
@@ -79,21 +78,12 @@ func writeUsableAudio(t *testing.T) *string {
 	return &dir
 }
 
-func writeTestModel(t *testing.T) string {
-	t.Helper()
-	modelPath := filepath.Join(t.TempDir(), "model.bin")
-	if err := os.WriteFile(modelPath, []byte("model"), 0o644); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
-	}
-	return modelPath
-}
-
 func staleRecoveryTestService(store *db.DB) Service {
 	return Service{Store: store, Out: io.Discard, ErrOut: io.Discard, transcriber: fakeTranscriber{}, enhancer: fakeEnhancer{summary: "summary"}}
 }
 
-func staleRecoveryTestOptions(modelPath string) RecoverStaleOptions {
-	return RecoverStaleOptions{Now: time.Date(2026, 4, 10, 12, 10, 0, 0, time.UTC), Timeout: StaleRecordingTimeout, ModelPath: modelPath, DefaultModelPath: modelPath}
+func staleRecoveryTestOptions() RecoverStaleOptions {
+	return RecoverStaleOptions{Now: time.Date(2026, 4, 10, 12, 10, 0, 0, time.UTC), Timeout: StaleRecordingTimeout}
 }
 
 func assertRecoveredMeetingCompleted(t *testing.T, store *db.DB, id string) {

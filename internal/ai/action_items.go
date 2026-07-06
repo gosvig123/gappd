@@ -5,7 +5,12 @@ import (
 	"strings"
 )
 
-const actionItemsHeadingText = "action items"
+const (
+	actionItemsHeadingText   = "action items"
+	decisionsHeadingText     = "decisions"
+	openQuestionsHeadingText = "open questions"
+	noneIdentifiedText       = "None identified"
+)
 
 var (
 	markdownHeadingPattern     = regexp.MustCompile(`^(#{1,6})\s+(.*?)\s*$`)
@@ -28,6 +33,65 @@ func normalizeActionItemsMarkdown(value string) string {
 		out = append(out, nextLine)
 	}
 	return strings.Join(out, "\n")
+}
+
+func normalizeNotesMarkdown(value string, extraction *Extraction) string {
+	value = normalizeActionItemsMarkdown(value)
+	if extraction == nil {
+		return value
+	}
+	for _, heading := range emptyExtractionHeadings(extraction) {
+		value = replaceMarkdownSection(value, heading, noneIdentifiedText)
+	}
+	return value
+}
+
+func emptyExtractionHeadings(extraction *Extraction) []string {
+	headings := []string{}
+	if len(extraction.Decisions) == 0 {
+		headings = append(headings, decisionsHeadingText)
+	}
+	if len(extraction.ActionItems) == 0 {
+		headings = append(headings, actionItemsHeadingText)
+	}
+	if len(extraction.OpenQuestions) == 0 {
+		headings = append(headings, openQuestionsHeadingText)
+	}
+	return headings
+}
+
+func replaceMarkdownSection(value, headingText, body string) string {
+	lines := strings.Split(value, "\n")
+	start, depth := markdownSectionStart(lines, headingText)
+	if start < 0 {
+		return value
+	}
+	end := markdownSectionEnd(lines, start+1, depth)
+	next := make([]string, 0, len(lines)+1)
+	next = append(next, lines[:start+1]...)
+	next = append(next, body)
+	next = append(next, lines[end:]...)
+	return strings.Join(next, "\n")
+}
+
+func markdownSectionStart(lines []string, headingText string) (int, int) {
+	for index, line := range lines {
+		text, depth, heading := parseMarkdownHeading(line)
+		if heading && normalizeHeadingText(text) == headingText {
+			return index, depth
+		}
+	}
+	return -1, 0
+}
+
+func markdownSectionEnd(lines []string, start, depth int) int {
+	for index := start; index < len(lines); index++ {
+		_, nextDepth, heading := parseMarkdownHeading(lines[index])
+		if heading && nextDepth <= depth {
+			return index
+		}
+	}
+	return len(lines)
 }
 
 func normalizeMarkdownLine(line string, actionDepth int) (string, int, bool) {

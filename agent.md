@@ -3,7 +3,7 @@
 ## What is gappd?
 
 Meeting intelligence from the terminal. Record meeting audio, transcribe locally,
-store transcripts in SQLite, and run Ollama-based summarisation/extraction.
+store transcripts in SQLite, and run llama.cpp-based summarisation/extraction.
 
 ## Tech stack
 
@@ -13,7 +13,7 @@ store transcripts in SQLite, and run Ollama-based summarisation/extraction.
 | CLI | `spf13/cobra` |
 | Database | SQLite via `modernc.org/sqlite` (pure Go), WAL mode, FTS5 for search |
 | Config | TOML (`~/.gappd/config.toml`), parsed with `BurntSushi/toml` |
-| AI | Ollama (local LLM inference), pipeline-based prompts |
+| AI | llama.cpp `llama-server` (local LLM inference), pipeline-based prompts |
 | Transcription | Local whisper binary (`whisper-local`) |
 | Audio capture | macOS ScreenCaptureKit helper (Swift, `capture-helper/`) |
 | Build | Makefile for Go/capture helper; root npm scripts for desktop |
@@ -28,8 +28,8 @@ cmd/gappd/           CLI entry point & command definitions
   helpers.go       shared CLI helpers (loadDeps, formatTranscript, etc.)
 
 internal/
-  ai/              Ollama inference layer
-    ollama.go      Ollama HTTP client
+  ai/              llama.cpp inference layer
+    openai_compat.go  OpenAI-compatible HTTP client for llama-server
     pipeline.go    Multi-step AI pipeline (summarise, extract, etc.)
     prompts.go     Prompt templates
   capture/         Audio capture (macOS)
@@ -94,7 +94,7 @@ npm run desktop:dev       # desktop dev app
 - **Errors**: wrap with `fmt.Errorf("context: %w", err)`, return early
 - **Packages**: thin `cmd/` layer delegates to `internal/` packages
 - **Config**: all runtime config flows through `config.Config`; no globals
-- **AI provider**: Ollama-only; keep provider config validation in `internal/config`
+- **AI provider**: llama.cpp-only; keep provider config validation in `internal/config`
 - **SQL**: use parameterised queries, never string-interpolate user input
 - **Schema changes**: keep `internal/db/schema.sql` as source of truth
 - **Tests**: place `_test.go` next to the code; use table-driven tests where sensible

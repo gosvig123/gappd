@@ -1,11 +1,11 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { access } from 'node:fs/promises'
 
-const DEFAULT_MACOS_MIN_VERSION = '13.0'
+const DEFAULT_MACOS_MIN_VERSION = '26.0'
 const MAC_BUILD_NATIVE = 'native'
 const MAC_BUILD_ARM64 = 'arm64'
 const MAC_BUILD_X64 = 'x64'
@@ -24,6 +24,8 @@ const buildDir = path.join(repoRoot, 'build')
 const gappdBinaryPath = path.join(buildDir, 'gappd')
 const captureAppPath = path.join(buildDir, 'GappdCapture.app')
 const captureBinaryPath = path.join(captureAppPath, 'Contents', 'MacOS', 'gappd-capture')
+const speechTranscriberAppPath = path.join(buildDir, 'GappdSpeechTranscriber.app')
+const speechTranscriberPath = path.join(speechTranscriberAppPath, 'Contents', 'MacOS', 'apple-speech-transcriber')
 const workflow = process.argv[2] || WORKFLOW_BUILD
 const macBuildProfile = process.env.GAPPD_MAC_BUILD || MAC_BUILD_NATIVE
 const macosMinVersion = process.env.GAPPD_MACOS_MIN_VERSION || DEFAULT_MACOS_MIN_VERSION
@@ -36,8 +38,11 @@ else console.log(`Skipping local runtime verification for cross-compiled ${macBu
 if (process.platform === 'darwin') {
   await requirePath(captureAppPath, `Native capture helper missing at ${captureAppPath} after build.`)
   await requirePath(captureBinaryPath, `Native capture helper binary missing at ${captureBinaryPath} after build.`)
+  await requirePath(speechTranscriberAppPath, `Native Apple speech transcriber app missing at ${speechTranscriberAppPath} after build.`)
+  await requirePath(speechTranscriberPath, `Native Apple speech transcriber missing at ${speechTranscriberPath} after build.`)
   verifyBinaryCompatibility('gappd binary', gappdBinaryPath)
   verifyBinaryCompatibility('capture helper binary', captureBinaryPath)
+  verifyBinaryCompatibility('Apple speech transcriber', speechTranscriberPath)
 }
 
 async function buildNativeArtifacts() {
@@ -46,8 +51,13 @@ async function buildNativeArtifacts() {
     return
   }
 
+  await mkdir(buildDir, { recursive: true })
   await buildGoBinary()
   runMake(['build-capture'], {
+    GAPPD_MAC_BUILD: macBuildProfile,
+    GAPPD_MACOS_MIN_VERSION: macosMinVersion,
+  })
+  runMake(['build-speech'], {
     GAPPD_MAC_BUILD: macBuildProfile,
     GAPPD_MACOS_MIN_VERSION: macosMinVersion,
   })

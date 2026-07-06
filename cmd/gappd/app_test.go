@@ -57,8 +57,11 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if detail.Status.Processing.State != db.ProcessingStatusFailed {
 		t.Fatalf("status.processing.state = %q, want %q", detail.Status.Processing.State, db.ProcessingStatusFailed)
 	}
-	if detail.TranscriptText == "" {
-		t.Fatal("transcriptText = empty, want fallback transcript from segments")
+	if detail.TranscriptText != "" {
+		t.Fatal("transcriptText populated despite segments, want app payload to avoid duplicate transcript")
+	}
+	if len(detail.Segments) != 1 || detail.Segments[0].Text != "hello" {
+		t.Fatalf("segments = %#v, want one segment with text", detail.Segments)
 	}
 }
 

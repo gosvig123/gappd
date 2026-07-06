@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -25,7 +24,7 @@ func enhanceCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+			service := newRecordingService(store, pipeline, recordingOutputConsole)
 			options := recording.EnhanceOptions{Notes: notes, Feedback: feedback, Refine: refine}
 			return service.EnhanceWithOptions(cmdContext(), args[0], options)
 		},
@@ -83,11 +82,7 @@ func showCmd() *cobra.Command {
 }
 
 func showMeeting(store *db.DB, id string) error {
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		return fmt.Errorf("meeting not found: %w", err)
-	}
-	segments, err := store.GetSegments(id)
+	meeting, segments, err := loadMeetingDetail(store, id)
 	if err != nil {
 		return err
 	}

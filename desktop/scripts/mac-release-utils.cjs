@@ -3,7 +3,7 @@ const { access, mkdtemp, readdir, rm, stat } = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
 
-const DEFAULT_MACOS_MIN_VERSION = '14.0'
+const DEFAULT_MACOS_MIN_VERSION = '26.0'
 const MAC_BUILD_NATIVE = 'native'
 const MAC_BUILD_ARM64 = 'arm64'
 const MAC_BUILD_X64 = 'x64'
@@ -16,8 +16,9 @@ const entitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.plist
 const inheritEntitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.inherit.plist')
 const nestedCodeLayout = [
   { label: 'gappd binary', relativePath: ['Contents', 'Resources', 'bin', 'gappd'], executable: true },
-  { label: 'Ollama binary', relativePath: ['Contents', 'Resources', 'ollama', 'ollama'], executable: true },
-  { label: 'Whisper binary', relativePath: ['Contents', 'Resources', 'whisper', 'whisper-cli'], executable: true },
+  { label: 'Apple speech transcriber app', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app'], executable: false },
+  { label: 'Apple speech transcriber', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app', 'Contents', 'MacOS', 'apple-speech-transcriber'], executable: true },
+  { label: 'llama-server binary', relativePath: ['Contents', 'Resources', 'llamacpp', 'llama-server'], executable: true },
   { label: 'capture helper app', relativePath: ['Contents', 'Resources', 'GappdCapture.app'], executable: false },
   { label: 'capture helper binary', relativePath: ['Contents', 'Resources', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'], executable: true },
 ]

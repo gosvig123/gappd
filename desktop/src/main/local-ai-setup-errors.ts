@@ -15,12 +15,12 @@ export type LocalAISetupErrorState = {
   ownershipConflict?: LocalAISetupStatus['ownershipConflict']
 }
 
-const OLLAMA_PULL_STALL_TIMEOUT_PRE_BYTES_MS = 90_000
-const OLLAMA_PULL_STALL_TIMEOUT_POST_BYTES_MS = 300_000
+const MODEL_PULL_STALL_TIMEOUT_PRE_BYTES_MS = 90_000
+const MODEL_PULL_STALL_TIMEOUT_POST_BYTES_MS = 300_000
 const BLOB_HOST_MARKERS = ['cloudflarestorage.com']
 const DISK_SPACE_MARKERS = ['no space', 'disk full', 'enospc', 'not enough space']
 const NETWORK_MARKERS = ['network', 'connection', 'dns', 'econn', 'socket', 'fetch', 'registry', 'dial tcp', 'connection refused', 'no such host', 'network is unreachable', 'econnrefused', 'econnreset', 'enetunreach', 'ehostunreach', 'enotfound', 'eai_again']
-const OWNERSHIP_MARKERS = ['another ollama process', 'app-owned runtime', 'ownership mismatch', '127.0.0.1:11435']
+const OWNERSHIP_MARKERS = ['another process', 'app-owned runtime', 'ownership mismatch', '127.0.0.1:11436']
 const PERMISSION_MARKERS = ['permission denied', 'operation not permitted', 'access denied', 'eacces']
 const TIMEOUT_MARKERS = ['i/o timeout', 'timed out', 'timeout', 'pull stalled', 'stalled with no new progress', 'etimedout', 'headers timeout', 'body timeout', 'connect timeout', 'und_err_connect_timeout']
 
@@ -51,9 +51,9 @@ export function createPullFailureError(...details: string[]): Error {
   return buildPullFailureError(describePullFailure(...details))
 }
 
-export function toLocalAISetupErrorState(error: unknown, phase: LocalAISetupPhase, fallback: string): LocalAISetupErrorState {
+export function toLocalAISetupErrorState(error: unknown, phase: LocalAISetupPhase, defaultMessage: string): LocalAISetupErrorState {
   const details = collectErrorDetails(error)
-  const summary = normalizeText(readErrorString(error, 'message') || readErrorMessage(error) || fallback) || fallback
+  const summary = normalizeText(readErrorString(error, 'message') || readErrorMessage(error) || defaultMessage) || defaultMessage
   const errorDetail = normalizeText(readErrorString(error, 'detail'))
   const errorDebug = readErrorDebug(error) || buildErrorDebug(details, errorDetail || summary)
   const ownershipConflict = readOwnershipConflict(error)
@@ -74,10 +74,10 @@ export function classifyLocalAISetupErrorKind(message: string | undefined, phase
 function describePullFailure(...details: string[]): PullFailure {
   const rawDetail = preferredDetail(details)
   const debug = buildErrorDebug(details, rawDetail)
-  if (isPullBlobHostNetwork([debug?.host, debug?.url, ...details].filter(Boolean).join(' '))) return pullFailure('Managed Ollama could not reach the model download host. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_blob_host_network', debug, 'Download host')
-  if (matchesDetail(details, TIMEOUT_MARKERS)) return pullFailure('Managed Ollama timed out while downloading the model. Check your network connection, then retry Local AI setup.', 'pull_timeout', debug, 'Reachability target')
-  if (matchesDetail(details, NETWORK_MARKERS)) return pullFailure('Managed Ollama could not reach the model registry. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_network', debug, 'Reachability target')
-  return { summary: rawDetail?.startsWith('Managed Ollama') ? rawDetail : 'Managed Ollama model download failed.', debug }
+  if (isPullBlobHostNetwork([debug?.host, debug?.url, ...details].filter(Boolean).join(' '))) return pullFailure('Managed llama.cpp could not reach the model download host. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_blob_host_network', debug, 'Download host')
+  if (matchesDetail(details, TIMEOUT_MARKERS)) return pullFailure('Managed llama.cpp timed out while downloading the model. Check your network connection, then retry Local AI setup.', 'pull_timeout', debug, 'Reachability target')
+  if (matchesDetail(details, NETWORK_MARKERS)) return pullFailure('Managed llama.cpp could not reach the model registry. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_network', debug, 'Reachability target')
+  return { summary: rawDetail?.startsWith('Managed llama.cpp') ? rawDetail : 'Managed llama.cpp model download failed.', debug }
 }
 
 function pullFailure(summary: string, errorKind: LocalAISetupErrorKind, debug?: LocalAISetupErrorDebug, label?: string): PullFailure {
@@ -142,11 +142,11 @@ function preferredDetail(details: string[]): string | undefined {
 
 function stalledPullMessage(lastMessage?: string): string {
   const detail = lastMessage ? ` Last status: ${lastMessage}.` : ''
-  return `Managed Ollama model download stalled with no new progress. Check your network connection, then retry Local AI setup.${detail}`
+  return `Managed llama.cpp model download stalled with no new progress. Check your network connection, then retry Local AI setup.${detail}`
 }
 
 function pullStallTimeoutMs(hasByteProgress: boolean): number {
-  return hasByteProgress ? OLLAMA_PULL_STALL_TIMEOUT_POST_BYTES_MS : OLLAMA_PULL_STALL_TIMEOUT_PRE_BYTES_MS
+  return hasByteProgress ? MODEL_PULL_STALL_TIMEOUT_POST_BYTES_MS : MODEL_PULL_STALL_TIMEOUT_PRE_BYTES_MS
 }
 
 function normalizeText(value: string | undefined): string | undefined {

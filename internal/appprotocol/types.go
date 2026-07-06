@@ -101,11 +101,8 @@ func NewRecordingEvent(name recording.EventName, meeting db.Meeting, err error) 
 }
 
 func MeetingStatusFor(meeting db.Meeting) MeetingStatus {
-	updatedAt := meeting.CaptureStatusUpdatedAt
-	if db.UsesProcessingTimestamp(meeting) {
-		updatedAt = meeting.ProcessingStatusUpdatedAt
-	}
-	return MeetingStatus{State: db.MeetingStateFor(meeting), UpdatedAt: updatedAt, Capture: CaptureStatusInfoFor(meeting), Processing: ProcessingStatusInfoFor(meeting)}
+	status := db.MeetingLifecycleStatusFor(meeting)
+	return MeetingStatus{State: status.State, UpdatedAt: status.UpdatedAt, Capture: CaptureStatusInfoFor(meeting), Processing: ProcessingStatusInfoFor(meeting)}
 }
 
 func CaptureStatusInfoFor(meeting db.Meeting) CaptureStatusInfo {

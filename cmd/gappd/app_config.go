@@ -14,7 +14,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigUseManagedOllamaCmd(), appConfigResetManagedOllamaCmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigUseManagedLocalAICmd())
 	return cmd
 }
 
@@ -38,19 +38,19 @@ func appConfigShowCmd() *cobra.Command {
 	return cmd
 }
 
-func appConfigUseManagedOllamaCmd() *cobra.Command {
+func appConfigUseManagedLocalAICmd() *cobra.Command {
 	var endpoint string
 	var model string
 	var temperature float64
 	cmd := &cobra.Command{
-		Use:   "use-managed-ollama",
-		Short: "Persist managed Ollama settings for the desktop app",
+		Use:   "use-managed-local-ai",
+		Short: "Persist managed Local AI settings for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadAppConfig()
 			if err != nil {
 				return err
 			}
-			if err := applyManagedOllama(&cfg, endpoint, model, temperature, cmd.Flags().Changed("temperature")); err != nil {
+			if err := applyManagedLocalAI(&cfg, endpoint, model, temperature, cmd.Flags().Changed("temperature")); err != nil {
 				return err
 			}
 			if err := config.Save(cfg); err != nil {
@@ -59,32 +59,9 @@ func appConfigUseManagedOllamaCmd() *cobra.Command {
 			return writeJSON(appConfigResponseFor(cfg))
 		},
 	}
-	cmd.Flags().StringVar(&endpoint, "endpoint", "", "Managed Ollama endpoint")
-	cmd.Flags().StringVar(&model, "model", "", "Managed Ollama model tag")
+	cmd.Flags().StringVar(&endpoint, "endpoint", "", "Managed Local AI endpoint")
+	cmd.Flags().StringVar(&model, "model", "", "Managed Local AI model")
 	cmd.Flags().Float64Var(&temperature, "temperature", 0, "Sampling temperature override")
-	return cmd
-}
-
-func appConfigResetManagedOllamaCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "reset-managed-ollama",
-		Short: "Reset managed Ollama settings to defaults",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := loadAppConfig()
-			if err != nil {
-				return err
-			}
-			defaults, err := config.DefaultAI()
-			if err != nil {
-				return fmt.Errorf("load default config: %w", err)
-			}
-			cfg.AI = defaults
-			if err := config.Save(cfg); err != nil {
-				return fmt.Errorf("save config: %w", err)
-			}
-			return writeJSON(appConfigResponseFor(cfg))
-		},
-	}
 	return cmd
 }
 
@@ -96,16 +73,16 @@ func loadAppConfig() (config.Config, error) {
 	return cfg, nil
 }
 
-func applyManagedOllama(cfg *config.Config, endpoint, model string, temperature float64, overrideTemp bool) error {
+func applyManagedLocalAI(cfg *config.Config, endpoint, model string, temperature float64, overrideTemp bool) error {
 	trimmedEndpoint := strings.TrimSpace(endpoint)
 	trimmedModel := strings.TrimSpace(model)
 	if trimmedEndpoint == "" {
-		return fmt.Errorf("managed Ollama endpoint must not be empty")
+		return fmt.Errorf("managed Local AI endpoint must not be empty")
 	}
 	if trimmedModel == "" {
-		return fmt.Errorf("managed Ollama model must not be empty")
+		return fmt.Errorf("managed Local AI model must not be empty")
 	}
-	cfg.AI.Provider = "ollama"
+	cfg.AI.Provider = config.ProviderLlamaCpp
 	cfg.AI.Endpoint = trimmedEndpoint
 	cfg.AI.Model = trimmedModel
 	cfg.AI.Managed = true

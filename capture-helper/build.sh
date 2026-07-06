@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 APP_DIR="${BUILD_DIR}/GappdCapture.app/Contents"
 BINARY_PATH="${APP_DIR}/MacOS/gappd-capture"
-MACOS_MIN_VERSION="${GAPPD_MACOS_MIN_VERSION:-13.0}"
+MACOS_MIN_VERSION="${GAPPD_MACOS_MIN_VERSION:-26.0}"
 MAC_BUILD_PROFILE="${GAPPD_MAC_BUILD:-native}"
 HOST_ARCH="$(uname -m)"
 

@@ -23,7 +23,14 @@ type Config struct {
 	AI     AI     `toml:"ai"`
 }
 
-const toleratedGoogleConfigTable = "google"
+const (
+	ProviderLlamaCpp = "llamacpp"
+
+	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
+	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
+
+	toleratedGoogleConfigTable = "google"
+)
 
 func defaults() (Config, error) {
 	dir, err := GappdDir()
@@ -33,9 +40,9 @@ func defaults() (Config, error) {
 	return Config{
 		DBPath: filepath.Join(dir, "db.sqlite"),
 		AI: AI{
-			Provider: "ollama",
-			Model:    "llama3.1:8b",
-			Endpoint: "http://localhost:11434",
+			Provider: ProviderLlamaCpp,
+			Model:    DefaultLlamaCppModel,
+			Endpoint: DefaultLlamaCppEndpoint,
 			Temp:     0.3,
 		},
 	}, nil
@@ -124,8 +131,8 @@ func validate(cfg *Config) error {
 		return err
 	}
 	cfg.DBPath = path
-	if cfg.AI.Provider != "ollama" {
-		return fmt.Errorf("unsupported AI provider %q (only %q is implemented)", cfg.AI.Provider, "ollama")
+	if !supportedProvider(cfg.AI.Provider) {
+		return fmt.Errorf("unsupported AI provider %q (supported: %s)", cfg.AI.Provider, ProviderLlamaCpp)
 	}
 	if cfg.AI.Model == "" {
 		return fmt.Errorf("config ai.model must not be empty")
@@ -137,6 +144,10 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("config ai.temperature must be between 0 and 2")
 	}
 	return nil
+}
+
+func supportedProvider(provider string) bool {
+	return provider == ProviderLlamaCpp
 }
 
 func encode(cfg Config) ([]byte, error) {

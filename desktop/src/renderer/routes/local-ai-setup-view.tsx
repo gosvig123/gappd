@@ -8,16 +8,16 @@ import {
 } from '../components/local-ai-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 import { Button, Card, Field, PageHeader, Panel, ProgressBar, StatusPill, cx } from '../components/ui'
-import { isManagedOllamaModel, type ManagedOllamaModelOption, type ManagedOllamaModelTag } from '../../shared/bundled-ollama'
+import { isManagedLlamaCppModel, type ManagedLlamaCppModelOption, type ManagedLlamaCppModelTag } from '../../shared/managed-local-ai'
 import type { SetupPermissionState } from '../hooks/use-setup-permissions'
 
 type LocalAISetupViewProps = {
   status: LocalAISetupStatus
   busy: boolean
-  selectedModel: ManagedOllamaModelTag
-  modelOptions: readonly ManagedOllamaModelOption[]
+  selectedModel: ManagedLlamaCppModelTag
+  modelOptions: readonly ManagedLlamaCppModelOption[]
   permissionState: SetupPermissionState
-  onModelChange: (model: ManagedOllamaModelTag) => void
+  onModelChange: (model: ManagedLlamaCppModelTag) => void
   onStart: () => void
   onRetry: () => void
   onRequestPermissions: () => void
@@ -29,12 +29,12 @@ type SetupStep = { label: string; detail: string; state: SetupStepState }
 type ActionModel = { label: string; disabled: boolean; hint?: string; onAction: () => void }
 
 const SHOW_PERMISSION_DEBUG = import.meta.env.DEV
-const ACTIVE_INSTALL_PHASES: LocalAISetupStatus['phase'][] = ['starting_ollama', 'pulling_model', 'saving_config']
+const ACTIVE_INSTALL_PHASES: LocalAISetupStatus['phase'][] = ['starting_runtime', 'pulling_model', 'saving_config']
 
 const PHASE_COPY: Record<LocalAISetupStatus['phase'], PhaseCopy> = {
   checking: { headline: 'Checking this Mac.', detail: 'Gappd is looking for existing local tools.', progress: 'Checking what is already ready.', action: 'Checking setup...' },
   needs_setup: { headline: 'Set up private meeting notes.', detail: 'Install local AI once. Recordings and notes stay on this Mac.', progress: 'Downloads run only after you start setup.', action: 'Install local AI' },
-  starting_ollama: { headline: 'Starting local AI.', detail: 'Gappd is starting private tools for meeting notes.', progress: 'This usually finishes quickly.', action: 'Installing...' },
+  starting_runtime: { headline: 'Starting local AI.', detail: 'Gappd is starting private tools for meeting notes.', progress: 'This usually finishes quickly.', action: 'Installing...' },
   pulling_model: { headline: 'Downloading local AI.', detail: 'First setup can take several minutes.', progress: 'Keep Gappd open while downloads finish.', action: 'Installing...', hint: 'Downloads can pause between updates.' },
   saving_config: { headline: 'Finishing setup.', detail: 'Downloads are done. Gappd is saving setup for future meetings.', progress: 'Almost done.', action: 'Installing...' },
   ready: { headline: 'Local AI is ready.', detail: 'Next, allow microphone and screen/system audio access.', progress: 'Setup complete.', action: 'Allow recording access' },
@@ -195,6 +195,6 @@ function modelSelectDisabled(props: Pick<LocalAISetupViewProps, 'status' | 'busy
   return props.busy || (props.status.phase !== 'needs_setup' && props.status.phase !== 'error')
 }
 
-function updateSelectedModel(value: string, onModelChange: (model: ManagedOllamaModelTag) => void): void {
-  if (isManagedOllamaModel(value)) onModelChange(value)
+function updateSelectedModel(value: string, onModelChange: (model: ManagedLlamaCppModelTag) => void): void {
+  if (isManagedLlamaCppModel(value)) onModelChange(value)
 }

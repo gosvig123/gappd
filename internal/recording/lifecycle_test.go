@@ -2,9 +2,8 @@ package recording
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -20,8 +19,8 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	captureErr := errors.New("start capture: boom")
 
-	if err := testSession(service, meeting).failCapture(captureErr); err != nil {
-		t.Fatalf("failCapture() error = %v", err)
+	if err := testSession(service, meeting).failCapture(captureErr); !errors.Is(err, captureErr) {
+		t.Fatalf("failCapture() error = %v, want %v", err, captureErr)
 	}
 
 	stored := getMeeting(t, store, meeting.ID)
@@ -48,7 +47,7 @@ func TestSaveProcessingFailurePreservesCaptureAndEmitsEvent(t *testing.T) {
 	service := Service{Store: store, Events: events}
 	processingErr := errors.New("no audio to transcribe")
 
-	err := testSession(service, meeting).saveProcessingFailure(processingErr)
+	err := service.processing().saveProcessingFailure(testSession(service, meeting), processingErr)
 	if err == nil || !strings.Contains(err.Error(), "transcription failed: no audio to transcribe") {
 		t.Fatalf("saveProcessingFailure() error = %v, want transcription failure", err)
 	}
@@ -72,8 +71,7 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	meeting := createCapturedMeeting(t, store)
 	events := &recordingEvents{}
 	providerErr := errors.New("llm down")
-	server := failingOllamaServer(t, providerErr.Error())
-	service := Service{Store: store, Pipeline: ai.NewPipeline(ai.NewOllama(server.URL, "test"), 0), Events: events}
+	service := Service{Store: store, Pipeline: ai.NewPipeline(failingProvider{err: providerErr}, 0), Events: events}
 	transcript := "[You] hello\n"
 
 	err := service.processing().enhanceAndSave(context.Background(), testSession(service, meeting), transcript, EnhanceOptions{})
@@ -85,17 +83,18 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 }
 
 func testSession(service Service, meeting *db.Meeting) recordingSession {
-	return recordingSession{service: service, meeting: meeting}
+	return recordingSession{store: service.meetings(), events: service.Events, meeting: meeting}
 }
 
-func failingOllamaServer(t *testing.T, message string) *httptest.Server {
-	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"error":"`+message+`"}`, http.StatusInternalServerError)
-	}))
-	t.Cleanup(server.Close)
-	return server
+type failingProvider struct{ err error }
+
+func (p failingProvider) Complete(context.Context, ai.CompletionRequest) (string, error) {
+	return "", p.err
 }
+func (p failingProvider) CompleteJSON(context.Context, ai.CompletionRequest) (json.RawMessage, error) {
+	return nil, p.err
+}
+func (p failingProvider) Available() error { return p.err }
 
 func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr string) {
 	t.Helper()
