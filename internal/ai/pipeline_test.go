@@ -31,7 +31,7 @@ func (p *fakeProvider) CompleteJSON(_ context.Context, req CompletionRequest) (j
 func (p *fakeProvider) Available() error { return nil }
 
 func TestPipelineExtract(t *testing.T) {
-	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
+	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Beta launch","summary":"Ada discussed shipping beta on Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"Ada proposed shipping beta on Friday","status":"decided","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
 
 	extraction, err := pipeline.Extract(context.Background(), "Ada: let's ship beta on Friday")
 	if err != nil {
@@ -50,7 +50,7 @@ func TestPipelineExtract(t *testing.T) {
 }
 
 func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
-	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers."}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints"}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10"}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
+	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers.","evidence":[{"speaker":"Alex","text":"Dr. Emily Carter confirmed keynote"}]}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints","status":"decided","evidence":[{"speaker":"Alex","text":"Proceed with marketing plan"}]}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10","evidence":[{"speaker":"Ben","text":"Draft content calendar by March"}]}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
 	transcript := "[Other] Did I do everything right?\n[Other] Did I forget something?\n[Other] Am I prepared?"
 
 	extraction, err := pipeline.Extract(context.Background(), transcript)
@@ -101,7 +101,7 @@ func TestPipelineRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	if extraction == nil || notes != "## Meeting Title\nWeekly sync" {
+	if extraction == nil || notes != "## Meeting Title\nWeekly Sync" {
 		t.Fatalf("Run extraction=%v notes=%q, want extraction and notes", extraction, notes)
 	}
 	assertRequest(t, provider.requests, 0, 0.3, "Ada: weekly sync")

@@ -137,7 +137,7 @@ func topicKey(value Topic) string {
 }
 
 func decisionKey(value Decision) string {
-	return normalizedKey(value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context)
+	return normalizedKey(value.Status + "\n" + value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context)
 }
 
 func actionKey(value ExtractedAction) string {

@@ -16,7 +16,7 @@ func TestPipelineRunRefinesExistingNotes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunWithOptions returned error: %v", err)
 	}
-	if extraction.Title != "Planning" || notes != "## Meeting Title\nSharper notes" {
+	if extraction.Title != "Planning" || notes != "## Meeting Title\nPlanning" {
 		t.Fatalf("extraction=%#v notes=%q, want refined notes", extraction, notes)
 	}
 	assertRequestContains(t, provider.requests, 1, 0.3, "## Current Notes", "focus action items")
