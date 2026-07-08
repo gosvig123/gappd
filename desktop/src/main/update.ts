@@ -1,12 +1,12 @@
 import { app, shell } from 'electron'
 import { autoUpdater, type ProgressInfo, type UpdateDownloadedEvent, type UpdateInfo } from 'electron-updater'
-import { BETA_UPDATE_CHANNEL, DEFAULT_UPDATE_CHANNEL, isUpdateChannel, type UpdateChannel, type UpdateStatus } from '../shared/contracts'
+import { BETA_UPDATE_CHANNEL, type UpdateStatus } from '../shared/contracts'
 import { RECORDING_STATUS_IDLE } from '../shared/meeting-recording-workflow'
 import { createObservableState } from './observable-state'
 import { getRecordingState } from './state'
+import { resolveUpdateChannel } from './update-channel-preference'
 
 const DEFAULT_RELEASE_URL = 'https://github.com/gosvig123/gappd/releases/latest'
-const UPDATE_CHANNEL_ENV = 'GAPPD_UPDATE_CHANNEL'
 const FORCE_DEV_UPDATE_ENV = 'GAPPD_FORCE_DEV_AUTO_UPDATE'
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 const FEED_BETA_CHANNEL = 'beta'
@@ -74,7 +74,7 @@ function configureAutoUpdater(): void {
   if (configured) return
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
-  autoUpdater.allowPrerelease = updateChannel() === BETA_UPDATE_CHANNEL
+  autoUpdater.allowPrerelease = resolveUpdateChannel() === BETA_UPDATE_CHANNEL
   if (autoUpdater.allowPrerelease) autoUpdater.channel = FEED_BETA_CHANNEL
   if (process.env[FORCE_DEV_UPDATE_ENV] === '1') autoUpdater.forceDevUpdateConfig = true
   autoUpdater.on('checking-for-update', () => setStatus({ phase: 'checking', available: false, error: undefined, progress: undefined }))
@@ -121,24 +121,18 @@ function handleUpdateError(error: unknown): UpdateStatus {
 }
 
 function setStatus(patch: Partial<UpdateStatus>): UpdateStatus {
-  const next = { ...updateState.get(), currentVersion: app.getVersion(), channel: updateChannel(), ...patch }
+  const next = { ...updateState.get(), currentVersion: app.getVersion(), channel: resolveUpdateChannel(), ...patch }
   updateState.set(next)
   return next
 }
 
 function idleStatus(): UpdateStatus {
-  return { phase: 'idle', available: false, currentVersion: app.getVersion(), channel: updateChannel() }
+  return { phase: 'idle', available: false, currentVersion: app.getVersion(), channel: resolveUpdateChannel() }
 }
 
 function infoPatch(info?: UpdateInfo): Partial<UpdateStatus> {
   if (!info) return {}
   return { latestVersion: info.version, name: info.releaseName ?? undefined, releaseUrl: releaseUrl(info.version) }
-}
-
-function updateChannel(): UpdateChannel {
-  const rawChannel = process.env[UPDATE_CHANNEL_ENV]?.trim()
-  if (isUpdateChannel(rawChannel)) return rawChannel
-  return app.getVersion().includes('-beta.') ? BETA_UPDATE_CHANNEL : DEFAULT_UPDATE_CHANNEL
 }
 
 function checkInProgress(): boolean {
