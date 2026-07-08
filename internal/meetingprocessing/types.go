@@ -3,6 +3,7 @@ package meetingprocessing
 import (
 	"context"
 	"errors"
+	"io"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -38,6 +39,19 @@ type CapturedChunkRequest struct {
 	Source    string
 	Start     float64
 	Language  string
+}
+
+type CapturedChunk struct {
+	Path   string
+	Source string
+	Start  float64
+}
+
+type LiveChunkOptions struct {
+	MeetingID string
+	Language  string
+	Chunks    func() <-chan CapturedChunk
+	ErrOut    io.Writer
 }
 
 type StoredRequest struct {

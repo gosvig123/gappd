@@ -13,6 +13,41 @@ const (
 	chunkSourceSystem = "system"
 )
 
+func StartLiveChunkProcessing(processing CapturedProcessor, opts LiveChunkOptions) func() {
+	processor, ok := processing.(LiveChunkProcessor)
+	if !ok || opts.Chunks == nil {
+		return func() {}
+	}
+	chunks := opts.Chunks()
+	if chunks == nil {
+		return func() {}
+	}
+	done := make(chan struct{})
+	go processLiveChunks(done, chunks, processor, opts)
+	return func() { <-done }
+}
+
+func processLiveChunks(done chan<- struct{}, chunks <-chan CapturedChunk, processor LiveChunkProcessor, opts LiveChunkOptions) {
+	defer close(done)
+	for chunk := range chunks {
+		request := liveChunkRequest(opts.MeetingID, opts.Language, chunk)
+		if err := processor.ProcessCapturedChunk(context.Background(), request); err != nil {
+			reportLiveChunkError(opts, chunk, err)
+		}
+	}
+}
+
+func liveChunkRequest(meetingID, language string, chunk CapturedChunk) CapturedChunkRequest {
+	return CapturedChunkRequest{MeetingID: meetingID, Path: chunk.Path, Source: chunk.Source, Start: chunk.Start, Language: language}
+}
+
+func reportLiveChunkError(opts LiveChunkOptions, chunk CapturedChunk, err error) {
+	if opts.ErrOut == nil {
+		return
+	}
+	fmt.Fprintf(opts.ErrOut, "warning: live transcription skipped %s chunk %.1fs: %v\n", chunk.Source, chunk.Start, err)
+}
+
 func (s Service) ProcessCapturedChunk(ctx context.Context, req CapturedChunkRequest) error {
 	if err := s.validateCapturedChunk(req); err != nil {
 		return err
