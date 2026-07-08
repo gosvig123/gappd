@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AppHeader } from './components/app-header'
 import { MeetingAnnouncements } from './components/meeting-announcements'
+import { PageSearch } from './components/page-search'
 import { PermissionBanner } from './components/permission-banner'
 import { SettingsSheet } from './components/settings-sheet'
 import { UpdateBanner } from './components/update-banner'
@@ -29,7 +30,7 @@ export function App() {
   const localAI = useLocalAISettings(settingsPanelOpen && developerDebugEnabled, localAISetup.setStatus)
   const update = useUpdateStatus()
   if (localAISetup.loading || !localAISetup.status) return <div className="screen-center">Starting Gappd…</div>
-  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <LocalAISetupApp localAISetup={localAISetup} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ ...localAI, onRepair: () => void localAI.repair() }} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}</div>
+  return <div className="app-shell"><AppHeader appReady={appReady} settingsOpen={settingsPanelOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((current) => !current)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main">{appReady ? <ReadyApp dashboard={dashboard} update={update} /> : <LocalAISetupApp localAISetup={localAISetup} permissions={permissions} />}</main>{settingsPanelOpen ? <SettingsSheet onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ ...localAI, onRepair: () => void localAI.repair() }} developerDebugEnabled={developerDebugEnabled} /></SettingsSheet> : null}<PageSearch /></div>
 }
 
 function ReadyApp({ dashboard, update }: { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus> }) {
