@@ -10,13 +10,14 @@ import { stopManagedLlamaCpp } from './llamacpp'
 type RecordingChild = ReturnType<typeof spawn>
 
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
+const LIVE_TRANSCRIPT_CHUNK_SECONDS = '30'
 let recordingChild: RecordingChild | null = null
 
 export async function startRecording(input: { title: string; device: number; mode: string; language: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   await ensureManagedLocalAIReady()
   logMainProcessMemory('recording:start')
-  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title))
+  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title), { GAPPD_CAPTURE_CHUNK_SECONDS: LIVE_TRANSCRIPT_CHUNK_SECONDS })
 }
 
 export function stopRecording(): void {

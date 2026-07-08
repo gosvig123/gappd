@@ -40,6 +40,7 @@ build_arch_binary() {
         -framework ScreenCaptureKit \
         -framework CoreMedia \
         -framework CoreAudio \
+        "${SCRIPT_DIR}/AudioChunks.swift" \
         "${SCRIPT_DIR}/main.swift" \
         -o "${output_path}"
 }
