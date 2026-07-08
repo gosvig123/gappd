@@ -16,10 +16,27 @@ var groundingStopWords = map[string]bool{
 }
 
 func groundExtraction(extraction *Extraction, transcript string) *Extraction {
-	if !needsConservativeExtraction(extraction, transcript) {
-		return boundExtraction(extraction)
+	bounded := boundExtraction(extraction)
+	beforeClaims := claimCount(bounded)
+	grounded := requireSupportedEvidence(bounded, transcript)
+	if supportedClaimsDropped(beforeClaims, grounded) {
+		return conservativeExtraction(transcript)
+	}
+	if !needsConservativeExtraction(grounded, transcript) {
+		return grounded
 	}
 	return conservativeExtraction(transcript)
+}
+
+func supportedClaimsDropped(beforeClaims int, after *Extraction) bool {
+	if beforeClaims == 0 {
+		return false
+	}
+	return claimCount(after) == 0
+}
+
+func claimCount(extraction *Extraction) int {
+	return len(extraction.Topics) + len(extraction.Decisions) + len(extraction.ActionItems)
 }
 
 func needsConservativeExtraction(extraction *Extraction, transcript string) bool {

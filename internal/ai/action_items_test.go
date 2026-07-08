@@ -31,12 +31,18 @@ func TestNormalizeNotesMarkdownClearsEmptyExtractionSections(t *testing.T) {
 	}
 }
 
-func TestNormalizeNotesMarkdownKeepsNonEmptyDecisionSection(t *testing.T) {
-	input := "### Summary\nWe decided scope.\n### Decisions\n- Ship beta\n### Action Items\nNone identified"
-	extraction := &Extraction{Decisions: []Decision{{What: "Ship beta"}}}
+func TestNormalizeNotesMarkdownProjectsStructuredSections(t *testing.T) {
+	input := "### Key Topics\n- Wrong topic\n### Decisions\n- Wrong decision\n### Action Items\n- Wrong action\n### Open Questions\n- Wrong question"
+	extraction := &Extraction{
+		Topics:        []Topic{{Name: "Agency sandbox", Summary: "Cabo workflow only"}},
+		Decisions:     []Decision{{What: "Reject first-client validation", Status: "rejected"}},
+		ActionItems:   []ExtractedAction{{Task: "Audit ambassador workflow", Owner: "Kristian"}},
+		OpenQuestions: []string{"Which sources are indexed?"},
+	}
+	want := "### Key Topics\n- Agency sandbox — Cabo workflow only\n### Decisions\n- Rejected option: Reject first-client validation\n### Action Items\n- [ ] Audit ambassador workflow (owner: Kristian)\n### Open Questions\n- Which sources are indexed?"
 
 	got := normalizeNotesMarkdown(input, extraction)
-	if got != input {
-		t.Fatalf("normalized markdown = %q, want unchanged input", got)
+	if got != want {
+		t.Fatalf("normalized markdown = %q, want %q", got, want)
 	}
 }

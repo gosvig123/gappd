@@ -24,7 +24,7 @@ func (p *Pipeline) refineExtraction(ctx context.Context, extraction *Extraction,
 	if err != nil {
 		return nil, err
 	}
-	return boundExtraction(refined), nil
+	return boundExtraction(requireEvidence(refined)), nil
 }
 
 func (p *Pipeline) RefineNotes(ctx context.Context, extraction *Extraction, draft string, feedback string, language string) (string, error) {

@@ -40,24 +40,7 @@ func normalizeNotesMarkdown(value string, extraction *Extraction) string {
 	if extraction == nil {
 		return value
 	}
-	for _, heading := range emptyExtractionHeadings(extraction) {
-		value = replaceMarkdownSection(value, heading, noneIdentifiedText)
-	}
-	return value
-}
-
-func emptyExtractionHeadings(extraction *Extraction) []string {
-	headings := []string{}
-	if len(extraction.Decisions) == 0 {
-		headings = append(headings, decisionsHeadingText)
-	}
-	if len(extraction.ActionItems) == 0 {
-		headings = append(headings, actionItemsHeadingText)
-	}
-	if len(extraction.OpenQuestions) == 0 {
-		headings = append(headings, openQuestionsHeadingText)
-	}
-	return headings
+	return enforceStructuredNotes(value, extraction)
 }
 
 func replaceMarkdownSection(value, headingText, body string) string {
