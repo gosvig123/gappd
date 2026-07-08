@@ -14,6 +14,7 @@ struct Config {
     let sampleRate: Double
     let deviceIndex: Int?
     let stopFile: String?
+    let chunkSeconds: Double?
 }
 
 func parseArgs() -> Config {
@@ -22,6 +23,7 @@ func parseArgs() -> Config {
     var sampleRate = 16000.0
     var deviceIndex: Int? = nil
     var stopFile: String? = nil
+    var chunkSeconds: Double? = nil
 
     let args = CommandLine.arguments
     var i = 1
@@ -37,6 +39,8 @@ func parseArgs() -> Config {
             i += 1; deviceIndex = Int(args[i])
         case "--stop-file":
             i += 1; stopFile = args[i]
+        case "--chunk-seconds":
+            i += 1; chunkSeconds = Double(args[i])
         case "--list-devices":
             listDevices(); exit(0)
         case "--request-permissions":
@@ -53,7 +57,7 @@ func parseArgs() -> Config {
         }
         i += 1
     }
-    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex, stopFile: stopFile)
+    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex, stopFile: stopFile, chunkSeconds: chunkSeconds)
 }
 
 func printUsage() {
@@ -69,6 +73,7 @@ func printUsage() {
       --sample-rate <hz>        Sample rate (default: 16000)
       --device <index>          Mic device index
       --stop-file <path>        Stop when this file appears
+      --chunk-seconds <sec>     Emit finalized chunk WAV files and JSON events
       --list-devices            List available audio input devices
       --help                    Show this help
 
@@ -133,19 +138,25 @@ func listDevices() {
 
 // MARK: - WAV Writer
 
+func outputPathDirectory(_ path: String) -> String {
+    return (path as NSString).deletingLastPathComponent
+}
+
 class WAVWriter {
     private let fileHandle: FileHandle
     private let filePath: String
     private let sampleRate: UInt32
     private let channels: UInt16
     private let bitsPerSample: UInt16
+    private let chunker: AudioChunker?
     private var dataSize: UInt32 = 0
 
-    init(path: String, sampleRate: UInt32, channels: UInt16 = 1, bitsPerSample: UInt16 = 16) throws {
+    init(path: String, sampleRate: UInt32, channels: UInt16 = 1, bitsPerSample: UInt16 = 16, chunker: AudioChunker? = nil) throws {
         self.filePath = path
         self.sampleRate = sampleRate
         self.channels = channels
         self.bitsPerSample = bitsPerSample
+        self.chunker = chunker
         FileManager.default.createFile(atPath: path, contents: nil)
         self.fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))
         writeHeader()
@@ -182,16 +193,17 @@ class WAVWriter {
             int16Data[i * 2] = UInt8(int16 & 0xFF)
             int16Data[i * 2 + 1] = UInt8((int16 >> 8) & 0xFF)
         }
-        fileHandle.write(int16Data)
-        dataSize += UInt32(int16Data.count)
+        writeRaw(data: int16Data)
     }
 
     func writeRaw(data: Data) {
         fileHandle.write(data)
         dataSize += UInt32(data.count)
+        chunker?.write(data: data)
     }
 
     func finalize() {
+        chunker?.finish()
         let fileSize = dataSize + 36
         fileHandle.seek(toFileOffset: 4)
         fileHandle.write(withUnsafeBytes(of: fileSize.littleEndian) { Data($0) })
@@ -208,11 +220,13 @@ class MicRecorder {
     private var writer: WAVWriter?
     private let sampleRate: Double
     private let requestedDevice: Int?
+    private let chunkSeconds: Double?
     private var converter: AVAudioConverter?
 
-    init(sampleRate: Double, deviceIndex: Int?) {
+    init(sampleRate: Double, deviceIndex: Int?, chunkSeconds: Double?) {
         self.sampleRate = sampleRate
         self.requestedDevice = deviceIndex
+        self.chunkSeconds = chunkSeconds
     }
 
     private func applyDeviceSelection() {
@@ -273,7 +287,8 @@ class MicRecorder {
         print("  mic hw: \(UInt32(hwFormat.sampleRate))Hz \(hwFormat.channelCount)ch")
 
         let targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1)
+        let chunker = AudioChunker(source: "mic", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds)
+        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
         converter = AVAudioConverter(from: hwFormat, to: targetFormat)
 
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
@@ -310,14 +325,17 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     private var stream: SCStream?
     private var writer: WAVWriter?
     private let sampleRate: Double
+    private let chunkSeconds: Double?
     private let sampleQueue = DispatchQueue(label: "dev.gappd.capture.system-audio")
 
-    init(sampleRate: Double) {
+    init(sampleRate: Double, chunkSeconds: Double?) {
         self.sampleRate = sampleRate
+        self.chunkSeconds = chunkSeconds
     }
 
     func start(outputPath: String) async throws {
-        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1)
+        let chunker = AudioChunker(source: "system", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds)
+        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
 
@@ -496,10 +514,10 @@ if config.mode == .system || config.mode == .both {
 }
 
 let micRecorder: MicRecorder? = (config.mode == .mic || config.mode == .both)
-    ? MicRecorder(sampleRate: config.sampleRate, deviceIndex: config.deviceIndex) : nil
+    ? MicRecorder(sampleRate: config.sampleRate, deviceIndex: config.deviceIndex, chunkSeconds: config.chunkSeconds) : nil
 
 let systemRecorder: SystemAudioRecorder? = (config.mode == .system || config.mode == .both)
-    ? SystemAudioRecorder(sampleRate: config.sampleRate) : nil
+    ? SystemAudioRecorder(sampleRate: config.sampleRate, chunkSeconds: config.chunkSeconds) : nil
 
 let stopSemaphore = DispatchSemaphore(value: 0)
 

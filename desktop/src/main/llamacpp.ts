@@ -9,8 +9,10 @@ import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-a
 import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
 
 type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: LocalAISetupErrorState }
+type ModelListResponse = { models?: Array<{ name?: string; model?: string }> }
 export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: LocalAISetupErrorState }
 
+const MODEL_CHECK_TIMEOUT_MS = 2_000
 const runtime: LlamaCppRuntime = { process: null, startPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
 
 export function resolveBundledLlamaCppBinary(): string {
@@ -82,10 +84,33 @@ function wireEvents(child: LlamaCppChild, binaryPath: string): void {
 
 function resetProcess(): void { runtime.ownedBySession = false; runtime.process = null }
 function bundledLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
-async function managedLlamaCppReadiness(): Promise<boolean> { return runtime.ownedBySession && await managedLlamaCppOwnedAndHealthy(runtime.process) }
+async function managedLlamaCppReadiness(): Promise<boolean> {
+  if (runtime.ownedBySession) return managedLlamaCppOwnedAndHealthy(runtime.process)
+  if (await endpointServesManagedModel(runtime.endpoint)) return true
+  return false
+}
 
 async function managedLlamaCppOwnedAndHealthy(child: LlamaCppChild | null): Promise<boolean> {
   return processServesEndpoint(child, endpointPort(runtime.endpoint), runtime.endpoint)
+}
+
+async function endpointServesManagedModel(endpoint: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${endpoint}/v1/models`, { signal: AbortSignal.timeout(MODEL_CHECK_TIMEOUT_MS) })
+    if (!response.ok) return false
+    return modelListContains(await response.json())
+  } catch {
+    return false
+  }
+}
+
+function modelListContains(value: unknown): boolean {
+  if (!isModelList(value)) return false
+  return value.models.some((model) => model.name === MANAGED_LLAMACPP_MODEL || model.model === MANAGED_LLAMACPP_MODEL)
+}
+
+function isModelList(value: unknown): value is ModelListResponse & { models: NonNullable<ModelListResponse['models']> } {
+  return typeof value === 'object' && value !== null && Array.isArray((value as ModelListResponse).models)
 }
 
 async function waitForLlamaCpp(child: LlamaCppChild, binaryPath: string, port: number, endpoint: string): Promise<void> {

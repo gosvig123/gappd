@@ -13,6 +13,10 @@ type CapturedProcessor interface {
 	ProcessCaptured(context.Context, CapturedRequest) error
 }
 
+type LiveChunkProcessor interface {
+	ProcessCapturedChunk(context.Context, CapturedChunkRequest) error
+}
+
 type StoredEnhancer interface {
 	EnhanceStored(context.Context, StoredRequest) error
 }
@@ -25,6 +29,14 @@ type Module interface {
 type CapturedRequest struct {
 	MeetingID string
 	AudioDir  string
+	Language  string
+}
+
+type CapturedChunkRequest struct {
+	MeetingID string
+	Path      string
+	Source    string
+	Start     float64
 	Language  string
 }
 
@@ -71,6 +83,7 @@ type Store interface {
 	CompleteProcessing(*db.Meeting, db.MeetingProcessingCompletion) error
 	FailProcessingWithTranscript(*db.Meeting, string, string, error) error
 	ReplaceSegments(string, []db.Segment) error
+	InsertSegment(*db.Segment) error
 }
 
 type Transcriber interface {

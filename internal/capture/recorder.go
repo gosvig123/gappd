@@ -22,7 +22,8 @@ const (
 	ModeSystem CaptureMode = "system"
 	ModeBoth   CaptureMode = "both"
 
-	captureHelperEnv = "GAPPD_CAPTURE_HELPER_PATH"
+	captureHelperEnv       = "GAPPD_CAPTURE_HELPER_PATH"
+	captureChunkSecondsEnv = "GAPPD_CAPTURE_CHUNK_SECONDS"
 )
 
 type captureLaunch struct {
@@ -39,6 +40,7 @@ type Recorder struct {
 	stderr    bytes.Buffer
 	stdoutBuf bytes.Buffer
 	stdout    io.Writer
+	chunks    chan ChunkEvent
 	stopFile  string
 }
 
@@ -59,13 +61,15 @@ func (r *Recorder) Start(ctx context.Context) error {
 		"--output-dir", r.outputDir,
 		"--device", fmt.Sprintf("%d", r.deviceIdx),
 	}
+	args = appendChunkArgs(args)
 	launch, err := findCaptureLaunch(args, r.outputDir)
 	if err != nil {
 		return err
 	}
 	r.cmd = exec.Command(launch.command, launch.args...)
 	r.stdoutBuf.Reset()
-	r.cmd.Stdout = io.MultiWriter(r.stdout, &r.stdoutBuf)
+	r.chunks = make(chan ChunkEvent, 32)
+	r.cmd.Stdout = newChunkEventWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.chunks)
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
 	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -75,6 +79,7 @@ func (r *Recorder) Start(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- r.cmd.Wait()
+		close(r.chunks)
 	}()
 	select {
 	case err := <-errCh:
@@ -97,6 +102,10 @@ func (r *Recorder) Start(ctx context.Context) error {
 
 func (r *Recorder) Done() <-chan error {
 	return r.waitCh
+}
+
+func (r *Recorder) Chunks() <-chan ChunkEvent {
+	return r.chunks
 }
 
 func (r *Recorder) Stop() error {
@@ -131,6 +140,14 @@ func (r *Recorder) killProcessGroup(sig syscall.Signal) error {
 
 func (r *Recorder) Artifacts() audioartifact.Artifacts {
 	return audioartifact.New(r.outputDir)
+}
+
+func appendChunkArgs(args []string) []string {
+	seconds := strings.TrimSpace(os.Getenv(captureChunkSecondsEnv))
+	if seconds == "" {
+		return args
+	}
+	return append(args, "--chunk-seconds", seconds)
 }
 
 func findCaptureLaunch(args []string, _ string) (captureLaunch, error) {

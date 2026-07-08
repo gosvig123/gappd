@@ -140,12 +140,14 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 	if err := w.startCapture(ctx, recorder, session); err != nil {
 		return err
 	}
+	waitForLiveChunks := w.startLiveChunkProcessing(recorder, session.meeting.ID, req.Language, processing)
 	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
 	if err := w.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
 		return err
 	}
 	stopHeartbeat()
+	waitForLiveChunks()
 	session = w.completeCapture(session, recorder)
 	processingCtx, stopProcessing := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stopProcessing()
