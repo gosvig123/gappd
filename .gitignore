@@ -20,7 +20,7 @@ vendor/
 *.raw
 *.wav
 sessions/
-
+.pi-subagents
 # Config with real credentials
 config.toml
 .apple-signing/

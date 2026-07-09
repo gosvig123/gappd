@@ -32,6 +32,7 @@ _Avoid_: legacy status mirror, status helper
 
 - A **Local AI Setup Operation** prepares one **Managed Runtime**.
 - A **Managed Runtime** provides **Local AI** for meeting transcription and summarization.
+- A healthy **Managed Runtime** should be shared instead of starting duplicate llama.cpp servers.
 - A **Meeting Recording Workflow** uses **Meeting Processing** after capture.
 - A **Meeting Lifecycle** defines valid meeting capture and processing state transitions and user-facing state derived from persisted meeting rows.
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
