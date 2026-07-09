@@ -37,7 +37,7 @@ func TestPipelineExtract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
-	assertRequest(t, provider.requests, 0, 0.3, "Ada: let's ship beta on Friday")
+	assertRequest(t, provider.requests, 0, structuredTemperature, "Ada: let's ship beta on Friday")
 	if extraction.Title != "Beta Launch Planning" {
 		t.Fatalf("extraction.Title = %q, want generated title", extraction.Title)
 	}
@@ -104,7 +104,7 @@ func TestPipelineRun(t *testing.T) {
 	if extraction == nil || notes != "## Meeting Title\nWeekly Sync" {
 		t.Fatalf("Run extraction=%v notes=%q, want extraction and notes", extraction, notes)
 	}
-	assertRequest(t, provider.requests, 0, 0.3, "Ada: weekly sync")
+	assertRequest(t, provider.requests, 0, structuredTemperature, "Ada: weekly sync")
 	if strings.Contains(provider.requests[1].User, "## User Notes") {
 		t.Fatalf("synthesize request user = %q, want no notes section", provider.requests[1].User)
 	}
@@ -117,7 +117,7 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 		`{"title":"Wrap Up","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		`{"title":"Roadmap Launch Planning","participants":["Ada","Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		"## Meeting Title\nMerged")
-	transcript := strings.Repeat("[Ada] roadmap\n", 1000) + strings.Repeat("[Ben] launch\n", 1000)
+	transcript := strings.Repeat("[Ada] roadmap\n", 500) + strings.Repeat("[Ben] launch\n", 500)
 
 	extraction, notes, err := pipeline.Run(context.Background(), transcript, "")
 	if err != nil {

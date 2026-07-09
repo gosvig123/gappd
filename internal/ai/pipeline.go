@@ -14,6 +14,11 @@ const (
 	ProgressRefineExtraction ProgressStage = "refine_extraction"
 	ProgressSynthesize       ProgressStage = "synthesize"
 	ProgressRefineNotes      ProgressStage = "refine_notes"
+
+	structuredTemperature     = 0
+	maxExtractionTokens       = 4096
+	maxRefineExtractionTokens = 8192
+	maxNotesTokens            = 4096
 )
 
 type Progress struct {
@@ -84,7 +89,7 @@ func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Ex
 
 func (p *Pipeline) extractChunk(ctx context.Context, transcript string, language string) (*Extraction, error) {
 	system, user := Stage1Prompt(transcript, language)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
+	req := CompletionRequest{System: system, User: user, Temperature: structuredTemperature, JSONSchema: ExtractionJSONSchema(), MaxTokens: maxExtractionTokens}
 	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
@@ -106,7 +111,7 @@ func (p *Pipeline) synthesize(ctx context.Context, extraction *Extraction, userN
 		return "", fmt.Errorf("marshal extraction: %w", err)
 	}
 	system, user := Stage2Prompt(string(data), userNotes, language)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
+	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, MaxTokens: maxNotesTokens}
 	result, err := p.provider.Complete(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("synthesis failed: %w", err)

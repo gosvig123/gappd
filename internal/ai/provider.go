@@ -16,4 +16,5 @@ type CompletionRequest struct {
 	User        string
 	Temperature float64
 	JSONSchema  json.RawMessage
+	MaxTokens   int
 }
