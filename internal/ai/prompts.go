@@ -52,6 +52,8 @@ Rules:
 - If transcript is short or vague, return sparse JSON with empty arrays
 - Use exact participant names from the transcript; never invent names
 - Speaker labels like "You" and "Other" are labels, not participant names
+- Participants must be unique; omit labels when names are absent
+- Keep arrays short and respect schema maxItems and maxLength limits
 - Title must be grounded in the transcript, not generic words like "Meeting" or "Recording"
 - Be concise but preserve key details
 - Every topic, decision, and action item must include at least one exact evidence quote from the transcript
@@ -99,6 +101,7 @@ Rules:
 - Choose a specific title for the whole meeting, not the first chunk
 - Merge duplicates and near-duplicates
 - Rank topics, decisions, action items, and questions by importance
+- Keep arrays short and respect schema maxItems and maxLength limits
 - Preserve owners, deadlines, decision context, status, and evidence quotes
 - Speaker labels like "You" and "Other" are labels, not participant names
 - Only list decisions with explicit agreement, rejection, or commitment in evidence quotes
