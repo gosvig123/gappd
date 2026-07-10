@@ -6,6 +6,7 @@ import { bootstrapLocalAISetup } from './local-ai-setup-operation'
 import { stopManagedLlamaCpp } from './llamacpp'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
+import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 let mainWindow: BrowserWindow | null = null
@@ -16,8 +17,9 @@ function applyDevDockIcon(): void {
   app.dock.setIcon(path.join(__dirname, '../../assets/app-icon.png'))
 }
 
-function createWindow(): void {
+function createWindow(show = true): void {
   const createdWindow = new BrowserWindow({
+    show,
     width: 1200,
     height: 780,
     minWidth: 960,
@@ -39,6 +41,12 @@ function createWindow(): void {
   loadRenderer(createdWindow)
 }
 
+function showMainWindow(): void {
+  if (!mainWindow) return createWindow()
+  mainWindow.show()
+  mainWindow.focus()
+}
+
 function loadRenderer(createdWindow: BrowserWindow): void {
   const devServerUrl = process.env.VITE_DEV_SERVER_URL
   if (devServerUrl) {
@@ -51,14 +59,14 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 
 app.whenReady().then(() => {
   applyDevDockIcon()
-  createWindow()
+  const startHidden = shouldStartHidden()
+  initializeStartupSettings()
+  createWindow(!startHidden)
   void bootstrapLocalAISetup()
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
+  app.on('activate', showMainWindow)
 })
 
 app.on('before-quit', (event) => {

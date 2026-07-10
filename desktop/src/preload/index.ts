@@ -16,6 +16,7 @@ function buildOperationApi(): IpcInvokeApi {
     recording: invokeGroup('recording'),
     localAISetup: invokeGroup('localAISetup'),
     update: invokeGroup('update'),
+    startup: invokeGroup('startup'),
   }
 }
 

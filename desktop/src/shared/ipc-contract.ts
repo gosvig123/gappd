@@ -6,6 +6,7 @@ export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
 export type LocalAISetupInput = { model?: string }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -40,6 +41,10 @@ export type IpcInvokeContract = {
     installAndRestart: OperationSpec<[], UpdateStatus>
     openUpdatePage: OperationSpec<[], void>
   }
+  startup: {
+    getSettings: OperationSpec<[], StartupSettings>
+    setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
+  }
 }
 
 export type IpcOperationGroup = Extract<keyof IpcInvokeContract, string>
@@ -66,6 +71,10 @@ export const IPC_OPERATIONS = {
     downloadUpdate: 'update:downloadUpdate',
     installAndRestart: 'update:installAndRestart',
     openUpdatePage: 'update:openUpdatePage',
+  },
+  startup: {
+    getSettings: 'startup:getSettings',
+    setOpenAtLogin: 'startup:setOpenAtLogin',
   },
 } as const satisfies IpcOperationChannels
 
