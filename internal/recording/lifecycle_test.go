@@ -36,5 +36,5 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 }
 
 func testSession(service Service, meeting *db.Meeting) recordingSession {
-	return recordingSession{store: service.meetings(), events: service.Events, meeting: meeting}
+	return recordingSession{lifecycle: service.meetingLifecycle(), events: service.Events, meeting: meeting}
 }

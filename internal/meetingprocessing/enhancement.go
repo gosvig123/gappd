@@ -9,6 +9,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 func (s Service) EnhanceStored(ctx context.Context, req StoredRequest) error {
@@ -19,7 +20,7 @@ func (s Service) EnhanceStored(ctx context.Context, req StoredRequest) error {
 	if err != nil {
 		return err
 	}
-	if err := s.markProcessing(meeting); err != nil {
+	if err := s.markProcessing(ctx, meeting, req); err != nil {
 		return err
 	}
 	return s.enhanceStored(ctx, meeting, transcript, req)
@@ -58,13 +59,6 @@ func (s Service) storedTranscript(meetingID string, saved *string) (string, erro
 	return FormatTranscript(segments), nil
 }
 
-func (s Service) markProcessing(meeting *db.Meeting) error {
-	if err := s.Store.MarkProcessingStarted(meeting, s.nowText()); err != nil {
-		return s.processingError("enhance stored", meeting.ID, PhaseLifecycle, err)
-	}
-	return s.emit(EventProcessing, meeting, nil)
-}
-
 func (s Service) enhanceStored(ctx context.Context, meeting *db.Meeting, transcript string, req StoredRequest) error {
 	if canRefineStored(meeting.ExtractionJSON, meeting.Summary, req) {
 		return s.refineStoredSummary(ctx, meeting, transcript, req)
@@ -87,22 +81,22 @@ func (s Service) refineStoredSummary(ctx context.Context, meeting *db.Meeting, t
 	s.report().AIProgress(Progress{Stage: string(ai.ProgressRefineNotes), Current: 1, Total: 1})
 	extraction, err := ai.DecodeExtractionJSON(*meeting.ExtractionJSON)
 	if err != nil {
-		return s.saveEnhanceFailure(meeting, transcript, err)
+		return s.saveEnhanceFailure(ctx, meeting, transcript, err)
 	}
 	summary, err := s.notes().RefineNotes(ctx, extraction, *meeting.Summary, refinementGuidance(req), enhanceLanguage(meeting, req))
 	if err != nil {
-		return s.saveEnhanceFailure(meeting, transcript, err)
+		return s.saveEnhanceFailure(ctx, meeting, transcript, err)
 	}
-	return s.saveEnhancement(meeting, extraction, transcript, summary)
+	return s.saveEnhancement(ctx, meeting, extraction, transcript, summary)
 }
 
 func (s Service) enhanceAndSave(ctx context.Context, meeting *db.Meeting, transcript string, req StoredRequest) error {
 	s.report().EnhancementStarted()
 	extraction, summary, err := s.notes().RunWithOptions(ctx, transcript, s.runOptions(meeting, req))
 	if err != nil {
-		return s.saveEnhanceFailure(meeting, transcript, err)
+		return s.saveEnhanceFailure(ctx, meeting, transcript, err)
 	}
-	return s.saveEnhancement(meeting, extraction, transcript, summary)
+	return s.saveEnhancement(ctx, meeting, extraction, transcript, summary)
 }
 
 func (s Service) runOptions(meeting *db.Meeting, req StoredRequest) ai.RunOptions {
@@ -127,19 +121,21 @@ func previousSummary(meeting *db.Meeting, req StoredRequest) string {
 	return *meeting.Summary
 }
 
-func (s Service) saveEnhancement(meeting *db.Meeting, extraction *ai.Extraction, transcript, summary string) error {
+func (s Service) saveEnhancement(ctx context.Context, meeting *db.Meeting, extraction *ai.Extraction, transcript, summary string) error {
 	extractionJSON, err := ai.EncodeExtraction(extraction)
 	if err != nil {
-		return s.saveEnhanceFailure(meeting, transcript, err)
+		return s.saveEnhanceFailure(ctx, meeting, transcript, err)
 	}
-	return s.completeProcessing(meeting, extraction, transcript, summary, extractionJSON)
+	return s.completeProcessing(ctx, meeting, extraction, transcript, summary, extractionJSON)
 }
 
-func (s Service) completeProcessing(meeting *db.Meeting, extraction *ai.Extraction, transcript, summary, extractionJSON string) error {
-	completion := db.MeetingProcessingCompletion{Title: extraction.Title, Transcript: transcript, Summary: summary, ExtractionJSON: extractionJSON, At: s.nowText()}
-	if err := s.Store.CompleteProcessing(meeting, completion); err != nil {
+func (s Service) completeProcessing(ctx context.Context, meeting *db.Meeting, extraction *ai.Extraction, transcript, summary, extractionJSON string) error {
+	completion := meetinglifecycle.Completion{Title: extraction.Title, Transcript: transcript, Summary: summary, ExtractionJSON: extractionJSON, At: s.now()}
+	updated, err := s.transition(ctx, meeting.ID, meetinglifecycle.ProcessingCompleted{Completion: completion})
+	if err != nil {
 		return s.processingError("complete processing", meeting.ID, PhasePersist, err)
 	}
+	*meeting = *updated
 	return s.complete(meeting, extraction, summary)
 }
 
@@ -151,10 +147,13 @@ func (s Service) complete(meeting *db.Meeting, extraction *ai.Extraction, summar
 	return nil
 }
 
-func (s Service) saveProcessingFailure(meeting *db.Meeting, origErr error) error {
-	if err := s.Store.MarkProcessingFailed(meeting, s.nowText(), origErr); err != nil {
+func (s Service) saveProcessingFailure(ctx context.Context, meeting *db.Meeting, origErr error) error {
+	transition := meetinglifecycle.ProcessingFailed{At: s.now(), Cause: origErr}
+	updated, err := s.transition(ctx, meeting.ID, transition)
+	if err != nil {
 		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", err))
 	}
+	*meeting = *updated
 	return s.emitProcessingFailure(meeting, origErr)
 }
 
@@ -166,10 +165,13 @@ func (s Service) emitProcessingFailure(meeting *db.Meeting, origErr error) error
 	return fmt.Errorf("transcription failed: %w", origErr)
 }
 
-func (s Service) saveEnhanceFailure(meeting *db.Meeting, transcript string, err error) error {
-	if updateErr := s.Store.FailProcessingWithTranscript(meeting, transcript, s.nowText(), err); updateErr != nil {
+func (s Service) saveEnhanceFailure(ctx context.Context, meeting *db.Meeting, transcript string, err error) error {
+	transition := meetinglifecycle.ProcessingFailed{At: s.now(), Cause: err, Transcript: &transcript}
+	updated, updateErr := s.transition(ctx, meeting.ID, transition)
+	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
 	}
+	*meeting = *updated
 	if emitErr := s.emit(EventFailed, meeting, err); emitErr != nil {
 		return emitErr
 	}

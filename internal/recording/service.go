@@ -13,6 +13,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
@@ -45,11 +46,10 @@ type audioRecorder interface {
 
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
-type meetingStore interface {
-	CreateMeeting(*db.Meeting) error
-	MarkCaptureFailed(*db.Meeting, string, error) error
-	MarkCaptured(*db.Meeting, string) error
-	UpdateRecordingHeartbeat(id, updatedAt string) error
+type meetingLifecycle interface {
+	BeginRecording(context.Context, meetinglifecycle.RecordingStart) (*db.Meeting, error)
+	Heartbeat(context.Context, string, time.Time) (meetinglifecycle.Result, error)
+	Transition(context.Context, string, meetinglifecycle.Transition) (meetinglifecycle.Result, error)
 }
 
 type Request struct {
@@ -69,18 +69,18 @@ type Service struct {
 	Events    EventSink
 	Reporter  meetingprocessing.Reporter
 	Processor meetingprocessing.CapturedProcessor
+	Lifecycle meetingLifecycle
 
-	store    meetingStore
 	recorder recorderFactory
 }
 
 type meetingRecordingWorkflow struct {
-	store    meetingStore
-	recorder recorderFactory
-	baseDir  string
-	out      io.Writer
-	errOut   io.Writer
-	events   EventSink
+	lifecycle meetingLifecycle
+	recorder  recorderFactory
+	baseDir   string
+	out       io.Writer
+	errOut    io.Writer
+	events    EventSink
 }
 
 func (s Service) Run(req Request) error {
@@ -89,7 +89,7 @@ func (s Service) Run(req Request) error {
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 	return meetingRecordingWorkflow{
-		store: s.meetings(), recorder: s.recorder, baseDir: s.BaseDir,
+		lifecycle: s.meetingLifecycle(), recorder: s.recorder, baseDir: s.BaseDir,
 		out: s.Out, errOut: s.ErrOut, events: s.Events,
 	}
 }
@@ -111,15 +111,11 @@ func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.
 	return w.record(req, session, sessionDir, processing)
 }
 
-func (s Service) meetings() meetingStore {
-	if s.store != nil {
-		return s.store
+func (s Service) meetingLifecycle() meetingLifecycle {
+	if s.Lifecycle != nil {
+		return s.Lifecycle
 	}
-	return s.Store
-}
-
-func (w meetingRecordingWorkflow) meetings() meetingStore {
-	return w.store
+	return meetinglifecycle.New(s.Store)
 }
 
 func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {

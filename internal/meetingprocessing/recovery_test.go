@@ -52,14 +52,17 @@ func TestRecoverStaleRecordingWithoutAudioFailsCapture(t *testing.T) {
 
 func createStaleRecordingMeeting(t *testing.T, store *db.DB, withAudio bool) *db.Meeting {
 	t.Helper()
-	meeting := createRecordingMeeting(t, store)
-	meeting.CaptureStatusUpdatedAt = "2026-04-10T12:00:00Z"
-	meeting.AudioPath = nil
+	meeting := &db.Meeting{
+		ID: "meeting-processing", Title: "Processing", StartedAt: "2026-04-10T12:00:00Z",
+		CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: "2026-04-10T12:00:00Z",
+		ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: "2026-04-10T12:00:00Z",
+		Tags: "[]", Source: "listen",
+	}
 	if withAudio {
 		meeting.AudioPath = writeUsableAudio(t)
 	}
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
+	if err := store.CreateMeeting(meeting); err != nil {
+		t.Fatalf("CreateMeeting() error = %v", err)
 	}
 	return meeting
 }

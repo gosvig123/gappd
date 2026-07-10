@@ -7,13 +7,13 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
-const timeFormat = time.RFC3339
-
 type Service struct {
 	Store       Store
+	Lifecycle   Lifecycle
 	Pipeline    *ai.Pipeline
 	Transcriber Transcriber
 	Notes       NotesGenerator
@@ -56,16 +56,33 @@ func (s Service) now() time.Time {
 	return time.Now().UTC()
 }
 
-func (s Service) nowText() string { return s.now().Format(timeFormat) }
-
 func (s Service) require() error {
-	if s.Store == nil {
-		return fmt.Errorf("meeting processing: store is required")
+	if s.Store == nil || s.lifecycle() == nil {
+		return fmt.Errorf("meeting processing: store and lifecycle are required")
 	}
 	if s.notes() == nil {
 		return fmt.Errorf("meeting processing: notes generator is required")
 	}
 	return nil
+}
+
+func (s Service) lifecycle() Lifecycle {
+	if s.Lifecycle != nil {
+		return s.Lifecycle
+	}
+	store, ok := s.Store.(*db.DB)
+	if !ok {
+		return nil
+	}
+	return meetinglifecycle.New(store)
+}
+
+func (s Service) transition(ctx context.Context, id string, transition meetinglifecycle.Transition) (*db.Meeting, error) {
+	result, err := s.lifecycle().Transition(ctx, id, transition)
+	if err != nil {
+		return nil, err
+	}
+	return result.Meeting, nil
 }
 
 func (s Service) processingError(operation, meetingID string, phase Phase, err error) error {

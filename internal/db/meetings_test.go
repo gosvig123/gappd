@@ -10,22 +10,9 @@ func TestMeetingLifecycleRoundTrip(t *testing.T) {
 		t.Fatalf("CreateMeeting() error = %v", err)
 	}
 
-	endedAt := "2026-04-10T12:30:00Z"
-	failure := "enhance failed"
-	transcript := "[You] hello"
-	extractionJSON := `{"title":"Sprint planning"}`
-	meeting.EndedAt = &endedAt
-	meeting.Transcript = &transcript
-	meeting.ExtractionJSON = &extractionJSON
-	meeting.CaptureStatus = CaptureStatusCaptured
-	meeting.CaptureStatusUpdatedAt = endedAt
-	meeting.ProcessingStatus = ProcessingStatusFailed
-	meeting.ProcessingStatusUpdatedAt = endedAt
-	meeting.ProcessingFailureMessage = &failure
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
-	}
-
+	endedAt := *meeting.EndedAt
+	failure := *meeting.ProcessingFailureMessage
+	extractionJSON := *meeting.ExtractionJSON
 	assertStoredLifecycleRoundTrip(t, store, meeting.ID, endedAt, failure, extractionJSON)
 	meetings, err := store.ListMeetings(10)
 	if err != nil {
@@ -35,7 +22,17 @@ func TestMeetingLifecycleRoundTrip(t *testing.T) {
 }
 
 func lifecycleRoundTripMeeting() *Meeting {
-	return &Meeting{Title: "Sprint planning", StartedAt: "2026-04-10T12:00:00Z", CaptureStatus: CaptureStatusRecording, CaptureStatusUpdatedAt: "2026-04-10T12:00:00Z", ProcessingStatus: ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: "2026-04-10T12:00:00Z", Tags: "[]", Source: "listen"}
+	endedAt := "2026-04-10T12:30:00Z"
+	failure := "enhance failed"
+	transcript := "[You] hello"
+	extractionJSON := `{"title":"Sprint planning"}`
+	return &Meeting{
+		Title: "Sprint planning", StartedAt: "2026-04-10T12:00:00Z", EndedAt: &endedAt,
+		CaptureStatus: CaptureStatusCaptured, CaptureStatusUpdatedAt: endedAt,
+		ProcessingStatus: ProcessingStatusFailed, ProcessingStatusUpdatedAt: endedAt,
+		ProcessingFailureMessage: &failure, Transcript: &transcript, ExtractionJSON: &extractionJSON,
+		Tags: "[]", Source: "listen",
+	}
 }
 
 func assertStoredLifecycleRoundTrip(t *testing.T, store *DB, id, endedAt, failure, extractionJSON string) {

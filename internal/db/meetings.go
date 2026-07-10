@@ -84,32 +84,6 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 	return nil
 }
 
-func (d *DB) UpdateMeeting(m *Meeting) error {
-	m.Language = meetinglang.Normalize(m.Language)
-	_, err := d.Conn.Exec(
-		`UPDATE meetings SET title=?, started_at=?, ended_at=?,
-		 capture_status=?, capture_status_updated_at=?, capture_failure_message=?, processing_status=?,
-		 processing_status_updated_at=?, processing_failure_message=?, audio_path=?, transcript=?, summary=?,
-		 extraction_json=?, language=?, tags=?, source=? WHERE id=?`,
-		m.Title, m.StartedAt, m.EndedAt,
-		m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage, m.ProcessingStatus,
-		m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.AudioPath, m.Transcript, m.Summary,
-		m.ExtractionJSON, m.Language, m.Tags, m.Source, m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("update meeting: %w", err)
-	}
-	return nil
-}
-
-func (d *DB) UpdateRecordingHeartbeat(id, updatedAt string) error {
-	_, err := d.Conn.Exec(`UPDATE meetings SET capture_status_updated_at = ? WHERE id = ? AND capture_status = ?`, updatedAt, id, CaptureStatusRecording)
-	if err != nil {
-		return fmt.Errorf("update recording heartbeat: %w", err)
-	}
-	return nil
-}
-
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
 	row := d.Conn.QueryRow(
 		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,

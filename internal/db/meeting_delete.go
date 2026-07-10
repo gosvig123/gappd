@@ -1,6 +1,9 @@
 package db
 
-import "fmt"
+import (
+	"database/sql"
+	"fmt"
+)
 
 func (d *DB) DeleteMeeting(id string) (*Meeting, error) {
 	meeting, err := d.GetMeeting(id)
@@ -20,6 +23,17 @@ func MeetingCanDelete(meeting Meeting) bool {
 	return meeting.CaptureStatus != CaptureStatusRecording && meeting.ProcessingStatus != ProcessingStatusProcessing
 }
 
+func rowsChanged(result sql.Result, err error, operation string) (bool, error) {
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", operation, err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("%s rows affected: %w", operation, err)
+	}
+	return rows > 0, nil
+}
+
 func (d *DB) deleteMeetingRows(id string) error {
 	tx, err := d.Conn.Begin()
 	if err != nil {
@@ -30,7 +44,7 @@ func (d *DB) deleteMeetingRows(id string) error {
 		return fmt.Errorf("delete segments for meeting %s: %w", id, err)
 	}
 	result, err := tx.Exec(`DELETE FROM meetings WHERE id = ? AND capture_status <> ? AND processing_status <> ?`, id, CaptureStatusRecording, ProcessingStatusProcessing)
-	ok, err := changed(result, err, fmt.Sprintf("delete meeting %s", id))
+	ok, err := rowsChanged(result, err, fmt.Sprintf("delete meeting %s", id))
 	if err != nil {
 		return err
 	}
