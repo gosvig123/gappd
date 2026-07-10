@@ -1,6 +1,7 @@
 import '../components/local-ai.css'
 
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
+import type { StartupSettings } from '../../shared/ipc-contract'
 import { Button, Card, cx, StatusPill } from '../components/ui'
 import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
@@ -15,7 +16,40 @@ type SettingsViewProps = {
 }
 
 export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+  return <section className="settings-stack settings-stack-plain"><StartupPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+}
+
+function StartupPanel() {
+  const [settings, setSettings] = useState<StartupSettings | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => loadStartupSettings(setSettings, setError), [])
+  const update = async (openAtLogin: boolean) => {
+    setBusy(true)
+    setError(null)
+    try { setSettings(await window.gappd.startup.setOpenAtLogin(openAtLogin)) }
+    catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
+  }
+  const disabled = busy || !settings?.supported
+  return <Card className="settings-section"><SectionTitle title="Startup" note="Control whether Gappd starts with macOS." /><label className="startup-setting"><span className="startup-setting-copy"><strong>Open Gappd at login</strong><span>Starts in the background. Click Gappd in the Dock to open its window.</span></span><input type="checkbox" checked={settings?.openAtLogin ?? false} disabled={disabled} onChange={(event) => void update(event.target.checked)} /></label><div className={cx('status-note', error ? 'danger' : undefined)}>{error || startupNote(settings)}</div></Card>
+}
+
+function loadStartupSettings(setSettings: (settings: StartupSettings) => void, setError: (error: string) => void) {
+  let active = true
+  window.gappd.startup.getSettings().then((settings) => { if (active) setSettings(settings) }).catch((cause) => { if (active) setError(errorMessage(cause)) })
+  return () => { active = false }
+}
+
+function startupNote(settings: StartupSettings | null): string {
+  if (!settings) return 'Checking macOS Login Items…'
+  if (!settings.supported) return 'Available in packaged macOS builds.'
+  if (settings.requiresApproval) return 'macOS requires approval in System Settings → General → Login Items.'
+  return settings.openAtLogin ? 'Gappd will start after you sign in.' : 'Gappd will not start after you sign in.'
+}
+
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause)
 }
 
 function AppleSpeechPanel({ language, onLanguageChange }: Pick<SettingsViewProps, 'language' | 'onLanguageChange'>) {

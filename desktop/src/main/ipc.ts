@@ -7,6 +7,7 @@ import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
+import { getStartupSettings, setOpenAtLogin } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
@@ -55,6 +56,10 @@ const IPC_HANDLERS: MainHandlers = {
     downloadUpdate: () => downloadUpdate(),
     installAndRestart: () => installAndRestart(),
     openUpdatePage: () => openUpdatePage(),
+  },
+  startup: {
+    getSettings: () => getStartupSettings(),
+    setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
   },
 }
 
