@@ -503,6 +503,10 @@ func watchStopFile(_ path: String, stopSemaphore: DispatchSemaphore) {
 
 // MARK: - Main
 
+if CommandLine.arguments.contains("--observe-meetings") {
+    runMeetingObserver()
+}
+
 let config = parseArgs()
 
 if config.mode == .mic || config.mode == .both {
