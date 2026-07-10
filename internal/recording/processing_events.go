@@ -26,5 +26,5 @@ func (s Service) capturedProcessor() meetingprocessing.CapturedProcessor {
 	if s.Processor != nil {
 		return s.Processor
 	}
-	return meetingprocessing.Service{Store: s.Store, Pipeline: s.Pipeline, Reporter: s.Reporter, Events: processingEventAdapter{s.Events}}
+	return meetingprocessing.Service{Store: s.Store, Lifecycle: s.meetingLifecycle(), Pipeline: s.Pipeline, Reporter: s.Reporter, Events: processingEventAdapter{s.Events}}
 }

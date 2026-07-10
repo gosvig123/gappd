@@ -8,6 +8,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
@@ -21,7 +22,7 @@ const (
 )
 
 func newMeetingProcessingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput, suppressProcessingFailure bool) meetingprocessing.Service {
-	service := meetingprocessing.Service{Store: store, Pipeline: pipeline}
+	service := meetingprocessing.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline}
 	if output == recordingOutputConsole {
 		service.Reporter = meetingprocessing.NewConsoleReporter(os.Stdout, os.Stderr)
 	}
@@ -49,7 +50,7 @@ func recordingEventName(name meetingprocessing.EventName) recording.EventName {
 }
 
 func newRecordingWorkflowService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput, suppressProcessingFailure bool) (recording.Service, error) {
-	service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+	service := recording.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
 	service.Processor = newMeetingProcessingService(store, pipeline, output, suppressProcessingFailure)
 	baseDir, err := config.GappdDir()
 	if err != nil {

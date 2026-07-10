@@ -9,6 +9,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
@@ -18,7 +19,7 @@ func (s Service) ProcessCaptured(ctx context.Context, req CapturedRequest) error
 	if err := s.validateCaptured(req); err != nil {
 		return err
 	}
-	meeting, err := s.startCapturedProcessing(req.MeetingID)
+	meeting, err := s.startCapturedProcessing(ctx, req.MeetingID)
 	if err != nil {
 		return err
 	}
@@ -35,25 +36,33 @@ func (s Service) validateCaptured(req CapturedRequest) error {
 	return nil
 }
 
-func (s Service) startCapturedProcessing(meetingID string) (*db.Meeting, error) {
+func (s Service) startCapturedProcessing(ctx context.Context, meetingID string) (*db.Meeting, error) {
 	meeting, err := s.Store.GetMeeting(meetingID)
 	if err != nil {
 		return nil, s.processingError("process captured", meetingID, PhaseLifecycle, err)
 	}
 	if meeting.ProcessingStatus != db.ProcessingStatusProcessing {
-		if err := s.Store.MarkProcessingStarted(meeting, s.nowText()); err != nil {
-			return nil, err
+		meeting, err = s.transition(ctx, meetingID, s.capturedStartTransition(meeting))
+		if err != nil {
+			return nil, s.processingError("process captured", meetingID, PhaseLifecycle, err)
 		}
 	}
 	return meeting, s.emit(EventProcessing, meeting, nil)
 }
 
+func (s Service) capturedStartTransition(meeting *db.Meeting) meetinglifecycle.Transition {
+	if meeting.ProcessingStatus == db.ProcessingStatusNotStarted {
+		return meetinglifecycle.ProcessingStarted{At: s.now()}
+	}
+	return meetinglifecycle.ProcessingRestarted{At: s.now(), Reason: meetinglifecycle.ReprocessingRetry}
+}
+
 func (s Service) processCaptured(ctx context.Context, meeting *db.Meeting, req CapturedRequest) error {
 	segments, err := s.transcribeStreams(ctx, req, meeting.ID)
 	if err != nil {
-		return s.saveProcessingFailure(meeting, err)
+		return s.saveProcessingFailure(ctx, meeting, err)
 	}
-	transcript, err := s.saveSegments(meeting, segments)
+	transcript, err := s.saveSegments(ctx, meeting, segments)
 	if err != nil {
 		return err
 	}
@@ -122,18 +131,21 @@ func segmentsWithSpeaker(segs []transcribe.Segment, speaker string) []transcribe
 	return segs
 }
 
-func (s Service) saveSegments(meeting *db.Meeting, segments []db.Segment) (string, error) {
+func (s Service) saveSegments(ctx context.Context, meeting *db.Meeting, segments []db.Segment) (string, error) {
 	s.report().SegmentsSaved(len(segments))
 	if err := s.Store.ReplaceSegments(meeting.ID, segments); err != nil {
 		return "", s.processingError("process captured", meeting.ID, PhasePersist, err)
 	}
-	return s.saveTranscript(meeting, FormatTranscript(segments))
+	return s.saveTranscript(ctx, meeting, FormatTranscript(segments))
 }
 
-func (s Service) saveTranscript(meeting *db.Meeting, transcript string) (string, error) {
-	if err := s.Store.SaveTranscript(meeting, transcript, s.nowText()); err != nil {
+func (s Service) saveTranscript(ctx context.Context, meeting *db.Meeting, transcript string) (string, error) {
+	transition := meetinglifecycle.TranscriptSaved{At: s.now(), Transcript: transcript}
+	updated, err := s.transition(ctx, meeting.ID, transition)
+	if err != nil {
 		return "", s.processingError("process captured", meeting.ID, PhasePersist, err)
 	}
+	*meeting = *updated
 	s.report().TranscriptSaved(transcript)
 	return transcript, nil
 }

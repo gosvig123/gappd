@@ -115,7 +115,7 @@ func runAppRecoverStale(asJSON bool) error {
 
 func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
 	processor := newMeetingProcessingService(store, pipeline, recordingOutputQuiet, true)
-	recovery := meetingprocessing.Recovery{Store: store, Processor: processor, Events: processor.Events}
+	recovery := meetingprocessing.Recovery{Store: store, Lifecycle: processor.Lifecycle, Processor: processor, Events: processor.Events}
 	return recovery.RecoverStale(cmdContext(), meetingprocessing.RecoveryOptions{SuppressProcessingFailure: true, ErrOut: os.Stderr})
 }
 

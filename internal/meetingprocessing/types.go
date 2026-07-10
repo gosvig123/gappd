@@ -7,6 +7,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
@@ -91,13 +92,12 @@ var (
 type Store interface {
 	GetMeeting(string) (*db.Meeting, error)
 	GetSegments(string) ([]db.Segment, error)
-	MarkProcessingStarted(*db.Meeting, string) error
-	MarkProcessingFailed(*db.Meeting, string, error) error
-	SaveTranscript(*db.Meeting, string, string) error
-	CompleteProcessing(*db.Meeting, db.MeetingProcessingCompletion) error
-	FailProcessingWithTranscript(*db.Meeting, string, string, error) error
 	ReplaceSegments(string, []db.Segment) error
 	InsertSegment(*db.Segment) error
+}
+
+type Lifecycle interface {
+	Transition(context.Context, string, meetinglifecycle.Transition) (meetinglifecycle.Result, error)
 }
 
 type Transcriber interface {

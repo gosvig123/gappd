@@ -5,9 +5,11 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
@@ -17,12 +19,12 @@ func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
 	extractionJSON := `{"title":"Planning","participants":[],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"neutral"}`
 	summary := "draft"
 	transcript := "[Ada] plan"
-	meeting.Transcript = &transcript
-	meeting.Summary = &summary
-	meeting.ExtractionJSON = &extractionJSON
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
+	completion := meetinglifecycle.Completion{Title: "Planning", Transcript: transcript, Summary: summary, ExtractionJSON: extractionJSON, At: testProcessingTime()}
+	result, err := meetinglifecycle.New(store).Transition(context.Background(), meeting.ID, meetinglifecycle.ProcessingCompleted{Completion: completion})
+	if err != nil {
+		t.Fatalf("ProcessingCompleted transition error = %v", err)
 	}
+	meeting = result.Meeting
 	notes := &fakeNotes{summary: "refined"}
 	service := Service{Store: store, Notes: notes}
 
@@ -64,9 +66,9 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	providerErr := errors.New("llm down")
 	service := Service{Store: store, Pipeline: ai.NewPipeline(failingProvider{err: providerErr}, 0), Events: events}
 	transcript := "[You] hello\n"
-	meeting.Transcript = &transcript
-	if err := store.UpdateMeeting(meeting); err != nil {
-		t.Fatalf("UpdateMeeting() error = %v", err)
+	transition := meetinglifecycle.TranscriptSaved{At: testProcessingTime(), Transcript: transcript}
+	if _, err := meetinglifecycle.New(store).Transition(context.Background(), meeting.ID, transition); err != nil {
+		t.Fatalf("TranscriptSaved transition error = %v", err)
 	}
 
 	err := service.EnhanceStored(context.Background(), StoredRequest{MeetingID: meeting.ID})
@@ -75,6 +77,10 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	}
 	assertEnhanceFailure(t, getMeeting(t, store, meeting.ID), transcript, providerErr.Error())
 	assertLastProcessingEvent(t, events, EventFailed, meeting.ID, providerErr)
+}
+
+func testProcessingTime() time.Time {
+	return time.Date(2026, 4, 10, 12, 45, 0, 0, time.UTC)
 }
 
 func assertProcessingFailed(t *testing.T, stored *db.Meeting, want string) {

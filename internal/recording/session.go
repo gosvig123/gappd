@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
@@ -17,14 +19,14 @@ type processingRequest struct {
 }
 
 type recordingSession struct {
-	store     meetingStore
+	lifecycle meetingLifecycle
 	events    EventSink
 	meeting   *db.Meeting
 	artifacts audioartifact.Artifacts
 }
 
 func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
-	return recordingSession{store: w.meetings(), events: w.events, meeting: meeting, artifacts: artifacts}
+	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting, artifacts: artifacts}
 }
 
 func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recordingSession {
@@ -40,7 +42,8 @@ func (r recordingSession) emit(name EventName, err error) error {
 }
 
 func (r recordingSession) failCapture(captureErr error) error {
-	if err := r.store.MarkCaptureFailed(r.meeting, nowUTC(), captureErr); err != nil {
+	transition := meetinglifecycle.CaptureFailed{At: time.Now(), Cause: captureErr}
+	if err := r.apply(context.Background(), transition); err != nil {
 		return err
 	}
 	if err := r.emit(EventFailed, captureErr); err != nil {
@@ -64,7 +67,7 @@ func (r recordingSession) finish(ctx context.Context, processing meetingprocessi
 	if err := r.requireAudio(); err != nil {
 		return err
 	}
-	if err := r.store.MarkCaptured(r.meeting, nowUTC()); err != nil {
+	if err := r.apply(ctx, meetinglifecycle.Captured{At: time.Now()}); err != nil {
 		return err
 	}
 	err := processing.ProcessCaptured(ctx, meetingprocessing.CapturedRequest{MeetingID: r.meeting.ID, AudioDir: r.audioDir(req), Language: req.language})
@@ -72,6 +75,15 @@ func (r recordingSession) finish(ctx context.Context, processing meetingprocessi
 		return nil
 	}
 	return err
+}
+
+func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle.Transition) error {
+	result, err := r.lifecycle.Transition(ctx, r.meeting.ID, transition)
+	if err != nil {
+		return err
+	}
+	*r.meeting = *result.Meeting
+	return nil
 }
 
 func (r recordingSession) audioDir(req processingRequest) string {
