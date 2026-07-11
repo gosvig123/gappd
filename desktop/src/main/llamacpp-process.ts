@@ -15,6 +15,7 @@ type ReadinessInput = {
 const READINESS_ATTEMPTS = 120
 const READINESS_INTERVAL_MS = 500
 const SHUTDOWN_TIMEOUT_MS = 5_000
+const SHUTDOWN_POLL_INTERVAL_MS = 50
 
 export function spawnLlamaCpp(binaryPath: string, args: string[], env: NodeJS.ProcessEnv): LlamaCppChild {
   return spawn(binaryPath, args, { env, stdio: ['ignore', 'ignore', 'pipe'] })
@@ -45,6 +46,14 @@ export async function chooseLlamaCppPort(): Promise<number> {
 export async function stopLlamaCppProcess(child: LlamaCppChild): Promise<void> {
   child.kill('SIGTERM')
   await waitForExit(child)
+}
+
+export async function reclaimStaleLlamaCppProcess(child: LlamaCppChild | null, binaryPath: string, port: number): Promise<boolean> {
+  const pid = await listenerPid(port)
+  if (pid === null || pid === child?.pid) return false
+  if ((await processExecutable(pid)) !== binaryPath) return false
+  await stopProcessByPid(pid, binaryPath)
+  return true
 }
 
 export function isLlamaCppPortBindError(error: unknown): boolean {
@@ -100,9 +109,41 @@ function listenerPid(port: number): Promise<number | null> {
   return new Promise((resolve) => execFile('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], (_error, stdout) => resolve(parsePid(stdout))))
 }
 
+function processExecutable(pid: number): Promise<string | null> {
+  return new Promise((resolve) => execFile('lsof', ['-a', '-p', String(pid), '-d', 'txt', '-Fn'], (_error, stdout) => resolve(parseExecutable(stdout))))
+}
+
+function parseExecutable(stdout: string): string | null {
+  const path = stdout.split('\n').find((line) => line.startsWith('n'))?.slice(1)
+  return path || null
+}
+
 function parsePid(stdout: string): number | null {
   const pid = Number.parseInt(stdout.trim().split('\n')[0] || '', 10)
   return Number.isInteger(pid) ? pid : null
+}
+
+async function stopProcessByPid(pid: number, binaryPath: string): Promise<void> {
+  if ((await processExecutable(pid)) !== binaryPath) return
+  signalProcess(pid, 'SIGTERM')
+  if (await waitForPidExit(pid, binaryPath)) return
+  signalProcess(pid, 'SIGKILL')
+  if (!(await waitForPidExit(pid, binaryPath))) throw new Error(`Failed to stop stale managed llama.cpp process ${pid} at ${binaryPath}; stop it manually, then retry.`)
+}
+
+async function waitForPidExit(pid: number, binaryPath: string): Promise<boolean> {
+  const deadline = Date.now() + SHUTDOWN_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if ((await processExecutable(pid)) !== binaryPath) return true
+    await new Promise((resolve) => setTimeout(resolve, SHUTDOWN_POLL_INTERVAL_MS))
+  }
+  return (await processExecutable(pid)) !== binaryPath
+}
+
+function signalProcess(pid: number, signal: NodeJS.Signals): void {
+  try { process.kill(pid, signal) } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+  }
 }
 
 function waitForExit(child: LlamaCppChild): Promise<void> {

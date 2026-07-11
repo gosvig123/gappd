@@ -6,7 +6,7 @@ import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
 import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
 import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-ai-setup-errors'
-import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
+import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, reclaimStaleLlamaCppProcess, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
 
 type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: LocalAISetupErrorState }
 type ModelListResponse = { models?: Array<{ name?: string; model?: string }> }
@@ -32,6 +32,7 @@ export async function ensureManagedLlamaCppRunning(): Promise<string> {
   if (!managedLlamaCppSupported()) throw new Error('Managed llama.cpp is only supported on macOS')
   if (!(await bundledLlamaCppAvailable())) throw new Error(missingBundledLlamaCppMessage())
   if (!(await managedLanguageModelAvailable())) throw new Error('Managed llama.cpp model is missing. Run Local AI setup to download it.')
+  await reclaimStaleLlamaCppProcess(runtime.process, resolveBundledLlamaCppBinary(), endpointPort(runtime.endpoint))
   if (await managedLlamaCppReadiness()) return runtime.endpoint
   if (!runtime.startPromise) runtime.startPromise = startManagedLlamaCpp()
   try { await runtime.startPromise; return runtime.endpoint } finally { runtime.startPromise = null }
