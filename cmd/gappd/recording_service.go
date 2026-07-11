@@ -23,8 +23,11 @@ const (
 
 func newMeetingProcessingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput) meetingprocessing.Service {
 	service := meetingprocessing.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline}
-	if output == recordingOutputConsole {
+	switch output {
+	case recordingOutputConsole:
 		service.Reporter = meetingprocessing.NewConsoleReporter(os.Stdout, os.Stderr)
+	case recordingOutputEvents:
+		service.Reporter = meetingprocessing.NewTimingReporter(os.Stderr)
 	}
 	return service
 }

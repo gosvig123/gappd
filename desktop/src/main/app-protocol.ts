@@ -18,6 +18,8 @@ type StreamHandlers<ID extends AppStreamID> = {
 
 type CommandEnv = NodeJS.ProcessEnv
 
+const PROCESSING_TIMING_MARKER = '● Timing '
+
 export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}): Promise<AppCommandOutput[ID]> {
   const output = await runCommand(id, commandArgs(id, input), env)
   return parseCommandOutput(id, output)
@@ -72,9 +74,14 @@ function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id:
   let stderr = ''
   const state = { buffer: '', sawEvent: false, sawTerminal: false, protocolError: null as string | null }
   child.stdout?.on('data', (chunk) => readProtocolChunk(id, state, chunk.toString(), handlers))
-  child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
+  child.stderr?.on('data', (chunk) => { stderr = captureStreamStderr(stderr, chunk.toString()) })
   child.on('error', (error) => handlers.onError(error.message))
   child.on('exit', (code, signal) => finishStream(state, stderr, code, signal, handlers))
+}
+
+function captureStreamStderr(current: string, chunk: string): string {
+  if (chunk.includes(PROCESSING_TIMING_MARKER)) console.info(chunk.trim())
+  return current + chunk
 }
 
 function readProtocolChunk<ID extends AppStreamID>(id: ID, state: StreamState, chunk: string, handlers: StreamHandlers<ID>): void {
