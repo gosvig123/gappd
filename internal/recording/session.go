@@ -19,7 +19,7 @@ type processingRequest struct {
 }
 
 type recordingSession struct {
-	lifecycle meetingLifecycle
+	lifecycle meetinglifecycle.Module
 	events    EventSink
 	meeting   *db.Meeting
 	artifacts audioartifact.Artifacts
@@ -63,7 +63,7 @@ func (r recordingSession) failUnexpectedCaptureStop(err error) error {
 	return unexpectedErr
 }
 
-func (r recordingSession) finish(ctx context.Context, processing meetingprocessing.CapturedProcessor, req processingRequest) error {
+func (r recordingSession) finish(ctx context.Context, processing meetingprocessing.Service, req processingRequest) error {
 	if err := r.requireAudio(); err != nil {
 		return err
 	}

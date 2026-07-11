@@ -15,19 +15,6 @@ type CapturedProcessor interface {
 	ProcessCaptured(context.Context, CapturedRequest) error
 }
 
-type LiveChunkProcessor interface {
-	ProcessCapturedChunk(context.Context, CapturedChunkRequest) error
-}
-
-type StoredEnhancer interface {
-	EnhanceStored(context.Context, StoredRequest) error
-}
-
-type Module interface {
-	CapturedProcessor
-	StoredEnhancer
-}
-
 type CapturedRequest struct {
 	MeetingID string
 	AudioDir  string

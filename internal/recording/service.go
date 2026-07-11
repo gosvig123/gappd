@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -46,12 +45,6 @@ type audioRecorder interface {
 
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
-type meetingLifecycle interface {
-	BeginRecording(context.Context, meetinglifecycle.RecordingStart) (*db.Meeting, error)
-	Heartbeat(context.Context, string, time.Time) (meetinglifecycle.Result, error)
-	Transition(context.Context, string, meetinglifecycle.Transition) (meetinglifecycle.Result, error)
-}
-
 type Request struct {
 	DeviceIdx                 int
 	Title                     string
@@ -61,21 +54,18 @@ type Request struct {
 }
 
 type Service struct {
-	Store     *db.DB
-	Pipeline  *ai.Pipeline
-	BaseDir   string
-	Out       io.Writer
-	ErrOut    io.Writer
-	Events    EventSink
-	Reporter  meetingprocessing.Reporter
-	Processor meetingprocessing.CapturedProcessor
-	Lifecycle meetingLifecycle
+	BaseDir string
+	Out     io.Writer
+	ErrOut  io.Writer
+	Events  EventSink
 
-	recorder recorderFactory
+	lifecycle  meetinglifecycle.Module
+	processing meetingprocessing.Service
+	recorder   recorderFactory
 }
 
 type meetingRecordingWorkflow struct {
-	lifecycle meetingLifecycle
+	lifecycle meetinglifecycle.Module
 	recorder  recorderFactory
 	baseDir   string
 	out       io.Writer
@@ -83,18 +73,24 @@ type meetingRecordingWorkflow struct {
 	events    EventSink
 }
 
+func New(lifecycle meetinglifecycle.Module, processing meetingprocessing.Service) Service {
+	return Service{lifecycle: lifecycle, processing: processing}
+}
+
 func (s Service) Run(req Request) error {
-	return s.recordingWorkflow().run(req, s.capturedProcessor())
+	processing := s.processing
+	processing.Events = processingEventAdapter{s.Events}
+	return s.recordingWorkflow().run(req, processing)
 }
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 	return meetingRecordingWorkflow{
-		lifecycle: s.meetingLifecycle(), recorder: s.recorder, baseDir: s.BaseDir,
+		lifecycle: s.lifecycle, recorder: s.recorder, baseDir: s.BaseDir,
 		out: s.Out, errOut: s.ErrOut, events: s.Events,
 	}
 }
 
-func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.CapturedProcessor) error {
+func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.Service) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
 	}
@@ -111,13 +107,6 @@ func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.
 	return w.record(req, session, sessionDir, processing)
 }
 
-func (s Service) meetingLifecycle() meetingLifecycle {
-	if s.Lifecycle != nil {
-		return s.Lifecycle
-	}
-	return meetinglifecycle.New(s.Store)
-}
-
 func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
 	if w.recorder != nil {
 		return w.recorder(mode, dir, device)
@@ -128,7 +117,7 @@ func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir stri
 	return capture.NewRecorder(mode, dir, device)
 }
 
-func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingprocessing.CapturedProcessor) error {
+func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingprocessing.Service) error {
 	w.printRecordingStart(req, sessionDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()

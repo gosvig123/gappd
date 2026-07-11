@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
@@ -12,10 +13,9 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	defer store.Close()
 	meeting := createRecordingMeeting(t, store)
 	events := &recordingEvents{}
-	service := Service{Store: store, Events: events}
 	captureErr := errors.New("start capture: boom")
 
-	if err := testSession(service, meeting).failCapture(captureErr); !errors.Is(err, captureErr) {
+	if err := testSession(meetinglifecycle.New(store), events, meeting).failCapture(captureErr); !errors.Is(err, captureErr) {
 		t.Fatalf("failCapture() error = %v, want %v", err, captureErr)
 	}
 
@@ -35,6 +35,6 @@ func TestFailCapturePersistsFailureAndEmitsEvent(t *testing.T) {
 	assertOneEvent(t, events, EventFailed, meeting.ID, captureErr)
 }
 
-func testSession(service Service, meeting *db.Meeting) recordingSession {
-	return recordingSession{lifecycle: service.meetingLifecycle(), events: service.Events, meeting: meeting}
+func testSession(lifecycle meetinglifecycle.Module, events EventSink, meeting *db.Meeting) recordingSession {
+	return recordingSession{lifecycle: lifecycle, events: events, meeting: meeting}
 }

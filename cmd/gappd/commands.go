@@ -24,7 +24,7 @@ func enhanceCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			service := newMeetingProcessingService(store, pipeline, recordingOutputConsole, false)
+			service := newMeetingProcessingService(store, pipeline, recordingOutputConsole)
 			return service.EnhanceStored(cmdContext(), meetingprocessing.StoredRequest{MeetingID: args[0], Notes: notes, Feedback: feedback, Refine: refine})
 		},
 	}

@@ -13,9 +13,8 @@ const (
 	chunkSourceSystem = "system"
 )
 
-func StartLiveChunkProcessing(processing CapturedProcessor, opts LiveChunkOptions) func() {
-	processor, ok := processing.(LiveChunkProcessor)
-	if !ok || opts.Chunks == nil {
+func StartLiveChunkProcessing(processing Service, opts LiveChunkOptions) func() {
+	if opts.Chunks == nil {
 		return func() {}
 	}
 	chunks := opts.Chunks()
@@ -23,15 +22,15 @@ func StartLiveChunkProcessing(processing CapturedProcessor, opts LiveChunkOption
 		return func() {}
 	}
 	done := make(chan struct{})
-	go processLiveChunks(done, chunks, processor, opts)
+	go processLiveChunks(done, chunks, processing, opts)
 	return func() { <-done }
 }
 
-func processLiveChunks(done chan<- struct{}, chunks <-chan CapturedChunk, processor LiveChunkProcessor, opts LiveChunkOptions) {
+func processLiveChunks(done chan<- struct{}, chunks <-chan CapturedChunk, processing Service, opts LiveChunkOptions) {
 	defer close(done)
 	for chunk := range chunks {
 		request := liveChunkRequest(opts.MeetingID, opts.Language, chunk)
-		if err := processor.ProcessCapturedChunk(context.Background(), request); err != nil {
+		if err := processing.ProcessCapturedChunk(context.Background(), request); err != nil {
 			reportLiveChunkError(opts, chunk, err)
 		}
 	}

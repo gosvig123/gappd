@@ -21,37 +21,20 @@ const (
 	recordingOutputQuiet
 )
 
-func newMeetingProcessingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput, suppressProcessingFailure bool) meetingprocessing.Service {
+func newMeetingProcessingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput) meetingprocessing.Service {
 	service := meetingprocessing.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline}
 	if output == recordingOutputConsole {
 		service.Reporter = meetingprocessing.NewConsoleReporter(os.Stdout, os.Stderr)
 	}
-	if output == recordingOutputEvents {
-		service.Events = processingEventEmitter{appprotocol.NewRecordingEventEmitter(os.Stdout, suppressProcessingFailure)}
-	}
 	return service
 }
 
-type processingEventEmitter struct{ events recording.EventSink }
-
-func (e processingEventEmitter) EmitProcessingEvent(event meetingprocessing.Event) error {
-	return e.events.EmitRecordingEvent(recordingEventName(event.Name), event.Meeting, event.Err)
-}
-
-func recordingEventName(name meetingprocessing.EventName) recording.EventName {
-	switch name {
-	case meetingprocessing.EventProcessing:
-		return recording.EventProcessing
-	case meetingprocessing.EventCompleted:
-		return recording.EventCompleted
-	default:
-		return recording.EventFailed
-	}
-}
-
 func newRecordingWorkflowService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput, suppressProcessingFailure bool) (recording.Service, error) {
-	service := recording.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
-	service.Processor = newMeetingProcessingService(store, pipeline, output, suppressProcessingFailure)
+	lifecycle := meetinglifecycle.New(store)
+	processing := newMeetingProcessingService(store, pipeline, output)
+	service := recording.New(lifecycle, processing)
+	service.Out = os.Stdout
+	service.ErrOut = os.Stderr
 	baseDir, err := config.GappdDir()
 	if err != nil {
 		return recording.Service{}, fmt.Errorf("resolve gappd dir for session path: %w", err)

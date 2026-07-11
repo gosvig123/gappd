@@ -6,6 +6,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
@@ -14,8 +15,11 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 	defer store.Close()
 	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir()}
 	events := &recordingEvents{onEvent: interruptOnStarted(t)}
-	processor := meetingprocessing.Service{Store: store, Transcriber: fakeTranscriber{}, Notes: fakeEnhancer{title: "Lifecycle Planning", summary: "summary"}, Events: processingEventAdapter{events}}
-	service := Service{BaseDir: t.TempDir(), Events: events, Store: store, Processor: processor, recorder: func(capture.CaptureMode, string, int) audioRecorder { return recorder }}
+	processor := meetingprocessing.Service{Store: store, Transcriber: fakeTranscriber{}, Notes: fakeEnhancer{title: "Lifecycle Planning", summary: "summary"}}
+	service := New(meetinglifecycle.New(store), processor)
+	service.BaseDir = t.TempDir()
+	service.Events = events
+	service.recorder = func(capture.CaptureMode, string, int) audioRecorder { return recorder }
 
 	err := service.Run(Request{Title: "Lifecycle"})
 	if err != nil {
