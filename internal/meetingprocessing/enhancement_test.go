@@ -111,7 +111,13 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "enhance failed (transcript saved)") {
 		t.Fatalf("EnhanceStored() error = %v, want saved transcript failure", err)
 	}
-	assertEnhanceFailure(t, getMeeting(t, store, meeting.ID), transcript, providerErr.Error())
+	stored := getMeeting(t, store, meeting.ID)
+	if stored.Transcript == nil || *stored.Transcript != transcript {
+		t.Fatalf("transcript = %v", stored.Transcript)
+	}
+	if stored.ProcessingStatus != db.ProcessingStatusPending {
+		t.Fatalf("processing_status = %q, want pending", stored.ProcessingStatus)
+	}
 	assertLastProcessingEvent(t, events, EventFailed, meeting.ID, providerErr)
 }
 

@@ -1,0 +1,96 @@
+package db
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"strings"
+	"time"
+)
+
+type QueueStage string
+
+const (
+	QueueStageTranscription QueueStage = "transcription"
+	QueueStageSummarization QueueStage = "summarization"
+	QueueStageNone          QueueStage = "none"
+	QueueStageRepair        QueueStage = "repair"
+)
+
+type ProcessingClaim struct {
+	Meeting   Meeting
+	Token     string
+	Stage     QueueStage
+	ExpiresAt time.Time
+}
+
+func DeriveQueueStage(m Meeting) QueueStage {
+	if !filledArtifact(m.Transcript) {
+		if filledArtifact(m.Summary) || filledArtifact(m.ExtractionJSON) {
+			return QueueStageRepair
+		}
+		return QueueStageTranscription
+	}
+	if !filledArtifact(m.Summary) || !filledArtifact(m.ExtractionJSON) {
+		return QueueStageSummarization
+	}
+	return QueueStageNone
+}
+
+func filledArtifact(value *string) bool {
+	return value != nil && strings.TrimSpace(*value) != ""
+}
+
+func (d *DB) ClaimNext(ctx context.Context, stage QueueStage, now time.Time, ttl time.Duration, excluded []string) (*ProcessingClaim, error) {
+	token, err := newID()
+	if err != nil {
+		return nil, err
+	}
+	expires := now.UTC().Add(ttl)
+	query, args := claimStatement(stage, token, now.UTC(), expires, excluded)
+	meeting, err := scanClaimRow(d.Conn.QueryRowContext(ctx, query, args...))
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("claim processing meeting: %w", err)
+	}
+	return &ProcessingClaim{Meeting: *meeting, Token: token, Stage: DeriveQueueStage(*meeting), ExpiresAt: expires}, nil
+}
+
+func claimStatement(stage QueueStage, token string, now, expires time.Time, excluded []string) (string, []any) {
+	condition := `transcript IS NULL OR trim(transcript)=''`
+	if stage == QueueStageSummarization {
+		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND (summary IS NULL OR trim(summary)='' OR extraction_json IS NULL OR trim(extraction_json)='')`
+	}
+	staleUnclaimedAt := now.Add(-3 * expires.Sub(now))
+	subquery := `SELECT id FROM meetings WHERE capture_status=? AND (` + condition + `) AND
+		(processing_status=? OR (processing_status=? AND ((processing_claim_token IS NULL AND processing_status_updated_at<=?)
+		OR (processing_claim_token IS NOT NULL AND (processing_claim_expires_at IS NULL OR processing_claim_expires_at<=?)))))`
+	args := []any{token, stamp(expires), ProcessingStatusProcessing, stamp(now), CaptureStatusCaptured,
+		ProcessingStatusPending, ProcessingStatusProcessing, stamp(staleUnclaimedAt), stamp(now)}
+	if len(excluded) > 0 {
+		subquery += ` AND id NOT IN (` + strings.TrimSuffix(strings.Repeat("?,", len(excluded)), ",") + `)`
+		for _, id := range excluded {
+			args = append(args, id)
+		}
+	}
+	subquery += ` ORDER BY started_at ASC, created_at ASC LIMIT 1`
+	query := `UPDATE meetings SET processing_claim_token=?, processing_claim_expires_at=?, processing_status=?,
+		processing_status_updated_at=?, processing_failure_message=NULL WHERE id=(` + subquery + `) RETURNING ` + meetingColumns
+	return query, args
+}
+
+const meetingColumns = `id,title,started_at,ended_at,capture_status,capture_status_updated_at,capture_failure_message,
+	processing_status,processing_status_updated_at,processing_failure_message,processing_claim_token,processing_claim_expires_at,
+	audio_path,transcript,summary,extraction_json,language,tags,source,created_at`
+
+func scanClaimRow(row *sql.Row) (*Meeting, error) {
+	m := &Meeting{}
+	err := row.Scan(&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
+		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage, &m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt,
+		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt)
+	return m, err
+}
+
+func stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000000000Z") }

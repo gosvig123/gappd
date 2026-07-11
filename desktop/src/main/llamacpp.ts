@@ -5,13 +5,13 @@ import { lastLines } from '../shared/subprocess-output'
 import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
 import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
-import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-ai-setup-errors'
+import { type ManagedRuntimeErrorState, toManagedRuntimeErrorState } from './managed-runtime-errors'
 import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, reclaimStaleLlamaCppProcess, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
 
-type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; stopPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: LocalAISetupErrorState }
+type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; stopPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: ManagedRuntimeErrorState }
 type ModelListResponse = { models?: Array<{ name?: string; model?: string }> }
 export type ManagedLlamaCppLease = { endpoint: string; release(): Promise<void> }
-export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: LocalAISetupErrorState }
+export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: ManagedRuntimeErrorState }
 
 const MODEL_CHECK_TIMEOUT_MS = 2_000
 const runtime: LlamaCppRuntime = { process: null, startPromise: null, stopPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
@@ -106,9 +106,9 @@ function runtimeEnv(binaryPath: string): NodeJS.ProcessEnv {
 }
 
 function wireEvents(child: LlamaCppChild, binaryPath: string): void {
-  child.stderr?.on('data', (chunk) => { if (runtime.process === child) runtime.lastError = toLocalAISetupErrorState(lastLines(chunk.toString()), 'error', 'Managed llama.cpp reported an error') })
-  child.on('exit', (code, signal) => { if (runtime.process !== child) return; resetProcess(); if (signal !== 'SIGTERM') runtime.lastError = toLocalAISetupErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed llama.cpp exited before becoming ready') })
-  child.on('error', (error) => { if (runtime.process !== child) return; resetProcess(); runtime.lastError = toLocalAISetupErrorState(`Failed to start managed llama.cpp at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed llama.cpp') })
+  child.stderr?.on('data', (chunk) => { if (runtime.process === child) runtime.lastError = toManagedRuntimeErrorState(lastLines(chunk.toString()), 'error', 'Managed llama.cpp reported an error') })
+  child.on('exit', (code, signal) => { if (runtime.process !== child) return; resetProcess(); if (signal !== 'SIGTERM') runtime.lastError = toManagedRuntimeErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed llama.cpp exited before becoming ready') })
+  child.on('error', (error) => { if (runtime.process !== child) return; resetProcess(); runtime.lastError = toManagedRuntimeErrorState(`Failed to start managed llama.cpp at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed llama.cpp') })
 }
 
 function resetProcess(): void { runtime.ownedBySession = false; runtime.process = null }

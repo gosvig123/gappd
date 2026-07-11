@@ -13,10 +13,12 @@ CREATE TABLE IF NOT EXISTS meetings (
                CHECK (capture_status IN ('recording', 'captured', 'failed')),
     capture_status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     capture_failure_message TEXT,
-    processing_status TEXT NOT NULL DEFAULT 'not_started'
-               CHECK (processing_status IN ('not_started', 'processing', 'completed', 'failed')),
+    processing_status TEXT NOT NULL DEFAULT 'pending'
+               CHECK (processing_status IN ('pending', 'processing', 'completed', 'failed')),
     processing_status_updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     processing_failure_message TEXT,
+    processing_claim_token TEXT,
+    processing_claim_expires_at TEXT,
     audio_path TEXT,
     transcript TEXT,
     summary    TEXT,
@@ -38,7 +40,8 @@ CREATE TABLE IF NOT EXISTS segments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_segments_meeting_id    ON segments(meeting_id);
-CREATE INDEX IF NOT EXISTS idx_meetings_started_at      ON meetings(started_at);
+CREATE INDEX IF NOT EXISTS idx_meetings_started_at ON meetings(started_at);
+CREATE INDEX IF NOT EXISTS idx_meetings_processing_queue ON meetings(processing_status, started_at);
 
 CREATE VIRTUAL TABLE IF NOT EXISTS meetings_fts USING fts5(
     title,

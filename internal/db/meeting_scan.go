@@ -22,7 +22,7 @@ func scanMeeting(rows *sql.Rows) (Meeting, error) {
 	err := rows.Scan(
 		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
 		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
+		&m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt, &m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
 	)
 	if err != nil {
 		return Meeting{}, fmt.Errorf("scan meeting: %w", err)
@@ -47,7 +47,7 @@ func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
 	err := rows.Scan(
 		&entry.ID, &entry.Title, &entry.StartedAt, &entry.EndedAt, &entry.CaptureStatus, &entry.CaptureStatusUpdatedAt, &entry.CaptureFailureMessage,
 		&entry.ProcessingStatus, &entry.ProcessingStatusUpdatedAt, &entry.ProcessingFailureMessage,
-		&entry.AudioPath, &entry.HasTranscript, &entry.HasSummary, &entry.Language, &entry.Tags, &entry.Source, &entry.CreatedAt,
+		&entry.ProcessingClaimToken, &entry.ProcessingClaimExpiresAt, &entry.AudioPath, &entry.HasTranscript, &entry.HasSummary, &entry.Language, &entry.Tags, &entry.Source, &entry.CreatedAt,
 	)
 	if err != nil {
 		return MeetingListEntry{}, fmt.Errorf("scan meeting list entry: %w", err)

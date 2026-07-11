@@ -14,7 +14,9 @@ const (
 	CaptureStatusCaptured  CaptureStatus = "captured"
 	CaptureStatusFailed    CaptureStatus = "failed"
 
-	ProcessingStatusNotStarted ProcessingStatus = "not_started"
+	ProcessingStatusPending ProcessingStatus = "pending"
+	// ProcessingStatusNotStarted is retained as a source-compatible alias.
+	ProcessingStatusNotStarted ProcessingStatus = ProcessingStatusPending
 	ProcessingStatusProcessing ProcessingStatus = "processing"
 	ProcessingStatusCompleted  ProcessingStatus = "completed"
 	ProcessingStatusFailed     ProcessingStatus = "failed"
@@ -22,7 +24,7 @@ const (
 
 var (
 	AllCaptureStatuses    = []CaptureStatus{CaptureStatusRecording, CaptureStatusCaptured, CaptureStatusFailed}
-	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusNotStarted, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
+	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusPending, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
 )
 
 type Meeting struct {
@@ -36,6 +38,8 @@ type Meeting struct {
 	ProcessingStatus          ProcessingStatus
 	ProcessingStatusUpdatedAt string
 	ProcessingFailureMessage  *string
+	ProcessingClaimToken      *string
+	ProcessingClaimExpiresAt  *string
 	AudioPath                 *string
 	Transcript                *string
 	Summary                   *string
@@ -54,12 +58,14 @@ type MeetingListEntry struct {
 
 const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
-	audio_path, transcript, summary, extraction_json, language, tags, source, created_at
+	processing_claim_token, processing_claim_expires_at, audio_path,
+	transcript, summary, extraction_json, language, tags, source, created_at
 	FROM meetings`
 
 const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
-	audio_path, transcript IS NOT NULL, summary IS NOT NULL, language, tags, source, created_at
+	processing_claim_token, processing_claim_expires_at, audio_path,
+	transcript IS NOT NULL AND trim(transcript)<>'', summary IS NOT NULL AND trim(summary)<>'', language, tags, source, created_at
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
@@ -71,36 +77,37 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 		}
 		m.ID = id
 	}
-	_, err := d.Conn.Exec(
-		`INSERT INTO meetings (
-			id, title, started_at, ended_at,
-			capture_status, capture_status_updated_at, capture_failure_message,
-			processing_status, processing_status_updated_at, processing_failure_message,
-			audio_path, transcript, summary, extraction_json, language, tags, source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, m.Title, m.StartedAt, m.EndedAt,
-		m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
-		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage,
-		m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Language, m.Tags, m.Source,
-	)
-	if err != nil {
+	if _, err := d.Conn.Exec(insertMeetingSQL, meetingInsertArgs(m)...); err != nil {
 		return fmt.Errorf("create meeting: %w", err)
 	}
 	return nil
+}
+
+const insertMeetingSQL = `INSERT INTO meetings (id,title,started_at,ended_at,capture_status,capture_status_updated_at,
+	capture_failure_message,processing_status,processing_status_updated_at,processing_failure_message,
+	processing_claim_token,processing_claim_expires_at,audio_path,transcript,summary,extraction_json,language,tags,source)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+
+func meetingInsertArgs(m *Meeting) []any {
+	return []any{m.ID, m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
+		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.ProcessingClaimToken,
+		m.ProcessingClaimExpiresAt, m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Language, m.Tags, m.Source}
 }
 
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
 	row := d.Conn.QueryRow(
 		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 		 processing_status, processing_status_updated_at, processing_failure_message,
-		 audio_path, transcript, summary, extraction_json, language, tags, source, created_at
+		 processing_claim_token, processing_claim_expires_at, audio_path,
+		 transcript, summary, extraction_json, language, tags, source, created_at
 		 FROM meetings WHERE id=?`, id,
 	)
 	m := &Meeting{}
 	err := row.Scan(
 		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
 		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
+		&m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt, &m.AudioPath,
+		&m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("get meeting: %w", err)

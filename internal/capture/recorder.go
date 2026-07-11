@@ -24,6 +24,7 @@ const (
 
 	captureHelperEnv       = "GAPPD_CAPTURE_HELPER_PATH"
 	captureChunkSecondsEnv = "GAPPD_CAPTURE_CHUNK_SECONDS"
+	captureChunkOverlapEnv = "GAPPD_CAPTURE_CHUNK_OVERLAP_SECONDS"
 )
 
 type Recorder struct {

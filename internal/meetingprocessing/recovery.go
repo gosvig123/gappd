@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
@@ -23,23 +22,19 @@ type RecoveryStore interface {
 }
 
 type RecoveryOptions struct {
-	Now                       time.Time
-	Timeout                   time.Duration
-	Limit                     int
-	SuppressProcessingFailure bool
-	ErrOut                    io.Writer
+	Now     time.Time
+	Timeout time.Duration
+	Limit   int
 }
 
 type Recovery struct {
 	Store     RecoveryStore
 	Lifecycle Lifecycle
-	Processor CapturedProcessor
-	Events    EventSink
 }
 
 func (r Recovery) RecoverStale(ctx context.Context, opts RecoveryOptions) (int, error) {
-	if r.Store == nil || r.lifecycle() == nil || r.Processor == nil {
-		return 0, fmt.Errorf("recover stale recordings: store, lifecycle, and processor are required")
+	if r.Store == nil || r.lifecycle() == nil {
+		return 0, fmt.Errorf("recover stale recordings: store and lifecycle are required")
 	}
 	opts = opts.withDefaults()
 	cutoff := opts.Now.Add(-opts.Timeout).UTC().Format(time.RFC3339)
@@ -100,8 +95,7 @@ func (r Recovery) recoverMeeting(ctx context.Context, meeting *db.Meeting, cutof
 	if ok, err := r.claimStaleRecording(ctx, meeting, cutoff, opts.Now); !ok || err != nil {
 		return ok, err
 	}
-	err := r.processClaimed(ctx, meeting)
-	return finishStaleProcessing(err, opts)
+	return true, nil
 }
 
 func (r Recovery) claimStaleRecording(ctx context.Context, meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {
@@ -113,20 +107,6 @@ func (r Recovery) claimStaleRecording(ctx context.Context, meeting *db.Meeting, 
 	return result.Applied, err
 }
 
-func (r Recovery) processClaimed(ctx context.Context, meeting *db.Meeting) error {
-	return r.Processor.ProcessCaptured(ctx, CapturedRequest{MeetingID: meeting.ID, AudioDir: *meeting.AudioPath, Language: meeting.Language})
-}
-
-func finishStaleProcessing(err error, opts RecoveryOptions) (bool, error) {
-	if err == nil || !opts.SuppressProcessingFailure {
-		return true, err
-	}
-	if opts.ErrOut != nil {
-		fmt.Fprintf(opts.ErrOut, "warning: stale recording post-processing failed: %v\n", err)
-	}
-	return true, nil
-}
-
 func (r Recovery) failStaleRecording(ctx context.Context, meeting *db.Meeting, cutoff string, now time.Time) (bool, error) {
 	failureErr := errors.New(StaleNoAudioMessage)
 	transition := meetinglifecycle.StaleCaptureFailed{Cutoff: parseTime(cutoff), At: now, Cause: failureErr}
@@ -135,14 +115,7 @@ func (r Recovery) failStaleRecording(ctx context.Context, meeting *db.Meeting, c
 		return result.Applied, err
 	}
 	*meeting = *result.Meeting
-	return true, r.emitFailed(meeting, failureErr)
-}
-
-func (r Recovery) emitFailed(meeting *db.Meeting, failure error) error {
-	if r.Events == nil {
-		return nil
-	}
-	return r.Events.EmitProcessingEvent(Event{Name: EventFailed, Meeting: *meeting, Err: failure})
+	return true, nil
 }
 
 func staleMeetingHasAudio(meeting *db.Meeting) bool {

@@ -2,12 +2,8 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"github.com/gappd-dev/gappd/internal/appprotocol"
-	"github.com/gappd-dev/gappd/internal/config"
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
@@ -54,47 +50,9 @@ func removeMeetingArtifacts(sessionDir *string) *string {
 	if sessionDir == nil || *sessionDir == "" {
 		return nil
 	}
-	if err := removeMeetingArtifactDir(*sessionDir); err != nil {
+	if err := audioartifact.DeleteSession(*sessionDir); err != nil {
 		message := err.Error()
 		return &message
 	}
 	return nil
-}
-
-func removeMeetingArtifactDir(sessionDir string) error {
-	root, err := config.GappdDir()
-	if err != nil {
-		return fmt.Errorf("resolve artifact root: %w", err)
-	}
-	cleaned, err := filepath.Abs(sessionDir)
-	if err != nil {
-		return fmt.Errorf("resolve artifact path %q: %w", sessionDir, err)
-	}
-	sessionsRoot := filepath.Join(root, "sessions")
-	if ok, err := pathInside(cleaned, sessionsRoot); err != nil || !ok {
-		return unsafeArtifactPathError(cleaned, sessionsRoot, err)
-	}
-	if err := os.RemoveAll(cleaned); err != nil {
-		return fmt.Errorf("delete artifacts %s: %w", cleaned, err)
-	}
-	return nil
-}
-
-func pathInside(path, root string) (bool, error) {
-	cleanRoot, err := filepath.Abs(root)
-	if err != nil {
-		return false, fmt.Errorf("resolve sessions root %q: %w", root, err)
-	}
-	rel, err := filepath.Rel(cleanRoot, path)
-	if err != nil {
-		return false, fmt.Errorf("compare artifact path %q to %q: %w", path, cleanRoot, err)
-	}
-	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)), nil
-}
-
-func unsafeArtifactPathError(path, root string, err error) error {
-	if err != nil {
-		return err
-	}
-	return fmt.Errorf("skip artifact delete %s: outside %s", path, root)
 }

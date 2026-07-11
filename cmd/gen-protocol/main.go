@@ -15,6 +15,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
 
@@ -74,6 +75,7 @@ func renderProtocol() string {
 	b.WriteString(protocolHeader)
 	writeEnum(&b, "CAPTURE_STATUSES", "CaptureStatus", values(db.AllCaptureStatuses))
 	writeEnum(&b, "PROCESSING_STATUSES", "ProcessingStatus", values(db.AllProcessingStatuses))
+	writeEnum(&b, "PROCESSING_CAPABILITIES", "ProcessingCapability", values(meetingprocessing.AllCapabilities))
 	writeEnum(&b, "MEETING_STATES", "MeetingState", values(meetinglifecycle.AllMeetingStates))
 	writeEnum(&b, "RECORDING_PROTOCOL_EVENT_TYPES", "RecordingProtocolEventType", values(recording.AllEventNames))
 	return b.String()
@@ -92,7 +94,7 @@ func renderContracts() string {
 	collector := collectCommandTypes()
 	var b strings.Builder
 	b.WriteString(protocolHeader)
-	b.WriteString("\nimport type { CaptureStatus, MeetingState, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
+	b.WriteString("\nimport type { CaptureStatus, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
 	for _, typ := range collector.order {
 		writeType(&b, typ)
 	}
@@ -222,6 +224,8 @@ func enumTypeName(typ reflect.Type) string {
 		return "ProcessingStatus"
 	case reflect.TypeOf(meetinglifecycle.MeetingState("")):
 		return "MeetingState"
+	case reflect.TypeOf(meetingprocessing.Capability("")):
+		return "ProcessingCapability"
 	case reflect.TypeOf(recording.EventName("")):
 		return "RecordingProtocolEventType"
 	default:

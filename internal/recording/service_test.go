@@ -1,7 +1,6 @@
 package recording
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/capture"
@@ -27,9 +26,9 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 	}
 
 	meeting := latestMeeting(t, store)
-	assertCompletedMeeting(t, meeting)
-	assertStoredSegmentCount(t, store, meeting.ID, 2)
-	assertEventNames(t, events, EventStarted, EventStopping, EventProcessing, EventCompleted)
+	assertCapturedMeeting(t, meeting)
+	assertStoredSegmentCount(t, store, meeting.ID, 0)
+	assertEventNames(t, events, EventStarted, EventStopping, EventCaptured)
 }
 
 func latestMeeting(t *testing.T, store *db.DB) *db.Meeting {
@@ -55,21 +54,15 @@ func assertStoredSegmentCount(t *testing.T, store *db.DB, id string, want int) {
 	}
 }
 
-func assertCompletedMeeting(t *testing.T, meeting *db.Meeting) {
+func assertCapturedMeeting(t *testing.T, meeting *db.Meeting) {
 	t.Helper()
 	if meeting.CaptureStatus != db.CaptureStatusCaptured {
 		t.Fatalf("capture_status = %q, want %q", meeting.CaptureStatus, db.CaptureStatusCaptured)
 	}
-	if meeting.ProcessingStatus != db.ProcessingStatusCompleted {
-		t.Fatalf("processing_status = %q, want %q", meeting.ProcessingStatus, db.ProcessingStatusCompleted)
+	if meeting.ProcessingStatus != db.ProcessingStatusPending {
+		t.Fatalf("processing_status = %q, want %q", meeting.ProcessingStatus, db.ProcessingStatusPending)
 	}
-	if meeting.Transcript == nil || !strings.Contains(*meeting.Transcript, "[You] mic.wav hello") {
-		t.Fatalf("transcript = %v, want You segment", meeting.Transcript)
-	}
-	if meeting.Summary == nil || *meeting.Summary != "summary" {
-		t.Fatalf("summary = %v, want summary", meeting.Summary)
-	}
-	if meeting.Title != "Lifecycle Planning" {
-		t.Fatalf("title = %q, want generated title", meeting.Title)
+	if meeting.Transcript != nil || meeting.Summary != nil {
+		t.Fatalf("capture synchronously produced transcript or summary")
 	}
 }

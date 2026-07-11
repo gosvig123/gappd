@@ -1,17 +1,16 @@
 import { buildOwnershipHelp, type LocalAIOwnershipHelp } from './local-ai-ownership'
 
-type LocalAIContract = Pick<typeof window.gappd, 'localAISetup'>
+type ManagedRuntimeContract = Pick<typeof window.gappd, 'managedRuntime'>
 
-export type LocalAISetupStatus = Awaited<ReturnType<LocalAIContract['localAISetup']['getStatus']>>
-export type LocalAIStatus = Awaited<ReturnType<LocalAIContract['localAISetup']['getDetails']>>
+export type ManagedRuntimeSnapshot = Awaited<ReturnType<ManagedRuntimeContract['managedRuntime']['status']>>
 
-type LocalAISetupMessageView = {
+type RuntimeMessageView = {
   headline: string
   detail?: string
   compact: string
 }
 
-type LocalAISetupErrorView = {
+type RuntimeErrorView = {
   title: string
   detail?: string
   errorDetail?: string
@@ -20,7 +19,7 @@ type LocalAISetupErrorView = {
   ownershipHelp?: LocalAIOwnershipHelp
 }
 
-const PULL_STAGE_VIEWS: Record<NonNullable<LocalAISetupStatus['pullStage']>, LocalAISetupMessageView> = {
+const PULL_STAGE_VIEWS: Record<NonNullable<ManagedRuntimeSnapshot['pullStage']>, RuntimeMessageView> = {
   preparing: { headline: 'Preparing download', compact: 'Preparing download.' },
   downloading: { headline: 'Downloading tools', compact: 'Downloading tools.' },
   verifying: { headline: 'Checking download', compact: 'Checking download.' },
@@ -28,7 +27,7 @@ const PULL_STAGE_VIEWS: Record<NonNullable<LocalAISetupStatus['pullStage']>, Loc
   complete: { headline: 'Download complete', compact: 'Download complete.' },
 }
 
-const ERROR_VIEWS: Record<NonNullable<LocalAISetupStatus['errorKind']>, Omit<LocalAISetupErrorView, 'debugDetail' | 'ownershipHelp'>> = {
+const ERROR_VIEWS: Record<NonNullable<ManagedRuntimeSnapshot['errorKind']>, Omit<RuntimeErrorView, 'debugDetail' | 'ownershipHelp'>> = {
   pull_timeout: { title: 'Download took too long.', detail: 'Check your connection, then click Fix setup.', compact: 'Download timed out.' },
   pull_network: { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' },
   pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Fix setup.', compact: 'Download host unavailable.' },
@@ -38,7 +37,7 @@ const ERROR_VIEWS: Record<NonNullable<LocalAISetupStatus['errorKind']>, Omit<Loc
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },
 }
 
-const GENERIC_PHASE_MESSAGES: Record<LocalAISetupStatus['phase'], string[]> = {
+const GENERIC_PHASE_MESSAGES: Record<ManagedRuntimeSnapshot['operation'], string[]> = {
   checking: ['checking managed runtime', 'checking your local ai setup'],
   needs_setup: ['local ai setup is required'],
   starting_runtime: ['managed llama.cpp is running', 'starting the bundled runtime'],
@@ -50,11 +49,11 @@ const GENERIC_PHASE_MESSAGES: Record<LocalAISetupStatus['phase'], string[]> = {
 
 const STATUS_DELIMITERS = [' -- ', ' - ', ' | ', ': ']
 
-export function getLocalAIContract(): LocalAIContract {
+export function getManagedRuntimeContract(): ManagedRuntimeContract {
   return window.gappd
 }
 
-export function localAISetupPhaseLabel(phase: LocalAISetupStatus['phase']): string {
+export function runtimeOperationLabel(phase: ManagedRuntimeSnapshot['operation']): string {
   switch (phase) {
     case 'checking': return 'Checking'
     case 'needs_setup': return 'Setup needed'
@@ -66,41 +65,32 @@ export function localAISetupPhaseLabel(phase: LocalAISetupStatus['phase']): stri
   }
 }
 
-export function localAISetupStatusTone(phase: LocalAISetupStatus['phase']): 'idle' | 'processing' | 'error' {
+export function runtimeStatusTone(phase: ManagedRuntimeSnapshot['operation']): 'idle' | 'processing' | 'error' {
   if (phase === 'ready') return 'idle'
   if (phase === 'error') return 'error'
   return 'processing'
 }
 
-export function localAISetupMessageView(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): LocalAISetupMessageView | null {
-  const pullView = localAISetupPullStageView(status)
+export function runtimeMessageView(status: Pick<ManagedRuntimeSnapshot, 'operation' | 'message' | 'progress' | 'pullStage'>): RuntimeMessageView | null {
+  const pullView = runtimePullStageView(status)
   if (pullView) return pullView
   const text = cleanStatusText(status.message, typeof status.progress === 'number')
-  if (!text || isGenericPhaseMessage(status.phase, text)) return null
+  if (!text || isGenericPhaseMessage(status.operation, text)) return null
   const [headline, detail] = splitStatusText(text)
   return { headline, detail, compact: truncateText(detail || headline, 72) }
 }
 
-export function localAISetupErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'> | null | undefined): LocalAISetupErrorView | null {
+export function runtimeErrorView(status: Pick<ManagedRuntimeSnapshot, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'> | null | undefined): RuntimeErrorView | null {
   if (!status?.error || !status.errorKind) return null
   return structuredErrorView(status)
 }
 
-export function toStatusError(error: unknown): LocalAIStatus {
+export function toStatusError(error: unknown): ManagedRuntimeSnapshot {
   return {
-    phase: 'error',
-    managed: true,
-    endpoint: '',
-    model: '',
-    message: 'Local AI unavailable.',
-    error: error instanceof Error ? error.message : String(error),
-    errorKind: 'runtime',
-    canRetry: true,
-    supported: false,
-    configured: false,
-    bundled: false,
-    running: false,
-    canRepair: false,
+    operation: 'error', activity: 'idle', endpoint: '', model: '', message: 'Local AI unavailable.',
+    error: error instanceof Error ? error.message : String(error), errorKind: 'runtime',
+    canRetry: true, canRepair: false, supported: false, configured: false, bundled: false, running: false,
+    capabilities: { summarization: { readiness: 'unavailable' }, transcription: { readiness: 'unavailable' } },
   }
 }
 
@@ -120,12 +110,12 @@ function cleanDebugDetail(detail: string | undefined): string | undefined {
   return text ? truncateText(text, 1200) : undefined
 }
 
-function localAISetupPullStageView(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): LocalAISetupMessageView | null {
-  if (status.phase !== 'pulling_model' || !status.pullStage) return null
+function runtimePullStageView(status: Pick<ManagedRuntimeSnapshot, 'operation' | 'message' | 'progress' | 'pullStage'>): RuntimeMessageView | null {
+  if (status.operation !== 'pulling_model' || !status.pullStage) return null
   return { ...PULL_STAGE_VIEWS[status.pullStage], detail: cleanPullDetail(status) }
 }
 
-function structuredErrorView(status: Pick<LocalAISetupStatus, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'>): LocalAISetupErrorView {
+function structuredErrorView(status: Pick<ManagedRuntimeSnapshot, 'debugDetail' | 'error' | 'errorDetail' | 'errorKind' | 'ownershipConflict'>): RuntimeErrorView {
   const view = ERROR_VIEWS[status.errorKind!]
   const errorDetail = status.errorDetail || (status.errorKind === 'runtime' ? cleanErrorText(status.error) : undefined)
   return { ...view, detail: errorDetail || view.detail, errorDetail, debugDetail: cleanDebugDetail(status.debugDetail), ownershipHelp: status.errorKind === 'ownership_mismatch' ? buildOwnershipHelp(status.ownershipConflict) : undefined }
@@ -139,7 +129,7 @@ function splitStatusText(text: string): [string, string | undefined] {
   return [text, undefined]
 }
 
-function isGenericPhaseMessage(phase: LocalAISetupStatus['phase'], text: string): boolean {
+function isGenericPhaseMessage(phase: ManagedRuntimeSnapshot['operation'], text: string): boolean {
   return GENERIC_PHASE_MESSAGES[phase].includes(normalizeKey(text))
 }
 
@@ -151,9 +141,9 @@ function normalizeKey(value: string): string {
   return normalizeText(value).toLowerCase()
 }
 
-function cleanPullDetail(status: Pick<LocalAISetupStatus, 'phase' | 'message' | 'progress' | 'pullStage'>): string | undefined {
+function cleanPullDetail(status: Pick<ManagedRuntimeSnapshot, 'operation' | 'message' | 'progress' | 'pullStage'>): string | undefined {
   const text = cleanStatusText(status.message, typeof status.progress === 'number')
-  if (!text || isGenericPhaseMessage(status.phase, text)) return undefined
+  if (!text || isGenericPhaseMessage(status.operation, text)) return undefined
   if (status.pullStage && normalizeKey(text) === normalizeKey(PULL_STAGE_VIEWS[status.pullStage].headline)) return undefined
   return text
 }

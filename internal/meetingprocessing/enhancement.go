@@ -136,6 +136,7 @@ func (s Service) completeProcessing(ctx context.Context, meeting *db.Meeting, ex
 		return s.processingError("complete processing", meeting.ID, PhasePersist, err)
 	}
 	*meeting = *updated
+	s.cleanupCompletedMeeting(ctx, meeting)
 	return s.complete(meeting, extraction, summary)
 }
 
@@ -148,13 +149,20 @@ func (s Service) complete(meeting *db.Meeting, extraction *ai.Extraction, summar
 }
 
 func (s Service) saveProcessingFailure(ctx context.Context, meeting *db.Meeting, origErr error) error {
-	transition := meetinglifecycle.ProcessingFailed{At: s.now(), Cause: origErr}
+	transition := s.failureTransition(origErr, nil)
 	updated, err := s.transition(ctx, meeting.ID, transition)
 	if err != nil {
 		return errors.Join(fmt.Errorf("transcription failed: %w", origErr), fmt.Errorf("save partial meeting: %w", err))
 	}
 	*meeting = *updated
 	return s.emitProcessingFailure(meeting, origErr)
+}
+
+func (s Service) failureTransition(err error, transcript *string) meetinglifecycle.Transition {
+	if category(err) == ErrorTransient {
+		return meetinglifecycle.ProcessingRequeued{At: s.now()}
+	}
+	return meetinglifecycle.ProcessingFailed{At: s.now(), Cause: err, Transcript: transcript}
 }
 
 func (s Service) emitProcessingFailure(meeting *db.Meeting, origErr error) error {
@@ -166,7 +174,7 @@ func (s Service) emitProcessingFailure(meeting *db.Meeting, origErr error) error
 }
 
 func (s Service) saveEnhanceFailure(ctx context.Context, meeting *db.Meeting, transcript string, err error) error {
-	transition := meetinglifecycle.ProcessingFailed{At: s.now(), Cause: err, Transcript: &transcript}
+	transition := s.failureTransition(err, &transcript)
 	updated, updateErr := s.transition(ctx, meeting.ID, transition)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))

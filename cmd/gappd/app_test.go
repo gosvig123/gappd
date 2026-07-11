@@ -87,7 +87,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		ProcessingStatus:          db.ProcessingStatusProcessing,
 		ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
 	}
-	if err := emitter.EmitRecordingEvent(recording.EventProcessing, meeting, nil); err != nil {
+	if err := emitter.EmitRecordingEvent(recording.EventCaptured, meeting, nil); err != nil {
 		t.Fatalf("EmitRecordingEvent() error = %v", err)
 	}
 	if err := writer.Close(); err != nil {
@@ -103,8 +103,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v\noutput=%s", err, buf.String())
 	}
-	if event.Type != recording.EventProcessing {
-		t.Fatalf("event.type = %q, want %q", event.Type, recording.EventProcessing)
+	if event.Type != recording.EventCaptured {
+		t.Fatalf("event.type = %q, want %q", event.Type, recording.EventCaptured)
 	}
 	if event.MeetingID != meeting.ID {
 		t.Fatalf("event.meetingId = %q, want %q", event.MeetingID, meeting.ID)

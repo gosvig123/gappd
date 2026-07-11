@@ -3,8 +3,12 @@ package main
 import (
 	"fmt"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/capture"
+	"github.com/gappd-dev/gappd/internal/config"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
 	"github.com/spf13/cobra"
 )
@@ -47,23 +51,52 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, suppressProcessingFailure bool) error {
-	_, store, pipeline, err := loadDeps()
+func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, desktop bool) error {
+	_, store, err := loadStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
-	service, err := newRecordingWorkflowService(store, pipeline, recordingOutputForListen(suppressProcessingFailure), suppressProcessingFailure)
+	service, err := newRecordingWorkflowService(store, nil, recordingOutputForListen(desktop), desktop)
 	if err != nil {
 		return err
 	}
-	return service.Run(recording.Request{
-		DeviceIdx:                 deviceIdx,
-		Title:                     title,
-		Mode:                      mode,
-		Language:                  language,
-		SuppressProcessingFailure: suppressProcessingFailure,
-	})
+	req := recording.Request{DeviceIdx: deviceIdx, Title: title, Mode: mode, Language: language}
+	if err := service.Run(req); err != nil || desktop {
+		return err
+	}
+	return drainListenCapabilities(store)
+}
+
+func drainListenCapabilities(store *db.DB) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
+	service := newMeetingProcessingService(store, pipeline, recordingOutputConsole)
+	transcription, err := service.Drain(cmdContext(), meetingprocessing.CapabilityTranscription)
+	if err != nil {
+		return err
+	}
+	if err := drainOutcomeError(transcription); err != nil {
+		return err
+	}
+	summarization, err := service.Drain(cmdContext(), meetingprocessing.CapabilitySummarization)
+	if err != nil {
+		return err
+	}
+	return drainOutcomeError(summarization)
+}
+
+func drainOutcomeError(result meetingprocessing.DrainResult) error {
+	if result.Failed > 0 {
+		return fmt.Errorf("%s processing failed for %d meeting(s)", result.Capability, result.Failed)
+	}
+	if result.Requeued > 0 {
+		return fmt.Errorf("%s processing remains pending for %d meeting(s)", result.Capability, result.Requeued)
+	}
+	return nil
 }
 
 func recordingOutputForListen(machineReadable bool) recordingOutput {

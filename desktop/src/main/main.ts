@@ -1,10 +1,10 @@
 import path from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { registerIpc } from './ipc'
+import { startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
 import { logMainProcessMemory } from './memory'
-import { bootstrapLocalAISetup } from './local-ai-setup-operation'
+import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
-import { stopManagedLlamaCpp } from './llamacpp'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
@@ -58,12 +58,13 @@ function loadRenderer(createdWindow: BrowserWindow): void {
   void createdWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   applyDevDockIcon()
   const startHidden = shouldStartHidden()
   initializeStartupSettings()
   createWindow(!startHidden)
-  void bootstrapLocalAISetup()
+  await bootstrapManagedRuntime()
+  startDrainCoordinator()
   startMeetingPresence(showMainWindow)
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
@@ -81,10 +82,11 @@ app.on('before-quit', (event) => {
 async function shutdown(): Promise<void> {
   logMainProcessMemory('shutdown:start')
   stopStaleRecordingRecovery()
+  await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()
   await stopActiveRecordingForQuit()
-  await stopManagedLlamaCpp()
+  await managedRuntime.close()
   logMainProcessMemory('shutdown:done')
 }
 

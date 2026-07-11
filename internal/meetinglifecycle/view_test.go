@@ -19,7 +19,7 @@ func TestViewFor(t *testing.T) {
 		wantAt    string
 	}{
 		{"recording", meetingWith(db.CaptureStatusRecording, db.ProcessingStatusNotStarted), MeetingStateRecording, captureAt},
-		{"captured", meetingWith(db.CaptureStatusCaptured, db.ProcessingStatusNotStarted), MeetingStateCaptured, captureAt},
+		{"pending", meetingWith(db.CaptureStatusCaptured, db.ProcessingStatusNotStarted), MeetingStatePending, captureAt},
 		{"processing", meetingWith(db.CaptureStatusCaptured, db.ProcessingStatusProcessing), MeetingStateProcessing, processingAt},
 		{"completed", meetingWith(db.CaptureStatusCaptured, db.ProcessingStatusCompleted), MeetingStateCompleted, processingAt},
 		{"capture failed", meetingWith(db.CaptureStatusFailed, db.ProcessingStatusNotStarted), MeetingStateFailed, captureAt},
@@ -33,7 +33,7 @@ func TestViewFor(t *testing.T) {
 func TestMeetingStatusToneFor(t *testing.T) {
 	cases := map[MeetingState]MeetingStatusTone{
 		MeetingStateRecording:  MeetingStatusToneRecording,
-		MeetingStateCaptured:   MeetingStatusToneIdle,
+		MeetingStatePending:    MeetingStatusToneIdle,
 		MeetingStateProcessing: MeetingStatusToneProcessing,
 		MeetingStateCompleted:  MeetingStatusToneIdle,
 		MeetingStateFailed:     MeetingStatusToneError,

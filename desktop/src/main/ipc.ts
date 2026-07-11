@@ -1,8 +1,8 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type LocalAISetupInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
-import { getLocalAISetupDetails, getLocalAISetupStatus, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
+import { managedRuntime } from './managed-runtime'
 import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -43,12 +43,9 @@ const IPC_HANDLERS: MainHandlers = {
     stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
   },
-  localAISetup: {
-    getStatus: () => getLocalAISetupStatus(),
-    getDetails: () => getLocalAISetupDetails(),
-    start: (_event, input?: LocalAISetupInput) => startLocalAISetup(input),
-    retry: (_event, input?: LocalAISetupInput) => retryLocalAISetup(input),
-    repair: () => repairLocalAISetup(),
+  managedRuntime: {
+    status: () => managedRuntime.status(),
+    prepare: (_event, input: ManagedRuntimePrepareInput) => managedRuntime.prepare(input.mode, input.model),
   },
   update: {
     getStatus: () => getUpdateStatus(),
@@ -75,7 +72,7 @@ export function registerIpc(mainWindow: BrowserWindow): void {
   disposeWindowSubscriptions(mainWindow)
   const disposers = [
     forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
-    forwardToWindow(mainWindow, IPC_EVENTS.localAISetup.statusChanged, onLocalAISetupStatusChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.managedRuntime.changed, managedRuntime.observe),
     forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
   ]
   windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))

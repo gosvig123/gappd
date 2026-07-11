@@ -1,6 +1,7 @@
 package recording
 
 import (
+	"context"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/capture"
@@ -12,21 +13,36 @@ type chunkRecorder interface {
 	ChunksComplete() bool
 }
 
-func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) func() meetingprocessing.LiveChunkResult {
-	return meetingprocessing.StartLiveChunkProcessing(processing, meetingprocessing.LiveChunkOptions{
-		MeetingID: meetingID,
-		Language:  language,
-		Chunks:    func() <-chan meetingprocessing.CapturedChunk { return capturedChunks(recorderChunks(recorder)) },
-		ErrOut:    w.errOut,
+const liveChunkDrainTimeout = 5 * time.Second
+
+func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) (func() meetingprocessing.LiveChunkResult, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(context.Background())
+	wait := meetingprocessing.StartLiveChunkProcessing(processing, meetingprocessing.LiveChunkOptions{
+		Context: ctx, MeetingID: meetingID, Language: language,
+		Chunks: func() <-chan meetingprocessing.CapturedChunk { return capturedChunks(recorderChunks(recorder)) }, ErrOut: w.errOut,
 	})
+	return wait, cancel
 }
 
-func drainLiveChunks(wait func() meetingprocessing.LiveChunkResult, processing meetingprocessing.Service, recorder audioRecorder) meetingprocessing.LiveChunkResult {
+func drainLiveChunks(wait func() meetingprocessing.LiveChunkResult, cancel context.CancelFunc, processing meetingprocessing.Service, recorder audioRecorder) meetingprocessing.LiveChunkResult {
 	started := time.Now()
-	result := wait()
-	result.Dropped = !recorderChunksComplete(recorder)
+	defer cancel()
+	result := waitForLiveChunks(wait, cancel)
+	result.Dropped = result.Dropped || !recorderChunksComplete(recorder)
 	processing.ReportStage(meetingprocessing.StageLiveDrain, time.Since(started))
 	return result
+}
+
+func waitForLiveChunks(wait func() meetingprocessing.LiveChunkResult, cancel context.CancelFunc) meetingprocessing.LiveChunkResult {
+	result := make(chan meetingprocessing.LiveChunkResult, 1)
+	go func() { result <- wait() }()
+	select {
+	case completed := <-result:
+		return completed
+	case <-time.After(liveChunkDrainTimeout):
+		cancel()
+		return meetingprocessing.LiveChunkResult{Dropped: true}
+	}
 }
 
 func recorderChunksComplete(recorder audioRecorder) bool {
@@ -49,7 +65,10 @@ func capturedChunks(events <-chan capture.ChunkEvent) <-chan meetingprocessing.C
 }
 
 func capturedChunk(event capture.ChunkEvent) meetingprocessing.CapturedChunk {
-	return meetingprocessing.CapturedChunk{Path: event.Path, Source: event.Source, Start: event.Start}
+	return meetingprocessing.CapturedChunk{
+		Path: event.Path, Source: event.Source, Start: event.Start, End: event.End,
+		CanonicalStart: event.CanonicalStart, CanonicalEnd: event.CanonicalEnd,
+	}
 }
 
 func recorderChunks(recorder audioRecorder) <-chan capture.ChunkEvent {

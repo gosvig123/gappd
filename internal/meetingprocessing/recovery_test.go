@@ -2,7 +2,6 @@ package meetingprocessing
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
@@ -23,7 +22,7 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	if recovered != 1 {
 		t.Fatalf("recovered = %d, want 1", recovered)
 	}
-	assertRecoveredMeetingCompleted(t, store, meeting.ID)
+	assertRecoveredMeetingPending(t, store, meeting.ID)
 
 	recovered, err = recovery.RecoverStale(context.Background(), staleRecoveryTestOptions())
 	if err != nil {
@@ -32,7 +31,7 @@ func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
 	if recovered != 0 {
 		t.Fatalf("second recovered = %d, want 0", recovered)
 	}
-	assertSegmentCount(t, store, meeting.ID, 1)
+	assertSegmentCount(t, store, meeting.ID, 0)
 }
 
 func TestRecoverStaleRecordingWithoutAudioFailsCapture(t *testing.T) {
@@ -68,26 +67,23 @@ func createStaleRecordingMeeting(t *testing.T, store *db.DB, withAudio bool) *db
 	return meeting
 }
 
-func staleRecoveryTestService(store *db.DB) Recovery {
-	processor := Service{Store: store, Transcriber: fakeTranscriber{}, Notes: &fakeNotes{summary: "summary"}}
-	return Recovery{Store: store, Processor: processor}
-}
+func staleRecoveryTestService(store *db.DB) Recovery { return Recovery{Store: store} }
 
 func staleRecoveryTestOptions() RecoveryOptions {
 	return RecoveryOptions{Now: time.Date(2026, 4, 10, 12, 10, 0, 0, time.UTC), Timeout: StaleRecordingTimeout}
 }
 
-func assertRecoveredMeetingCompleted(t *testing.T, store *db.DB, id string) {
+func assertRecoveredMeetingPending(t *testing.T, store *db.DB, id string) {
 	t.Helper()
 	meeting := getMeeting(t, store, id)
 	if meeting.CaptureStatus != db.CaptureStatusCaptured {
 		t.Fatalf("capture_status = %q, want %q", meeting.CaptureStatus, db.CaptureStatusCaptured)
 	}
-	if meeting.ProcessingStatus != db.ProcessingStatusCompleted {
-		t.Fatalf("processing_status = %q, want %q", meeting.ProcessingStatus, db.ProcessingStatusCompleted)
+	if meeting.ProcessingStatus != db.ProcessingStatusPending {
+		t.Fatalf("processing_status = %q, want %q", meeting.ProcessingStatus, db.ProcessingStatusPending)
 	}
-	if meeting.Transcript == nil || !strings.Contains(*meeting.Transcript, "mic.wav hello") {
-		t.Fatalf("transcript = %v, want recovered mic segment", meeting.Transcript)
+	if meeting.Transcript != nil {
+		t.Fatalf("recovery synchronously transcribed audio")
 	}
 }
 

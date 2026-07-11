@@ -1,11 +1,12 @@
-import type { Device, LocalAISetupStatus, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
-export type { LocalAISetupStatus, RecordingState, UpdateStatus } from './contracts'
+import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
+import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
+export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
-export type LocalAISetupInput = { model?: string }
+export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
@@ -27,12 +28,9 @@ export type IpcInvokeContract = {
     stop: OperationSpec<[], RecordingState>
     getStatus: OperationSpec<[], RecordingState>
   }
-  localAISetup: {
-    getStatus: OperationSpec<[], LocalAISetupStatus>
-    getDetails: OperationSpec<[], LocalAIStatus>
-    start: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-    retry: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-    repair: OperationSpec<[], LocalAIStatus>
+  managedRuntime: {
+    status: OperationSpec<[], ManagedRuntimeSnapshot>
+    prepare: OperationSpec<[input: ManagedRuntimePrepareInput], ManagedRuntimeSnapshot>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -64,7 +62,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: { list: 'meetings:list', show: 'meetings:show', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
-  localAISetup: { getStatus: 'localAISetup:getStatus', getDetails: 'localAISetup:getDetails', start: 'localAISetup:start', retry: 'localAISetup:retry', repair: 'localAISetup:repair' },
+  managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -82,8 +80,8 @@ export const IPC_EVENTS = {
   recording: {
     statusChanged: 'recording:status-changed',
   },
-  localAISetup: {
-    statusChanged: 'localAISetup:status-changed',
+  managedRuntime: {
+    changed: 'managedRuntime:changed',
   },
   update: {
     statusChanged: 'update:status-changed',
@@ -95,8 +93,8 @@ export type GappdApi = IpcInvokeApi & {
   recording: IpcInvokeApi['recording'] & {
     onStatusChanged(listener: (state: RecordingState) => void): () => void
   }
-  localAISetup: IpcInvokeApi['localAISetup'] & {
-    onStatusChanged(listener: (state: LocalAISetupStatus) => void): () => void
+  managedRuntime: IpcInvokeApi['managedRuntime'] & {
+    observe(listener: (state: ManagedRuntimeSnapshot) => void): () => void
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void

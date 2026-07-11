@@ -57,7 +57,8 @@ func canRestart(status db.ProcessingStatus) bool {
 }
 
 func processingActive(meeting *db.Meeting) bool {
-	return meeting.CaptureStatus == db.CaptureStatusCaptured && meeting.ProcessingStatus == db.ProcessingStatusProcessing
+	return meeting.CaptureStatus == db.CaptureStatusCaptured &&
+		(meeting.ProcessingStatus == db.ProcessingStatusProcessing || meeting.ProcessingStatus == db.ProcessingStatusPending)
 }
 
 type TranscriptSaved struct {
@@ -76,6 +77,20 @@ func (t TranscriptSaved) apply(meeting *db.Meeting) (bool, error) {
 	}
 	meeting.Transcript = &t.Transcript
 	setProcessing(meeting, db.ProcessingStatusProcessing, timestamp(t.At), nil)
+	return true, nil
+}
+
+type ProcessingRequeued struct{ At time.Time }
+
+func (ProcessingRequeued) name() string { return "processing_requeued" }
+func (t ProcessingRequeued) apply(meeting *db.Meeting) (bool, error) {
+	if meeting.ProcessingStatus == db.ProcessingStatusPending {
+		return false, nil
+	}
+	if !processingActive(meeting) {
+		return false, conflict(meeting, t.name())
+	}
+	setProcessing(meeting, db.ProcessingStatusPending, timestamp(t.At), nil)
 	return true, nil
 }
 

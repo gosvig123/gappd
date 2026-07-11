@@ -53,6 +53,13 @@ func (d *DB) ReplaceSegments(meetingID string, segments []Segment) error {
 	return tx.Commit()
 }
 
+func replaceSegmentsTx(tx *sql.Tx, meetingID string, segments []Segment) error {
+	if _, err := tx.Exec(deleteSegmentsSQL, meetingID); err != nil {
+		return err
+	}
+	return insertSegmentsTx(tx, segments)
+}
+
 func insertSegmentsTx(tx *sql.Tx, segments []Segment) error {
 	stmt, err := tx.Prepare(insertSegmentSQL)
 	if err != nil {

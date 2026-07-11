@@ -9,7 +9,7 @@ Private on-device inference capability used by gappd to transcribe and summarize
 _Avoid_: cloud AI, remote AI
 
 **Managed Runtime**:
-Desktop-owned llama.cpp, Whisper binaries, processes, and model files used for **Local AI**.
+Desktop-owned llama.cpp and Apple Speech binaries, processes, and model assets used for **Local AI** summarization and transcription.
 _Avoid_: external runtime, user runtime
 
 **Local AI Setup Operation**:
@@ -28,14 +28,32 @@ _Avoid_: post-processing helper, enhancer wrapper
 Rules that create, transition, and derive meeting capture, processing, and user-facing state from persisted meeting rows.
 _Avoid_: legacy status mirror, status helper
 
+**Meeting Reprocessing**:
+An explicit retry, refinement, or enhancement that moves completed or failed **Meeting Processing** back into active processing.
+_Avoid_: processing start, silent retry
+
+**Pending Meeting Processing**:
+Durable work remains for captured meeting artifacts, but no worker currently owns that work.
+_Avoid_: not started, waiting stage
+
+**Live Transcript**:
+Accumulated provisional transcription shown during recording from processed audio chunks.
+_Avoid_: final transcript, chunk transcript
+
 ## Relationships
 
 - A **Local AI Setup Operation** prepares one **Managed Runtime**.
-- A **Managed Runtime** provides **Local AI** for meeting transcription and summarization.
+- A **Managed Runtime** provides **Local AI** for desktop meeting transcription and summarization.
+- Desktop workflows always use the **Managed Runtime**; command-line workflows may use user-configured local dependencies.
 - A healthy **Managed Runtime** should be shared instead of starting duplicate llama.cpp servers.
-- A **Meeting Recording Workflow** uses **Meeting Processing** after capture.
+- A **Meeting Recording Workflow** preserves captured audio even when **Local AI** is unavailable; **Meeting Processing** may run later through **Meeting Reprocessing**.
+- Captured audio remains durable through **Meeting Processing** and becomes eligible for deletion only after processing completes.
 - A **Meeting Lifecycle** defines valid meeting capture and processing state transitions and user-facing state derived from persisted meeting rows.
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
+- **Pending Meeting Processing** derives its next work from persisted artifacts: audio without transcript needs transcription; transcript without summary needs summarization.
+- A **Live Transcript** becomes the persisted transcript only when every captured audio chunk was processed without failure or dropped events; otherwise **Meeting Processing** rebuilds it from durable audio.
+- **Live Transcript** audio windows overlap for recognition context, but each window owns a non-overlapping canonical time range so repeated boundary audio is not duplicated.
+- **Meeting Reprocessing** explicitly restarts completed or failed **Meeting Processing** for retry, refinement, or enhancement.
 - `llama-server` provides meeting summarization through **Local AI**.
 
 ## Example dialogue

@@ -15,7 +15,7 @@ type View struct {
 
 const (
 	MeetingStateRecording  MeetingState = "recording"
-	MeetingStateCaptured   MeetingState = "captured"
+	MeetingStatePending    MeetingState = "pending"
 	MeetingStateProcessing MeetingState = "processing"
 	MeetingStateCompleted  MeetingState = "completed"
 	MeetingStateFailed     MeetingState = "failed"
@@ -28,7 +28,7 @@ const (
 
 // The All* slices are the source of truth for generated TypeScript lifecycle types.
 var (
-	AllMeetingStates      = []MeetingState{MeetingStateRecording, MeetingStateCaptured, MeetingStateProcessing, MeetingStateCompleted, MeetingStateFailed}
+	AllMeetingStates      = []MeetingState{MeetingStateRecording, MeetingStatePending, MeetingStateProcessing, MeetingStateCompleted, MeetingStateFailed}
 	AllMeetingStatusTones = []MeetingStatusTone{MeetingStatusToneRecording, MeetingStatusToneProcessing, MeetingStatusToneIdle, MeetingStatusToneError}
 )
 
@@ -52,7 +52,7 @@ func MeetingStateFor(meeting db.Meeting) MeetingState {
 	case meeting.ProcessingStatus == db.ProcessingStatusCompleted:
 		return MeetingStateCompleted
 	default:
-		return MeetingStateCaptured
+		return MeetingStatePending
 	}
 }
 

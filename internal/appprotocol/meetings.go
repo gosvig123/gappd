@@ -19,14 +19,15 @@ type MeetingListItem struct {
 }
 
 type MeetingDetail struct {
-	ID             string           `json:"id"`
-	Title          string           `json:"title"`
-	StartedAt      string           `json:"startedAt"`
-	EndedAt        *string          `json:"endedAt,omitempty"`
-	Status         MeetingStatus    `json:"status"`
-	TranscriptText string           `json:"transcriptText,omitempty"`
-	Summary        string           `json:"summary,omitempty"`
-	Segments       []MeetingSegment `json:"segments"`
+	ID                    string           `json:"id"`
+	Title                 string           `json:"title"`
+	StartedAt             string           `json:"startedAt"`
+	EndedAt               *string          `json:"endedAt,omitempty"`
+	Status                MeetingStatus    `json:"status"`
+	TranscriptText        string           `json:"transcriptText,omitempty"`
+	TranscriptProvisional bool             `json:"transcriptProvisional"`
+	Summary               string           `json:"summary,omitempty"`
+	Segments              []MeetingSegment `json:"segments"`
 }
 
 type MeetingSegment struct {
@@ -60,7 +61,7 @@ func BuildAppMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDet
 
 func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript string) MeetingDetail {
 	status := MeetingStatusFor(meeting)
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: meeting.Transcript == nil && len(segments) > 0, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
 }
 
 func appTranscriptText(meeting db.Meeting, segments []db.Segment) string {

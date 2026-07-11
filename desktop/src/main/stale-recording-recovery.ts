@@ -1,5 +1,5 @@
 import { requestCommand } from './app-protocol'
-import { acquireManagedLocalAI } from './local-ai-config'
+import { requestDrains } from './drain-coordinator'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
 
@@ -19,14 +19,10 @@ export function stopStaleRecordingRecovery(): void {
 
 async function recoverStaleRecordings(): Promise<number> {
   const stale = await requestCommand('record.hasStale', {})
-  if (!stale.hasStale) return 0
-  const lease = await acquireManagedLocalAI()
-  try {
-    const result = await requestCommand('record.recoverStale', {})
-    return result.recovered
-  } finally {
-    await lease.release()
-  }
+  if (!stale.hasStale) { requestDrains(); return 0 }
+  const result = await requestCommand('record.recoverStale', {})
+  requestDrains()
+  return result.recovered
 }
 
 async function runStaleRecordingRecovery(): Promise<number> {

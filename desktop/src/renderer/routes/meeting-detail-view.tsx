@@ -9,7 +9,7 @@ import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
-const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
+const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
@@ -114,8 +114,8 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
-        {activeTab === TRANSCRIPT_TAB && recording ? <TrackingIndicator /> : null}
-        {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} reading={reading}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
+        {activeTab === TRANSCRIPT_TAB && recording && !hasLiveSegments(selectedMeeting) ? <TrackingIndicator /> : null}
+        {activeTab === TRANSCRIPT_TAB && (hasLiveSegments(selectedMeeting) || !recording) ? <TranscriptPanel meeting={selectedMeeting} transcript={transcript} reading={reading} /> : null}
       </div>
     </div>
   )
@@ -137,7 +137,13 @@ function showPostMeetingProgress(meeting: MeetingDetail, progress: MeetingProgre
   return meeting.status.state !== RECORDING_STATE && (meetingHasWork(progress) || meetingFailed(progress))
 }
 
-function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div> }
+function TranscriptPanel({ meeting, transcript, reading }: { meeting: MeetingDetail; transcript: string; reading: ReturnType<typeof useReadingOverflow> }) {
+  const provisional = meeting.transcriptProvisional
+  return <><div className="meeting-section-label">{provisional ? 'Live Transcript' : 'Transcript'}</div><ReadingCard value={transcript} emptyText={transcriptEmptyText(meeting)} reading={reading}><TranscriptText value={transcript} segments={meeting.segments ?? []} /></ReadingCard></>
+}
+
+function hasLiveSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
+function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
 
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
@@ -145,7 +151,7 @@ function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput):
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
   if (progress.hasTranscript && progress.hasSummary) return ''
   if (progress.hasTranscript) return 'Transcript available.'
-  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured · waiting to process.'
+  if (meeting.status.state === PENDING_STATE) return 'Audio captured · waiting to process.'
   return 'Analysis and transcript for selected meeting.'
 }
 

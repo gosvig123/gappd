@@ -3,7 +3,6 @@ import { ChevronDownIcon, MicIcon, SquareIcon } from '../components/icons'
 import { cx } from '../components/ui'
 
 const RECORDING_STOPPING: RecordingStatus = 'stopping'
-const RECORDING_PROCESSING: RecordingStatus = 'processing'
 
 type RecordControlsProps = {
   device: number
@@ -41,7 +40,6 @@ export function RecordControls(props: RecordControlsProps) {
 
 function recordAction(props: RecordControlsProps): RecordAction {
   if (props.recordingStatus === RECORDING_STOPPING) return { label: 'Stopping…', recording: true, disabled: true, onClick: props.onStop }
-  if (props.recordingStatus === RECORDING_PROCESSING) return { label: 'Processing…', recording: true, disabled: true, onClick: props.onStop }
   if (props.canStop) return { label: 'Stop', recording: true, disabled: false, onClick: props.onStop }
   return { label: 'Record', recording: false, disabled: !props.canStart, title: props.canStart ? undefined : 'Connect an audio input to record', onClick: props.onStart }
 }

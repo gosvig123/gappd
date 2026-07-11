@@ -86,8 +86,8 @@ func TestInitPreservesExistingStatusWhenOnlyTimestampNeedsBackfill(t *testing.T)
 	if err != nil {
 		t.Fatalf("GetMeeting(processing-1) error = %v", err)
 	}
-	if meeting.CaptureStatus != CaptureStatusCaptured || meeting.ProcessingStatus != ProcessingStatusProcessing {
-		t.Fatalf("status = (%q,%q), want (%q,%q)", meeting.CaptureStatus, meeting.ProcessingStatus, CaptureStatusCaptured, ProcessingStatusProcessing)
+	if meeting.CaptureStatus != CaptureStatusCaptured || meeting.ProcessingStatus != ProcessingStatusPending {
+		t.Fatalf("status = (%q,%q), want (%q,%q)", meeting.CaptureStatus, meeting.ProcessingStatus, CaptureStatusCaptured, ProcessingStatusPending)
 	}
 	if meeting.ProcessingStatusUpdatedAt != "2026-04-10T14:15:00Z" {
 		t.Fatalf("processing_status_updated_at = %q", meeting.ProcessingStatusUpdatedAt)

@@ -20,8 +20,8 @@ type CommandEnv = NodeJS.ProcessEnv
 
 const PROCESSING_TIMING_MARKER = '● Timing '
 
-export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}): Promise<AppCommandOutput[ID]> {
-  const output = await runCommand(id, commandArgs(id, input), env)
+export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}, signal?: AbortSignal): Promise<AppCommandOutput[ID]> {
+  const output = await runCommand(id, commandArgs(id, input), env, signal)
   return parseCommandOutput(id, output)
 }
 
@@ -39,9 +39,9 @@ function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommand
   return APP_COMMANDS[id].args(input as never)
 }
 
-function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv): Promise<string> {
+function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: ['ignore', 'pipe', 'pipe'] })
     collectCommandOutput(child, resolve, reject)
   })
 }

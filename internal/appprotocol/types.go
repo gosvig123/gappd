@@ -6,6 +6,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
 
@@ -49,6 +50,16 @@ type HasStaleRecordingsResponse struct {
 
 type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
+}
+
+type ProcessingDrainResponse struct {
+	Capability    meetingprocessing.Capability `json:"capability"`
+	Attempted     int                          `json:"attempted"`
+	Completed     int                          `json:"completed"`
+	Requeued      int                          `json:"requeued"`
+	Failed        int                          `json:"failed"`
+	Cleaned       int                          `json:"cleaned"`
+	CleanupFailed int                          `json:"cleanupFailed"`
 }
 
 type MeetingStatus struct {

@@ -10,7 +10,7 @@ import './meetings.css'
 import './today.css'
 import { dateLabel, EMPTY_TITLE } from './today-model'
 
-const MEETING_CAPTURED = 'captured'
+const MEETING_PENDING = 'pending'
 const MEETING_RECORDING = 'recording'
 const PROCESSING_PROCESSING = 'processing'
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -185,7 +185,7 @@ function artifactSummary(meeting: MeetingListItem): string {
   if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasTranscript) return 'Transcribing audio locally…'
   if (meeting.status.processing.state === PROCESSING_PROCESSING && !meeting.hasSummary) return 'Creating summary locally…'
   if (meeting.status.processing.state === PROCESSING_PROCESSING) return 'Finalizing notes…'
-  if (meeting.status.state === MEETING_CAPTURED) return 'Audio captured · waiting to process'
+  if (meeting.status.state === MEETING_PENDING) return 'Audio captured · waiting to process'
   if (meeting.hasSummary && meeting.hasTranscript) return 'Notes available'
   if (meeting.hasSummary) return 'Notes available'
   if (meeting.hasTranscript) return 'Transcript available'

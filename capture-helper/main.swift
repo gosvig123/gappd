@@ -15,6 +15,7 @@ struct Config {
     let deviceIndex: Int?
     let stopFile: String?
     let chunkSeconds: Double?
+    let chunkOverlapSeconds: Double
 }
 
 func parseArgs() -> Config {
@@ -24,6 +25,7 @@ func parseArgs() -> Config {
     var deviceIndex: Int? = nil
     var stopFile: String? = nil
     var chunkSeconds: Double? = nil
+    var chunkOverlapSeconds = 0.0
 
     let args = CommandLine.arguments
     var i = 1
@@ -40,7 +42,9 @@ func parseArgs() -> Config {
         case "--stop-file":
             i += 1; stopFile = args[i]
         case "--chunk-seconds":
-            i += 1; chunkSeconds = Double(args[i])
+            chunkSeconds = Double(requiredValue(args, index: &i, option: args[i])) ?? .nan
+        case "--chunk-overlap-seconds":
+            chunkOverlapSeconds = Double(requiredValue(args, index: &i, option: args[i])) ?? .nan
         case "--list-devices":
             listDevices(); exit(0)
         case "--request-permissions":
@@ -57,7 +61,30 @@ func parseArgs() -> Config {
         }
         i += 1
     }
-    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex, stopFile: stopFile, chunkSeconds: chunkSeconds)
+    validateChunkConfig(seconds: chunkSeconds, overlap: chunkOverlapSeconds)
+    return Config(mode: mode, outputDir: outputDir, sampleRate: sampleRate, deviceIndex: deviceIndex,
+        stopFile: stopFile, chunkSeconds: chunkSeconds, chunkOverlapSeconds: chunkOverlapSeconds)
+}
+
+func requiredValue(_ args: [String], index: inout Int, option: String) -> String {
+    guard index + 1 < args.count else {
+        stderrPrint("error: \(option) requires a value")
+        exit(2)
+    }
+    index += 1
+    return args[index]
+}
+
+func validateChunkConfig(seconds: Double?, overlap: Double) {
+    guard let seconds else { return }
+    guard seconds.isFinite, seconds > 0 else {
+        stderrPrint("error: --chunk-seconds must be a finite number greater than zero")
+        exit(2)
+    }
+    guard overlap.isFinite, overlap >= 0, overlap < seconds else {
+        stderrPrint("error: --chunk-overlap-seconds must be finite, non-negative, and less than --chunk-seconds")
+        exit(2)
+    }
 }
 
 func printUsage() {
@@ -74,6 +101,7 @@ func printUsage() {
       --device <index>          Mic device index
       --stop-file <path>        Stop when this file appears
       --chunk-seconds <sec>     Emit finalized chunk WAV files and JSON events
+      --chunk-overlap-seconds <sec> Total centered overlap between chunks
       --list-devices            List available audio input devices
       --help                    Show this help
 
@@ -221,12 +249,14 @@ class MicRecorder {
     private let sampleRate: Double
     private let requestedDevice: Int?
     private let chunkSeconds: Double?
+    private let chunkOverlapSeconds: Double
     private var converter: AVAudioConverter?
 
-    init(sampleRate: Double, deviceIndex: Int?, chunkSeconds: Double?) {
+    init(sampleRate: Double, deviceIndex: Int?, chunkSeconds: Double?, chunkOverlapSeconds: Double) {
         self.sampleRate = sampleRate
         self.requestedDevice = deviceIndex
         self.chunkSeconds = chunkSeconds
+        self.chunkOverlapSeconds = chunkOverlapSeconds
     }
 
     private func applyDeviceSelection() {
@@ -287,7 +317,7 @@ class MicRecorder {
         print("  mic hw: \(UInt32(hwFormat.sampleRate))Hz \(hwFormat.channelCount)ch")
 
         let targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
-        let chunker = AudioChunker(source: "mic", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds)
+        let chunker = AudioChunker(source: "mic", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds, overlapSeconds: chunkOverlapSeconds)
         writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
         converter = AVAudioConverter(from: hwFormat, to: targetFormat)
 
@@ -326,15 +356,17 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     private var writer: WAVWriter?
     private let sampleRate: Double
     private let chunkSeconds: Double?
+    private let chunkOverlapSeconds: Double
     private let sampleQueue = DispatchQueue(label: "dev.gappd.capture.system-audio")
 
-    init(sampleRate: Double, chunkSeconds: Double?) {
+    init(sampleRate: Double, chunkSeconds: Double?, chunkOverlapSeconds: Double) {
         self.sampleRate = sampleRate
         self.chunkSeconds = chunkSeconds
+        self.chunkOverlapSeconds = chunkOverlapSeconds
     }
 
     func start(outputPath: String) async throws {
-        let chunker = AudioChunker(source: "system", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds)
+        let chunker = AudioChunker(source: "system", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds, overlapSeconds: chunkOverlapSeconds)
         writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
@@ -518,10 +550,12 @@ if config.mode == .system || config.mode == .both {
 }
 
 let micRecorder: MicRecorder? = (config.mode == .mic || config.mode == .both)
-    ? MicRecorder(sampleRate: config.sampleRate, deviceIndex: config.deviceIndex, chunkSeconds: config.chunkSeconds) : nil
+    ? MicRecorder(sampleRate: config.sampleRate, deviceIndex: config.deviceIndex, chunkSeconds: config.chunkSeconds,
+        chunkOverlapSeconds: config.chunkOverlapSeconds) : nil
 
 let systemRecorder: SystemAudioRecorder? = (config.mode == .system || config.mode == .both)
-    ? SystemAudioRecorder(sampleRate: config.sampleRate, chunkSeconds: config.chunkSeconds) : nil
+    ? SystemAudioRecorder(sampleRate: config.sampleRate, chunkSeconds: config.chunkSeconds,
+        chunkOverlapSeconds: config.chunkOverlapSeconds) : nil
 
 let stopSemaphore = DispatchSemaphore(value: 0)
 

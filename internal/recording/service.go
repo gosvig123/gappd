@@ -19,18 +19,17 @@ import (
 type EventName string
 
 const (
-	EventStarted    EventName = "recording.started"
-	EventStopping   EventName = "recording.stopping"
-	EventProcessing EventName = "recording.processing"
-	EventCompleted  EventName = "recording.completed"
-	EventFailed     EventName = "recording.failed"
+	EventStarted  EventName = "recording.started"
+	EventStopping EventName = "recording.stopping"
+	EventCaptured EventName = "recording.captured"
+	EventFailed   EventName = "recording.failed"
 
 	recordingHeartbeatInterval = 30 * time.Second
 )
 
 // AllEventNames is the canonical enumeration of recording protocol events,
 // used by cmd/gen-protocol to generate the TypeScript protocol definitions.
-var AllEventNames = []EventName{EventStarted, EventStopping, EventProcessing, EventCompleted, EventFailed}
+var AllEventNames = []EventName{EventStarted, EventStopping, EventCaptured, EventFailed}
 
 type EventSink interface {
 	EmitRecordingEvent(EventName, db.Meeting, error) error
@@ -46,11 +45,10 @@ type audioRecorder interface {
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
 type Request struct {
-	DeviceIdx                 int
-	Title                     string
-	Mode                      capture.CaptureMode
-	Language                  string
-	SuppressProcessingFailure bool
+	DeviceIdx int
+	Title     string
+	Mode      capture.CaptureMode
+	Language  string
 }
 
 type Service struct {
@@ -78,9 +76,7 @@ func New(lifecycle meetinglifecycle.Module, processing meetingprocessing.Service
 }
 
 func (s Service) Run(req Request) error {
-	processing := s.processing
-	processing.Events = processingEventAdapter{s.Events}
-	return s.recordingWorkflow().run(req, processing)
+	return s.recordingWorkflow().run(req, s.processing)
 }
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
@@ -125,23 +121,28 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 	if err := w.startCapture(ctx, recorder, session); err != nil {
 		return err
 	}
-	waitForLiveChunks := w.startLiveChunkProcessing(recorder, session.meeting.ID, req.Language, processing)
+	waitForLiveChunks, cancelLiveChunks := w.startLiveChunkProcessing(recorder, session.meeting.ID, req.Language, processing)
 	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
 	if err := w.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
 		return err
 	}
 	stopHeartbeat()
-	liveChunks := drainLiveChunks(waitForLiveChunks, processing, recorder)
-	return w.finishRecordingProcessing(req, session, sessionDir, recorder, processing, liveChunks)
+	liveChunks := drainLiveChunks(waitForLiveChunks, cancelLiveChunks, processing, recorder)
+	session = w.completeCapture(session, recorder)
+	if err := session.capture(context.Background()); err != nil {
+		return err
+	}
+	if liveChunks.Usable() {
+		w.promoteLiveTranscript(processing, session.meeting.ID)
+	}
+	return session.emit(EventCaptured, nil)
 }
 
-func (w meetingRecordingWorkflow) finishRecordingProcessing(req Request, session recordingSession, sessionDir string, recorder audioRecorder, processing meetingprocessing.Service, liveChunks meetingprocessing.LiveChunkResult) error {
-	session = w.completeCapture(session, recorder)
-	processingCtx, stopProcessing := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stopProcessing()
-	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure, audioDir: sessionDir, reuseLiveSegments: liveChunks.Usable()}
-	return session.finish(processingCtx, processing, request)
+func (w meetingRecordingWorkflow) promoteLiveTranscript(processing meetingprocessing.Service, meetingID string) {
+	if err := processing.PromoteProvisionalTranscript(context.Background(), meetingID); err != nil {
+		fmt.Fprintf(w.errOut, "warning: live transcript promotion skipped: %v\n", err)
+	}
 }
 
 func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {

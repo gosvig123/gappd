@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +17,7 @@ func appCmd() *cobra.Command {
 		Use:   "app",
 		Short: "Machine-readable commands for the desktop app",
 	}
-	cmd.AddCommand(appConfigCmd(), appDevicesCmd(), appMeetingsCmd(), appRecordCmd())
+	cmd.AddCommand(appConfigCmd(), appDevicesCmd(), appMeetingsCmd(), appProcessingCmd(), appRecordCmd())
 	return cmd
 }
 
@@ -101,22 +100,21 @@ func runAppRecoverStale(asJSON bool) error {
 	if !asJSON {
 		return fmt.Errorf("app record recover-stale requires --json")
 	}
-	_, store, pipeline, err := loadDeps()
+	_, store, err := loadStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
-	recovered, err := recoverStaleRecordings(store, pipeline)
+	recovered, err := recoverStaleRecordings(store)
 	if err != nil {
 		return err
 	}
 	return writeJSON(appprotocol.RecoverStaleRecordingsResponse{Recovered: recovered})
 }
 
-func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
-	processor := newMeetingProcessingService(store, pipeline, recordingOutputQuiet)
-	recovery := meetingprocessing.Recovery{Store: store, Lifecycle: processor.Lifecycle, Processor: processor, Events: processor.Events}
-	return recovery.RecoverStale(cmdContext(), meetingprocessing.RecoveryOptions{SuppressProcessingFailure: true, ErrOut: os.Stderr})
+func recoverStaleRecordings(store *db.DB) (int, error) {
+	recovery := meetingprocessing.Recovery{Store: store, Lifecycle: meetinglifecycle.New(store)}
+	return recovery.RecoverStale(cmdContext(), meetingprocessing.RecoveryOptions{})
 }
 
 func appMeetingsListCmd() *cobra.Command {

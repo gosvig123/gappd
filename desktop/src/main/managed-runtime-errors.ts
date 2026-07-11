@@ -1,18 +1,18 @@
-import type { LocalAISetupErrorDebug, LocalAISetupErrorKind, LocalAISetupPhase, LocalAISetupStatus } from '../shared/contracts'
-import { buildErrorDebug, readErrorDebug, readOwnershipConflict } from './local-ai-setup-error-debug'
+import type { ManagedRuntimeErrorDebug, ManagedRuntimeErrorKind, ManagedRuntimeOperation, ManagedRuntimeSnapshot } from '../shared/contracts'
+import { buildErrorDebug, readErrorDebug, readOwnershipConflict } from './managed-runtime-error-debug'
 
 type ErrorLike = Record<string, unknown>
-type PullFailure = { summary: string; detail?: string; debug?: LocalAISetupErrorDebug; errorKind?: LocalAISetupErrorKind }
-type PullFailureError = Error & { detail?: string; debug?: LocalAISetupErrorDebug; errorKind?: LocalAISetupErrorKind }
+type PullFailure = { summary: string; detail?: string; debug?: ManagedRuntimeErrorDebug; errorKind?: ManagedRuntimeErrorKind }
+type PullFailureError = Error & { detail?: string; debug?: ManagedRuntimeErrorDebug; errorKind?: ManagedRuntimeErrorKind }
 type PullStallController = { refresh: () => void; clear: () => void; errorFor: (error: unknown) => Error }
 
-export type LocalAISetupErrorState = {
+export type ManagedRuntimeErrorState = {
   error: string
-  errorDetail?: LocalAISetupStatus['errorDetail']
-  debugDetail?: LocalAISetupStatus['debugDetail']
-  errorDebug?: LocalAISetupStatus['errorDebug']
-  errorKind: NonNullable<LocalAISetupStatus['errorKind']>
-  ownershipConflict?: LocalAISetupStatus['ownershipConflict']
+  errorDetail?: ManagedRuntimeSnapshot['errorDetail']
+  debugDetail?: ManagedRuntimeSnapshot['debugDetail']
+  errorDebug?: ManagedRuntimeSnapshot['errorDebug']
+  errorKind: NonNullable<ManagedRuntimeSnapshot['errorKind']>
+  ownershipConflict?: ManagedRuntimeSnapshot['ownershipConflict']
 }
 
 const MODEL_PULL_STALL_TIMEOUT_PRE_BYTES_MS = 90_000
@@ -51,16 +51,16 @@ export function createPullFailureError(...details: string[]): Error {
   return buildPullFailureError(describePullFailure(...details))
 }
 
-export function toLocalAISetupErrorState(error: unknown, phase: LocalAISetupPhase, defaultMessage: string): LocalAISetupErrorState {
+export function toManagedRuntimeErrorState(error: unknown, phase: ManagedRuntimeOperation, defaultMessage: string): ManagedRuntimeErrorState {
   const details = collectErrorDetails(error)
   const summary = normalizeText(readErrorString(error, 'message') || readErrorMessage(error) || defaultMessage) || defaultMessage
   const errorDetail = normalizeText(readErrorString(error, 'detail'))
   const errorDebug = readErrorDebug(error) || buildErrorDebug(details, errorDetail || summary)
   const ownershipConflict = readOwnershipConflict(error)
-  return { error: summary, errorDetail, debugDetail: errorDebug?.rawDetail, errorDebug, errorKind: classifyLocalAISetupErrorKind(summary, phase, errorDetail, errorDebug), ownershipConflict }
+  return { error: summary, errorDetail, debugDetail: errorDebug?.rawDetail, errorDebug, errorKind: classifyManagedRuntimeErrorKind(summary, phase, errorDetail, errorDebug), ownershipConflict }
 }
 
-export function classifyLocalAISetupErrorKind(message: string | undefined, phase: LocalAISetupPhase, detail?: string, debug?: LocalAISetupErrorDebug): LocalAISetupErrorKind {
+export function classifyManagedRuntimeErrorKind(message: string | undefined, phase: ManagedRuntimeOperation, detail?: string, debug?: ManagedRuntimeErrorDebug): ManagedRuntimeErrorKind {
   const value = normalizeErrorText([message, detail, debug?.rawDetail, debug?.host, debug?.url, debug?.ip].filter(Boolean).join(' '))
   if (matchesAny(value, DISK_SPACE_MARKERS)) return 'disk_space'
   if (matchesAny(value, OWNERSHIP_MARKERS)) return 'ownership_mismatch'
@@ -80,7 +80,7 @@ function describePullFailure(...details: string[]): PullFailure {
   return { summary: rawDetail?.startsWith('Managed llama.cpp') ? rawDetail : 'Managed llama.cpp model download failed.', debug }
 }
 
-function pullFailure(summary: string, errorKind: LocalAISetupErrorKind, debug?: LocalAISetupErrorDebug, label?: string): PullFailure {
+function pullFailure(summary: string, errorKind: ManagedRuntimeErrorKind, debug?: ManagedRuntimeErrorDebug, label?: string): PullFailure {
   return { summary, detail: reachabilityDetail(debug, label || 'Reachability target'), debug, errorKind }
 }
 
@@ -120,7 +120,7 @@ function isPullBlobHostNetwork(value: string): boolean {
   return matchesAny(normalized, BLOB_HOST_MARKERS) && (matchesAny(normalized, TIMEOUT_MARKERS) || matchesAny(normalized, NETWORK_MARKERS))
 }
 
-function reachabilityDetail(debug: LocalAISetupErrorDebug | undefined, label: string): string | undefined {
+function reachabilityDetail(debug: ManagedRuntimeErrorDebug | undefined, label: string): string | undefined {
   if (!debug?.host && !debug?.ip) return undefined
   const target = debug.host && debug.ip ? `${debug.host} (${debug.ip})` : debug.host || debug.ip
   return `${label}: ${target}.`

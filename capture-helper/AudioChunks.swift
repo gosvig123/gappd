@@ -6,66 +6,114 @@ struct AudioChunkEvent: Encodable {
     let path: String
     let start: Double
     let end: Double
+    let canonicalStart: Double
+    let canonicalEnd: Double
+}
+
+struct AudioChunkFailure: Encodable {
+    let type = "audio_chunk"
+    let source: String
+    let error: String
 }
 
 final class AudioChunker {
     private let source: String
     private let dir: String
-    private let sampleRate: UInt32
-    private let maxFrames: UInt32
-    private var writer: WAVWriter?
+    private let sampleRate: UInt64
+    private let chunkFrames: UInt64
+    private let contextFrames: UInt64
+    private var pcm = Data()
     private var index: UInt32 = 0
-    private var chunkStartFrame: UInt64 = 0
-    private var chunkFrames: UInt32 = 0
+    private var windowStart: UInt64 = 0
+    private var canonicalStart: UInt64 = 0
+    private var totalFrames: UInt64 = 0
 
-    init?(source: String, outputDir: String, sampleRate: UInt32, seconds: Double?) {
-        guard let seconds, seconds > 0 else { return nil }
+    init?(source: String, outputDir: String, sampleRate: UInt32, seconds: Double?, overlapSeconds: Double) {
+        guard let seconds, seconds.isFinite, seconds > 0,
+              overlapSeconds.isFinite, overlapSeconds >= 0, overlapSeconds < seconds else { return nil }
         self.source = source
         self.dir = (outputDir as NSString).appendingPathComponent("chunks")
-        self.sampleRate = sampleRate
-        self.maxFrames = max(1, UInt32(seconds * Double(sampleRate)))
-        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        self.sampleRate = UInt64(sampleRate)
+        self.chunkFrames = max(1, UInt64(seconds * Double(sampleRate)))
+        self.contextFrames = UInt64(overlapSeconds * Double(sampleRate)) / 2
+        guard (try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)) != nil else { return nil }
     }
 
     func write(data: Data) {
-        var offset = 0
-        while offset < data.count {
-            ensureWriter()
-            let roomBytes = Int(maxFrames - chunkFrames) * 2
-            let count = min(roomBytes, data.count - offset)
-            writer?.writeRaw(data: data.subdata(in: offset..<(offset + count)))
-            chunkFrames += UInt32(count / 2)
-            offset += count
-            if chunkFrames >= maxFrames { finishChunk() }
+        let completeBytes = data.count - data.count % 2
+        guard completeBytes > 0 else { return }
+        pcm.append(data.prefix(completeBytes))
+        totalFrames += UInt64(completeBytes / 2)
+        emitCompleteWindows()
+    }
+
+    func finish() {
+        emitCompleteWindows()
+        emitFinalWindows()
+        pcm.removeAll(keepingCapacity: false)
+    }
+
+    private func emitFinalWindows() {
+        while totalFrames > canonicalStart + chunkFrames {
+            let canonicalEnd = canonicalStart + chunkFrames
+            _ = emitWindow(canonicalEnd: canonicalEnd, windowEnd: totalFrames)
+            advance(after: canonicalEnd)
+        }
+        guard totalFrames > canonicalStart else { return }
+        _ = emitWindow(canonicalEnd: totalFrames, windowEnd: totalFrames)
+    }
+
+    private func emitCompleteWindows() {
+        while totalFrames >= canonicalStart + chunkFrames + contextFrames {
+            let canonicalEnd = canonicalStart + chunkFrames
+            _ = emitWindow(canonicalEnd: canonicalEnd, windowEnd: canonicalEnd + contextFrames)
+            advance(after: canonicalEnd)
         }
     }
 
-    func finish() { finishChunk() }
-
-    private func ensureWriter() {
-        guard writer == nil else { return }
+    private func emitWindow(canonicalEnd: UInt64, windowEnd: UInt64) -> Bool {
+        let byteCount = Int((windowEnd - windowStart) * 2)
+        guard pcm.count >= byteCount else { emitFailure("incomplete PCM window"); return false }
         index += 1
-        writer = try? WAVWriter(path: chunkPath(), sampleRate: sampleRate, channels: 1)
+        let path = chunkPath()
+        guard let writer = try? WAVWriter(path: path, sampleRate: UInt32(sampleRate), channels: 1) else {
+            emitFailure("could not create chunk WAV"); return false
+        }
+        writer.writeRaw(data: pcm.prefix(byteCount))
+        writer.finalize()
+        emitEvent(path: path, canonicalEnd: canonicalEnd, windowEnd: windowEnd)
+        return true
     }
 
-    private func finishChunk() {
-        guard let current = writer, chunkFrames > 0 else { return }
-        current.finalize()
-        emitChunk(path: chunkPath(), frames: chunkFrames)
-        chunkStartFrame += UInt64(chunkFrames)
-        chunkFrames = 0
-        writer = nil
+    private func advance(after canonicalEnd: UInt64) {
+        let nextStart = canonicalEnd > contextFrames ? canonicalEnd - contextFrames : 0
+        let discardedFrames = nextStart - windowStart
+        pcm.removeFirst(Int(discardedFrames * 2))
+        windowStart = nextStart
+        canonicalStart = canonicalEnd
     }
 
     private func chunkPath() -> String {
-        return (dir as NSString).appendingPathComponent(String(format: "%@-%06d.wav", source, index))
+        (dir as NSString).appendingPathComponent(String(format: "%@-%06d.wav", source, index))
     }
 
-    private func emitChunk(path: String, frames: UInt32) {
-        let start = Double(chunkStartFrame) / Double(sampleRate)
-        let end = Double(chunkStartFrame + UInt64(frames)) / Double(sampleRate)
-        let event = AudioChunkEvent(source: source, path: path, start: start, end: end)
-        guard let data = try? JSONEncoder().encode(event), let line = String(data: data, encoding: .utf8) else { return }
+    private func seconds(_ frames: UInt64) -> Double {
+        Double(frames) / Double(sampleRate)
+    }
+
+    private func emitEvent(path: String, canonicalEnd: UInt64, windowEnd: UInt64) {
+        let event = AudioChunkEvent(source: source, path: path, start: seconds(windowStart),
+            end: seconds(windowEnd), canonicalStart: seconds(canonicalStart), canonicalEnd: seconds(canonicalEnd))
+        printJSON(event)
+    }
+
+    private func emitFailure(_ message: String) {
+        printJSON(AudioChunkFailure(source: source, error: message))
+    }
+
+    private func printJSON<T: Encodable>(_ value: T) {
+        guard let data = try? JSONEncoder().encode(value),
+              let line = String(data: data, encoding: .utf8) else { return }
         print(line)
     }
 }

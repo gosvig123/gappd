@@ -17,7 +17,12 @@ func appendChunkArgs(args []string) []string {
 	if seconds == "" {
 		return args
 	}
-	return append(args, "--chunk-seconds", seconds)
+	args = append(args, "--chunk-seconds", seconds)
+	overlap := strings.TrimSpace(os.Getenv(captureChunkOverlapEnv))
+	if overlap != "" {
+		args = append(args, "--chunk-overlap-seconds", overlap)
+	}
+	return args
 }
 
 func findCaptureLaunch(args []string, _ string) (captureLaunch, error) {

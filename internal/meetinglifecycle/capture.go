@@ -12,7 +12,7 @@ type Captured struct{ At time.Time }
 func (Captured) name() string { return "captured" }
 
 func (t Captured) apply(meeting *db.Meeting) (bool, error) {
-	if meeting.CaptureStatus == db.CaptureStatusCaptured && meeting.ProcessingStatus == db.ProcessingStatusProcessing {
+	if meeting.CaptureStatus == db.CaptureStatusCaptured && meeting.ProcessingStatus == db.ProcessingStatusPending {
 		return false, nil
 	}
 	if meeting.CaptureStatus != db.CaptureStatusRecording || meeting.ProcessingStatus != db.ProcessingStatusNotStarted {
@@ -21,7 +21,7 @@ func (t Captured) apply(meeting *db.Meeting) (bool, error) {
 	at := timestamp(t.At)
 	end(meeting, at)
 	setCapture(meeting, db.CaptureStatusCaptured, at, nil)
-	setProcessing(meeting, db.ProcessingStatusProcessing, at, nil)
+	setProcessing(meeting, db.ProcessingStatusPending, at, nil)
 	return true, nil
 }
 

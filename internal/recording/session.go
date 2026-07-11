@@ -3,21 +3,12 @@ package recording
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
-	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
-
-type processingRequest struct {
-	language          string
-	suppressFailure   bool
-	audioDir          string
-	reuseLiveSegments bool
-}
 
 type recordingSession struct {
 	lifecycle meetinglifecycle.Module
@@ -64,18 +55,11 @@ func (r recordingSession) failUnexpectedCaptureStop(err error) error {
 	return unexpectedErr
 }
 
-func (r recordingSession) finish(ctx context.Context, processing meetingprocessing.Service, req processingRequest) error {
+func (r recordingSession) capture(ctx context.Context) error {
 	if err := r.requireAudio(); err != nil {
 		return err
 	}
-	if err := r.apply(ctx, meetinglifecycle.Captured{At: time.Now()}); err != nil {
-		return err
-	}
-	err := processing.ProcessCaptured(ctx, meetingprocessing.CapturedRequest{MeetingID: r.meeting.ID, AudioDir: r.audioDir(req), Language: req.language, ReuseLiveSegments: req.reuseLiveSegments})
-	if err != nil && req.suppressFailure {
-		return nil
-	}
-	return err
+	return r.apply(ctx, meetinglifecycle.Captured{At: time.Now()})
 }
 
 func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle.Transition) error {
@@ -85,13 +69,6 @@ func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle
 	}
 	*r.meeting = *result.Meeting
 	return nil
-}
-
-func (r recordingSession) audioDir(req processingRequest) string {
-	if r.artifacts.MicPath() != "" {
-		return filepath.Dir(r.artifacts.MicPath())
-	}
-	return req.audioDir
 }
 
 func (r recordingSession) requireAudio() error {

@@ -4,11 +4,14 @@
 export const CAPTURE_STATUSES = ['recording', 'captured', 'failed'] as const
 export type CaptureStatus = (typeof CAPTURE_STATUSES)[number]
 
-export const PROCESSING_STATUSES = ['not_started', 'processing', 'completed', 'failed'] as const
+export const PROCESSING_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const
 export type ProcessingStatus = (typeof PROCESSING_STATUSES)[number]
 
-export const MEETING_STATES = ['recording', 'captured', 'processing', 'completed', 'failed'] as const
+export const PROCESSING_CAPABILITIES = ['transcription', 'summarization'] as const
+export type ProcessingCapability = (typeof PROCESSING_CAPABILITIES)[number]
+
+export const MEETING_STATES = ['recording', 'pending', 'processing', 'completed', 'failed'] as const
 export type MeetingState = (typeof MEETING_STATES)[number]
 
-export const RECORDING_PROTOCOL_EVENT_TYPES = ['recording.started', 'recording.stopping', 'recording.processing', 'recording.completed', 'recording.failed'] as const
+export const RECORDING_PROTOCOL_EVENT_TYPES = ['recording.started', 'recording.stopping', 'recording.captured', 'recording.failed'] as const
 export type RecordingProtocolEventType = (typeof RECORDING_PROTOCOL_EVENT_TYPES)[number]

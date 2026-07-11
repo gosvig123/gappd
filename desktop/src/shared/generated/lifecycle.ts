@@ -8,7 +8,7 @@ export type MeetingStatusTone = 'recording' | 'processing' | 'idle' | 'error'
 export function meetingStatusTone(state: MeetingState): MeetingStatusTone {
   switch (state) {
     case 'recording': return 'recording'
-    case 'captured': return 'idle'
+    case 'pending': return 'idle'
     case 'processing': return 'processing'
     case 'completed': return 'idle'
     case 'failed': return 'error'

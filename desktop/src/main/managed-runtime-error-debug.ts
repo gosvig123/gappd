@@ -1,8 +1,8 @@
-import type { LocalAISetupErrorDebug, OwnershipConflict } from '../shared/contracts'
+import type { ManagedRuntimeErrorDebug, OwnershipConflict } from '../shared/contracts'
 
 type ErrorLike = Record<string, unknown>
 
-export function buildErrorDebug(details: string[], rawDetail?: string): LocalAISetupErrorDebug | undefined {
+export function buildErrorDebug(details: string[], rawDetail?: string): ManagedRuntimeErrorDebug | undefined {
   const url = firstUrl(details)
   const host = urlHost(url) || firstHost(details)
   const ip = firstIp(details)
@@ -10,7 +10,7 @@ export function buildErrorDebug(details: string[], rawDetail?: string): LocalAIS
   return Object.values(debug).some(Boolean) ? debug : undefined
 }
 
-export function readErrorDebug(error: unknown): LocalAISetupErrorDebug | undefined {
+export function readErrorDebug(error: unknown): ManagedRuntimeErrorDebug | undefined {
   if (!error || typeof error !== 'object' || !('debug' in error)) return undefined
   const value = (error as ErrorLike).debug
   if (!value || typeof value !== 'object') return undefined

@@ -105,6 +105,11 @@ func transcriptStage(reused bool) ProcessingStage {
 func (s Service) enhanceCaptured(ctx context.Context, meeting *db.Meeting, transcript, language string) error {
 	started := time.Now()
 	defer func() { s.report().StageCompleted(StageSummary, time.Since(started)) }()
+	updated, err := s.transition(ctx, meeting.ID, meetinglifecycle.ProcessingStarted{At: s.now()})
+	if err != nil {
+		return s.processingError("start summarization", meeting.ID, PhaseLifecycle, err)
+	}
+	*meeting = *updated
 	return s.enhanceAndSave(ctx, meeting, transcript, StoredRequest{Language: language})
 }
 
@@ -168,28 +173,4 @@ func segmentsWithSpeaker(segs []transcribe.Segment, speaker string) []transcribe
 		segs[i].Speaker = speaker
 	}
 	return segs
-}
-
-func (s Service) saveSegments(ctx context.Context, meeting *db.Meeting, segments []db.Segment) (string, error) {
-	s.report().SegmentsSaved(len(segments))
-	if err := s.Store.ReplaceSegments(meeting.ID, segments); err != nil {
-		return "", s.processingError("process captured", meeting.ID, PhasePersist, err)
-	}
-	return s.saveTranscript(ctx, meeting, FormatTranscript(segments))
-}
-
-func (s Service) saveLiveSegments(ctx context.Context, meeting *db.Meeting, segments []db.Segment) (string, error) {
-	s.report().SegmentsReused(len(segments))
-	return s.saveTranscript(ctx, meeting, FormatTranscript(segments))
-}
-
-func (s Service) saveTranscript(ctx context.Context, meeting *db.Meeting, transcript string) (string, error) {
-	transition := meetinglifecycle.TranscriptSaved{At: s.now(), Transcript: transcript}
-	updated, err := s.transition(ctx, meeting.ID, transition)
-	if err != nil {
-		return "", s.processingError("process captured", meeting.ID, PhasePersist, err)
-	}
-	*meeting = *updated
-	s.report().TranscriptSaved(transcript)
-	return transcript, nil
 }
