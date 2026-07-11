@@ -21,10 +21,3 @@ func recordingEventName(name meetingprocessing.EventName) EventName {
 		return EventFailed
 	}
 }
-
-func (s Service) capturedProcessor() meetingprocessing.CapturedProcessor {
-	if s.Processor != nil {
-		return s.Processor
-	}
-	return meetingprocessing.Service{Store: s.Store, Lifecycle: s.meetingLifecycle(), Pipeline: s.Pipeline, Reporter: s.Reporter, Events: processingEventAdapter{s.Events}}
-}

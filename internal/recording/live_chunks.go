@@ -9,7 +9,7 @@ type chunkRecorder interface {
 	Chunks() <-chan capture.ChunkEvent
 }
 
-func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.CapturedProcessor) func() {
+func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) func() {
 	return meetingprocessing.StartLiveChunkProcessing(processing, meetingprocessing.LiveChunkOptions{
 		MeetingID: meetingID,
 		Language:  language,
