@@ -1,6 +1,6 @@
 import type { LocalAIConfig } from '../shared/contracts'
 import { requestCommand } from './app-protocol'
-import { ensureManagedLlamaCppRunning } from './llamacpp'
+import { acquireManagedLlamaCpp } from './llamacpp'
 
 export async function getLocalAIConfig(): Promise<LocalAIConfig> {
   const result = await requestCommand('config.show', {})
@@ -12,10 +12,19 @@ export async function saveManagedLocalAIConfig(input: { endpoint: string; model:
   return result.ai
 }
 
-export async function ensureManagedLocalAIReady(): Promise<void> {
+export type LocalAILease = { release(): Promise<void> }
+
+const EXTERNAL_LOCAL_AI_LEASE: LocalAILease = { release: async () => {} }
+
+export async function acquireManagedLocalAI(): Promise<LocalAILease> {
   const config = await getLocalAIConfig()
-  if (!config.managed) return
-  const endpoint = await ensureManagedLlamaCppRunning()
-  if (config.endpoint === endpoint) return
-  await saveManagedLocalAIConfig({ endpoint, model: config.model, temperature: config.temperature })
+  if (!config.managed) return EXTERNAL_LOCAL_AI_LEASE
+  const lease = await acquireManagedLlamaCpp()
+  try {
+    if (config.endpoint !== lease.endpoint) await saveManagedLocalAIConfig({ endpoint: lease.endpoint, model: config.model, temperature: config.temperature })
+    return lease
+  } catch (error) {
+    await lease.release()
+    throw error
+  }
 }

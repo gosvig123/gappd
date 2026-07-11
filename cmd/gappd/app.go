@@ -60,7 +60,7 @@ func appRecordCmd() *cobra.Command {
 		Use:   "record",
 		Short: "Machine-readable recording entrypoints",
 	}
-	cmd.AddCommand(appRecordStartCmd(), appRecordRecoverStaleCmd())
+	cmd.AddCommand(appRecordStartCmd(), appRecordHasStaleCmd(), appRecordRecoverStaleCmd())
 	return cmd
 }
 

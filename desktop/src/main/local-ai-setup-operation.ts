@@ -4,7 +4,7 @@ import type { LocalAISetupInput } from '../shared/ipc-contract'
 import { getLocalAIConfig, saveManagedLocalAIConfig } from './local-ai-config'
 import { appleSpeechAssetAvailable, ensureAppleSpeechAsset, missingAppleSpeechAssetMessage } from './apple-speech'
 import { ensureManagedLanguageModel, managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
-import { ensureManagedLlamaCppRunning, managedLlamaCppSupported } from './llamacpp'
+import { acquireManagedLlamaCpp, managedLlamaCppAvailable, managedLlamaCppSupported, missingBundledLlamaCppMessage } from './llamacpp'
 import { createObservableState } from './observable-state'
 import { errorStatus, localAISetupStatusFrom, localAIStatusFrom, managedModelStatus, managedStatus, needsSetupStatus, runtimeLocalAIStatus } from './local-ai-setup-status'
 
@@ -49,11 +49,9 @@ async function bootstrapFromConfig(runId: number, result: ConfigLoadResult): Pro
 
 async function bootstrapManagedLlamaCppConfig(runId: number, config: LocalAIConfig): Promise<void> {
   try {
+    if (!managedLlamaCppSupported() || !(await managedLlamaCppAvailable())) return void setBootstrapStatus(runId, errorStatus(missingBundledLlamaCppMessage(), getLocalAISetupStatus().phase, config.model))
     if (!(await managedLanguageModelAvailable(config.model))) return void setBootstrapStatus(runId, missingLanguageModelStatus(config.endpoint, config.model))
-    if (!setBootstrapStatus(runId, managedStatus('starting_runtime', 'Starting managed llama.cpp', { endpoint: config.endpoint, model: config.model }))) return
-    const endpoint = await ensureManagedLlamaCppRunning()
-    await saveManagedEndpoint(config, endpoint)
-    await publishLlamaCppReadiness(runId, config.model, endpoint)
+    await publishLlamaCppReadiness(runId, config.model, config.endpoint)
   } catch (error) {
     setBootstrapStatus(runId, errorStatus(error, getLocalAISetupStatus().phase, config.model))
   }
@@ -92,9 +90,13 @@ async function downloadLanguageModel(model: string): Promise<void> {
 }
 
 async function startLlamaCpp(model: string): Promise<string> {
-  const endpoint = await ensureManagedLlamaCppRunning()
-  setStatus(managedModelStatus(model, 'starting_runtime', 'Managed llama.cpp is running', { endpoint }))
-  return endpoint
+  const lease = await acquireManagedLlamaCpp()
+  try {
+    setStatus(managedModelStatus(model, 'starting_runtime', 'Managed llama.cpp is ready', { endpoint: lease.endpoint }))
+    return lease.endpoint
+  } finally {
+    await lease.release()
+  }
 }
 
 async function downloadSpeechModel(model: string, endpoint: string): Promise<void> {
@@ -111,11 +113,6 @@ async function localAIStatusFor(operation: LocalAISetupStatus, refreshOperation:
 
 async function loadLocalAIConfig(): Promise<ConfigLoadResult> {
   try { return { config: await getLocalAIConfig() } } catch (error) { return { config: null, error: error instanceof Error ? error.message : 'Failed to read local AI configuration' } }
-}
-
-async function saveManagedEndpoint(config: LocalAIConfig, endpoint: string): Promise<void> {
-  if (config.endpoint === endpoint) return
-  await saveManagedLocalAIConfig({ endpoint, model: config.model, temperature: config.temperature })
 }
 
 async function resolveSetupModel(input: LocalAISetupInput | undefined, preserveConfigured: boolean): Promise<string> {

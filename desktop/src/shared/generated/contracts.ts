@@ -102,6 +102,10 @@ export type ConfigUseManagedLocalAIInput = {
   temperature?: number
 }
 
+export type HasStaleRecordingsResponse = {
+  hasStale: boolean
+}
+
 export type RecoverStaleRecordingsResponse = {
   recovered: number
 }

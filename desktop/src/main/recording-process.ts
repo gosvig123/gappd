@@ -2,22 +2,28 @@ import type { spawn } from 'node:child_process'
 import type { RecordingEvent } from '../shared/generated/contracts'
 import { ignoresStopRequest, recordingEventOutcome, RECORDING_STATUS_ERROR, RECORDING_STATUS_IDLE, RECORDING_STATUS_STOPPING } from '../shared/meeting-recording-workflow'
 import { streamCommand } from './app-protocol'
-import { ensureManagedLocalAIReady } from './local-ai-config'
+import { acquireManagedLocalAI, type LocalAILease } from './local-ai-config'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
-import { stopManagedLlamaCpp } from './llamacpp'
 
 type RecordingChild = ReturnType<typeof spawn>
 
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
 const LIVE_TRANSCRIPT_CHUNK_SECONDS = '30'
 let recordingChild: RecordingChild | null = null
+let localAILease: LocalAILease | null = null
 
 export async function startRecording(input: { title: string; device: number; mode: string; language: string }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
-  await ensureManagedLocalAIReady()
-  logMainProcessMemory('recording:start')
-  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title), { GAPPD_CAPTURE_CHUNK_SECONDS: LIVE_TRANSCRIPT_CHUNK_SECONDS })
+  const lease = await acquireManagedLocalAI()
+  try {
+    logMainProcessMemory('recording:start')
+    recordingChild = streamCommand('record.start', input, recordingHandlers(input.title), { GAPPD_CAPTURE_CHUNK_SECONDS: LIVE_TRANSCRIPT_CHUNK_SECONDS })
+    localAILease = lease
+  } catch (error) {
+    await lease.release()
+    throw error
+  }
 }
 
 export function stopRecording(): void {
@@ -69,11 +75,13 @@ function recordingHandlers(title: string) {
 
 function finishRecording(label: string): void {
   recordingChild = null
-  void releaseManagedRuntimeAfterRecording(label)
+  const lease = localAILease
+  localAILease = null
+  if (lease) void releaseManagedRuntimeAfterRecording(label, lease)
 }
 
-async function releaseManagedRuntimeAfterRecording(label: string): Promise<void> {
+async function releaseManagedRuntimeAfterRecording(label: string, lease: LocalAILease): Promise<void> {
   logMainProcessMemory(`${label}:before-runtime-stop`)
-  await stopManagedLlamaCpp()
+  await lease.release()
   logMainProcessMemory(`${label}:after-runtime-stop`)
 }

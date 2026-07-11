@@ -103,8 +103,7 @@ function isManagedLlamaCppConfigured(config: LocalAIConfig | null | undefined): 
 function runtimePhase(context: StatusContext): LocalAIStatus['phase'] {
   if (context.configError || !context.supported || !context.bundled) return 'error'
   if (!context.modelAvailable) return 'needs_setup'
-  if (context.configured && context.running) return 'ready'
-  if (context.configured) return 'error'
+  if (context.configured) return 'ready'
   return 'needs_setup'
 }
 
@@ -114,7 +113,7 @@ function runtimeMessage(context: StatusContext): string {
   if (!context.bundled) return missingBundledLlamaCppMessage()
   if (!context.modelAvailable) return missingManagedLanguageModelMessage()
   if (context.configured && context.running) return 'Managed llama.cpp is running'
-  if (context.configured) return 'Managed llama.cpp is configured but stopped'
+  if (context.configured) return 'Managed llama.cpp is ready and starts when needed'
   if (context.config && !context.config.managed) return 'Gappd is configured for external Local AI. Run Local AI setup to switch to the managed runtime.'
   if (context.running) return 'Managed llama.cpp is running but Local AI setup has not switched Gappd to it yet.'
   return 'Managed llama.cpp is ready for Local AI setup'
