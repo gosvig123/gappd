@@ -8,6 +8,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
 
@@ -45,8 +46,8 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("appMeetingDetailFor() error = %v", err)
 	}
-	if detail.Status.State != db.MeetingStateFailed {
-		t.Fatalf("status.state = %q, want %q", detail.Status.State, db.MeetingStateFailed)
+	if detail.Status.State != meetinglifecycle.MeetingStateFailed {
+		t.Fatalf("status.state = %q, want %q", detail.Status.State, meetinglifecycle.MeetingStateFailed)
 	}
 	if detail.Status.UpdatedAt != meeting.ProcessingStatusUpdatedAt {
 		t.Fatalf("status.updatedAt = %q, want %q", detail.Status.UpdatedAt, meeting.ProcessingStatusUpdatedAt)
@@ -111,8 +112,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if event.Title != meeting.Title {
 		t.Fatalf("event.title = %q, want %q", event.Title, meeting.Title)
 	}
-	if event.Status.State != db.MeetingStateProcessing {
-		t.Fatalf("event.status.state = %q, want %q", event.Status.State, db.MeetingStateProcessing)
+	if event.Status.State != meetinglifecycle.MeetingStateProcessing {
+		t.Fatalf("event.status.state = %q, want %q", event.Status.State, meetinglifecycle.MeetingStateProcessing)
 	}
 	if event.Status.Processing.State != db.ProcessingStatusProcessing {
 		t.Fatalf("event.status.processing.state = %q, want %q", event.Status.Processing.State, db.ProcessingStatusProcessing)

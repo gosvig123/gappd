@@ -9,11 +9,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
-type Module interface {
-	BeginRecording(context.Context, RecordingStart) (*db.Meeting, error)
-	Heartbeat(context.Context, string, time.Time) (Result, error)
-	Transition(context.Context, string, Transition) (Result, error)
-}
+type Module struct{ store *db.DB }
 
 type RecordingStart struct {
 	Title      string
@@ -27,11 +23,9 @@ type Result struct {
 	Applied bool
 }
 
-type writer struct{ store *db.DB }
+func New(store *db.DB) Module { return Module{store: store} }
 
-func New(store *db.DB) Module { return writer{store: store} }
-
-func (w writer) BeginRecording(_ context.Context, start RecordingStart) (*db.Meeting, error) {
+func (w Module) BeginRecording(_ context.Context, start RecordingStart) (*db.Meeting, error) {
 	at := timestamp(start.At)
 	meeting := &db.Meeting{
 		Title: start.Title, StartedAt: at, AudioPath: &start.SessionDir,
@@ -45,7 +39,7 @@ func (w writer) BeginRecording(_ context.Context, start RecordingStart) (*db.Mee
 	return meeting, nil
 }
 
-func (w writer) Heartbeat(ctx context.Context, id string, at time.Time) (Result, error) {
+func (w Module) Heartbeat(ctx context.Context, id string, at time.Time) (Result, error) {
 	result, err := w.store.Conn.ExecContext(ctx, heartbeatSQL, timestamp(at), id, db.CaptureStatusRecording)
 	if err != nil {
 		return Result{}, fmt.Errorf("update recording heartbeat: %w", err)
@@ -58,7 +52,7 @@ func (w writer) Heartbeat(ctx context.Context, id string, at time.Time) (Result,
 	return Result{Meeting: meeting, Applied: rows > 0}, rowsErr
 }
 
-func (w writer) Transition(ctx context.Context, id string, transition Transition) (Result, error) {
+func (w Module) Transition(ctx context.Context, id string, transition Transition) (Result, error) {
 	for attempt := 0; attempt < 2; attempt++ {
 		result, retry, err := w.apply(ctx, id, transition)
 		if err != nil || !retry {
@@ -68,7 +62,7 @@ func (w writer) Transition(ctx context.Context, id string, transition Transition
 	return Result{}, &ConflictError{MeetingID: id, Transition: transition.name()}
 }
 
-func (w writer) apply(ctx context.Context, id string, transition Transition) (Result, bool, error) {
+func (w Module) apply(ctx context.Context, id string, transition Transition) (Result, bool, error) {
 	meeting, err := w.store.GetMeeting(id)
 	if err != nil {
 		return Result{}, false, err
