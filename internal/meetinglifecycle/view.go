@@ -1,4 +1,6 @@
-package db
+package meetinglifecycle
+
+import "github.com/gappd-dev/gappd/internal/db"
 
 // MeetingState is the single user-facing lifecycle state derived from the
 // capture and processing statuses stored on a meeting.
@@ -6,7 +8,7 @@ type MeetingState string
 
 type MeetingStatusTone string
 
-type MeetingLifecycleStatus struct {
+type View struct {
 	State     MeetingState
 	UpdatedAt string
 }
@@ -24,34 +26,30 @@ const (
 	MeetingStatusToneError      MeetingStatusTone = "error"
 )
 
-// The All* slices are the canonical enumerations of each status enum. They are
-// the source of truth for the generated TypeScript protocol (cmd/gen-protocol);
-// keep them in sync with the schema CHECK constraints.
+// The All* slices are the source of truth for generated TypeScript lifecycle types.
 var (
-	AllCaptureStatuses    = []CaptureStatus{CaptureStatusRecording, CaptureStatusCaptured, CaptureStatusFailed}
-	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusNotStarted, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
 	AllMeetingStates      = []MeetingState{MeetingStateRecording, MeetingStateCaptured, MeetingStateProcessing, MeetingStateCompleted, MeetingStateFailed}
 	AllMeetingStatusTones = []MeetingStatusTone{MeetingStatusToneRecording, MeetingStatusToneProcessing, MeetingStatusToneIdle, MeetingStatusToneError}
 )
 
-// MeetingLifecycleStatusFor derives the user-facing Meeting Lifecycle state.
-func MeetingLifecycleStatusFor(meeting Meeting) MeetingLifecycleStatus {
-	return MeetingLifecycleStatus{State: MeetingStateFor(meeting), UpdatedAt: meetingLifecycleUpdatedAt(meeting)}
+// ViewFor derives the user-facing Meeting Lifecycle view.
+func ViewFor(meeting db.Meeting) View {
+	return View{State: MeetingStateFor(meeting), UpdatedAt: meetingLifecycleUpdatedAt(meeting)}
 }
 
 // MeetingStateFor derives the user-facing state: capture outcomes win over
 // processing outcomes, and a capture in progress masks processing entirely.
-func MeetingStateFor(meeting Meeting) MeetingState {
+func MeetingStateFor(meeting db.Meeting) MeetingState {
 	switch {
-	case meeting.CaptureStatus == CaptureStatusFailed:
+	case meeting.CaptureStatus == db.CaptureStatusFailed:
 		return MeetingStateFailed
-	case meeting.CaptureStatus == CaptureStatusRecording:
+	case meeting.CaptureStatus == db.CaptureStatusRecording:
 		return MeetingStateRecording
-	case meeting.ProcessingStatus == ProcessingStatusFailed:
+	case meeting.ProcessingStatus == db.ProcessingStatusFailed:
 		return MeetingStateFailed
-	case meeting.ProcessingStatus == ProcessingStatusProcessing:
+	case meeting.ProcessingStatus == db.ProcessingStatusProcessing:
 		return MeetingStateProcessing
-	case meeting.ProcessingStatus == ProcessingStatusCompleted:
+	case meeting.ProcessingStatus == db.ProcessingStatusCompleted:
 		return MeetingStateCompleted
 	default:
 		return MeetingStateCaptured
@@ -71,14 +69,14 @@ func MeetingStatusToneFor(state MeetingState) MeetingStatusTone {
 	}
 }
 
-func meetingLifecycleUpdatedAt(meeting Meeting) string {
+func meetingLifecycleUpdatedAt(meeting db.Meeting) string {
 	if usesProcessingTimestamp(meeting) {
 		return meeting.ProcessingStatusUpdatedAt
 	}
 	return meeting.CaptureStatusUpdatedAt
 }
 
-func usesProcessingTimestamp(meeting Meeting) bool {
+func usesProcessingTimestamp(meeting db.Meeting) bool {
 	state := MeetingStateFor(meeting)
-	return meeting.ProcessingStatus == ProcessingStatusFailed || state == MeetingStateProcessing || state == MeetingStateCompleted
+	return meeting.ProcessingStatus == db.ProcessingStatusFailed || state == MeetingStateProcessing || state == MeetingStateCompleted
 }

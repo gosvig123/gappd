@@ -6,6 +6,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 )
 
 func renderMeetingListLine(meeting db.Meeting) string {
-	return fmt.Sprintf("  %s %s  %s  %s (capture: %s, processing: %s)", meetingMarker(db.MeetingStateFor(meeting)), previewID(meeting.ID), meetingDate(meeting.StartedAt), meeting.Title, meeting.CaptureStatus, meeting.ProcessingStatus)
+	return fmt.Sprintf("  %s %s  %s  %s (capture: %s, processing: %s)", meetingMarker(meetinglifecycle.MeetingStateFor(meeting)), previewID(meeting.ID), meetingDate(meeting.StartedAt), meeting.Title, meeting.CaptureStatus, meeting.ProcessingStatus)
 }
 
 func renderMeetingDetail(meeting db.Meeting, view appprotocol.MeetingDetail) string {
@@ -53,13 +54,13 @@ func writeMeetingSummary(b *strings.Builder, view appprotocol.MeetingDetail) {
 	fmt.Fprintf(b, "── Notes ───────────────────────────\n%s\n", view.Summary)
 }
 
-func meetingMarker(status db.MeetingState) string {
+func meetingMarker(status meetinglifecycle.MeetingState) string {
 	switch status {
-	case db.MeetingStateCompleted:
+	case meetinglifecycle.MeetingStateCompleted:
 		return meetingMarkerCompleted
-	case db.MeetingStateFailed:
+	case meetinglifecycle.MeetingStateFailed:
 		return meetingMarkerFailed
-	case db.MeetingStateProcessing:
+	case meetinglifecycle.MeetingStateProcessing:
 		return meetingMarkerProcessing
 	default:
 		return meetingMarkerCaptured

@@ -20,6 +20,11 @@ const (
 	ProcessingStatusFailed     ProcessingStatus = "failed"
 )
 
+var (
+	AllCaptureStatuses    = []CaptureStatus{CaptureStatusRecording, CaptureStatusCaptured, CaptureStatusFailed}
+	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusNotStarted, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
+)
+
 type Meeting struct {
 	ID                        string
 	Title                     string

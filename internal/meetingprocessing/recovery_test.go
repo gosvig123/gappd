@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 func TestRecoverStaleRecordingProcessesSavedAudioOnce(t *testing.T) {
@@ -93,8 +94,8 @@ func assertRecoveredMeetingCompleted(t *testing.T, store *db.DB, id string) {
 func assertRecoveredMeetingFailed(t *testing.T, store *db.DB, id string) {
 	t.Helper()
 	meeting := getMeeting(t, store, id)
-	if db.MeetingStateFor(*meeting) != db.MeetingStateFailed {
-		t.Fatalf("state = %q, want %q", db.MeetingStateFor(*meeting), db.MeetingStateFailed)
+	if meetinglifecycle.MeetingStateFor(*meeting) != meetinglifecycle.MeetingStateFailed {
+		t.Fatalf("state = %q, want %q", meetinglifecycle.MeetingStateFor(*meeting), meetinglifecycle.MeetingStateFailed)
 	}
 	if meeting.CaptureFailureMessage == nil || *meeting.CaptureFailureMessage != StaleNoAudioMessage {
 		t.Fatalf("capture_failure_message = %v, want stale message", meeting.CaptureFailureMessage)
