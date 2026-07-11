@@ -10,6 +10,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
@@ -40,6 +41,41 @@ func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
 	if got := getMeeting(t, store, meeting.ID).Summary; got == nil || *got != "refined" {
 		t.Fatalf("summary = %v, want refined", got)
 	}
+}
+
+func TestProcessCapturedReusesLiveSegments(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	meeting := createCapturedMeeting(t, store)
+	insertLiveTestSegment(t, store, meeting.ID)
+	transcriber := &rejectingTranscriber{}
+	service := Service{Store: store, Notes: &fakeNotes{summary: "summary"}, Transcriber: transcriber}
+
+	err := service.ProcessCaptured(context.Background(), CapturedRequest{MeetingID: meeting.ID, AudioDir: t.TempDir(), ReuseLiveSegments: true})
+	if err != nil {
+		t.Fatalf("ProcessCaptured() error = %v", err)
+	}
+	if transcriber.called {
+		t.Fatal("Transcribe() called, want persisted live segments reused")
+	}
+	if got := getMeeting(t, store, meeting.ID).Transcript; got == nil || !strings.Contains(*got, "live hello") {
+		t.Fatalf("transcript = %v, want live segment", got)
+	}
+}
+
+func insertLiveTestSegment(t *testing.T, store *db.DB, meetingID string) {
+	t.Helper()
+	segment := &db.Segment{MeetingID: meetingID, Start: 0, End: 1, Text: "live hello", Speaker: "You"}
+	if err := store.InsertSegment(segment); err != nil {
+		t.Fatalf("InsertSegment() error = %v", err)
+	}
+}
+
+type rejectingTranscriber struct{ called bool }
+
+func (t *rejectingTranscriber) Transcribe(context.Context, string, string) ([]transcribe.Segment, error) {
+	t.called = true
+	return nil, errors.New("full transcription should not run")
 }
 
 func TestProcessCapturedFailurePreservesCaptureAndEmitsEvent(t *testing.T) {

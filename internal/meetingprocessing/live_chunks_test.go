@@ -28,6 +28,20 @@ func TestProcessCapturedChunkPersistsOffsetSegments(t *testing.T) {
 	assertLiveChunkSegment(t, segments)
 }
 
+func TestLiveChunkResultRejectsFailedChunk(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	meeting := createRecordingMeeting(t, store)
+	chunks := make(chan CapturedChunk, 1)
+	chunks <- CapturedChunk{Path: filepath.Join(t.TempDir(), "missing.wav"), Source: "mic"}
+	close(chunks)
+	wait := StartLiveChunkProcessing(Service{Store: store}, LiveChunkOptions{MeetingID: meeting.ID, Chunks: func() <-chan CapturedChunk { return chunks }})
+	result := wait()
+	if result.Processed != 1 || result.Failed != 1 || result.Usable() {
+		t.Fatalf("result = %+v, want one failed unusable chunk", result)
+	}
+}
+
 func writeChunkAudio(t *testing.T) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "mic-000001.wav")

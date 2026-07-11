@@ -35,6 +35,10 @@ func (s Service) report() Reporter {
 	return noopReporter{}
 }
 
+func (s Service) ReportStage(stage ProcessingStage, duration time.Duration) {
+	s.report().StageCompleted(stage, duration)
+}
+
 func (s Service) notes() NotesGenerator {
 	if s.Notes != nil {
 		return s.Notes

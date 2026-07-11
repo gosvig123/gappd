@@ -1,21 +1,37 @@
 package recording
 
 import (
+	"time"
+
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
 type chunkRecorder interface {
 	Chunks() <-chan capture.ChunkEvent
+	ChunksComplete() bool
 }
 
-func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) func() {
+func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) func() meetingprocessing.LiveChunkResult {
 	return meetingprocessing.StartLiveChunkProcessing(processing, meetingprocessing.LiveChunkOptions{
 		MeetingID: meetingID,
 		Language:  language,
 		Chunks:    func() <-chan meetingprocessing.CapturedChunk { return capturedChunks(recorderChunks(recorder)) },
 		ErrOut:    w.errOut,
 	})
+}
+
+func drainLiveChunks(wait func() meetingprocessing.LiveChunkResult, processing meetingprocessing.Service, recorder audioRecorder) meetingprocessing.LiveChunkResult {
+	started := time.Now()
+	result := wait()
+	result.Dropped = !recorderChunksComplete(recorder)
+	processing.ReportStage(meetingprocessing.StageLiveDrain, time.Since(started))
+	return result
+}
+
+func recorderChunksComplete(recorder audioRecorder) bool {
+	chunker, ok := recorder.(chunkRecorder)
+	return ok && chunker.ChunksComplete()
 }
 
 func capturedChunks(events <-chan capture.ChunkEvent) <-chan meetingprocessing.CapturedChunk {

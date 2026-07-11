@@ -1,6 +1,21 @@
 package capture
 
-import "testing"
+import (
+	"io"
+	"testing"
+)
+
+func TestChunkEventWriterReportsDroppedEvent(t *testing.T) {
+	dropped := false
+	events := make(chan ChunkEvent)
+	writer := newChunkEventWriter(io.Discard, events, func() { dropped = true })
+	if _, err := writer.Write([]byte(`{"type":"audio_chunk","source":"mic","path":"/tmp/mic.wav"}` + "\n")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	if !dropped {
+		t.Fatal("dropped = false, want full channel reported")
+	}
+}
 
 func TestParseChunkEvent(t *testing.T) {
 	event, ok := parseChunkEvent([]byte(`{"type":"audio_chunk","source":"mic","path":"/tmp/mic.wav","start":1.5,"end":31.5}`))

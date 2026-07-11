@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -58,15 +59,53 @@ func (s Service) capturedStartTransition(meeting *db.Meeting) meetinglifecycle.T
 }
 
 func (s Service) processCaptured(ctx context.Context, meeting *db.Meeting, req CapturedRequest) error {
-	segments, err := s.transcribeStreams(ctx, req, meeting.ID)
-	if err != nil {
-		return s.saveProcessingFailure(ctx, meeting, err)
-	}
-	transcript, err := s.saveSegments(ctx, meeting, segments)
+	started := time.Now()
+	defer func() { s.report().StageCompleted(StageTotal, time.Since(started)) }()
+	transcript, err := s.prepareCapturedTranscript(ctx, meeting, req)
 	if err != nil {
 		return err
 	}
-	return s.enhanceAndSave(ctx, meeting, transcript, StoredRequest{Language: req.Language})
+	return s.enhanceCaptured(ctx, meeting, transcript, req.Language)
+}
+
+func (s Service) prepareCapturedTranscript(ctx context.Context, meeting *db.Meeting, req CapturedRequest) (string, error) {
+	started := time.Now()
+	segments, reused, err := s.capturedSegments(ctx, req, meeting.ID)
+	defer func() { s.report().StageCompleted(transcriptStage(reused), time.Since(started)) }()
+	if err != nil {
+		return "", s.saveProcessingFailure(ctx, meeting, err)
+	}
+	if reused {
+		return s.saveLiveSegments(ctx, meeting, segments)
+	}
+	return s.saveSegments(ctx, meeting, segments)
+}
+
+func (s Service) capturedSegments(ctx context.Context, req CapturedRequest, meetingID string) ([]db.Segment, bool, error) {
+	if req.ReuseLiveSegments {
+		segments, err := s.Store.GetSegments(meetingID)
+		if err != nil {
+			return nil, false, s.processingError("load live segments", meetingID, PhasePersist, err)
+		}
+		if len(segments) > 0 {
+			return segments, true, nil
+		}
+	}
+	segments, err := s.transcribeStreams(ctx, req, meetingID)
+	return segments, false, err
+}
+
+func transcriptStage(reused bool) ProcessingStage {
+	if reused {
+		return StageLiveTranscript
+	}
+	return StageFullTranscript
+}
+
+func (s Service) enhanceCaptured(ctx context.Context, meeting *db.Meeting, transcript, language string) error {
+	started := time.Now()
+	defer func() { s.report().StageCompleted(StageSummary, time.Since(started)) }()
+	return s.enhanceAndSave(ctx, meeting, transcript, StoredRequest{Language: language})
 }
 
 func (s Service) transcribeStreams(ctx context.Context, req CapturedRequest, meetingID string) ([]db.Segment, error) {
@@ -136,6 +175,11 @@ func (s Service) saveSegments(ctx context.Context, meeting *db.Meeting, segments
 	if err := s.Store.ReplaceSegments(meeting.ID, segments); err != nil {
 		return "", s.processingError("process captured", meeting.ID, PhasePersist, err)
 	}
+	return s.saveTranscript(ctx, meeting, FormatTranscript(segments))
+}
+
+func (s Service) saveLiveSegments(ctx context.Context, meeting *db.Meeting, segments []db.Segment) (string, error) {
+	s.report().SegmentsReused(len(segments))
 	return s.saveTranscript(ctx, meeting, FormatTranscript(segments))
 }
 

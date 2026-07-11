@@ -16,9 +16,10 @@ type CapturedProcessor interface {
 }
 
 type CapturedRequest struct {
-	MeetingID string
-	AudioDir  string
-	Language  string
+	MeetingID         string
+	AudioDir          string
+	Language          string
+	ReuseLiveSegments bool
 }
 
 type CapturedChunkRequest struct {
@@ -41,6 +42,14 @@ type LiveChunkOptions struct {
 	Chunks    func() <-chan CapturedChunk
 	ErrOut    io.Writer
 }
+
+type LiveChunkResult struct {
+	Processed int
+	Failed    int
+	Dropped   bool
+}
+
+func (r LiveChunkResult) Usable() bool { return r.Processed > 0 && r.Failed == 0 && !r.Dropped }
 
 type StoredRequest struct {
 	MeetingID string

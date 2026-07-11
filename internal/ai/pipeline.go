@@ -50,10 +50,10 @@ func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction,
 }
 
 func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractLong(ctx, transcript, nil, "")
+	return p.extractLong(ctx, transcript, nil, "", "")
 }
 
-func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language string) (*Extraction, error) {
+func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language, relevance string) (*Extraction, error) {
 	chunks := transcriptChunks(transcript)
 	if len(chunks) > maxTranscriptChunks {
 		return nil, fmt.Errorf("transcript too large: %d chunks exceeds limit %d", len(chunks), maxTranscriptChunks)
@@ -65,7 +65,7 @@ func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress 
 	if err != nil {
 		return nil, err
 	}
-	return p.refineMergedExtraction(ctx, extractions, progress, language)
+	return p.refineMergedExtraction(ctx, extractions, progress, language, relevance)
 }
 
 func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress func(Progress), language string) ([]*Extraction, error) {
@@ -81,10 +81,10 @@ func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress 
 	return extractions, nil
 }
 
-func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress), language string) (*Extraction, error) {
+func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress), language, relevance string) (*Extraction, error) {
 	merged := mergeExtractions(extractions)
 	emitProgress(progress, ProgressRefineExtraction, 1, 1)
-	return p.refineExtraction(ctx, merged, language)
+	return p.refineExtraction(ctx, merged, relevance, language)
 }
 
 func (p *Pipeline) extractChunk(ctx context.Context, transcript string, language string) (*Extraction, error) {
@@ -124,7 +124,7 @@ func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string)
 }
 
 func (p *Pipeline) RunWithOptions(ctx context.Context, transcript string, options RunOptions) (*Extraction, string, error) {
-	extraction, err := p.extractLong(ctx, transcript, options.OnProgress, options.Language)
+	extraction, err := p.extractLong(ctx, transcript, options.OnProgress, options.Language, options.UserNotes)
 	if err != nil {
 		return nil, "", err
 	}

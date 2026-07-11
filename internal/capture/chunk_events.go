@@ -19,11 +19,12 @@ const chunkEventType = "audio_chunk"
 type chunkEventWriter struct {
 	forward io.Writer
 	events  chan<- ChunkEvent
+	onDrop  func()
 	buf     bytes.Buffer
 }
 
-func newChunkEventWriter(forward io.Writer, events chan<- ChunkEvent) io.Writer {
-	return &chunkEventWriter{forward: forward, events: events}
+func newChunkEventWriter(forward io.Writer, events chan<- ChunkEvent, onDrop func()) io.Writer {
+	return &chunkEventWriter{forward: forward, events: events, onDrop: onDrop}
 }
 
 func (w *chunkEventWriter) Write(p []byte) (int, error) {
@@ -56,6 +57,9 @@ func (w *chunkEventWriter) consumeLine() {
 		select {
 		case w.events <- event:
 		default:
+			if w.onDrop != nil {
+				w.onDrop()
+			}
 		}
 	}
 }

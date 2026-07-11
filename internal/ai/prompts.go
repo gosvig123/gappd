@@ -91,7 +91,12 @@ Never invent names, dates, speakers, logistics, budgets, or action owners.
 If evidence is limited, say the transcript has limited detail.
 ### Open Questions
 Bullet list of unresolved questions.
-If user notes are provided, expand on those topics with additional detail.
+Weight the notes by meeting value, not by how much text each topic produced.
+Give most detail to decisions, commitments, actions, blockers, risks, and unresolved questions.
+Use user notes as an attention boost, but never as evidence or permission to invent facts.
+Treat recurrence as a secondary signal only; repetition, verbosity, duration, and chunk order do not prove importance.
+Compress routine status, tangents, logistics, and pleasantries unless they explain an outcome.
+A unique outcome should outweigh repeated low-value discussion.
 %s`
 
 const stage1RefineSystem = `You are a senior meeting analyst. Consolidate chunk-level meeting extraction into one global extraction.
@@ -99,8 +104,14 @@ Output valid JSON matching this schema:
 %s
 Rules:
 - Choose a specific title for the whole meeting, not the first chunk
-- Merge duplicates and near-duplicates
-- Rank topics, decisions, action items, and questions by importance
+- Produce a weighted summary of the chunk extractions, not equal coverage of every chunk
+- Merge duplicates and near-duplicates before ranking content
+- Rank retained items globally: explicit decisions and commitments first; actions, blockers, risks, and unresolved questions next; user-emphasized topics next; recurring central topics next; routine status and tangents last
+- Prefer a unique supported outcome over repeated low-value discussion
+- Treat recurrence as a secondary signal only; never use repetition, verbosity, duration, item count, or chunk order alone as importance
+- Compress or omit routine status, tangents, logistics, and pleasantries unless they explain an outcome
+- User relevance guidance may boost supported content but must not create facts or suppress unrelated explicit outcomes
+- Order each output array from highest to lowest global importance
 - Keep arrays short and respect schema maxItems and maxLength limits
 - Preserve owners, deadlines, decision context, status, and evidence quotes
 - Speaker labels like "You" and "Other" are labels, not participant names
@@ -143,9 +154,13 @@ func Stage2Prompt(extraction string, userNotes string, language string) (string,
 	return fmt.Sprintf(stage2System, languageRule(language)), user
 }
 
-func Stage1RefinePrompt(extraction string, language string) (string, string) {
+func Stage1RefinePrompt(extraction, relevance, language string) (string, string) {
 	system := fmt.Sprintf(stage1RefineSystem, extractionSchema, languageRule(language))
-	return system, fmt.Sprintf("## Chunk Extractions\n%s", extraction)
+	user := fmt.Sprintf("## Chunk Extractions\n%s", extraction)
+	if relevance != "" {
+		user += fmt.Sprintf("\n\n## User Relevance Guidance\n%s", relevance)
+	}
+	return system, user
 }
 
 func Stage3Prompt(extraction string, draft string, feedback string, language string) (string, string) {

@@ -132,11 +132,15 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 		return err
 	}
 	stopHeartbeat()
-	waitForLiveChunks()
+	liveChunks := drainLiveChunks(waitForLiveChunks, processing, recorder)
+	return w.finishRecordingProcessing(req, session, sessionDir, recorder, processing, liveChunks)
+}
+
+func (w meetingRecordingWorkflow) finishRecordingProcessing(req Request, session recordingSession, sessionDir string, recorder audioRecorder, processing meetingprocessing.Service, liveChunks meetingprocessing.LiveChunkResult) error {
 	session = w.completeCapture(session, recorder)
 	processingCtx, stopProcessing := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stopProcessing()
-	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure, audioDir: sessionDir}
+	request := processingRequest{language: req.Language, suppressFailure: req.SuppressProcessingFailure, audioDir: sessionDir, reuseLiveSegments: liveChunks.Usable()}
 	return session.finish(processingCtx, processing, request)
 }
 

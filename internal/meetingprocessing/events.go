@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -25,16 +26,29 @@ type Event struct {
 
 type EventSink interface{ EmitProcessingEvent(Event) error }
 
+type ProcessingStage string
+
+const (
+	StageLiveDrain         ProcessingStage = "transcript.live_drain"
+	StageLiveTranscript    ProcessingStage = "transcript.live"
+	StageFullTranscript    ProcessingStage = "transcript.full"
+	StageSummary           ProcessingStage = "summary"
+	StageTotal             ProcessingStage = "processing.total"
+	processingTimingPrefix                 = "● Timing "
+)
+
 type Reporter interface {
 	Transcribing(string)
 	TranscriptionSkipped(string)
 	TranscriptionFailed(string, error)
 	SegmentsSaved(int)
+	SegmentsReused(int)
 	TranscriptSaved(string)
 	ProcessingFailure(*string)
 	EnhancementStarted()
 	AIProgress(Progress)
 	EnhancementCompleted(string, int, string)
+	StageCompleted(ProcessingStage, time.Duration)
 }
 
 type Progress struct {
@@ -44,11 +58,13 @@ type Progress struct {
 }
 
 type consoleReporter struct{ out, errOut io.Writer }
-type noopReporter struct{}
+type noopReporter struct{ timing io.Writer }
 
 func NewConsoleReporter(out, errOut io.Writer) Reporter {
 	return consoleReporter{out: out, errOut: errOut}
 }
+
+func NewTimingReporter(out io.Writer) Reporter { return noopReporter{timing: out} }
 
 func (r consoleReporter) Transcribing(speaker string) {
 	fmt.Fprintf(r.out, "● Transcribing %s audio with Apple Speech...\n", speaker)
@@ -63,6 +79,10 @@ func (r consoleReporter) TranscriptionFailed(speaker string, err error) {
 }
 
 func (r consoleReporter) SegmentsSaved(count int) { fmt.Fprintf(r.out, "● Got %d segments\n", count) }
+
+func (r consoleReporter) SegmentsReused(count int) {
+	fmt.Fprintf(r.out, "● Reused %d live transcript segments\n", count)
+}
 
 func (r consoleReporter) TranscriptSaved(transcript string) {
 	fmt.Fprintln(r.out, "\n── Transcript ──────────────────────────")
@@ -85,20 +105,34 @@ func (r consoleReporter) EnhancementCompleted(summary string, actionItems int, m
 	printEnhancementResult(r.out, summary, actionItems, meetingID)
 }
 
+func (r consoleReporter) StageCompleted(stage ProcessingStage, duration time.Duration) {
+	printStageDuration(r.out, stage, duration)
+}
+
 func (noopReporter) Transcribing(string)                      {}
 func (noopReporter) TranscriptionSkipped(string)              {}
 func (noopReporter) TranscriptionFailed(string, error)        {}
 func (noopReporter) SegmentsSaved(int)                        {}
+func (noopReporter) SegmentsReused(int)                       {}
 func (noopReporter) TranscriptSaved(string)                   {}
 func (noopReporter) ProcessingFailure(*string)                {}
 func (noopReporter) EnhancementStarted()                      {}
 func (noopReporter) AIProgress(Progress)                      {}
 func (noopReporter) EnhancementCompleted(string, int, string) {}
+func (r noopReporter) StageCompleted(stage ProcessingStage, duration time.Duration) {
+	if r.timing != nil {
+		printStageDuration(r.timing, stage, duration)
+	}
+}
 
 func bridgeProgress(report Reporter) func(ai.Progress) {
 	return func(progress ai.Progress) {
 		report.AIProgress(Progress{Stage: string(progress.Stage), Current: progress.Current, Total: progress.Total})
 	}
+}
+
+func printStageDuration(out io.Writer, stage ProcessingStage, duration time.Duration) {
+	fmt.Fprintf(out, "%s%s: %s\n", processingTimingPrefix, stage, duration.Round(time.Millisecond))
 }
 
 func printAIProgress(out io.Writer, progress Progress) {

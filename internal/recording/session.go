@@ -13,9 +13,10 @@ import (
 )
 
 type processingRequest struct {
-	language        string
-	suppressFailure bool
-	audioDir        string
+	language          string
+	suppressFailure   bool
+	audioDir          string
+	reuseLiveSegments bool
 }
 
 type recordingSession struct {
@@ -70,7 +71,7 @@ func (r recordingSession) finish(ctx context.Context, processing meetingprocessi
 	if err := r.apply(ctx, meetinglifecycle.Captured{At: time.Now()}); err != nil {
 		return err
 	}
-	err := processing.ProcessCaptured(ctx, meetingprocessing.CapturedRequest{MeetingID: r.meeting.ID, AudioDir: r.audioDir(req), Language: req.language})
+	err := processing.ProcessCaptured(ctx, meetingprocessing.CapturedRequest{MeetingID: r.meeting.ID, AudioDir: r.audioDir(req), Language: req.language, ReuseLiveSegments: req.reuseLiveSegments})
 	if err != nil && req.suppressFailure {
 		return nil
 	}

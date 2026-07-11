@@ -77,6 +77,9 @@ func TestPipelineSynthesize(t *testing.T) {
 		t.Fatalf("Synthesize result = %q, want provider output", notes)
 	}
 	assertRequestContains(t, provider.requests, 0, 0.3, "## Extracted Data", "Emphasize launch blockers")
+	if !strings.Contains(provider.requests[0].System, "A unique outcome should outweigh repeated low-value discussion") {
+		t.Fatal("synthesis system missing outcome-first weighting")
+	}
 }
 
 func TestPipelineSynthesizeClearsEmptyDecisionSection(t *testing.T) {
@@ -119,18 +122,30 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 		"## Meeting Title\nMerged")
 	transcript := strings.Repeat("[Ada] roadmap\n", 500) + strings.Repeat("[Ben] launch\n", 500)
 
-	extraction, notes, err := pipeline.Run(context.Background(), transcript, "")
+	extraction, notes, err := pipeline.Run(context.Background(), transcript, "Focus launch blockers")
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	if len(provider.requests) != 5 || notes == "" {
 		t.Fatalf("requests=%d notes=%q, want chunked extraction, refinement, and synthesis", len(provider.requests), notes)
 	}
+	assertWeightedRefinement(t, provider.requests)
 	if extraction.Title != "Roadmap Launch Planning" {
 		t.Fatalf("title = %q, want refined global title", extraction.Title)
 	}
 	if strings.Join(extraction.Participants, ",") != "Ada,Ben" {
 		t.Fatalf("participants = %#v, want merged participants", extraction.Participants)
+	}
+}
+
+func assertWeightedRefinement(t *testing.T, requests []CompletionRequest) {
+	t.Helper()
+	refinement := requests[len(requests)-2]
+	if !strings.Contains(refinement.User, "## User Relevance Guidance\nFocus launch blockers") {
+		t.Fatalf("refinement user = %q, want relevance guidance", refinement.User)
+	}
+	if !strings.Contains(refinement.System, "Prefer a unique supported outcome") {
+		t.Fatalf("refinement system missing outcome-first weighting")
 	}
 }
 
