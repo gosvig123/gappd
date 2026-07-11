@@ -1,10 +1,11 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import readline from 'node:readline'
 import { canStartRecordingStatus } from '../shared/meeting-recording-workflow'
+import { createAssistedRecordingStop } from './assisted-recording-stop'
 import { childEnv, resolveCaptureBinary } from './native-runtime'
 import { dismissMeetingPrompt, showMeetingPrompt, stopMeetingPrompts } from './meeting-notification'
-import { startMeetingRecordingWorkflow } from './meeting-recording-workflow'
-import { getRecordingState } from './state'
+import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
+import { getRecordingState, onRecordingStateChange } from './state'
 
 const DEBOUNCE_MS = 4_000
 const OBSERVER_RESTART_MS = 2_000
@@ -19,12 +20,22 @@ const activeSignals = new Map<string, MeetingSignal>()
 const promptedKeys = new Set<string>()
 const debounceTimers = new Map<string, NodeJS.Timeout>()
 let observer: ChildProcessWithoutNullStreams | null = null
+let observerRestartTimer: NodeJS.Timeout | null = null
+let unsubscribeRecordingState: (() => void) | null = null
 let stopping = false
 let showApp = () => {}
+
+const assistedStop = createAssistedRecordingStop({
+  getState: getRecordingState,
+  isSignalActive: (key) => activeSignals.has(key),
+  stopRecording: stopMeetingRecordingWorkflow,
+})
 
 export function startMeetingPresence(showMainWindow: () => void): void {
   showApp = showMainWindow
   stopping = false
+  unsubscribeRecordingState?.()
+  unsubscribeRecordingState = onRecordingStateChange(assistedStop.recordingStateChanged)
   startNativeObserver()
 }
 
@@ -32,11 +43,12 @@ export function stopMeetingPresence(): void {
   stopping = true
   observer?.kill()
   observer = null
-  for (const timer of debounceTimers.values()) clearTimeout(timer)
-  debounceTimers.clear()
-  activeSignals.clear()
-  promptedKeys.clear()
-  stopMeetingPrompts()
+  if (observerRestartTimer) clearTimeout(observerRestartTimer)
+  observerRestartTimer = null
+  unsubscribeRecordingState?.()
+  unsubscribeRecordingState = null
+  clearPresenceSignals()
+  assistedStop.reset()
 }
 
 function receiveSnapshot(line: string): void {
@@ -48,7 +60,8 @@ function receiveSnapshot(line: string): void {
 }
 
 function applySnapshot(snapshot: MeetingSnapshot): void {
-  const meetings = Array.isArray(snapshot.meetings) ? snapshot.meetings.filter(validSignal) : []
+  if (!snapshot || !Array.isArray(snapshot.meetings)) return
+  const meetings = snapshot.meetings.filter(validSignal)
   const nextKeys = new Set(meetings.map((meeting) => meeting.key))
   logSnapshotChange(nextKeys, meetings)
   for (const key of activeSignals.keys()) if (!nextKeys.has(key)) removeSignal(key)
@@ -66,6 +79,7 @@ function logSnapshotChange(nextKeys: Set<string>, meetings: MeetingSignal[]): vo
 
 function acceptSignal(signal: MeetingSignal): void {
   activeSignals.set(signal.key, signal)
+  assistedStop.signalFound(signal.key)
   if (promptedKeys.has(signal.key) || debounceTimers.has(signal.key)) return
   debounceTimers.set(signal.key, setTimeout(() => promptForSignal(signal.key), DEBOUNCE_MS))
 }
@@ -86,6 +100,7 @@ function removeSignal(key: string): void {
   const timer = debounceTimers.get(key)
   if (timer) clearTimeout(timer)
   debounceTimers.delete(key)
+  assistedStop.signalLost(key)
 }
 
 function promptForSignal(key: string): void {
@@ -99,7 +114,8 @@ function promptForSignal(key: string): void {
 
 async function recordSignal(signal: MeetingSignal): Promise<void> {
   try {
-    await startMeetingRecordingWorkflow({ title: signal.title })
+    const state = await startMeetingRecordingWorkflow({ title: signal.title })
+    assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
   } catch (error) {
     showApp()
     console.error(`Start recording for ${signal.provider} failed:`, error)
@@ -108,14 +124,32 @@ async function recordSignal(signal: MeetingSignal): Promise<void> {
 
 function startNativeObserver(): void {
   if (process.platform !== 'darwin' || stopping) return
-  observer = spawn(resolveCaptureBinary(), ['--observe-meetings'], { env: childEnv() })
-  readline.createInterface({ input: observer.stdout }).on('line', receiveSnapshot)
-  observer.stderr.on('data', (data) => console.warn(`Meeting observer warning: ${String(data).trim()}`))
-  observer.once('error', (error) => console.warn(`Meeting observer failed to start: ${error.message}`))
-  observer.once('exit', restartNativeObserver)
+  const child = spawn(resolveCaptureBinary(), ['--observe-meetings'], { env: childEnv() })
+  observer = child
+  readline.createInterface({ input: child.stdout }).on('line', receiveSnapshot)
+  child.stderr.on('data', (data) => console.warn(`Meeting observer warning: ${String(data).trim()}`))
+  child.once('error', (error) => observerFailed(child, error))
+  child.once('exit', () => restartNativeObserver(child))
 }
 
-function restartNativeObserver(): void {
+function observerFailed(child: ChildProcessWithoutNullStreams, error: Error): void {
+  console.warn(`Meeting observer failed to start: ${error.message}`)
+  if (observer === child) clearPresenceSignals()
+  assistedStop.observerUnavailable()
+}
+
+function restartNativeObserver(child: ChildProcessWithoutNullStreams): void {
+  if (observer !== child) return
   observer = null
-  if (!stopping) setTimeout(startNativeObserver, OBSERVER_RESTART_MS)
+  clearPresenceSignals()
+  assistedStop.observerUnavailable()
+  if (!stopping) observerRestartTimer = setTimeout(startNativeObserver, OBSERVER_RESTART_MS)
+}
+
+function clearPresenceSignals(): void {
+  for (const timer of debounceTimers.values()) clearTimeout(timer)
+  debounceTimers.clear()
+  activeSignals.clear()
+  promptedKeys.clear()
+  stopMeetingPrompts()
 }
