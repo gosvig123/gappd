@@ -10,7 +10,6 @@ import (
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
-	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
@@ -43,57 +42,6 @@ func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
 	}
 }
 
-func TestProcessCapturedReusesLiveSegments(t *testing.T) {
-	store := openTestDB(t)
-	defer store.Close()
-	meeting := createCapturedMeeting(t, store)
-	insertLiveTestSegment(t, store, meeting.ID)
-	transcriber := &rejectingTranscriber{}
-	service := Service{Store: store, Notes: &fakeNotes{summary: "summary"}, Transcriber: transcriber}
-
-	err := service.ProcessCaptured(context.Background(), CapturedRequest{MeetingID: meeting.ID, AudioDir: t.TempDir(), ReuseLiveSegments: true})
-	if err != nil {
-		t.Fatalf("ProcessCaptured() error = %v", err)
-	}
-	if transcriber.called {
-		t.Fatal("Transcribe() called, want persisted live segments reused")
-	}
-	if got := getMeeting(t, store, meeting.ID).Transcript; got == nil || !strings.Contains(*got, "live hello") {
-		t.Fatalf("transcript = %v, want live segment", got)
-	}
-}
-
-func insertLiveTestSegment(t *testing.T, store *db.DB, meetingID string) {
-	t.Helper()
-	segment := &db.Segment{MeetingID: meetingID, Start: 0, End: 1, Text: "live hello", Speaker: "You"}
-	if err := store.InsertSegment(segment); err != nil {
-		t.Fatalf("InsertSegment() error = %v", err)
-	}
-}
-
-type rejectingTranscriber struct{ called bool }
-
-func (t *rejectingTranscriber) Transcribe(context.Context, string, string) ([]transcribe.Segment, error) {
-	t.called = true
-	return nil, errors.New("full transcription should not run")
-}
-
-func TestProcessCapturedFailurePreservesCaptureAndEmitsEvent(t *testing.T) {
-	store := openTestDB(t)
-	defer store.Close()
-	meeting := createCapturedMeeting(t, store)
-	events := &testEvents{}
-	service := Service{Store: store, Notes: &fakeNotes{}, Transcriber: fakeTranscriber{}, Events: events}
-
-	err := service.ProcessCaptured(context.Background(), CapturedRequest{MeetingID: meeting.ID, AudioDir: t.TempDir()})
-	if err == nil || !strings.Contains(err.Error(), "transcription failed: no audio captured") {
-		t.Fatalf("ProcessCaptured() error = %v, want transcription failure", err)
-	}
-	stored := getMeeting(t, store, meeting.ID)
-	assertProcessingFailed(t, stored, "no audio captured")
-	assertLastProcessingEvent(t, events, EventFailed, meeting.ID, ErrNoAudio)
-}
-
 func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
@@ -123,19 +71,6 @@ func TestEnhanceFailureSavesTranscriptAndEmitsEvent(t *testing.T) {
 
 func testProcessingTime() time.Time {
 	return time.Date(2026, 4, 10, 12, 45, 0, 0, time.UTC)
-}
-
-func assertProcessingFailed(t *testing.T, stored *db.Meeting, want string) {
-	t.Helper()
-	if stored.CaptureStatus != db.CaptureStatusCaptured {
-		t.Fatalf("capture_status = %q, want %q", stored.CaptureStatus, db.CaptureStatusCaptured)
-	}
-	if stored.ProcessingStatus != db.ProcessingStatusFailed {
-		t.Fatalf("processing_status = %q, want %q", stored.ProcessingStatus, db.ProcessingStatusFailed)
-	}
-	if stored.ProcessingFailureMessage == nil || *stored.ProcessingFailureMessage != want {
-		t.Fatalf("processing_failure_message = %v, want %q", stored.ProcessingFailureMessage, want)
-	}
 }
 
 func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr string) {

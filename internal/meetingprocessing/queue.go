@@ -104,8 +104,7 @@ func (s Service) transcribeClaim(ctx context.Context, lifecycle meetinglifecycle
 	if claim.Meeting.AudioPath == nil || *claim.Meeting.AudioPath == "" {
 		return deterministic(ErrNoAudio)
 	}
-	req := CapturedRequest{MeetingID: claim.Meeting.ID, AudioDir: *claim.Meeting.AudioPath, Language: claim.Meeting.Language}
-	segments, _, err := s.capturedSegments(ctx, req, claim.Meeting.ID)
+	segments, err := s.transcribeStreams(ctx, *claim.Meeting.AudioPath, claim.Meeting.Language, claim.Meeting.ID)
 	if err != nil {
 		return err
 	}

@@ -4,24 +4,12 @@ import (
 	"context"
 	"errors"
 	"io"
-	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
-
-type CapturedProcessor interface {
-	ProcessCaptured(context.Context, CapturedRequest) error
-}
-
-type CapturedRequest struct {
-	MeetingID         string
-	AudioDir          string
-	Language          string
-	ReuseLiveSegments bool
-}
 
 type CapturedChunkRequest struct {
 	MeetingID      string
@@ -93,14 +81,9 @@ var (
 	ErrNoTranscript = errors.New("no transcript found")
 )
 
-type AtomicTranscriptStore interface {
-	CommitDirectTranscript(context.Context, string, string, []db.Segment, time.Time) (bool, error)
-}
-
 type Store interface {
 	GetMeeting(string) (*db.Meeting, error)
 	GetSegments(string) ([]db.Segment, error)
-	ReplaceSegments(string, []db.Segment) error
 	InsertSegment(*db.Segment) error
 }
 

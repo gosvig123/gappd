@@ -30,10 +30,6 @@ type ProcessingStage string
 
 const (
 	StageLiveDrain         ProcessingStage = "transcript.live_drain"
-	StageLiveTranscript    ProcessingStage = "transcript.live"
-	StageFullTranscript    ProcessingStage = "transcript.full"
-	StageSummary           ProcessingStage = "summary"
-	StageTotal             ProcessingStage = "processing.total"
 	processingTimingPrefix                 = "● Timing "
 )
 
@@ -41,10 +37,6 @@ type Reporter interface {
 	Transcribing(string)
 	TranscriptionSkipped(string)
 	TranscriptionFailed(string, error)
-	SegmentsSaved(int)
-	SegmentsReused(int)
-	TranscriptSaved(string)
-	ProcessingFailure(*string)
 	EnhancementStarted()
 	AIProgress(Progress)
 	EnhancementCompleted(string, int, string)
@@ -78,23 +70,6 @@ func (r consoleReporter) TranscriptionFailed(speaker string, err error) {
 	fmt.Fprintf(r.errOut, "  error: %s transcription failed: %v\n", speaker, err)
 }
 
-func (r consoleReporter) SegmentsSaved(count int) { fmt.Fprintf(r.out, "● Got %d segments\n", count) }
-
-func (r consoleReporter) SegmentsReused(count int) {
-	fmt.Fprintf(r.out, "● Reused %d live transcript segments\n", count)
-}
-
-func (r consoleReporter) TranscriptSaved(transcript string) {
-	fmt.Fprintln(r.out, "\n── Transcript ──────────────────────────")
-	fmt.Fprintln(r.out, transcript)
-}
-
-func (r consoleReporter) ProcessingFailure(audioPath *string) {
-	if audioPath != nil {
-		fmt.Fprintf(r.out, "  session saved (audio may be incomplete — check %s)\n", *audioPath)
-	}
-}
-
 func (r consoleReporter) EnhancementStarted() {
 	fmt.Fprintln(r.out, "── Enhancing with AI... ─────────────────")
 }
@@ -112,10 +87,6 @@ func (r consoleReporter) StageCompleted(stage ProcessingStage, duration time.Dur
 func (noopReporter) Transcribing(string)                      {}
 func (noopReporter) TranscriptionSkipped(string)              {}
 func (noopReporter) TranscriptionFailed(string, error)        {}
-func (noopReporter) SegmentsSaved(int)                        {}
-func (noopReporter) SegmentsReused(int)                       {}
-func (noopReporter) TranscriptSaved(string)                   {}
-func (noopReporter) ProcessingFailure(*string)                {}
 func (noopReporter) EnhancementStarted()                      {}
 func (noopReporter) AIProgress(Progress)                      {}
 func (noopReporter) EnhancementCompleted(string, int, string) {}
