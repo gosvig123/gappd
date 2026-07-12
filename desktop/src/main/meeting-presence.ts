@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import readline from 'node:readline'
-import { canStartRecordingStatus } from '../shared/meeting-recording-workflow'
+import { canStartRecordingStatus, RECORDING_STATUS_RECORDING } from '../shared/meeting-recording-workflow'
 import { createAssistedRecordingStop } from './assisted-recording-stop'
 import { childEnv, resolveCaptureBinary } from './native-runtime'
 import { dismissMeetingPrompt, showMeetingPrompt, stopMeetingPrompts } from './meeting-notification'
@@ -35,7 +35,7 @@ export function startMeetingPresence(showMainWindow: () => void): void {
   showApp = showMainWindow
   stopping = false
   unsubscribeRecordingState?.()
-  unsubscribeRecordingState = onRecordingStateChange(assistedStop.recordingStateChanged)
+  unsubscribeRecordingState = onRecordingStateChange(recordingStateChanged)
   startNativeObserver()
 }
 
@@ -49,6 +49,14 @@ export function stopMeetingPresence(): void {
   unsubscribeRecordingState = null
   clearPresenceSignals()
   assistedStop.reset()
+}
+
+function recordingStateChanged(state: ReturnType<typeof getRecordingState>): void {
+  assistedStop.recordingStateChanged(state)
+  if (state.status !== RECORDING_STATUS_RECORDING) return
+  const signals = [...activeSignals.values()]
+  const signal = signals.find((candidate) => candidate.title === state.title) ?? (signals.length === 1 ? signals[0] : null)
+  if (signal) assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
 }
 
 function receiveSnapshot(line: string): void {
