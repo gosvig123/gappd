@@ -11,10 +11,10 @@ import (
 
 type DB struct{ Conn *sql.DB }
 
-const initBusyTimeoutMS = 5000
+const sqliteBusyTimeoutMS = 5000
 
 func Open(path string) (*DB, error) {
-	conn, err := sql.Open("sqlite", path)
+	conn, err := sql.Open("sqlite", sqliteConnectionString(path))
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
@@ -47,10 +47,11 @@ func finishInitConnection(ctx context.Context, conn *sql.Conn) error {
 	return nil
 }
 
+func sqliteConnectionString(path string) string {
+	return fmt.Sprintf("%s?_pragma=busy_timeout(%d)&_pragma=foreign_keys(1)", path, sqliteBusyTimeoutMS)
+}
+
 func prepareInitConnection(ctx context.Context, conn *sql.Conn) error {
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("PRAGMA busy_timeout = %d", initBusyTimeoutMS)); err != nil {
-		return fmt.Errorf("set busy timeout: %w", err)
-	}
 	// SQLite requires foreign keys off before rebuilding a referenced table.
 	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys = OFF"); err != nil {
 		return fmt.Errorf("disable foreign keys for migration: %w", err)
