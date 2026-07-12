@@ -441,7 +441,14 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
 
     func stop() async {
         try? await stream?.stopCapture()
-        writer?.finalize()
+        await withCheckedContinuation { continuation in
+            sampleQueue.async(execute: DispatchWorkItem {
+                let writer = self.writer
+                self.writer = nil
+                writer?.finalize()
+                continuation.resume()
+            })
+        }
     }
 }
 
