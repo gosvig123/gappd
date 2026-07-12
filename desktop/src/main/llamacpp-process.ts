@@ -16,6 +16,7 @@ const READINESS_ATTEMPTS = 120
 const READINESS_INTERVAL_MS = 500
 const READINESS_TIMEOUT_MS = READINESS_ATTEMPTS * READINESS_INTERVAL_MS
 const HEALTH_CHECK_TIMEOUT_MS = 2_000
+const LSOF_TIMEOUT_MS = 2_000
 const SHUTDOWN_TIMEOUT_MS = 5_000
 const SHUTDOWN_POLL_INTERVAL_MS = 50
 
@@ -116,12 +117,16 @@ async function sleepBeforeRetry(deadline: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, Math.min(READINESS_INTERVAL_MS, remainingMs)))
 }
 
-function listenerPid(port: number): Promise<number | null> {
-  return new Promise((resolve) => execFile('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], (_error, stdout) => resolve(parsePid(stdout))))
+async function listenerPid(port: number): Promise<number | null> {
+  return parsePid(await runLsof(['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t']))
 }
 
-function processExecutable(pid: number): Promise<string | null> {
-  return new Promise((resolve) => execFile('lsof', ['-a', '-p', String(pid), '-d', 'txt', '-Fn'], (_error, stdout) => resolve(parseExecutable(stdout))))
+async function processExecutable(pid: number): Promise<string | null> {
+  return parseExecutable(await runLsof(['-a', '-p', String(pid), '-d', 'txt', '-Fn']))
+}
+
+function runLsof(args: string[]): Promise<string> {
+  return new Promise((resolve) => execFile('lsof', args, { timeout: LSOF_TIMEOUT_MS }, (error, stdout) => resolve(error ? '' : stdout)))
 }
 
 function parseExecutable(stdout: string): string | null {
