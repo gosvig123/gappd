@@ -29,11 +29,15 @@ func TestClaimExclusiveExpiryAndStaleToken(t *testing.T) {
 	if err != nil || expired == nil || expired.Token == first.Token {
 		t.Fatalf("expired claim = %#v, %v", expired, err)
 	}
-	ok, err := store.ReleaseClaim(context.Background(), meeting.ID, first.Token, now)
+	first.Meeting.ProcessingStatus = ProcessingStatusPending
+	first.Meeting.ProcessingStatusUpdatedAt = stamp(now)
+	ok, err := store.CommitClaim(context.Background(), &first.Meeting, first.Token)
 	if err != nil || ok {
 		t.Fatalf("stale release = %v, %v", ok, err)
 	}
-	ok, err = store.ReleaseClaim(context.Background(), meeting.ID, expired.Token, now)
+	expired.Meeting.ProcessingStatus = ProcessingStatusPending
+	expired.Meeting.ProcessingStatusUpdatedAt = stamp(now)
+	ok, err = store.CommitClaim(context.Background(), &expired.Meeting, expired.Token)
 	if err != nil || !ok {
 		t.Fatalf("current release = %v, %v", ok, err)
 	}
@@ -65,20 +69,24 @@ func TestClaimUsesOldestEligibleMeeting(t *testing.T) {
 	}
 }
 
-func TestCommitTranscriptIsAtomicAndTokenChecked(t *testing.T) {
+func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
 	store := openQueueDB(t)
 	defer store.Close()
 	meeting := queueMeeting(t, store, "atomic", "2026-01-01T00:00:00Z")
 	claim, _ := store.ClaimNext(context.Background(), QueueStageTranscription, time.Now(), time.Minute, nil)
 	segments := []Segment{{ID: "segment", MeetingID: meeting.ID, Text: "hello", End: 1}}
-	ok, err := store.CommitTranscript(context.Background(), meeting.ID, "stale", "bad", segments, time.Now())
+	transcript := "hello"
+	claim.Meeting.Transcript = &transcript
+	claim.Meeting.ProcessingStatus = ProcessingStatusPending
+	claim.Meeting.ProcessingStatusUpdatedAt = stamp(time.Now())
+	ok, err := store.CommitClaimTranscript(context.Background(), &claim.Meeting, "stale", segments)
 	if err != nil || ok {
 		t.Fatalf("stale commit = %v, %v", ok, err)
 	}
 	if got, _ := store.GetSegments(meeting.ID); len(got) != 0 {
 		t.Fatal("stale commit changed segments")
 	}
-	ok, err = store.CommitTranscript(context.Background(), meeting.ID, claim.Token, "hello", segments, time.Now())
+	ok, err = store.CommitClaimTranscript(context.Background(), &claim.Meeting, claim.Token, segments)
 	if err != nil || !ok {
 		t.Fatalf("commit = %v, %v", ok, err)
 	}

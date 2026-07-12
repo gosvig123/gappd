@@ -2,12 +2,14 @@ package meetingprocessing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 const claimTTL = 5 * time.Minute
@@ -43,7 +45,9 @@ func (s Service) drainClaims(ctx context.Context, store *db.DB, stage db.QueueSt
 		}
 		attempted = append(attempted, claim.Meeting.ID)
 		result.Attempted++
-		s.runClaim(ctx, store, claim, result)
+		if err := s.runClaim(ctx, store, claim, result); err != nil {
+			return err
+		}
 	}
 }
 
@@ -58,35 +62,45 @@ func capabilityStage(capability Capability) (db.QueueStage, error) {
 	}
 }
 
-func (s Service) runClaim(ctx context.Context, store *db.DB, claim *db.ProcessingClaim, result *DrainResult) {
+func (s Service) runClaim(ctx context.Context, store *db.DB, claim *db.ProcessingClaim, result *DrainResult) error {
+	lifecycle := meetinglifecycle.New(store)
 	stopRenewal := s.maintainClaim(ctx, store, claim)
-	err := s.processClaim(ctx, store, claim)
-	stopRenewal()
-	if err == nil {
-		result.Completed++
-		return
+	defer stopRenewal()
+	if err := s.processClaim(ctx, lifecycle, claim); err != nil {
+		return s.finalizeClaimError(ctx, lifecycle, claim, result, err)
 	}
-	if category(err) == ErrorTransient {
-		_, _ = store.ReleaseClaim(ctx, claim.Meeting.ID, claim.Token, s.now())
-		result.Requeued++
-		return
-	}
-	_, _ = store.FailClaim(ctx, claim.Meeting.ID, claim.Token, s.now(), err)
-	result.Failed++
+	result.Completed++
+	return nil
 }
 
-func (s Service) processClaim(ctx context.Context, store *db.DB, claim *db.ProcessingClaim) error {
+func (s Service) finalizeClaimError(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult, claimErr error) error {
+	finalized, err := lifecycle.TransitionClaim(ctx, claim.Meeting.ID, claim.Token, s.failureTransition(claimErr, nil))
+	if err != nil {
+		return errors.Join(claimErr, fmt.Errorf("finalize processing claim: %w", err))
+	}
+	if !finalized.Applied {
+		return nil
+	}
+	if category(claimErr) == ErrorTransient {
+		result.Requeued++
+	} else {
+		result.Failed++
+	}
+	return nil
+}
+
+func (s Service) processClaim(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim) error {
 	switch claim.Stage {
 	case db.QueueStageTranscription:
-		return s.transcribeClaim(ctx, store, claim)
+		return s.transcribeClaim(ctx, lifecycle, claim)
 	case db.QueueStageSummarization:
-		return s.summarizeClaim(ctx, store, claim)
+		return s.summarizeClaim(ctx, lifecycle, claim)
 	default:
 		return deterministic(fmt.Errorf("inconsistent meeting artifacts"))
 	}
 }
 
-func (s Service) transcribeClaim(ctx context.Context, store *db.DB, claim *db.ProcessingClaim) error {
+func (s Service) transcribeClaim(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim) error {
 	if claim.Meeting.AudioPath == nil || *claim.Meeting.AudioPath == "" {
 		return deterministic(ErrNoAudio)
 	}
@@ -95,17 +109,17 @@ func (s Service) transcribeClaim(ctx context.Context, store *db.DB, claim *db.Pr
 	if err != nil {
 		return err
 	}
-	ok, err := store.CommitTranscript(ctx, claim.Meeting.ID, claim.Token, FormatTranscript(segments), segments, s.now())
+	result, err := lifecycle.SaveClaimTranscript(ctx, claim.Meeting.ID, claim.Token, FormatTranscript(segments), segments, s.now())
 	if err != nil {
 		return err
 	}
-	if !ok {
+	if !result.Applied {
 		return fmt.Errorf("transcription claim expired")
 	}
 	return nil
 }
 
-func (s Service) summarizeClaim(ctx context.Context, store *db.DB, claim *db.ProcessingClaim) error {
+func (s Service) summarizeClaim(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim) error {
 	if claim.Meeting.Transcript == nil || *claim.Meeting.Transcript == "" {
 		return deterministic(ErrNoTranscript)
 	}
@@ -117,16 +131,18 @@ func (s Service) summarizeClaim(ctx context.Context, store *db.DB, claim *db.Pro
 	if err != nil {
 		return deterministic(err)
 	}
-	value := db.ProcessingCompletion{Title: extraction.Title, Transcript: *claim.Meeting.Transcript, Summary: summary, ExtractionJSON: encoded}
-	return s.commitClaimSummary(ctx, store, claim, value)
+	completion := meetinglifecycle.Completion{Title: extraction.Title, Transcript: *claim.Meeting.Transcript,
+		Summary: summary, ExtractionJSON: encoded, At: s.now()}
+	return commitClaimCompletion(ctx, lifecycle, claim, completion)
 }
 
-func (s Service) commitClaimSummary(ctx context.Context, store *db.DB, claim *db.ProcessingClaim, value db.ProcessingCompletion) error {
-	ok, err := store.CommitSummary(ctx, claim.Meeting.ID, claim.Token, value, s.now())
+func commitClaimCompletion(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, completion meetinglifecycle.Completion) error {
+	result, err := lifecycle.TransitionClaim(ctx, claim.Meeting.ID, claim.Token,
+		meetinglifecycle.ProcessingCompleted{Completion: completion})
 	if err != nil {
 		return err
 	}
-	if !ok {
+	if !result.Applied {
 		return fmt.Errorf("summarization claim expired")
 	}
 	return nil
