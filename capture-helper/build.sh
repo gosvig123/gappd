@@ -34,6 +34,8 @@ build_arch_binary() {
 
     swiftc \
         -O \
+        -swift-version 6 \
+        -strict-concurrency=complete \
         -target "${arch}-apple-macos${MACOS_MIN_VERSION}" \
         -framework AppKit \
         -framework AVFoundation \

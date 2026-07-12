@@ -18,6 +18,7 @@ struct Config {
     let chunkOverlapSeconds: Double
 }
 
+@MainActor
 func parseArgs() -> Config {
     var mode: CaptureMode = .both
     var outputDir = "."
@@ -154,12 +155,15 @@ func listDevices() {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var name: CFString = "" as CFString
-        var nameSize = UInt32(MemoryLayout<CFString>.size)
-        AudioObjectGetPropertyData(id, &nameAddr, 0, nil, &nameSize, &name)
+        var name: CFString?
+        var nameSize = UInt32(MemoryLayout<CFString?>.size)
+        let nameStatus = withUnsafeMutablePointer(to: &name) {
+            AudioObjectGetPropertyData(id, &nameAddr, 0, nil, &nameSize, $0)
+        }
 
+        let deviceName = nameStatus == noErr ? name as String? ?? "Unknown" : "Unknown"
         let def = id == defaultID ? " (default)" : ""
-        print("  [\(idx)] \(name)\(def)")
+        print("  [\(idx)] \(deviceName)\(def)")
         idx += 1
     }
 }
@@ -327,12 +331,14 @@ class MicRecorder {
             let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
             guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { return }
             var error: NSError?
-            var consumed = false
+            // convert consumes its input block synchronously; AVFAudio does not mark buffers Sendable.
+            nonisolated(unsafe) let input = buffer
+            nonisolated(unsafe) var consumed = false
             converter.convert(to: converted, error: &error) { _, outStatus in
-                if consumed { outStatus.pointee = .noDataNow; return nil }
+                guard !consumed else { outStatus.pointee = .noDataNow; return nil }
                 consumed = true
                 outStatus.pointee = .haveData
-                return buffer
+                return input
             }
             if error == nil && converted.frameLength > 0 {
                 self.writer?.write(pcmBuffer: converted)
@@ -365,6 +371,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
         self.chunkOverlapSeconds = chunkOverlapSeconds
     }
 
+    @MainActor
     func start(outputPath: String) async throws {
         let chunker = AudioChunker(source: "system", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds, overlapSeconds: chunkOverlapSeconds)
         writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
@@ -439,6 +446,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
         writer?.writeRaw(data: int16Data)
     }
 
+    @MainActor
     func stop() async {
         try? await stream?.stopCapture()
         await withCheckedContinuation { continuation in
@@ -458,6 +466,7 @@ func stderrPrint(_ message: String) {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
 }
 
+@MainActor
 func requestPermissionsAndExit(outputPath: String? = nil) {
     let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
     let micAfter = requestMicrophoneAccessIfNeeded(micBefore)
@@ -492,20 +501,25 @@ func authorizationName(_ status: AVAuthorizationStatus) -> String {
     }
 }
 
+@MainActor
 func requestMicrophoneAccessIfNeeded(_ status: AVAuthorizationStatus) -> AVAuthorizationStatus {
     guard status == .notDetermined else { return status }
     activateForPermissionPrompt()
-    var finished = false
-    AVCaptureDevice.requestAccess(for: .audio) { _ in finished = true }
-    while !finished { RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1)) }
+    let finished = DispatchSemaphore(value: 0)
+    AVCaptureDevice.requestAccess(for: .audio) { _ in finished.signal() }
+    while finished.wait(timeout: .now()) == .timedOut {
+        RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.1))
+    }
     return AVCaptureDevice.authorizationStatus(for: .audio)
 }
 
+@MainActor
 func activateForPermissionPrompt() {
     NSApplication.shared.setActivationPolicy(.accessory)
     NSApp.activate(ignoringOtherApps: true)
 }
 
+@MainActor
 func checkMicPermission() {
     let status = AVCaptureDevice.authorizationStatus(for: .audio)
     switch status {
@@ -588,11 +602,9 @@ if let mic = micRecorder {
     }
 }
 
-if let sys = systemRecorder {
-    let sysPath = (config.outputDir as NSString).appendingPathComponent("system.wav")
-    let group = DispatchGroup()
-    group.enter()
-    Task {
+Task { @MainActor in
+    if let sys = systemRecorder {
+        let sysPath = (config.outputDir as NSString).appendingPathComponent("system.wav")
         do {
             try await sys.start(outputPath: sysPath)
             print("● System audio recording to \(sysPath)")
@@ -600,25 +612,19 @@ if let sys = systemRecorder {
             stderrPrint("error: could not start system audio capture: \(error)")
             exit(1)
         }
-        group.leave()
     }
-    group.wait()
-}
 
-print("● Recording... send SIGINT to stop")
-
-DispatchQueue.global().async {
-    stopSemaphore.wait()
-    print("\n● Stopping...")
-    micRecorder?.stop()
-    let done = DispatchSemaphore(value: 0)
-    Task {
-        await systemRecorder?.stop()
-        done.signal()
+    print("● Recording... send SIGINT to stop")
+    DispatchQueue.global().async {
+        stopSemaphore.wait()
+        Task { @MainActor in
+            print("\n● Stopping...")
+            micRecorder?.stop()
+            await systemRecorder?.stop()
+            print("● Capture stopped")
+            exit(0)
+        }
     }
-    done.wait()
-    print("● Capture stopped")
-    exit(0)
 }
 
 dispatchMain()
