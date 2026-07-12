@@ -357,9 +357,23 @@ class MicRecorder {
 
 // MARK: - System Audio Recorder
 
+// install runs before capture; write and finalize run only on sampleQueue.
+private final class SystemWriterState: @unchecked Sendable {
+    private var writer: WAVWriter?
+
+    func install(_ writer: WAVWriter) { self.writer = writer }
+    func write(_ data: Data) { writer?.writeRaw(data: data) }
+
+    func finalize() {
+        let writer = writer
+        self.writer = nil
+        writer?.finalize()
+    }
+}
+
 class SystemAudioRecorder: NSObject, SCStreamOutput {
     private var stream: SCStream?
-    private var writer: WAVWriter?
+    private let writerState = SystemWriterState()
     private let sampleRate: Double
     private let chunkSeconds: Double?
     private let chunkOverlapSeconds: Double
@@ -374,7 +388,8 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     @MainActor
     func start(outputPath: String) async throws {
         let chunker = AudioChunker(source: "system", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds, overlapSeconds: chunkOverlapSeconds)
-        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
+        let writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
+        writerState.install(writer)
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
 
@@ -443,20 +458,19 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
             }
         }
 
-        writer?.writeRaw(data: int16Data)
+        writerState.write(int16Data)
     }
 
     @MainActor
     func stop() async throws {
         var stopError: Error?
         do { try await stream?.stopCapture() } catch { stopError = error }
+        let state = writerState
         await withCheckedContinuation { continuation in
-            sampleQueue.async(execute: DispatchWorkItem {
-                let writer = self.writer
-                self.writer = nil
-                writer?.finalize()
+            sampleQueue.async {
+                state.finalize()
                 continuation.resume()
-            })
+            }
         }
         if let stopError { throw stopError }
     }
