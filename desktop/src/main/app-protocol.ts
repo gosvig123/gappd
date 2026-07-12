@@ -72,11 +72,20 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
 
 function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id: ID, handlers: StreamHandlers<ID>): void {
   let stderr = ''
+  let settled = false
   const state = { buffer: '', sawEvent: false, sawTerminal: false, protocolError: null as string | null }
   child.stdout?.on('data', (chunk) => readProtocolChunk(id, state, chunk.toString(), handlers))
   child.stderr?.on('data', (chunk) => { stderr = captureStreamStderr(stderr, chunk.toString()) })
-  child.on('error', (error) => handlers.onError(error.message))
-  child.on('exit', (code, signal) => finishStream(state, stderr, code, signal, handlers))
+  child.once('error', (error) => {
+    if (settled) return
+    settled = true
+    handlers.onError(error.message)
+  })
+  child.once('close', (code, signal) => {
+    if (settled) return
+    settled = true
+    finishStream(state, stderr, code, signal, handlers)
+  })
 }
 
 function captureStreamStderr(current: string, chunk: string): string {
