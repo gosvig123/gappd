@@ -2,6 +2,7 @@ package recording
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -97,7 +98,7 @@ func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.
 	}
 	meeting, err := w.startMeeting(req.Title, sessionDir, req.Language)
 	if err != nil {
-		return err
+		return errors.Join(err, audioartifact.DeleteSessionUnder(w.baseDir, sessionDir))
 	}
 	session := w.sessionFor(meeting, audioartifact.New(sessionDir))
 	return w.record(req, session, sessionDir, processing)

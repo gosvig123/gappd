@@ -49,8 +49,13 @@ func (w meetingRecordingWorkflow) saveCaptureHeartbeat(meeting *db.Meeting) {
 }
 
 func (w meetingRecordingWorkflow) createSessionDir(title string) (string, error) {
-	dir := filepath.Join(w.baseDir, "sessions", fmt.Sprintf("%s-%s", time.Now().Format("2006-01-02T1504"), sanitize(title)))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	root := filepath.Join(w.baseDir, "sessions")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", fmt.Errorf("create sessions root: %w", err)
+	}
+	prefix := fmt.Sprintf("%s-%s-", time.Now().Format("2006-01-02T1504"), sanitize(title))
+	dir, err := os.MkdirTemp(root, prefix)
+	if err != nil {
 		return "", fmt.Errorf("create session dir: %w", err)
 	}
 	return dir, nil
