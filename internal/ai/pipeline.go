@@ -46,11 +46,11 @@ func NewPipeline(provider Provider, temperature float64) *Pipeline {
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractChunk(ctx, transcript, "")
+	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
 func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractLong(ctx, transcript, nil, "", "")
+	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
 func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language, relevance string) (*Extraction, error) {
@@ -124,7 +124,7 @@ func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string)
 }
 
 func (p *Pipeline) RunWithOptions(ctx context.Context, transcript string, options RunOptions) (*Extraction, string, error) {
-	extraction, err := p.extractLong(ctx, transcript, options.OnProgress, options.Language, options.UserNotes)
+	extraction, err := p.extractVerified(ctx, transcript, options.OnProgress, options.Language, options.UserNotes)
 	if err != nil {
 		return nil, "", err
 	}

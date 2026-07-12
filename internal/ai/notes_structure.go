@@ -63,9 +63,9 @@ func questionSectionBody(values []string) string {
 
 func decisionLabel(value Decision) string {
 	switch value.Status {
-	case "rejected":
+	case decisionStatusRejected:
 		return "Rejected option: "
-	case "tentative":
+	case decisionStatusTentative:
 		return "Tentative plan: "
 	default:
 		return ""

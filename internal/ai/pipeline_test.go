@@ -31,7 +31,7 @@ func (p *fakeProvider) CompleteJSON(_ context.Context, req CompletionRequest) (j
 func (p *fakeProvider) Available() error { return nil }
 
 func TestPipelineExtract(t *testing.T) {
-	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Beta launch","summary":"Ada discussed shipping beta on Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"Ada proposed shipping beta on Friday","status":"decided","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
+	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Beta launch","summary":"Ada discussed shipping beta on Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"Ada proposed shipping beta on Friday","status":"decided","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`, `{"verdicts":[{"index":0,"speech_act":"commitment","entailed":true}]}`)
 
 	extraction, err := pipeline.Extract(context.Background(), "Ada: let's ship beta on Friday")
 	if err != nil {
@@ -129,16 +129,10 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 	if len(provider.requests) != 5 || notes == "" {
 		t.Fatalf("requests=%d notes=%q, want chunked extraction, refinement, and synthesis", len(provider.requests), notes)
 	}
-	assertWeightedRefinement(t, provider.requests)
-	if extraction.Title != "Roadmap Launch Planning" {
-		t.Fatalf("title = %q, want refined global title", extraction.Title)
-	}
-	if strings.Join(extraction.Participants, ",") != "Ada,Ben" {
-		t.Fatalf("participants = %#v, want merged participants", extraction.Participants)
-	}
+	assertWeightedRefinement(t, provider.requests, extraction)
 }
 
-func assertWeightedRefinement(t *testing.T, requests []CompletionRequest) {
+func assertWeightedRefinement(t *testing.T, requests []CompletionRequest, extraction *Extraction) {
 	t.Helper()
 	refinement := requests[len(requests)-2]
 	if !strings.Contains(refinement.User, "## User Relevance Guidance\nFocus launch blockers") {
@@ -146,6 +140,9 @@ func assertWeightedRefinement(t *testing.T, requests []CompletionRequest) {
 	}
 	if !strings.Contains(refinement.System, "Prefer a unique supported outcome") {
 		t.Fatalf("refinement system missing outcome-first weighting")
+	}
+	if extraction.Title != "Roadmap Launch Planning" || strings.Join(extraction.Participants, ",") != "Ada,Ben" {
+		t.Fatalf("extraction = %#v, want refined global title and participants", extraction)
 	}
 }
 
