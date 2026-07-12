@@ -447,8 +447,9 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     }
 
     @MainActor
-    func stop() async {
-        try? await stream?.stopCapture()
+    func stop() async throws {
+        var stopError: Error?
+        do { try await stream?.stopCapture() } catch { stopError = error }
         await withCheckedContinuation { continuation in
             sampleQueue.async(execute: DispatchWorkItem {
                 let writer = self.writer
@@ -457,6 +458,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
                 continuation.resume()
             })
         }
+        if let stopError { throw stopError }
     }
 }
 
@@ -620,9 +622,14 @@ Task { @MainActor in
         Task { @MainActor in
             print("\n● Stopping...")
             micRecorder?.stop()
-            await systemRecorder?.stop()
-            print("● Capture stopped")
-            exit(0)
+            do {
+                try await systemRecorder?.stop()
+                print("● Capture stopped")
+                exit(0)
+            } catch {
+                stderrPrint("error: could not stop system audio capture cleanly: \(error)")
+                exit(1)
+            }
         }
     }
 }
