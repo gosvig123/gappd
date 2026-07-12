@@ -117,10 +117,6 @@ export type ProcessingDrainResponse = {
   cleanupFailed: number
 }
 
-export type HasStaleRecordingsResponse = {
-  hasStale: boolean
-}
-
 export type RecoverStaleRecordingsResponse = {
   recovered: number
 }

@@ -44,10 +44,6 @@ type MeetingDeleteResponse struct {
 	ArtifactWarning *string `json:"artifactWarning,omitempty"`
 }
 
-type HasStaleRecordingsResponse struct {
-	HasStale bool `json:"hasStale"`
-}
-
 type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
 }

@@ -18,8 +18,6 @@ export function stopStaleRecordingRecovery(): void {
 }
 
 async function recoverStaleRecordings(): Promise<number> {
-  const stale = await requestCommand('record.hasStale', {})
-  if (!stale.hasStale) { requestDrains(); return 0 }
   const result = await requestCommand('record.recoverStale', {})
   requestDrains()
   return result.recovered
