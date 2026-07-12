@@ -14,6 +14,8 @@ type ReadinessInput = {
 
 const READINESS_ATTEMPTS = 120
 const READINESS_INTERVAL_MS = 500
+const READINESS_TIMEOUT_MS = READINESS_ATTEMPTS * READINESS_INTERVAL_MS
+const HEALTH_CHECK_TIMEOUT_MS = 2_000
 const SHUTDOWN_TIMEOUT_MS = 5_000
 const SHUTDOWN_POLL_INTERVAL_MS = 50
 
@@ -22,19 +24,22 @@ export function spawnLlamaCpp(binaryPath: string, args: string[], env: NodeJS.Pr
 }
 
 export async function waitForLlamaCppReadiness(input: ReadinessInput): Promise<void> {
+  const deadline = Date.now() + READINESS_TIMEOUT_MS
   for (let attempt = 0; attempt < READINESS_ATTEMPTS; attempt += 1) {
+    const remainingMs = deadline - Date.now()
+    if (remainingMs <= 0) break
     const startupError = input.startupError()
     if (startupError) throw new Error(startupError)
-    if (await processServesEndpoint(input.child, input.port, input.endpoint)) return
+    if (await processServesEndpoint(input.child, input.port, input.endpoint, Math.min(HEALTH_CHECK_TIMEOUT_MS, remainingMs))) return
     if ((await listenerPid(input.port)) !== null && !(await processOwnsPort(input.child, input.port))) throw portBindError(input.port)
-    await new Promise((resolve) => setTimeout(resolve, READINESS_INTERVAL_MS))
+    await sleepBeforeRetry(deadline)
   }
   throw new Error(`Managed llama.cpp did not become ready in time at ${input.binaryPath}`)
 }
 
-export async function processServesEndpoint(child: LlamaCppChild | null, port: number, endpoint: string): Promise<boolean> {
+export async function processServesEndpoint(child: LlamaCppChild | null, port: number, endpoint: string, timeoutMs = HEALTH_CHECK_TIMEOUT_MS): Promise<boolean> {
   if (!(await processOwnsPort(child, port))) return false
-  if (!(await endpointHealthy(endpoint))) return false
+  if (!(await endpointHealthy(endpoint, timeoutMs))) return false
   return processOwnsPort(child, port)
 }
 
@@ -96,13 +101,19 @@ async function processOwnsPort(child: LlamaCppChild | null, port: number): Promi
   return processRunning(child) && (await listenerPid(port)) === child.pid
 }
 
-async function endpointHealthy(endpoint: string): Promise<boolean> {
+async function endpointHealthy(endpoint: string, timeoutMs: number): Promise<boolean> {
   try {
-    const response = await fetch(`${endpoint}/v1/models`)
+    const response = await fetch(`${endpoint}/v1/models`, { signal: AbortSignal.timeout(timeoutMs) })
     return response.ok
   } catch {
     return false
   }
+}
+
+async function sleepBeforeRetry(deadline: number): Promise<void> {
+  const remainingMs = deadline - Date.now()
+  if (remainingMs <= 0) return
+  await new Promise((resolve) => setTimeout(resolve, Math.min(READINESS_INTERVAL_MS, remainingMs)))
 }
 
 function listenerPid(port: number): Promise<number | null> {
