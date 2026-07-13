@@ -114,6 +114,6 @@ final class AudioChunker {
     private func printJSON<T: Encodable>(_ value: T) {
         guard let data = try? JSONEncoder().encode(value),
               let line = String(data: data, encoding: .utf8) else { return }
-        print(line)
+        FileHandle.standardOutput.write(Data((line + "\n").utf8))
     }
 }

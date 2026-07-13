@@ -163,7 +163,7 @@ function transcriptEmptyText(meeting: MeetingDetail): string {
 }
 
 function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
-  return { status: meeting.status, hasTranscript, hasSummary: Boolean(meeting.summary) }
+  return { status: meeting.status, hasTranscript: hasTranscript && !meeting.transcriptProvisional, hasSummary: Boolean(meeting.summary) }
 }
 
 function detailTranscript(meeting: MeetingDetail, transcript: string): string {

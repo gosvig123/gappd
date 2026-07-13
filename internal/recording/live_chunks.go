@@ -13,7 +13,7 @@ type chunkRecorder interface {
 	ChunksComplete() bool
 }
 
-const liveChunkDrainTimeout = 5 * time.Second
+const liveChunkDrainTimeout = 30 * time.Second
 
 func (w meetingRecordingWorkflow) startLiveChunkProcessing(recorder audioRecorder, meetingID, language string, processing meetingprocessing.Service) (func() meetingprocessing.LiveChunkResult, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(context.Background())
