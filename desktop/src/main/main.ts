@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { app, BrowserWindow } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
 import { registerIpc } from './ipc'
 import { startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
 import { logMainProcessMemory } from './memory'
@@ -10,8 +10,12 @@ import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
+const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
+
 let mainWindow: BrowserWindow | null = null
+let quitAllowed = false
 let shutdownStarted = false
+let updateInstallRequested = false
 
 function applyDevDockIcon(): void {
   if (process.platform !== 'darwin' || app.isPackaged || !app.dock) return
@@ -72,12 +76,21 @@ app.whenReady().then(async () => {
   app.on('activate', showMainWindow)
 })
 
+nativeAutoUpdater.on(BEFORE_QUIT_FOR_UPDATE_EVENT, () => { updateInstallRequested = true })
+
 app.on('before-quit', (event) => {
-  if (shutdownStarted) return
+  if (quitAllowed) return
   event.preventDefault()
+  if (shutdownStarted) return
   shutdownStarted = true
-  void shutdown().finally(() => app.quit())
+  void shutdown().finally(quitAfterShutdown)
 })
+
+function quitAfterShutdown(): void {
+  quitAllowed = true
+  if (updateInstallRequested) return nativeAutoUpdater.quitAndInstall()
+  app.quit()
+}
 
 async function shutdown(): Promise<void> {
   logMainProcessMemory('shutdown:start')
