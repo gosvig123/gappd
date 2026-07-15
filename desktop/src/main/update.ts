@@ -72,10 +72,11 @@ export async function openUpdatePage(): Promise<void> {
 
 function configureAutoUpdater(): void {
   if (configured) return
-  autoUpdater.autoDownload = true
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.allowPrerelease = resolveUpdateChannel() === BETA_UPDATE_CHANNEL
   if (autoUpdater.allowPrerelease) autoUpdater.channel = FEED_BETA_CHANNEL
+  autoUpdater.allowDowngrade = false
   if (process.env[FORCE_DEV_UPDATE_ENV] === '1') autoUpdater.forceDevUpdateConfig = true
   autoUpdater.on('checking-for-update', () => setStatus({ phase: 'checking', available: false, error: undefined, progress: undefined }))
   autoUpdater.on('update-not-available', (info) => setIdle(info))
