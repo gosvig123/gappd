@@ -8,11 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/livetranscript"
 )
 
 type CaptureMode string
@@ -28,17 +28,16 @@ const (
 )
 
 type Recorder struct {
-	mode          CaptureMode
-	outputDir     string
-	deviceIdx     int
-	cmd           *exec.Cmd
-	waitCh        chan error
-	stderr        bytes.Buffer
-	stdoutBuf     bytes.Buffer
-	stdout        io.Writer
-	chunks        chan ChunkEvent
-	chunksDropped atomic.Bool
-	stopFile      string
+	mode             CaptureMode
+	outputDir        string
+	deviceIdx        int
+	cmd              *exec.Cmd
+	waitCh           chan error
+	stderr           bytes.Buffer
+	stdoutBuf        bytes.Buffer
+	stdout           io.Writer
+	transcriptEvents chan livetranscript.Event
+	stopFile         string
 }
 
 func NewRecorder(mode CaptureMode, outputDir string, deviceIdx int) *Recorder {
@@ -72,9 +71,8 @@ func (r *Recorder) captureLaunch() (captureLaunch, error) {
 func (r *Recorder) prepareCommand(launch captureLaunch) {
 	r.cmd = exec.Command(launch.command, launch.args...)
 	r.stdoutBuf.Reset()
-	r.chunksDropped.Store(false)
-	r.chunks = make(chan ChunkEvent, 32)
-	r.cmd.Stdout = newChunkEventWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.chunks, func() { r.chunksDropped.Store(true) })
+	r.transcriptEvents = make(chan livetranscript.Event, 32)
+	r.cmd.Stdout = newChunkEventWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.transcriptEvents)
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
 	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -84,7 +82,7 @@ func (r *Recorder) waitForExit() chan error {
 	exited := make(chan error, 1)
 	go func() {
 		exited <- r.cmd.Wait()
-		close(r.chunks)
+		close(r.transcriptEvents)
 	}()
 	return exited
 }
@@ -117,9 +115,7 @@ func (r *Recorder) Done() <-chan error {
 	return r.waitCh
 }
 
-func (r *Recorder) Chunks() <-chan ChunkEvent { return r.chunks }
-
-func (r *Recorder) ChunksComplete() bool { return !r.chunksDropped.Load() }
+func (r *Recorder) TranscriptEvents() <-chan livetranscript.Event { return r.transcriptEvents }
 
 func (r *Recorder) Stop() error {
 	if r.cmd == nil || r.cmd.Process == nil || r.waitCh == nil {

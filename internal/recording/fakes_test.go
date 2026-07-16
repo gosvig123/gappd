@@ -8,6 +8,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/livetranscript"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
@@ -26,8 +27,9 @@ func (e fakeEnhancer) RefineNotes(context.Context, *ai.Extraction, string, strin
 }
 
 type fakeRecorder struct {
-	dir  string
-	done chan error
+	dir              string
+	done             chan error
+	transcriptEvents chan livetranscript.Event
 }
 
 func (r *fakeRecorder) Start(context.Context) error {
@@ -43,6 +45,8 @@ func (r *fakeRecorder) Stop() error { return nil }
 func (r *fakeRecorder) Done() <-chan error { return r.done }
 
 func (r *fakeRecorder) Artifacts() audioartifact.Artifacts { return audioartifact.New(r.dir) }
+
+func (r *fakeRecorder) TranscriptEvents() <-chan livetranscript.Event { return r.transcriptEvents }
 
 type fakeTranscriber struct{}
 

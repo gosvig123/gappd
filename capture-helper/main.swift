@@ -88,6 +88,14 @@ func validateChunkConfig(seconds: Double?, overlap: Double) {
     }
 }
 
+func captureSources(_ mode: CaptureMode) -> [String] {
+    switch mode {
+    case .mic: return ["mic"]
+    case .system: return ["system"]
+    case .both: return ["mic", "system"]
+    }
+}
+
 func printUsage() {
     let usage = """
     gappd-capture: Record mic and/or system audio
@@ -638,6 +646,9 @@ Task { @MainActor in
             micRecorder?.stop()
             do {
                 try await systemRecorder?.stop()
+                if config.chunkSeconds != nil {
+                    emitAudioChunkStreamComplete(sources: captureSources(config.mode))
+                }
                 print("● Capture stopped")
                 exit(0)
             } catch {

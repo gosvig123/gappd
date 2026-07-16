@@ -57,7 +57,7 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 		return err
 	}
 	defer store.Close()
-	service, err := newRecordingWorkflowService(store, nil, recordingOutputForListen(desktop), desktop)
+	service, err := newRecordingWorkflowService(store, recordingOutputForListen(desktop), desktop)
 	if err != nil {
 		return err
 	}

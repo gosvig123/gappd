@@ -16,6 +16,28 @@ struct AudioChunkFailure: Encodable {
     let error: String
 }
 
+struct AudioChunkSourceComplete: Encodable {
+    let type = "audio_chunk_source_complete"
+    let source: String
+    let count: UInt32
+    let canonicalEnd: Double
+}
+
+struct AudioChunkStreamComplete: Encodable {
+    let type = "audio_chunk_stream_complete"
+    let sources: [String]
+}
+
+func emitAudioChunkStreamComplete(sources: [String]) {
+    printAudioChunkEvent(AudioChunkStreamComplete(sources: sources))
+}
+
+private func printAudioChunkEvent<T: Encodable>(_ value: T) {
+    guard let data = try? JSONEncoder().encode(value),
+          let line = String(data: data, encoding: .utf8) else { return }
+    FileHandle.standardOutput.write(Data((line + "\n").utf8))
+}
+
 final class AudioChunker {
     private let source: String
     private let dir: String
@@ -27,6 +49,7 @@ final class AudioChunker {
     private var windowStart: UInt64 = 0
     private var canonicalStart: UInt64 = 0
     private var totalFrames: UInt64 = 0
+    private var finished = false
 
     init?(source: String, outputDir: String, sampleRate: UInt32, seconds: Double?, overlapSeconds: Double) {
         guard let seconds, seconds.isFinite, seconds > 0,
@@ -48,9 +71,13 @@ final class AudioChunker {
     }
 
     func finish() {
+        guard !finished else { return }
+        finished = true
         emitCompleteWindows()
         emitFinalWindows()
         pcm.removeAll(keepingCapacity: false)
+        printAudioChunkEvent(AudioChunkSourceComplete(
+            source: source, count: index, canonicalEnd: seconds(totalFrames)))
     }
 
     private func emitFinalWindows() {
@@ -104,16 +131,10 @@ final class AudioChunker {
     private func emitEvent(path: String, canonicalEnd: UInt64, windowEnd: UInt64) {
         let event = AudioChunkEvent(source: source, path: path, start: seconds(windowStart),
             end: seconds(windowEnd), canonicalStart: seconds(canonicalStart), canonicalEnd: seconds(canonicalEnd))
-        printJSON(event)
+        printAudioChunkEvent(event)
     }
 
     private func emitFailure(_ message: String) {
-        printJSON(AudioChunkFailure(source: source, error: message))
-    }
-
-    private func printJSON<T: Encodable>(_ value: T) {
-        guard let data = try? JSONEncoder().encode(value),
-              let line = String(data: data, encoding: .utf8) else { return }
-        FileHandle.standardOutput.write(Data((line + "\n").utf8))
+        printAudioChunkEvent(AudioChunkFailure(source: source, error: message))
     }
 }

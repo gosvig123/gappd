@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -26,13 +25,6 @@ type Event struct {
 
 type EventSink interface{ EmitProcessingEvent(Event) error }
 
-type ProcessingStage string
-
-const (
-	StageLiveDrain         ProcessingStage = "transcript.live_drain"
-	processingTimingPrefix                 = "● Timing "
-)
-
 type Reporter interface {
 	Transcribing(string)
 	TranscriptionSkipped(string)
@@ -40,7 +32,6 @@ type Reporter interface {
 	EnhancementStarted()
 	AIProgress(Progress)
 	EnhancementCompleted(string, int, string)
-	StageCompleted(ProcessingStage, time.Duration)
 }
 
 type Progress struct {
@@ -50,13 +41,11 @@ type Progress struct {
 }
 
 type consoleReporter struct{ out, errOut io.Writer }
-type noopReporter struct{ timing io.Writer }
+type noopReporter struct{}
 
 func NewConsoleReporter(out, errOut io.Writer) Reporter {
 	return consoleReporter{out: out, errOut: errOut}
 }
-
-func NewTimingReporter(out io.Writer) Reporter { return noopReporter{timing: out} }
 
 func (r consoleReporter) Transcribing(speaker string) {
 	fmt.Fprintf(r.out, "● Transcribing %s audio with Apple Speech...\n", speaker)
@@ -80,30 +69,17 @@ func (r consoleReporter) EnhancementCompleted(summary string, actionItems int, m
 	printEnhancementResult(r.out, summary, actionItems, meetingID)
 }
 
-func (r consoleReporter) StageCompleted(stage ProcessingStage, duration time.Duration) {
-	printStageDuration(r.out, stage, duration)
-}
-
 func (noopReporter) Transcribing(string)                      {}
 func (noopReporter) TranscriptionSkipped(string)              {}
 func (noopReporter) TranscriptionFailed(string, error)        {}
 func (noopReporter) EnhancementStarted()                      {}
 func (noopReporter) AIProgress(Progress)                      {}
 func (noopReporter) EnhancementCompleted(string, int, string) {}
-func (r noopReporter) StageCompleted(stage ProcessingStage, duration time.Duration) {
-	if r.timing != nil {
-		printStageDuration(r.timing, stage, duration)
-	}
-}
 
 func bridgeProgress(report Reporter) func(ai.Progress) {
 	return func(progress ai.Progress) {
 		report.AIProgress(Progress{Stage: string(progress.Stage), Current: progress.Current, Total: progress.Total})
 	}
-}
-
-func printStageDuration(out io.Writer, stage ProcessingStage, duration time.Duration) {
-	fmt.Fprintf(out, "%s%s: %s\n", processingTimingPrefix, stage, duration.Round(time.Millisecond))
 }
 
 func printAIProgress(out io.Writer, progress Progress) {

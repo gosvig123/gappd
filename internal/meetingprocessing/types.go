@@ -3,49 +3,12 @@ package meetingprocessing
 import (
 	"context"
 	"errors"
-	"io"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
-
-type CapturedChunkRequest struct {
-	MeetingID      string
-	Path           string
-	Source         string
-	Start          float64
-	End            float64
-	CanonicalStart float64
-	CanonicalEnd   float64
-	Language       string
-}
-
-type CapturedChunk struct {
-	Path           string
-	Source         string
-	Start          float64
-	End            float64
-	CanonicalStart float64
-	CanonicalEnd   float64
-}
-
-type LiveChunkOptions struct {
-	Context   context.Context
-	MeetingID string
-	Language  string
-	Chunks    func() <-chan CapturedChunk
-	ErrOut    io.Writer
-}
-
-type LiveChunkResult struct {
-	Processed int
-	Failed    int
-	Dropped   bool
-}
-
-func (r LiveChunkResult) Usable() bool { return r.Processed > 0 && r.Failed == 0 && !r.Dropped }
 
 type StoredRequest struct {
 	MeetingID string
@@ -84,7 +47,6 @@ var (
 type Store interface {
 	GetMeeting(string) (*db.Meeting, error)
 	GetSegments(string) ([]db.Segment, error)
-	InsertSegment(*db.Segment) error
 }
 
 type Lifecycle interface {

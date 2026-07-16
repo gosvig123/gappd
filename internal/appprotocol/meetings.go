@@ -61,11 +61,13 @@ func BuildAppMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDet
 
 func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript string) MeetingDetail {
 	status := MeetingStatusFor(meeting)
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: meeting.Transcript == nil && len(segments) > 0, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+	visible := visibleTranscriptSegments(meeting, segments)
+	provisional := meeting.Transcript == nil && len(visible) > 0
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible)}
 }
 
 func appTranscriptText(meeting db.Meeting, segments []db.Segment) string {
-	if len(segments) > 0 {
+	if len(visibleTranscriptSegments(meeting, segments)) > 0 {
 		return ""
 	}
 	return transcriptText(meeting, segments)
@@ -75,10 +77,20 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if meeting.Transcript != nil {
 		return *meeting.Transcript
 	}
-	if len(segments) == 0 {
+	visible := visibleTranscriptSegments(meeting, segments)
+	if len(visible) == 0 {
 		return ""
 	}
-	return formatTranscript(segments)
+	return formatTranscript(visible)
+}
+
+func visibleTranscriptSegments(meeting db.Meeting, segments []db.Segment) []db.Segment {
+	incomplete := meeting.CaptureStatus == db.CaptureStatusCaptured &&
+		meeting.ProcessingStatus == db.ProcessingStatusPending && meeting.Transcript == nil
+	if incomplete {
+		return nil
+	}
+	return segments
 }
 
 func formatTranscript(segments []db.Segment) string {

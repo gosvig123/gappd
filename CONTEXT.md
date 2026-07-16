@@ -52,7 +52,7 @@ _Avoid_: final transcript, chunk transcript
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
 - **Pending Meeting Processing** derives its next work from persisted artifacts: audio without transcript needs transcription; transcript without summary needs summarization.
 - A **Live Transcript** becomes the persisted transcript only when every captured audio chunk was processed without failure or dropped events; otherwise **Meeting Processing** rebuilds it from durable audio.
-- **Live Transcript** audio windows overlap for recognition context, but each window owns a non-overlapping canonical time range so repeated boundary audio is not duplicated.
+- **Live Transcript** audio windows overlap for recognition context, and each window owns a non-overlapping canonical time range; conservative same-speaker phrase-containment reconciliation removes exact or contained boundary repeats, while differently worded fragments remain distinct to avoid deleting legitimate speech.
 - **Meeting Reprocessing** explicitly restarts completed or failed **Meeting Processing** for retry, refinement, or enhancement.
 - `llama-server` provides meeting summarization through **Local AI**.
 
@@ -63,4 +63,5 @@ _Avoid_: final transcript, chunk transcript
 
 ## Flagged ambiguities
 
+- Real microphone and system-audio validation confirmed strict contained boundary repeats can be reconciled, but differently worded fragments such as `Confirmation number seven.` / `number 742.` cannot be safely merged without word timing; broad fuzzy reconciliation remains intentionally unresolved.
 - `context.md` is a stale code-scout scratch file, not the project glossary. Use `CONTEXT.md` for domain language.

@@ -12,9 +12,9 @@ import (
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/livetranscript"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
-	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 )
 
 type EventName string
@@ -41,6 +41,7 @@ type audioRecorder interface {
 	Stop() error
 	Done() <-chan error
 	Artifacts() audioartifact.Artifacts
+	TranscriptEvents() <-chan livetranscript.Event
 }
 
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
@@ -58,36 +59,37 @@ type Service struct {
 	ErrOut  io.Writer
 	Events  EventSink
 
-	lifecycle  meetinglifecycle.Module
-	processing meetingprocessing.Service
-	recorder   recorderFactory
+	lifecycle      meetinglifecycle.Module
+	liveTranscript livetranscript.Module
+	recorder       recorderFactory
 }
 
 type meetingRecordingWorkflow struct {
-	lifecycle meetinglifecycle.Module
-	recorder  recorderFactory
-	baseDir   string
-	out       io.Writer
-	errOut    io.Writer
-	events    EventSink
+	lifecycle      meetinglifecycle.Module
+	liveTranscript livetranscript.Module
+	recorder       recorderFactory
+	baseDir        string
+	out            io.Writer
+	errOut         io.Writer
+	events         EventSink
 }
 
-func New(lifecycle meetinglifecycle.Module, processing meetingprocessing.Service) Service {
-	return Service{lifecycle: lifecycle, processing: processing}
+func New(lifecycle meetinglifecycle.Module, liveTranscript livetranscript.Module) Service {
+	return Service{lifecycle: lifecycle, liveTranscript: liveTranscript}
 }
 
 func (s Service) Run(req Request) error {
-	return s.recordingWorkflow().run(req, s.processing)
+	return s.recordingWorkflow().run(req)
 }
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 	return meetingRecordingWorkflow{
-		lifecycle: s.lifecycle, recorder: s.recorder, baseDir: s.BaseDir,
+		lifecycle: s.lifecycle, liveTranscript: s.liveTranscript, recorder: s.recorder, baseDir: s.BaseDir,
 		out: s.Out, errOut: s.ErrOut, events: s.Events,
 	}
 }
 
-func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.Service) error {
+func (w meetingRecordingWorkflow) run(req Request) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
 	}
@@ -101,7 +103,7 @@ func (w meetingRecordingWorkflow) run(req Request, processing meetingprocessing.
 		return errors.Join(err, audioartifact.DeleteSessionUnder(w.baseDir, sessionDir))
 	}
 	session := w.sessionFor(meeting, audioartifact.New(sessionDir))
-	return w.record(req, session, sessionDir, processing)
+	return w.record(req, session, sessionDir)
 }
 
 func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
@@ -114,7 +116,7 @@ func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir stri
 	return capture.NewRecorder(mode, dir, device)
 }
 
-func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string, processing meetingprocessing.Service) error {
+func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string) error {
 	w.printRecordingStart(req, sessionDir)
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
@@ -122,28 +124,23 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 	if err := w.startCapture(ctx, recorder, session); err != nil {
 		return err
 	}
-	waitForLiveChunks, cancelLiveChunks := w.startLiveChunkProcessing(recorder, session.meeting.ID, req.Language, processing)
+	live := w.startLiveTranscript(recorder, session.meeting.ID, req.Language)
 	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
 	if err := w.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
 		return err
 	}
 	stopHeartbeat()
-	liveChunks := drainLiveChunks(waitForLiveChunks, cancelLiveChunks, processing, recorder)
+	return w.finalizeRecording(session, recorder, live)
+}
+
+func (w meetingRecordingWorkflow) finalizeRecording(session recordingSession, recorder audioRecorder, live *livetranscript.Session) error {
 	session = w.completeCapture(session, recorder)
 	if err := session.capture(context.Background()); err != nil {
 		return err
 	}
-	if liveChunks.Usable() {
-		w.promoteLiveTranscript(processing, session.meeting.ID)
-	}
+	w.finishLiveTranscript(live)
 	return session.emit(EventCaptured, nil)
-}
-
-func (w meetingRecordingWorkflow) promoteLiveTranscript(processing meetingprocessing.Service, meetingID string) {
-	if err := processing.PromoteProvisionalTranscript(context.Background(), meetingID); err != nil {
-		fmt.Fprintf(w.errOut, "warning: live transcript promotion skipped: %v\n", err)
-	}
 }
 
 func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {
