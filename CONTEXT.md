@@ -47,7 +47,7 @@ _Avoid_: final transcript, chunk transcript
 - Desktop workflows always use the **Managed Runtime**; command-line workflows may use user-configured local dependencies.
 - A healthy **Managed Runtime** should be shared instead of starting duplicate llama.cpp servers.
 - A **Meeting Recording Workflow** preserves captured audio even when **Local AI** is unavailable; **Meeting Processing** may run later through **Meeting Reprocessing**.
-- Captured audio remains durable through **Meeting Processing** and becomes eligible for deletion only after processing completes.
+- Captured audio remains durable after **Meeting Processing** and is deleted when its meeting is deleted, preserving source material for future **Meeting Reprocessing**.
 - A **Meeting Lifecycle** defines valid meeting capture and processing state transitions and user-facing state derived from persisted meeting rows.
 - **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
 - **Pending Meeting Processing** derives its next work from persisted artifacts: audio without transcript needs transcription; transcript without summary needs summarization.

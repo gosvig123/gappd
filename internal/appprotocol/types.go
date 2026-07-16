@@ -49,13 +49,11 @@ type RecoverStaleRecordingsResponse struct {
 }
 
 type ProcessingDrainResponse struct {
-	Capability    meetingprocessing.Capability `json:"capability"`
-	Attempted     int                          `json:"attempted"`
-	Completed     int                          `json:"completed"`
-	Requeued      int                          `json:"requeued"`
-	Failed        int                          `json:"failed"`
-	Cleaned       int                          `json:"cleaned"`
-	CleanupFailed int                          `json:"cleanupFailed"`
+	Capability meetingprocessing.Capability `json:"capability"`
+	Attempted  int                          `json:"attempted"`
+	Completed  int                          `json:"completed"`
+	Requeued   int                          `json:"requeued"`
+	Failed     int                          `json:"failed"`
 }
 
 type MeetingStatus struct {

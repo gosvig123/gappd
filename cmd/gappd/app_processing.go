@@ -45,6 +45,6 @@ func runProcessingDrain(capability meetingprocessing.Capability) error {
 	}
 	return writeJSON(appprotocol.ProcessingDrainResponse{
 		Capability: result.Capability, Attempted: result.Attempted, Completed: result.Completed,
-		Requeued: result.Requeued, Failed: result.Failed, Cleaned: result.Cleaned, CleanupFailed: result.CleanupFailed,
+		Requeued: result.Requeued, Failed: result.Failed,
 	})
 }

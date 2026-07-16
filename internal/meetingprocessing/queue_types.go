@@ -16,13 +16,11 @@ const (
 var AllCapabilities = []Capability{CapabilityTranscription, CapabilitySummarization}
 
 type DrainResult struct {
-	Capability    Capability `json:"capability"`
-	Attempted     int        `json:"attempted"`
-	Completed     int        `json:"completed"`
-	Requeued      int        `json:"requeued"`
-	Failed        int        `json:"failed"`
-	Cleaned       int        `json:"cleaned"`
-	CleanupFailed int        `json:"cleanupFailed"`
+	Capability Capability `json:"capability"`
+	Attempted  int        `json:"attempted"`
+	Completed  int        `json:"completed"`
+	Requeued   int        `json:"requeued"`
+	Failed     int        `json:"failed"`
 }
 
 type ErrorCategory string

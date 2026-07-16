@@ -51,17 +51,3 @@ const commitClaimSQL = `UPDATE meetings SET title=?, transcript=?, summary=?, ex
 	processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
 	processing_claim_token=NULL, processing_claim_expires_at=NULL
 	WHERE id=? AND processing_status=? AND processing_claim_token=?`
-
-func (d *DB) ClearAudioPath(ctx context.Context, id, expectedPath string) (bool, error) {
-	result, err := d.Conn.ExecContext(ctx, `UPDATE meetings SET audio_path=NULL WHERE id=? AND processing_status=? AND audio_path=?`, id, ProcessingStatusCompleted, expectedPath)
-	return rowsChanged(result, err, "clear meeting audio path")
-}
-
-func (d *DB) CompletedWithAudio(ctx context.Context) ([]Meeting, error) {
-	rows, err := d.Conn.QueryContext(ctx, selectMeetingsSQL+` WHERE processing_status=? AND audio_path IS NOT NULL AND audio_path<>'' ORDER BY started_at ASC`, ProcessingStatusCompleted)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanMeetings(rows)
-}

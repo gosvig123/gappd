@@ -12,15 +12,14 @@ import (
 )
 
 type Service struct {
-	Store           Store
-	Lifecycle       Lifecycle
-	Pipeline        *ai.Pipeline
-	Transcriber     Transcriber
-	Notes           NotesGenerator
-	Reporter        Reporter
-	Events          EventSink
-	Clock           func() time.Time
-	ArtifactDeleter func(string) error
+	Store       Store
+	Lifecycle   Lifecycle
+	Pipeline    *ai.Pipeline
+	Transcriber Transcriber
+	Notes       NotesGenerator
+	Reporter    Reporter
+	Events      EventSink
+	Clock       func() time.Time
 }
 
 type appleSpeechTranscriber struct{}

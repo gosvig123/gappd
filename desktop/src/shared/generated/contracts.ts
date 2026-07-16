@@ -113,8 +113,6 @@ export type ProcessingDrainResponse = {
   completed: number
   requeued: number
   failed: number
-  cleaned: number
-  cleanupFailed: number
 }
 
 export type RecoverStaleRecordingsResponse = {

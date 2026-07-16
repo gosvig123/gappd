@@ -136,7 +136,6 @@ func (s Service) completeProcessing(ctx context.Context, meeting *db.Meeting, ex
 		return s.processingError("complete processing", meeting.ID, PhasePersist, err)
 	}
 	*meeting = *updated
-	s.cleanupCompletedMeeting(ctx, meeting)
 	return s.complete(meeting, extraction, summary)
 }
 

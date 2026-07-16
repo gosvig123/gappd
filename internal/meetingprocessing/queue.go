@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
-	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
@@ -25,9 +24,6 @@ func (s Service) Drain(ctx context.Context, capability Capability) (DrainResult,
 		return result, err
 	}
 	if err := s.drainClaims(ctx, store, stage, &result); err != nil {
-		return result, err
-	}
-	if err := s.cleanupCompleted(ctx, store, &result); err != nil {
 		return result, err
 	}
 	return result, nil
@@ -145,32 +141,4 @@ func commitClaimCompletion(ctx context.Context, lifecycle meetinglifecycle.Modul
 		return fmt.Errorf("summarization claim expired")
 	}
 	return nil
-}
-
-func (s Service) cleanupCompleted(ctx context.Context, store *db.DB, result *DrainResult) error {
-	meetings, err := store.CompletedWithAudio(ctx)
-	if err != nil {
-		return err
-	}
-	for _, meeting := range meetings {
-		if err := s.deleteArtifact(*meeting.AudioPath); err != nil {
-			result.CleanupFailed++
-			continue
-		}
-		ok, err := store.ClearAudioPath(ctx, meeting.ID, *meeting.AudioPath)
-		if err != nil {
-			return err
-		}
-		if ok {
-			result.Cleaned++
-		}
-	}
-	return nil
-}
-
-func (s Service) deleteArtifact(path string) error {
-	if s.ArtifactDeleter != nil {
-		return s.ArtifactDeleter(path)
-	}
-	return audioartifact.DeleteSession(path)
 }
