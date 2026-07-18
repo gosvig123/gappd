@@ -5,6 +5,7 @@ import type { StartupSettings } from '../shared/ipc-contract'
 
 const MACOS_PLATFORM = 'darwin'
 const STARTUP_MARKER_FILE = 'startup-initialized'
+const SPEAKER_LABELS_DISABLED_FILE = 'speaker-labels-disabled'
 const REQUIRES_APPROVAL_STATUS = 'requires-approval'
 
 export function initializeStartupSettings(): void {
@@ -28,13 +29,17 @@ export function shouldStartHidden(): boolean {
 }
 
 export function getStartupSettings(): StartupSettings {
-  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false }
+  const speakerLabelsEnabled = !fs.existsSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE))
+  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled }
   const settings = app.getLoginItemSettings()
-  return {
-    openAtLogin: settings.openAtLogin,
-    supported: true,
-    requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS,
-  }
+  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled }
+}
+
+export function setSpeakerLabelsEnabled(enabled: boolean): StartupSettings {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true })
+  if (enabled) fs.rmSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE), { force: true })
+  else fs.writeFileSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE), '')
+  return getStartupSettings()
 }
 
 export function setOpenAtLogin(openAtLogin: boolean): StartupSettings {
@@ -52,6 +57,5 @@ function markInitialized(): void {
   fs.writeFileSync(markerPath(), '', { flag: 'wx' })
 }
 
-function markerPath(): string {
-  return path.join(app.getPath('userData'), STARTUP_MARKER_FILE)
-}
+function markerPath(): string { return preferencePath(STARTUP_MARKER_FILE) }
+function preferencePath(name: string): string { return path.join(app.getPath('userData'), name) }

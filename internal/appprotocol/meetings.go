@@ -1,6 +1,10 @@
 package appprotocol
 
-import "github.com/gappd-dev/gappd/internal/db"
+import (
+	"encoding/json"
+
+	"github.com/gappd-dev/gappd/internal/db"
+)
 
 type MeetingListItem struct {
 	ID            string        `json:"id"`
@@ -23,6 +27,14 @@ type MeetingDetail struct {
 	TranscriptProvisional bool             `json:"transcriptProvisional"`
 	Summary               string           `json:"summary,omitempty"`
 	Segments              []MeetingSegment `json:"segments"`
+	Diarization           DiarizationInfo  `json:"diarization"`
+}
+
+type DiarizationInfo struct {
+	State        db.DiarizationState `json:"state"`
+	Error        *string             `json:"error,omitempty"`
+	SpeakerCount *int                `json:"speakerCount,omitempty"`
+	Coverage     *float64            `json:"coverage,omitempty"`
 }
 
 type MeetingSegment struct {
@@ -58,7 +70,32 @@ func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript st
 	status := MeetingStatusFor(meeting)
 	visible := visibleTranscriptSegments(meeting, segments)
 	provisional := meeting.Transcript == nil && len(visible) > 0
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible)}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Diarization: diarizationInfo(meeting)}
+}
+
+func diarizationInfo(meeting db.Meeting) DiarizationInfo {
+	info := DiarizationInfo{State: meeting.DiarizationState}
+	if meeting.DiarizationError != nil {
+		message := "Speaker labeling unavailable."
+		info.Error = &message
+	}
+	if meeting.DiarizationJSON == nil {
+		return info
+	}
+	var provenance struct {
+		SpeakerCount *int     `json:"speakerCount"`
+		Coverage     *float64 `json:"coverage"`
+	}
+	if json.Unmarshal([]byte(*meeting.DiarizationJSON), &provenance) != nil {
+		return info
+	}
+	if provenance.SpeakerCount != nil && *provenance.SpeakerCount >= 0 {
+		info.SpeakerCount = provenance.SpeakerCount
+	}
+	if provenance.Coverage != nil && *provenance.Coverage >= 0 && *provenance.Coverage <= 1 {
+		info.Coverage = provenance.Coverage
+	}
+	return info
 }
 
 func appTranscriptText(meeting db.Meeting, segments []db.Segment) string {

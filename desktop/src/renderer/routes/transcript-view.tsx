@@ -6,6 +6,7 @@ import './transcript-view.css'
 const ALL_SPEAKERS = 'All'
 const EMPTY_FILTER_TEXT = 'No transcript lines for this speaker yet.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
+const EXPERIMENTAL_SPEAKER_PATTERN = /^Speaker [1-9][0-9]*$/
 
 type TranscriptGroup = { speaker: string | null; lines: string[] }
 type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: string }
@@ -29,7 +30,7 @@ function SpeakerFilter({ speakers, speaker, onSpeaker }: { speakers: string[]; s
       {[ALL_SPEAKERS, ...speakers].map((option) => (
         <Button key={option} className="compact-action transcript-chip" style={speakerStyle(option)} aria-pressed={speaker === option} onClick={() => onSpeaker(option)}>
           {option === ALL_SPEAKERS ? null : <span className="transcript-chip-dot" aria-hidden="true" />}
-          {option}
+          <SpeakerName speaker={option} />
         </Button>
       ))}
     </div>
@@ -48,7 +49,7 @@ function TranscriptTurnRow({ turn }: { turn: SegmentTurn }) {
       <SpeakerAvatar speaker={turn.speaker} />
       <div className="transcript-turn-body">
         <div className="transcript-turn-meta">
-          <span className="transcript-speaker">{turn.speaker}</span>
+          <span className="transcript-speaker"><SpeakerName speaker={turn.speaker} /></span>
           <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>
         </div>
         <div className="transcript-turn-lines">{turn.texts.map((text, index) => <p key={index} className="transcript-segment-text">{text}</p>)}</div>
@@ -65,11 +66,15 @@ function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
     <article className="transcript-turn" style={speakerStyle(group.speaker)}>
       <SpeakerAvatar speaker={group.speaker} />
       <div className="transcript-turn-body">
-        <div className="transcript-turn-meta"><span className="transcript-speaker">{group.speaker}</span></div>
+        <div className="transcript-turn-meta"><span className="transcript-speaker"><SpeakerName speaker={group.speaker} /></span></div>
         <div className="transcript-turn-lines">{group.lines.map((line, index) => <p key={index} className="transcript-segment-text">{line}</p>)}</div>
       </div>
     </article>
   )
+}
+
+function SpeakerName({ speaker }: { speaker: string }) {
+  return <><span data-page-search-ignore>{speaker}</span>{EXPERIMENTAL_SPEAKER_PATTERN.test(speaker) ? <small data-page-search-ignore> Experimental</small> : null}</>
 }
 
 function SpeakerAvatar({ speaker }: { speaker: string }) {

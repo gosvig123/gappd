@@ -65,6 +65,7 @@ var Commands = []CommandSpec{
 	{ID: "devices.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[DevicesResponse](), Args: literalArgs("app", "devices", "--json")},
 	{ID: "meetings.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingsResponse](), Args: literalArgs("app", "meetings", "list", "--json")},
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},
+	{ID: "meetings.retryDiarization", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("retry-diarization"), field("id"), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},

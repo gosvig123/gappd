@@ -75,6 +75,7 @@ func renderProtocol() string {
 	b.WriteString(protocolHeader)
 	writeEnum(&b, "CAPTURE_STATUSES", "CaptureStatus", values(db.AllCaptureStatuses))
 	writeEnum(&b, "PROCESSING_STATUSES", "ProcessingStatus", values(db.AllProcessingStatuses))
+	writeEnum(&b, "DIARIZATION_STATES", "DiarizationState", values(db.AllDiarizationStates))
 	writeEnum(&b, "PROCESSING_CAPABILITIES", "ProcessingCapability", values(meetingprocessing.AllCapabilities))
 	writeEnum(&b, "MEETING_STATES", "MeetingState", values(meetinglifecycle.AllMeetingStates))
 	writeEnum(&b, "RECORDING_PROTOCOL_EVENT_TYPES", "RecordingProtocolEventType", values(recording.AllEventNames))
@@ -94,7 +95,7 @@ func renderContracts() string {
 	collector := collectCommandTypes()
 	var b strings.Builder
 	b.WriteString(protocolHeader)
-	b.WriteString("\nimport type { CaptureStatus, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
+	b.WriteString("\nimport type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
 	for _, typ := range collector.order {
 		writeType(&b, typ)
 	}
@@ -222,6 +223,8 @@ func enumTypeName(typ reflect.Type) string {
 		return "CaptureStatus"
 	case reflect.TypeOf(db.ProcessingStatus("")):
 		return "ProcessingStatus"
+	case reflect.TypeOf(db.DiarizationState("")):
+		return "DiarizationState"
 	case reflect.TypeOf(meetinglifecycle.MeetingState("")):
 		return "MeetingState"
 	case reflect.TypeOf(meetingprocessing.Capability("")):

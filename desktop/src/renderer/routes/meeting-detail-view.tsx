@@ -9,7 +9,7 @@ import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
-const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending'
+const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded', COMPLETED_STATE = 'completed'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
@@ -95,7 +95,7 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
     <Panel className="detail-panel readable-detail-panel">
       <div className="panel-header compact meeting-detail-header">
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
-        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
+        <div className="meeting-detail-actions"><DiarizationStatus meeting={selectedMeeting} />{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
       <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} />
     </Panel>
@@ -111,6 +111,7 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
     <div className="detail-grid detail-reading-stack">
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
+      <DiarizationNotice meeting={selectedMeeting} />
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
@@ -119,6 +120,19 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       </div>
     </div>
   )
+}
+
+function DiarizationStatus({ meeting }: { meeting: MeetingDetail }) {
+  const { state, speakerCount } = meeting.diarization
+  const label = state === PENDING_STATE ? 'Speaker labels pending' : state === PROCESSING_STATUS ? 'Speaker labels processing' : state === COMPLETED_STATE ? `Speaker count ${speakerCount ?? 0}` : ''
+  return label ? <><span>{label}</span><StatusPill tone="idle"><span data-page-search-ignore>Experimental</span></StatusPill></> : null
+}
+
+function DiarizationNotice({ meeting }: { meeting: MeetingDetail }) {
+  const [busy, setBusy] = useState(false)
+  if (meeting.diarization.state !== DEGRADED_STATE) return null
+  const retry = async () => { setBusy(true); try { await window.gappd.meetings.retryDiarization(meeting.id) } catch {} finally { setBusy(false) } }
+  return <div className="detail-surface"><span><span data-page-search-ignore>Experimental</span> · {meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span><div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
 }
 
 function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {

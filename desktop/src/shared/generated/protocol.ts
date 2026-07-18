@@ -7,6 +7,9 @@ export type CaptureStatus = (typeof CAPTURE_STATUSES)[number]
 export const PROCESSING_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const
 export type ProcessingStatus = (typeof PROCESSING_STATUSES)[number]
 
+export const DIARIZATION_STATES = ['not_requested', 'not_applicable', 'pending', 'processing', 'completed', 'degraded'] as const
+export type DiarizationState = (typeof DIARIZATION_STATES)[number]
+
 export const PROCESSING_CAPABILITIES = ['transcription', 'diarization', 'summarization'] as const
 export type ProcessingCapability = (typeof PROCESSING_CAPABILITIES)[number]
 

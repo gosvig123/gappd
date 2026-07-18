@@ -8,6 +8,7 @@ export type AppCommandInput = {
   'devices.list': EmptyInput
   'meetings.list': EmptyInput
   'meetings.show': MeetingShowInput
+  'meetings.retryDiarization': MeetingShowInput
   'meetings.delete': MeetingDeleteInput
   'config.show': EmptyInput
   'config.useManagedLocalAI': ConfigUseManagedLocalAIInput
@@ -20,6 +21,7 @@ export type AppCommandOutput = {
   'devices.list': DevicesResponse
   'meetings.list': MeetingsResponse
   'meetings.show': MeetingResponse
+  'meetings.retryDiarization': MeetingResponse
   'meetings.delete': MeetingDeleteResponse
   'config.show': ConfigResponse
   'config.useManagedLocalAI': ConfigResponse
@@ -40,6 +42,7 @@ export const APP_COMMANDS = {
   'devices.list': { mode: 'request', args: (input: EmptyInput) => ['app', 'devices', '--json'], env: [], terminal: [] },
   'meetings.list': { mode: 'request', args: (input: EmptyInput) => ['app', 'meetings', 'list', '--json'], env: [], terminal: [] },
   'meetings.show': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'show', input.id, '--json'], env: [], terminal: [] },
+  'meetings.retryDiarization': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'retry-diarization', input.id, '--json'], env: [], terminal: [] },
   'meetings.delete': { mode: 'request', args: (input: MeetingDeleteInput) => ['app', 'meetings', 'delete', input.id, '--json'], env: [], terminal: [] },
   'config.show': { mode: 'request', args: (input: EmptyInput) => ['app', 'config', 'show', '--json'], env: [], terminal: [] },
   'config.useManagedLocalAI': { mode: 'request', args: (input: ConfigUseManagedLocalAIInput) => ['app', 'config', 'use-managed-local-ai', '--endpoint', String(input.endpoint), '--model', String(input.model), ...(input.temperature === undefined ? [] : ['--temperature', String(input.temperature)])], env: [], terminal: [] },
