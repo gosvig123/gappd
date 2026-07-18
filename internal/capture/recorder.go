@@ -13,6 +13,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/livetranscript"
+	"github.com/gappd-dev/gappd/internal/processgroup"
 )
 
 type CaptureMode string
@@ -75,7 +76,7 @@ func (r *Recorder) prepareCommand(launch captureLaunch) {
 	r.cmd.Stdout = newChunkEventWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.transcriptEvents)
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
-	r.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	processgroup.Configure(r.cmd)
 }
 
 func (r *Recorder) waitForExit() chan error {
@@ -155,7 +156,7 @@ func (r *Recorder) stopCaptureProcess(sig syscall.Signal) error {
 }
 
 func (r *Recorder) killProcessGroup(sig syscall.Signal) error {
-	return syscall.Kill(-r.cmd.Process.Pid, sig)
+	return processgroup.Signal(r.cmd, sig)
 }
 
 func (r *Recorder) Artifacts() audioartifact.Artifacts {
