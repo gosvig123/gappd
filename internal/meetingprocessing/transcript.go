@@ -51,7 +51,11 @@ func (s Service) transcribeSource(ctx context.Context, src audioartifact.Source,
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", src.Speaker, err)
 	}
-	return toDBSegments(meetingID, cleanTranscriptionArtifacts(segments)), nil
+	reason := db.SpeakerAssignmentReasonPendingSystemAttribution
+	if src.Kind == db.SegmentSourceMicrophone {
+		reason = db.SpeakerAssignmentReasonMicrophone
+	}
+	return toDBSegments(meetingID, cleanTranscriptionArtifacts(segments), src.Kind, reason), nil
 }
 
 func (s Service) skipMissingAudio(src audioartifact.Source) ([]db.Segment, error) {

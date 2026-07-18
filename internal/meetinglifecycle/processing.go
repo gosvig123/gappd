@@ -76,6 +76,7 @@ func (t TranscriptSaved) apply(meeting *db.Meeting) (bool, error) {
 		return false, nil
 	}
 	meeting.Transcript = &t.Transcript
+	meeting.TranscriptRevision++
 	setProcessing(meeting, db.ProcessingStatusProcessing, timestamp(t.At), nil)
 	return true, nil
 }
@@ -113,8 +114,9 @@ func (t ProcessingFailed) apply(meeting *db.Meeting) (bool, error) {
 	if !processingActive(meeting) {
 		return false, conflict(meeting, t.name())
 	}
-	if t.Transcript != nil {
+	if t.Transcript != nil && !sameText(meeting.Transcript, *t.Transcript) {
 		meeting.Transcript = t.Transcript
+		meeting.TranscriptRevision++
 	}
 	setProcessing(meeting, db.ProcessingStatusFailed, timestamp(t.At), t.Cause)
 	return true, nil
@@ -155,8 +157,12 @@ func applyCompletion(meeting *db.Meeting, completion Completion) {
 	if title := cleanGeneratedMeetingTitle(completion.Title); title != "" {
 		meeting.Title = title
 	}
-	meeting.Transcript = &completion.Transcript
+	if !sameText(meeting.Transcript, completion.Transcript) {
+		meeting.Transcript = &completion.Transcript
+		meeting.TranscriptRevision++
+	}
 	meeting.Summary = &completion.Summary
+	meeting.SummaryTranscriptRevision = meeting.TranscriptRevision
 	meeting.ExtractionJSON = &completion.ExtractionJSON
 	setProcessing(meeting, db.ProcessingStatusCompleted, timestamp(completion.At), nil)
 }
@@ -168,8 +174,9 @@ func completionMatches(meeting *db.Meeting, completion Completion) bool {
 }
 
 func sameCompletion(a, b *db.Meeting) bool {
-	return a.Title == b.Title && samePointers(a.Transcript, b.Transcript) &&
-		samePointers(a.Summary, b.Summary) && samePointers(a.ExtractionJSON, b.ExtractionJSON)
+	return a.Title == b.Title && samePointers(a.Transcript, b.Transcript) && a.TranscriptRevision == b.TranscriptRevision &&
+		samePointers(a.Summary, b.Summary) && a.SummaryTranscriptRevision == b.SummaryTranscriptRevision &&
+		samePointers(a.ExtractionJSON, b.ExtractionJSON)
 }
 
 func samePointers(a, b *string) bool {

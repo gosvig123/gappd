@@ -50,6 +50,9 @@ func discardLiveTranscriptTx(ctx context.Context, tx *sql.Tx, id string, at time
 	if _, err := tx.ExecContext(ctx, deleteSegmentsSQL, id); err != nil {
 		return false, err
 	}
+	if err := incrementTranscriptRevision(tx, id); err != nil {
+		return false, err
+	}
 	return true, tx.Commit()
 }
 

@@ -91,7 +91,7 @@ func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
 		t.Fatalf("commit = %v, %v", ok, err)
 	}
 	got, _ := store.GetMeeting(meeting.ID)
-	if got.Transcript == nil || *got.Transcript != "hello" || got.ProcessingStatus != ProcessingStatusPending {
+	if got.Transcript == nil || *got.Transcript != "hello" || got.ProcessingStatus != ProcessingStatusPending || got.TranscriptRevision != 1 {
 		t.Fatalf("meeting = %#v", got)
 	}
 }

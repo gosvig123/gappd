@@ -37,8 +37,12 @@ func TestEnhanceRefinesStoredSummaryWithFeedback(t *testing.T) {
 	if !strings.Contains(notes.feedback, "prefer bullets") || !strings.Contains(notes.feedback, "shorter") {
 		t.Fatalf("feedback = %q, want notes and feedback", notes.feedback)
 	}
-	if got := getMeeting(t, store, meeting.ID).Summary; got == nil || *got != "refined" {
-		t.Fatalf("summary = %v, want refined", got)
+	stored := getMeeting(t, store, meeting.ID)
+	if stored.Summary == nil || *stored.Summary != "refined" {
+		t.Fatalf("summary = %v, want refined", stored.Summary)
+	}
+	if stored.TranscriptRevision != 1 || stored.SummaryTranscriptRevision != stored.TranscriptRevision {
+		t.Fatalf("summary revision = %d at transcript revision %d", stored.SummaryTranscriptRevision, stored.TranscriptRevision)
 	}
 }
 
