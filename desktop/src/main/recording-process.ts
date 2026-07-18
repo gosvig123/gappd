@@ -2,7 +2,7 @@ import type { spawn } from 'node:child_process'
 import type { RecordingEvent } from '../shared/generated/contracts'
 import { ignoresStopRequest, recordingEventOutcome, RECORDING_STATUS_ERROR, RECORDING_STATUS_IDLE, RECORDING_STATUS_STOPPING } from '../shared/meeting-recording-workflow'
 import { streamCommand } from './app-protocol'
-import { requestDrains } from './drain-coordinator'
+import { requestDrains, resumeDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
@@ -65,6 +65,8 @@ function recordingHandlers(title: string) {
 }
 
 function finishRecording(): void {
+  if (!recordingChild) return
   recordingChild = null
+  resumeDrains()
   logMainProcessMemory('recording:finished')
 }
