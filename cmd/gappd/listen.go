@@ -18,19 +18,21 @@ func listenCmd() *cobra.Command {
 	var title string
 	var mode string
 	var language string
+	var speakerLabelsEnabled bool
 
 	cmd := &cobra.Command{
 		Use:   "listen",
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := capture.CaptureMode(mode)
-			return runListen(deviceIdx, title, m, language, false)
+			return runListen(deviceIdx, title, m, language, &speakerLabelsEnabled, false)
 		},
 	}
 	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
 	cmd.Flags().StringVarP(&title, "title", "t", "", "Session title")
 	cmd.Flags().StringVar(&mode, "mode", "both", "Capture mode: mic, system, or both (default); \"both\" captures mic + system audio for meetings")
 	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
+	cmd.Flags().BoolVar(&speakerLabelsEnabled, "speaker-labels-enabled", true, "Run speaker labeling before summary")
 	return cmd
 }
 
@@ -51,7 +53,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, desktop bool) error {
+func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, speakerLabelsEnabled *bool, desktop bool) error {
 	_, store, err := loadStore()
 	if err != nil {
 		return err
@@ -61,7 +63,7 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 	if err != nil {
 		return err
 	}
-	req := recording.Request{DeviceIdx: deviceIdx, Title: title, Mode: mode, Language: language}
+	req := recording.Request{DeviceIdx: deviceIdx, Title: title, Mode: mode, Language: language, SpeakerLabelsEnabled: speakerLabelsEnabled}
 	if err := service.Run(req); err != nil || desktop {
 		return err
 	}

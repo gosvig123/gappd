@@ -61,8 +61,9 @@ func (w meetingRecordingWorkflow) createSessionDir(title string) (string, error)
 	return dir, nil
 }
 
-func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string) (*db.Meeting, error) {
-	start := meetinglifecycle.RecordingStart{Title: title, SessionDir: sessionDir, Language: language, At: time.Now()}
+func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string, speakerLabelsEnabled *bool) (*db.Meeting, error) {
+	start := meetinglifecycle.RecordingStart{Title: title, SessionDir: sessionDir, Language: language,
+		SpeakerLabelsEnabled: speakerLabelsEnabled, At: time.Now()}
 	meeting, err := w.lifecycle.BeginRecording(context.Background(), start)
 	if err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)

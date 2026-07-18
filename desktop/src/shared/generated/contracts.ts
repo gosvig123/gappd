@@ -124,6 +124,7 @@ export type RecordStartInput = {
   device: number
   mode: string
   language: string
+  speakerLabelsEnabled?: boolean
 }
 
 export type RecordingEvent = {

@@ -11,11 +11,14 @@ import (
 
 type Module struct{ store *db.DB }
 
+const speakerDiarizationAvailable = false
+
 type RecordingStart struct {
-	Title      string
-	SessionDir string
-	Language   string
-	At         time.Time
+	Title                string
+	SessionDir           string
+	Language             string
+	SpeakerLabelsEnabled *bool
+	At                   time.Time
 }
 
 type Result struct {
@@ -27,11 +30,16 @@ func New(store *db.DB) Module { return Module{store: store} }
 
 func (w Module) BeginRecording(_ context.Context, start RecordingStart) (*db.Meeting, error) {
 	at := timestamp(start.At)
+	diarizationState := db.DiarizationStateNotRequested
+	if speakerDiarizationAvailable && (start.SpeakerLabelsEnabled == nil || *start.SpeakerLabelsEnabled) {
+		diarizationState = db.DiarizationStatePending
+	}
 	meeting := &db.Meeting{
 		Title: start.Title, StartedAt: at, AudioPath: &start.SessionDir,
 		CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: at,
 		ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: at,
-		Language: meetinglang.Normalize(start.Language), Tags: "[]", Source: "listen",
+		DiarizationState: diarizationState,
+		Language:         meetinglang.Normalize(start.Language), Tags: "[]", Source: "listen",
 	}
 	if err := w.store.CreateMeeting(meeting); err != nil {
 		return nil, err

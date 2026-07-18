@@ -13,7 +13,7 @@ const LIVE_TRANSCRIPT_CHUNK_SECONDS = '300'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string; language: string }): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const snapshot = managedRuntime.status()
   const liveTranscript = snapshot.capabilities.transcription.readiness === 'ready'

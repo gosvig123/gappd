@@ -45,7 +45,7 @@ export const APP_COMMANDS = {
   'config.useManagedLocalAI': { mode: 'request', args: (input: ConfigUseManagedLocalAIInput) => ['app', 'config', 'use-managed-local-ai', '--endpoint', String(input.endpoint), '--model', String(input.model), ...(input.temperature === undefined ? [] : ['--temperature', String(input.temperature)])], env: [], terminal: [] },
   'processing.drain': { mode: 'request', args: (input: ProcessingDrainInput) => ['app', 'processing', 'drain', '--capability', String(input.capability), '--json'], env: [], terminal: [] },
   'record.recoverStale': { mode: 'request', args: (input: EmptyInput) => ['app', 'record', 'recover-stale', '--json'], env: [], terminal: [] },
-  'record.start': { mode: 'stream', args: (input: RecordStartInput) => ['app', 'record', 'start', '--title', String(input.title), '--device', String(input.device), '--mode', String(input.mode), '--language', String(input.language)], env: ['GAPPD_CAPTURE_HELPER_PATH'], terminal: ['recording.captured', 'recording.failed'] },
+  'record.start': { mode: 'stream', args: (input: RecordStartInput) => ['app', 'record', 'start', '--title', String(input.title), '--device', String(input.device), '--mode', String(input.mode), '--language', String(input.language), ...(input.speakerLabelsEnabled === undefined ? [] : ['--speaker-labels-enabled', String(input.speakerLabelsEnabled)])], env: ['GAPPD_CAPTURE_HELPER_PATH'], terminal: ['recording.captured', 'recording.failed'] },
 } as const satisfies AppCommandDefinitions
 
 export type AppCommandID = keyof typeof APP_COMMANDS

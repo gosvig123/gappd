@@ -15,9 +15,12 @@ func TestStageForArtifacts(t *testing.T) {
 		meeting db.Meeting
 		want    db.QueueStage
 	}{
-		{"empty", db.Meeting{}, db.QueueStageTranscription},
-		{"transcript", db.Meeting{Transcript: &text}, db.QueueStageSummarization},
-		{"complete", db.Meeting{Transcript: &text, Summary: &summary, ExtractionJSON: &extraction}, db.QueueStageNone},
+		{"empty before diarization", db.Meeting{DiarizationState: db.DiarizationStatePending}, db.QueueStageTranscription},
+		{"legacy bypass", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStateNotRequested}, db.QueueStageSummarization},
+		{"pending diarization", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStatePending}, db.QueueStageDiarization},
+		{"completed", db.Meeting{Transcript: &text, Summary: &summary, ExtractionJSON: &extraction, DiarizationState: db.DiarizationStateCompleted}, db.QueueStageNone},
+		{"degraded unblocks summary", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStateDegraded}, db.QueueStageSummarization},
+		{"stale summary", db.Meeting{Transcript: &text, TranscriptRevision: 2, Summary: &summary, SummaryTranscriptRevision: 1, ExtractionJSON: &extraction, DiarizationState: db.DiarizationStateCompleted}, db.QueueStageSummarization},
 		{"inconsistent", db.Meeting{Summary: &summary}, db.QueueStageRepair},
 	}
 	for _, test := range tests {
