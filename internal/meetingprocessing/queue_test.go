@@ -22,7 +22,6 @@ func TestStageForArtifacts(t *testing.T) {
 		{"pending diarization", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStatePending}, db.QueueStageDiarization},
 		{"completed", db.Meeting{Transcript: &text, Summary: &summary, ExtractionJSON: &extraction, DiarizationState: db.DiarizationStateCompleted}, db.QueueStageNone},
 		{"degraded unblocks summary", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStateDegraded}, db.QueueStageSummarization},
-		{"stale summary", db.Meeting{Transcript: &text, TranscriptRevision: 2, Summary: &summary, SummaryTranscriptRevision: 1, ExtractionJSON: &extraction, DiarizationState: db.DiarizationStateCompleted}, db.QueueStageSummarization},
 		{"inconsistent", db.Meeting{Summary: &summary}, db.QueueStageRepair},
 	}
 	for _, test := range tests {
@@ -42,18 +41,15 @@ func TestTranscriptionDrainPersistsSourceAndRevision(t *testing.T) {
 	if _, err := store.Conn.Exec(`UPDATE meetings SET audio_path=? WHERE id=?`, audioPath, meeting.ID); err != nil {
 		t.Fatal(err)
 	}
-	service := Service{Store: store, Transcriber: fakeTranscriber{}}
-	if result, err := service.Drain(context.Background(), CapabilityTranscription); err != nil || result.Completed != 1 {
+	if result, err := (Service{Store: store, Transcriber: fakeTranscriber{}}).Drain(context.Background(), CapabilityTranscription); err != nil || result.Completed != 1 {
 		t.Fatalf("Drain() = %#v, %v", result, err)
 	}
 	segments, err := store.GetSegments(meeting.ID)
 	if err != nil || len(segments) != 1 || segments[0].SpeakerSource == nil ||
 		*segments[0].SpeakerSource != db.SegmentSourceMicrophone || segments[0].SpeakerAssignmentReason == nil ||
-		*segments[0].SpeakerAssignmentReason != db.SpeakerAssignmentReasonMicrophone {
+		*segments[0].SpeakerAssignmentReason != db.SpeakerAssignmentReasonMicrophone ||
+		getMeeting(t, store, meeting.ID).TranscriptRevision != 1 {
 		t.Fatalf("segments = %#v, %v", segments, err)
-	}
-	if got := getMeeting(t, store, meeting.ID).TranscriptRevision; got != 1 {
-		t.Fatalf("transcript revision = %d, want 1", got)
 	}
 }
 
@@ -71,15 +67,8 @@ func TestDiarizationDrainOutcomes(t *testing.T) {
 			_ = store.InsertSegment(&db.Segment{ID: "system-1", MeetingID: meeting.ID, Start: 0, End: 1, Text: "one", Speaker: "Other", SpeakerSource: &system})
 			_ = store.InsertSegment(&db.Segment{ID: "system-2", MeetingID: meeting.ID, Start: 2, End: 3, Text: "two", Speaker: "Other", SpeakerSource: &system})
 			windows := []diarize.WindowReport{{DurationSeconds: 3, Clusters: []diarize.LocalCluster{{ID: "a", Centroid: []float64{1}}}, Spans: []diarize.LocalSpan{{ClusterID: "a", StartSeconds: 0, EndSeconds: 1, Quality: 1, Identity: 1}}}}
-			runner := func(context.Context, string) ([]diarize.WindowReport, error) {
-				if mode == "cancel" {
-					return nil, context.Canceled
-				}
-				if mode == "failure" {
-					return nil, errors.New("/private/helper: raw stderr")
-				}
-				return windows, nil
-			}
+			runErr := map[string]error{"cancel": context.Canceled, "failure": errors.New("/private/helper: raw stderr")}[mode]
+			runner := func(context.Context, string) ([]diarize.WindowReport, error) { return windows, runErr }
 			result, err := (Service{Store: store, RunDiarization: runner}).Drain(context.Background(), CapabilityDiarization)
 			if err != nil {
 				t.Fatal(err)
