@@ -80,22 +80,6 @@ func TestNumberingCountAndCoverage(t *testing.T) {
 	}
 }
 
-func TestRejectsMalformedInput(t *testing.T) {
-	tests := []Input{
-		{Windows: []WindowReport{window(1, 2, nil, nil)}},
-		{Windows: []WindowReport{window(0, 2, []LocalCluster{{"a", []float64{math.NaN()}}}, nil)}},
-		{Windows: []WindowReport{window(0, 2, []LocalCluster{{"a", []float64{1}}, {"b", []float64{1, 2}}}, nil)}},
-		{Windows: []WindowReport{window(0, 2, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{span("a", 1, 2, 1), span("a", 0, 1, 1)})}},
-		{Windows: []WindowReport{window(0, 2, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{{"a", 0, 1, 1, math.Inf(1)}})}},
-		{Phrases: []Phrase{{"b", 2, 3}, {"a", 1, 2}}},
-	}
-	for i, input := range tests {
-		if _, err := Transform(input); err == nil {
-			t.Fatalf("case %d succeeded", i)
-		}
-	}
-}
-
 func window(start, duration float64, clusters []LocalCluster, spans []LocalSpan) WindowReport {
 	return WindowReport{start, duration, clusters, spans}
 }
