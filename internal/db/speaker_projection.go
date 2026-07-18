@@ -19,13 +19,14 @@ const (
 
 var numberedSpeaker = regexp.MustCompile(`^Speaker [1-9][0-9]*$`)
 
-var projectionReasons = map[SpeakerAssignmentReason]struct{}{
-	SpeakerAssignmentReasonThresholdAssignment:  {},
-	SpeakerAssignmentReasonAmbiguousSupport:     {},
-	SpeakerAssignmentReasonInsufficientCoverage: {},
-	SpeakerAssignmentReasonNoEvidence:           {},
-	SpeakerAssignmentReasonDominantFallback:     {},
-	SpeakerAssignmentReasonSingleTurnFallback:   {},
+func validProjectionReason(reason SpeakerAssignmentReason) bool {
+	switch reason {
+	case SpeakerAssignmentReasonThresholdAssignment, SpeakerAssignmentReasonAmbiguousSupport,
+		SpeakerAssignmentReasonInsufficientCoverage, SpeakerAssignmentReasonNoEvidence,
+		SpeakerAssignmentReasonDominantFallback, SpeakerAssignmentReasonSingleTurnFallback:
+		return true
+	}
+	return false
 }
 
 type SpeakerProjectionAssignment struct {
@@ -59,19 +60,26 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 	if err != nil {
 		return nil, false, err
 	}
-	if !projectionClaimMatches(meeting, input) {
+	if meeting.ProcessingStatus != ProcessingStatusProcessing || meeting.ProcessingClaimToken == nil ||
+		*meeting.ProcessingClaimToken != input.ClaimToken || meeting.DiarizationState != DiarizationStateProcessing ||
+		meeting.TranscriptRevision != input.CapturedTranscriptRevision {
 		return meeting, false, nil
 	}
-	segments, err := getSegmentsTx(ctx, tx, input.MeetingID)
+	rows, err := tx.QueryContext(ctx, selectSegmentsSQL, input.MeetingID)
 	if err != nil {
 		return nil, false, err
 	}
-	if !exactSystemAssignments(segments, assignments) {
-		return meeting, false, nil
-	}
-	changed, err := updateProjectedSegments(ctx, tx, segments, assignments)
+	segments, err := scanSegments(rows)
+	rows.Close()
 	if err != nil {
 		return nil, false, err
+	}
+	changed, exact, err := updateProjectedSegments(ctx, tx, segments, assignments)
+	if err != nil {
+		return nil, false, err
+	}
+	if !exact {
+		return meeting, false, nil
 	}
 	result, err := tx.ExecContext(ctx, `UPDATE meetings SET
 		transcript=?, transcript_revision=transcript_revision+?,
@@ -80,7 +88,7 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 		processing_claim_token=NULL, processing_claim_expires_at=NULL
 		WHERE id=? AND processing_status=? AND processing_claim_token=?
 		AND diarization_state=? AND transcript_revision=?`,
-		FormatTranscript(segments), boolInt(changed), DiarizationStateCompleted, provenanceJSON,
+		FormatTranscript(segments), changed, DiarizationStateCompleted, provenanceJSON,
 		ProcessingStatusPending, stamp(input.CompletedAt), input.MeetingID, ProcessingStatusProcessing,
 		input.ClaimToken, DiarizationStateProcessing, input.CapturedTranscriptRevision)
 	applied, err := rowsChanged(result, err, "commit speaker projection")
@@ -98,11 +106,8 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 }
 
 func validateProjection(input SpeakerProjectionCommit) (map[string]SpeakerProjectionAssignment, string, error) {
-	if input.MeetingID == "" || input.ClaimToken == "" {
-		return nil, "", fmt.Errorf("speaker projection requires meeting and claim")
-	}
-	if len(input.Assignments) == 0 {
-		return nil, "", fmt.Errorf("speaker projection requires assignments")
+	if input.MeetingID == "" || input.ClaimToken == "" || len(input.Assignments) == 0 {
+		return nil, "", fmt.Errorf("speaker projection requires meeting, claim, and assignments")
 	}
 	if len(input.ProvenanceJSON) > maxProjectionProvenanceJSONBytes {
 		return nil, "", fmt.Errorf("speaker projection provenance exceeds %d bytes", maxProjectionProvenanceJSONBytes)
@@ -116,8 +121,7 @@ func validateProjection(input SpeakerProjectionCommit) (map[string]SpeakerProjec
 	for _, assignment := range input.Assignments {
 		_, duplicate := assignments[assignment.SegmentID]
 		confidence := assignment.Confidence
-		_, validReason := projectionReasons[assignment.Reason]
-		if assignment.SegmentID == "" || duplicate || !validReason ||
+		if assignment.SegmentID == "" || duplicate || !validProjectionReason(assignment.Reason) ||
 			assignment.Speaker != VisibleSpeakerOther && !numberedSpeaker.MatchString(string(assignment.Speaker)) ||
 			confidence != nil && (math.IsNaN(*confidence) || math.IsInf(*confidence, 0) || *confidence < 0 || *confidence > 1) {
 			return nil, "", fmt.Errorf("invalid speaker projection assignment for segment %q", assignment.SegmentID)
@@ -127,32 +131,17 @@ func validateProjection(input SpeakerProjectionCommit) (map[string]SpeakerProjec
 	return assignments, string(compact), nil
 }
 
-func projectionClaimMatches(meeting *Meeting, input SpeakerProjectionCommit) bool {
-	return meeting.ProcessingStatus == ProcessingStatusProcessing && meeting.ProcessingClaimToken != nil &&
-		*meeting.ProcessingClaimToken == input.ClaimToken && meeting.DiarizationState == DiarizationStateProcessing &&
-		meeting.TranscriptRevision == input.CapturedTranscriptRevision
-}
-
-func exactSystemAssignments(segments []Segment, assignments map[string]SpeakerProjectionAssignment) bool {
-	matched := 0
-	for _, segment := range segments {
-		if segment.SpeakerSource != nil && *segment.SpeakerSource == SegmentSourceSystem {
-			if _, ok := assignments[segment.ID]; !ok {
-				return false
-			}
-			matched++
-		}
-	}
-	return matched == len(assignments)
-}
-
-func updateProjectedSegments(ctx context.Context, tx *sql.Tx, segments []Segment, assignments map[string]SpeakerProjectionAssignment) (bool, error) {
-	changed := false
+func updateProjectedSegments(ctx context.Context, tx *sql.Tx, segments []Segment, assignments map[string]SpeakerProjectionAssignment) (bool, bool, error) {
+	changed, matched := false, 0
 	for i := range segments {
-		assignment, ok := assignments[segments[i].ID]
-		if !ok {
+		if segments[i].SpeakerSource == nil || *segments[i].SpeakerSource != SegmentSourceSystem {
 			continue
 		}
+		assignment, ok := assignments[segments[i].ID]
+		if !ok {
+			return false, false, nil
+		}
+		matched++
 		speaker := string(assignment.Speaker)
 		if segments[i].Speaker == speaker && equalFloat(segments[i].SpeakerConfidence, assignment.Confidence) &&
 			segments[i].SpeakerAssignmentReason != nil && *segments[i].SpeakerAssignmentReason == assignment.Reason {
@@ -163,17 +152,17 @@ func updateProjectedSegments(ctx context.Context, tx *sql.Tx, segments []Segment
 			segments[i].ID, segments[i].MeetingID, SegmentSourceSystem)
 		updated, err := rowsChanged(result, err, "update projected segment")
 		if err != nil {
-			return false, err
+			return false, false, err
 		}
 		if !updated {
-			return false, fmt.Errorf("system segment %s changed during projection", segments[i].ID)
+			return false, false, fmt.Errorf("system segment %s changed during projection", segments[i].ID)
 		}
 		segments[i].Speaker = speaker
 		segments[i].SpeakerConfidence = assignment.Confidence
 		segments[i].SpeakerAssignmentReason = &assignment.Reason
 		changed = true
 	}
-	return changed, nil
+	return changed, matched == len(assignments), nil
 }
 
 func getMeetingTx(ctx context.Context, tx *sql.Tx, id string) (*Meeting, error) {
@@ -181,22 +170,6 @@ func getMeetingTx(ctx context.Context, tx *sql.Tx, id string) (*Meeting, error) 
 	return &meeting, err
 }
 
-func getSegmentsTx(ctx context.Context, tx *sql.Tx, meetingID string) ([]Segment, error) {
-	rows, err := tx.QueryContext(ctx, selectSegmentsSQL, meetingID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return scanSegments(rows)
-}
-
 func equalFloat(left, right *float64) bool {
 	return left == nil && right == nil || left != nil && right != nil && *left == *right
-}
-
-func boolInt(value bool) int {
-	if value {
-		return 1
-	}
-	return 0
 }

@@ -33,11 +33,8 @@ func needsDiarizationMigration(ctx context.Context, conn *sql.Conn) (bool, error
 		if err != nil {
 			return false, err
 		}
-		if len(columns) == 0 {
-			continue
-		}
 		for _, column := range required {
-			if !columns[column.name] {
+			if len(columns) > 0 && !columns[column.name] {
 				return true, nil
 			}
 		}

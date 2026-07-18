@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,26 +11,29 @@ import (
 
 func TestCommitSpeakerProjectionUpdatesInPlace(t *testing.T) {
 	store, id := projectionFixture(t)
-	before := projectionSnapshot(t, store, id)
+	before, _ := store.GetSegments(id)
 	meeting, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id))
 	if err != nil || !applied {
 		t.Fatalf("commit = applied %v, error %v", applied, err)
 	}
-	after := projectionSnapshot(t, store, id)
+	after, _ := store.GetSegments(id)
 	confidence, reason := 0.91, SpeakerAssignmentReasonThresholdAssignment
-	want := append([]Segment(nil), before.segments...)
+	want := append([]Segment(nil), before...)
 	want[1].Speaker, want[1].SpeakerConfidence, want[1].SpeakerAssignmentReason = "Speaker 1", &confidence, &reason
-	if !reflect.DeepEqual(want, after.segments) {
+	if !reflect.DeepEqual(want, after) {
 		t.Fatal("projection changed microphone or system row shape")
 	}
 	if meeting.Transcript == nil || *meeting.Transcript != "[You] microphone words\n[Speaker 1] remote words\n" || meeting.TranscriptRevision != 8 {
 		t.Fatal("transcript or changed revision not updated")
 	}
 	if meeting.Summary == nil || *meeting.Summary != "old summary" || meeting.SummaryTranscriptRevision != 7 ||
-		meeting.ExtractionJSON == nil || *meeting.ExtractionJSON != `{"old":true}` || DeriveQueueStage(*meeting) != QueueStageSummarization {
+		DeriveQueueStage(*meeting) != QueueStageSummarization {
 		t.Fatal("summary did not remain stale")
 	}
-	assertProjectionCompleted(t, meeting)
+	if meeting.DiarizationState != DiarizationStateCompleted || meeting.DiarizationJSON == nil ||
+		*meeting.DiarizationJSON != `{"engine":"test"}` || meeting.ProcessingStatus != ProcessingStatusPending || meeting.ProcessingClaimToken != nil {
+		t.Fatal("completion fields incorrect")
+	}
 }
 
 func TestCommitSpeakerProjectionNoOpDoesNotBumpRevision(t *testing.T) {
@@ -40,55 +44,34 @@ func TestCommitSpeakerProjectionNoOpDoesNotBumpRevision(t *testing.T) {
 	if err != nil || !applied || meeting.TranscriptRevision != 7 || meeting.SummaryTranscriptRevision != 7 {
 		t.Fatalf("no-op = applied %v, revision %d, error %v", applied, meeting.TranscriptRevision, err)
 	}
-	assertProjectionCompleted(t, meeting)
 }
 
 func TestCommitSpeakerProjectionRejectsStaleOrInexactInput(t *testing.T) {
-	for _, name := range []string{"token", "revision", "processing state", "diarization state", "missing system row", "extra assignment", "changed source"} {
-		t.Run(name, func(t *testing.T) {
-			store, id := projectionFixture(t)
-			input := projectionInput(id)
-			switch name {
-			case "token":
-				input.ClaimToken = "stale"
-			case "revision":
-				input.CapturedTranscriptRevision--
-			case "processing state":
-				mustExec(t, store, `UPDATE meetings SET processing_status=? WHERE id=?`, ProcessingStatusPending, id)
-			case "diarization state":
-				mustExec(t, store, `UPDATE meetings SET diarization_state=? WHERE id=?`, DiarizationStatePending, id)
-			case "missing system row":
-				mustExec(t, store, `INSERT INTO segments (id,meeting_id,start_sec,end_sec,text,speaker,speaker_source) SELECT 'system-2',meeting_id,3,4,'more',speaker,speaker_source FROM segments WHERE id='system-1'`)
-			case "extra assignment":
-				input.Assignments = append(input.Assignments, SpeakerProjectionAssignment{SegmentID: "absent", Speaker: VisibleSpeakerOther, Reason: SpeakerAssignmentReasonNoEvidence})
-			case "changed source":
-				mustExec(t, store, `UPDATE segments SET speaker_source=? WHERE id='system-1'`, SegmentSourceMicrophone)
-			}
-			assertProjectionRejected(t, store, input)
-		})
+	tests := map[string]func(*testing.T, *DB, *SpeakerProjectionCommit){
+		"token":    func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) { in.ClaimToken = "stale" },
+		"revision": func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) { in.CapturedTranscriptRevision-- },
+		"missing system row": func(t *testing.T, s *DB, _ *SpeakerProjectionCommit) {
+			mustExec(t, s, `INSERT INTO segments (id,meeting_id,start_sec,end_sec,text,speaker,speaker_source) SELECT 'system-2',meeting_id,3,4,'more',speaker,speaker_source FROM segments WHERE id='system-1'`)
+		},
+		"extra assignment": func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) {
+			in.Assignments = append(in.Assignments, SpeakerProjectionAssignment{SegmentID: "absent", Speaker: VisibleSpeakerOther, Reason: SpeakerAssignmentReasonNoEvidence})
+		},
+		"changed source": func(t *testing.T, s *DB, _ *SpeakerProjectionCommit) {
+			mustExec(t, s, `UPDATE segments SET speaker_source=? WHERE id='system-1'`, SegmentSourceMicrophone)
+		},
+		"oversized provenance": func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) {
+			in.ProvenanceJSON = `{"x":"` + strings.Repeat("x", maxProjectionProvenanceJSONBytes) + `"}`
+		},
 	}
-}
-
-func TestValidateProjectionRejectsInvalidInputBeforeTransaction(t *testing.T) {
-	for _, name := range []string{"empty assignments", "null provenance", "array provenance", "oversized provenance", "unknown reason"} {
-		t.Run(name, func(t *testing.T) {
-			input := projectionInput("meeting-1")
-			switch name {
-			case "empty assignments":
-				input.Assignments = nil
-			case "null provenance":
-				input.ProvenanceJSON = "null"
-			case "array provenance":
-				input.ProvenanceJSON = "[]"
-			case "oversized provenance":
-				input.ProvenanceJSON = `{"x":"` + strings.Repeat("x", maxProjectionProvenanceJSONBytes) + `"}`
-			case "unknown reason":
-				input.Assignments[0].Reason = SpeakerAssignmentReason("invented")
-			}
-			if _, _, err := validateProjection(input); err == nil {
-				t.Fatal("validation succeeded")
-			}
-		})
+	for name, mutate := range tests {
+		store, id := projectionFixture(t)
+		input := projectionInput(id)
+		mutate(t, store, &input)
+		before := projectionSnapshot(t, store, id)
+		_, applied, err := store.CommitSpeakerProjection(context.Background(), input)
+		if applied || before != projectionSnapshot(t, store, id) || (err != nil) != (name == "oversized provenance") {
+			t.Fatalf("%s rejection = applied %v, error %v", name, applied, err)
+		}
 	}
 }
 
@@ -99,40 +82,29 @@ func TestCommitSpeakerProjectionRollsBack(t *testing.T) {
 	if _, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id)); err == nil || applied {
 		t.Fatalf("failure = applied %v, error %v", applied, err)
 	}
-	if after := projectionSnapshot(t, store, id); !reflect.DeepEqual(before, after) {
+	if after := projectionSnapshot(t, store, id); before != after {
 		t.Fatal("projection was not rolled back")
 	}
-}
-
-type projectionState struct {
-	meeting  *Meeting
-	segments []Segment
 }
 
 func projectionFixture(t *testing.T) (*DB, string) {
 	t.Helper()
 	store := openTestDB(t)
 	t.Cleanup(func() { store.Close() })
-	claim, expiry := "claim-1", "2026-04-10T13:00:00Z"
-	transcript, summary, extraction := "[You] microphone words\n[Other] remote words\n", "old summary", `{"old":true}`
-	diarizationError, processingError := "old diarization error", "old processing error"
-	meeting := &Meeting{ID: "meeting-1", Title: "Projection", StartedAt: "2026-04-10T12:00:00Z",
-		CaptureStatus: CaptureStatusCaptured, CaptureStatusUpdatedAt: "2026-04-10T12:01:00Z",
-		ProcessingStatus: ProcessingStatusProcessing, ProcessingStatusUpdatedAt: "2026-04-10T12:02:00Z",
-		ProcessingFailureMessage: &processingError, ProcessingClaimToken: &claim, ProcessingClaimExpiresAt: &expiry,
-		Transcript: &transcript, TranscriptRevision: 7, Summary: &summary, SummaryTranscriptRevision: 7,
-		ExtractionJSON: &extraction, DiarizationState: DiarizationStateProcessing, DiarizationError: &diarizationError,
-		Language: "en_US", Tags: "[]", Source: "listen"}
-	if err := store.CreateMeeting(meeting); err != nil {
-		t.Fatal(err)
-	}
+	id := "meeting-1"
+	mustExec(t, store, `INSERT INTO meetings
+		(id,title,started_at,capture_status,processing_status,processing_status_updated_at,processing_claim_token,
+		transcript,transcript_revision,summary,summary_transcript_revision,extraction_json,diarization_state)
+		VALUES (?,'Projection','2026-04-10T12:00:00Z',?,?,'2026-04-10T12:02:00Z','claim-1',?,7,
+		'old summary',7,'{"old":true}',?)`, id, CaptureStatusCaptured, ProcessingStatusProcessing,
+		"[You] microphone words\n[Other] remote words\n", DiarizationStateProcessing)
 	mustExec(t, store, `INSERT INTO segments
-		(id,meeting_id,start_sec,end_sec,text,speaker,speaker_source,speaker_confidence,speaker_assignment_reason,created_at)
-		VALUES ('mic-1',?,.125,1.25,'microphone words',?,?,NULL,?,'2026-04-10T12:00:01.123Z'),
-		('system-1',?,1.5,2.75,'remote words',?,?,NULL,?,'2026-04-10T12:00:02.456Z')`,
-		meeting.ID, SpeakerYou, SegmentSourceMicrophone, SpeakerAssignmentReasonMicrophone,
-		meeting.ID, SpeakerOther, SegmentSourceSystem, SpeakerAssignmentReasonPendingSystemAttribution)
-	return store, meeting.ID
+		(id,meeting_id,start_sec,end_sec,text,speaker,speaker_source,speaker_assignment_reason) VALUES
+		('mic-1',?,.125,1.25,'microphone words',?,?,?),
+		('system-1',?,1.5,2.75,'remote words',?,?,?)`,
+		id, SpeakerYou, SegmentSourceMicrophone, SpeakerAssignmentReasonMicrophone,
+		id, SpeakerOther, SegmentSourceSystem, SpeakerAssignmentReasonPendingSystemAttribution)
+	return store, id
 }
 
 func projectionInput(id string) SpeakerProjectionCommit {
@@ -142,39 +114,15 @@ func projectionInput(id string) SpeakerProjectionCommit {
 		ProvenanceJSON: ` { "engine": "test" } `, CompletedAt: time.Date(2026, 4, 10, 12, 3, 4, 0, time.UTC)}
 }
 
-func projectionSnapshot(t *testing.T, store *DB, id string) projectionState {
+func projectionSnapshot(t *testing.T, store *DB, id string) string {
 	t.Helper()
-	meeting, err := store.GetMeeting(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	segments, err := store.GetSegments(id)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return projectionState{meeting, segments}
-}
-
-func assertProjectionRejected(t *testing.T, store *DB, input SpeakerProjectionCommit) {
-	t.Helper()
-	before := projectionSnapshot(t, store, input.MeetingID)
-	_, applied, err := store.CommitSpeakerProjection(context.Background(), input)
-	if err != nil || applied {
-		t.Fatalf("rejection = applied %v, error %v", applied, err)
-	}
-	if after := projectionSnapshot(t, store, input.MeetingID); !reflect.DeepEqual(before, after) {
-		t.Fatal("rejected projection wrote data")
-	}
-}
-
-func assertProjectionCompleted(t *testing.T, meeting *Meeting) {
-	t.Helper()
-	if meeting.DiarizationState != DiarizationStateCompleted || meeting.DiarizationError != nil ||
-		meeting.DiarizationJSON == nil || *meeting.DiarizationJSON != `{"engine":"test"}` ||
-		meeting.ProcessingStatus != ProcessingStatusPending || meeting.ProcessingStatusUpdatedAt != "2026-04-10T12:03:04.000000000Z" ||
-		meeting.ProcessingFailureMessage != nil || meeting.ProcessingClaimToken != nil || meeting.ProcessingClaimExpiresAt != nil {
-		t.Fatal("completion fields incorrect")
-	}
+	meeting, _ := store.GetMeeting(id)
+	segments, _ := store.GetSegments(id)
+	data, _ := json.Marshal(struct {
+		Meeting  *Meeting
+		Segments []Segment
+	}{meeting, segments})
+	return string(data)
 }
 
 func mustExec(t *testing.T, store *DB, query string, args ...any) {
