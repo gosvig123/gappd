@@ -61,9 +61,10 @@ type clusterMatch struct {
 	continuity float64
 }
 type candidate struct {
-	local   string
-	speaker int
-	score   float64
+	local    string
+	speaker  int
+	score    float64
+	centroid []float64
 }
 
 func Transform(in Input) (Output, error) {
@@ -164,10 +165,6 @@ func stitch(windows []WindowReport) []stitchedSpan {
 func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*globalCluster, previous []stitchedSpan) map[string]clusterMatch {
 	matches := make(map[string]clusterMatch)
 	used := make(map[int]bool)
-	centroids := make(map[string][]float64, len(clusters))
-	for _, cluster := range clusters {
-		centroids[cluster.ID] = cluster.Centroid
-	}
 	overlaps := make(map[string]map[int][][2]float64)
 	for _, span := range window.Spans {
 		start, end := span.StartSeconds+window.StartSeconds, span.EndSeconds+window.StartSeconds
@@ -184,7 +181,7 @@ func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*
 	var edges []candidate
 	for local, speakers := range overlaps {
 		for speaker, intervals := range speakers {
-			edges = append(edges, candidate{local, speaker, unionSeconds(intervals)})
+			edges = append(edges, candidate{local: local, speaker: speaker, score: unionSeconds(intervals)})
 		}
 	}
 	sort.Slice(edges, func(i, j int) bool { return candidateLess(edges[i], edges[j]) })
@@ -201,7 +198,7 @@ func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*
 		for speaker, global := range globals {
 			score := cosine(cluster.Centroid, global.centroid)
 			if !used[speaker] && score >= CentroidSimilarityThreshold {
-				edges = append(edges, candidate{cluster.ID, speaker, score})
+				edges = append(edges, candidate{cluster.ID, speaker, score, cluster.Centroid})
 			}
 		}
 	}
@@ -210,10 +207,10 @@ func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*
 		if _, found := matches[edge.local]; found || used[edge.speaker] {
 			continue
 		}
-		local, second := centroids[edge.local], -1.0
+		second := -1.0
 		for speaker, global := range globals {
 			if speaker != edge.speaker {
-				second = math.Max(second, cosine(local, global.centroid))
+				second = math.Max(second, cosine(edge.centroid, global.centroid))
 			}
 		}
 		similarity := clamp((edge.score - CentroidSimilarityThreshold) / (1 - CentroidSimilarityThreshold))
@@ -234,11 +231,11 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 			bySpeaker[span.speaker] = append(bySpeaker[span.speaker], i)
 		}
 	}
-	seconds, eligible := make(map[int]float64), 0.0
+	eligible := 0.0
 	active := make(map[int]db.SpeakerAssignmentReason)
 	for speaker, indexes := range bySpeaker {
 		value, turns := metricFor(indexes, spans)
-		seconds[speaker], eligible = value, eligible+value
+		eligible += value
 		if value >= 5 && turns >= 2 {
 			active[speaker] = db.SpeakerAssignmentReasonThresholdAssignment
 		}
@@ -252,10 +249,7 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 			top, topSeconds = speaker, value
 		}
 	}
-	weakRivals := true
-	for speaker := range active {
-		weakRivals = weakRivals && speaker == top
-	}
+	weakRivals := len(active) == 0 || len(active) == 1 && active[top] != ""
 	if rawSeconds > 0 && topSeconds/rawSeconds >= .95 && weakRivals && (len(rawBySpeaker) > 1 || active[top] == "") {
 		for speaker := range rawBySpeaker {
 			active[speaker], aliases[speaker] = db.SpeakerAssignmentReasonDominantFallback, top
