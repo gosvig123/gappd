@@ -54,7 +54,7 @@ func fakeHelper(mode string) {
 	fmt.Print(validJSON(start, count))
 }
 func validJSON(start, count int64) string {
-	return fmt.Sprintf(`{"schemaVersion":1,"engine":%q,"engineRevision":%q,"requestedStartFrame":%d,"requestedFrameCount":%d,"clusters":[{"localClusterID":"a","centroid":[1,0]}],"spans":[{"localClusterID":"a","startSeconds":0,"endSeconds":1,"qualityScore":0.8,"identityScore":0.7}]}`, reportEngine, reportRevision, start, count)
+	return fmt.Sprintf(`{"schemaVersion":1,"engine":%q,"engineRevision":%q,"requestedStartFrame":%d,"requestedFrameCount":%d,"clusters":[{"localClusterID":"a","centroid":[1,0]}],"spans":[{"localClusterID":"a","startSeconds":0,"endSeconds":1,"qualityScore":0.8,"identityScore":0.7}]}`, Engine, EngineRevision, start, count)
 }
 func writeWAV(t *testing.T, frames int64) string {
 	t.Helper()

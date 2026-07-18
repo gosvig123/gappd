@@ -36,9 +36,17 @@ func TestDiarizationClaimTransitionsAndRetry(t *testing.T) {
 	if result, err := module.StartDiarization(context.Background(), meeting.ID, claim.Token); err != nil || !result.Applied {
 		t.Fatalf("start = %#v, %v", result, err)
 	}
-	if result, err := module.DegradeDiarization(context.Background(), meeting.ID, "stale", errors.New("helper failed"), now); err != nil || result.Applied {
+	recovered, err := store.ClaimNext(context.Background(), db.QueueStageDiarization, now.Add(4*time.Minute), time.Minute, nil)
+	if err != nil || recovered == nil || recovered.Token == claim.Token || recovered.Stage != db.QueueStageDiarization {
+		t.Fatalf("recovered processing claim = %#v, %v", recovered, err)
+	}
+	if result, err := module.StartDiarization(context.Background(), meeting.ID, recovered.Token); err != nil || !result.Applied {
+		t.Fatalf("restart = %#v, %v", result, err)
+	}
+	if result, err := module.DegradeDiarization(context.Background(), meeting.ID, claim.Token, errors.New("helper failed"), now); err != nil || result.Applied {
 		t.Fatalf("stale degrade = %#v, %v", result, err)
 	}
+	claim = recovered
 	interrupted, err := module.InterruptDiarization(context.Background(), meeting.ID, claim.Token, now)
 	if err != nil || !interrupted.Applied || interrupted.Meeting.DiarizationState != db.DiarizationStatePending {
 		t.Fatalf("interrupt = %#v, %v", interrupted, err)

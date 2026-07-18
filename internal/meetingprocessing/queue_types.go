@@ -10,10 +10,11 @@ type Capability string
 
 const (
 	CapabilityTranscription Capability = "transcription"
+	CapabilityDiarization   Capability = "diarization"
 	CapabilitySummarization Capability = "summarization"
 )
 
-var AllCapabilities = []Capability{CapabilityTranscription, CapabilitySummarization}
+var AllCapabilities = []Capability{CapabilityTranscription, CapabilityDiarization, CapabilitySummarization}
 
 type DrainResult struct {
 	Capability Capability `json:"capability"`

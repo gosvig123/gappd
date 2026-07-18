@@ -24,8 +24,8 @@ const (
 	// maxReportBytes caps compact window reports at 3 MiB.
 	maxReportBytes = 3 << 20
 	maxStderrBytes = 4 << 10
-	reportEngine   = "fluidaudio-offline-vbx"
-	reportRevision = "300165b240c45375add402265f62410b6df33cf1"
+	Engine         = "fluidaudio-offline-vbx"
+	EngineRevision = "300165b240c45375add402265f62410b6df33cf1"
 )
 
 // Supervisor validates a retained recording and runs one isolated helper per window.
@@ -190,7 +190,7 @@ func decodeReport(data []byte, r frameRange, dimension *int) (WindowReport, erro
 		return WindowReport{}, errors.New("json")
 	}
 	var trailing any
-	if decoder.Decode(&trailing) != io.EOF || raw.SchemaVersion != 1 || raw.Engine != reportEngine || raw.EngineRevision != reportRevision ||
+	if decoder.Decode(&trailing) != io.EOF || raw.SchemaVersion != 1 || raw.Engine != Engine || raw.EngineRevision != EngineRevision ||
 		raw.RequestedStartFrame != r.start || raw.RequestedFrameCount != r.count {
 		return WindowReport{}, errors.New("metadata")
 	}

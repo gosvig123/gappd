@@ -43,6 +43,9 @@ export function resolveSpeechTranscriberBinary(): string {
   })
 }
 
+export const resolveDiarizerBinary = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZER_BIN', packaged: ['bin', 'gappd-diarizer'], dev: ['..', 'build', 'gappd-diarizer'] })
+export const resolveDiarizationModels = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZATION_MODELS', packaged: ['diarization-models'], dev: ['..', 'gappd-diarizer', 'models'] })
+
 export function childEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const pathParts = [
     process.env.PATH ?? '',

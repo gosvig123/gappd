@@ -90,7 +90,7 @@ export function toStatusError(error: unknown): ManagedRuntimeSnapshot {
     operation: 'error', activity: 'idle', endpoint: '', model: '', message: 'Local AI unavailable.',
     error: error instanceof Error ? error.message : String(error), errorKind: 'runtime',
     canRetry: true, canRepair: false, supported: false, configured: false, bundled: false, running: false,
-    capabilities: { summarization: { readiness: 'unavailable' }, transcription: { readiness: 'unavailable' } },
+    capabilities: { summarization: { readiness: 'unavailable' }, transcription: { readiness: 'unavailable' }, diarization: { readiness: 'unavailable' } },
   }
 }
 

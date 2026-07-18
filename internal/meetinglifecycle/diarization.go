@@ -10,8 +10,8 @@ import (
 
 func (w Module) StartDiarization(ctx context.Context, id, token string) (Result, error) {
 	return w.updateDiarization(ctx, id, `UPDATE meetings SET diarization_state=?,diarization_error=NULL,diarization_json=NULL
-		WHERE id=? AND diarization_state=? AND processing_status=? AND processing_claim_token=?`,
-		db.DiarizationStateProcessing, id, db.DiarizationStatePending, db.ProcessingStatusProcessing, token)
+		WHERE id=? AND diarization_state IN (?,?) AND processing_status=? AND processing_claim_token=?`,
+		db.DiarizationStateProcessing, id, db.DiarizationStatePending, db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
 }
 
 func (w Module) CompleteDiarization(ctx context.Context, id, token, resultJSON string, at time.Time) (Result, error) {

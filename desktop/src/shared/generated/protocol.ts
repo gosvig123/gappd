@@ -7,7 +7,7 @@ export type CaptureStatus = (typeof CAPTURE_STATUSES)[number]
 export const PROCESSING_STATUSES = ['pending', 'processing', 'completed', 'failed'] as const
 export type ProcessingStatus = (typeof PROCESSING_STATUSES)[number]
 
-export const PROCESSING_CAPABILITIES = ['transcription', 'summarization'] as const
+export const PROCESSING_CAPABILITIES = ['transcription', 'diarization', 'summarization'] as const
 export type ProcessingCapability = (typeof PROCESSING_CAPABILITIES)[number]
 
 export const MEETING_STATES = ['recording', 'pending', 'processing', 'completed', 'failed'] as const

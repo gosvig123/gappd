@@ -8,7 +8,7 @@ import {
   type AppStreamID,
 } from '../shared/generated/app-protocol'
 import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
-import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
   onEvent(event: AppStreamEvent<ID>): void
@@ -32,7 +32,7 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), ...overrides })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), ...overrides })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {
@@ -42,7 +42,7 @@ function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommand
 function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: ['ignore', 'pipe', 'pipe'] })
-    collectCommandOutput(child, resolve, reject)
+    collectCommandOutput(child, resolve, reject, signal)
   })
 }
 
@@ -61,12 +61,12 @@ function parseCommandOutput<ID extends AppRequestID>(id: ID, output: string): Ap
   }
 }
 
-function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void): void {
+function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void, signal?: AbortSignal): void {
   let stdout = ''
   let stderr = ''
   child.stdout?.on('data', (chunk) => { stdout += chunk.toString() })
   child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
-  child.on('error', reject)
+  child.on('error', (error) => signal?.aborted ? child.once('close', () => reject(error)) : reject(error))
   child.on('exit', (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr || stdout || `gappd exited with code ${code}`)))
 }
 

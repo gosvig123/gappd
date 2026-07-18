@@ -1,7 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
@@ -26,7 +30,7 @@ func appProcessingDrainCmd() *cobra.Command {
 			return runProcessingDrain(meetingprocessing.Capability(capability))
 		},
 	}
-	cmd.Flags().StringVar(&capability, "capability", "", "transcription or summarization")
+	cmd.Flags().StringVar(&capability, "capability", "", "transcription, diarization, or summarization")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	_ = cmd.MarkFlagRequired("capability")
 	return cmd
@@ -39,7 +43,9 @@ func runProcessingDrain(capability meetingprocessing.Capability) error {
 	}
 	defer store.Close()
 	service := newMeetingProcessingService(store, pipeline, recordingOutputQuiet)
-	result, err := service.Drain(cmdContext(), capability)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	result, err := service.Drain(ctx, capability)
 	if err != nil {
 		return err
 	}
