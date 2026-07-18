@@ -1,7 +1,6 @@
 package meetingprocessing
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
@@ -83,13 +82,7 @@ func countRepeatedSegment(counts map[string]int, maxCount int, segment transcrib
 	return maxCount
 }
 
-func FormatTranscript(segments []db.Segment) string {
-	var b strings.Builder
-	for _, s := range segments {
-		fmt.Fprintf(&b, "[%s] %s\n", s.Speaker, s.Text)
-	}
-	return b.String()
-}
+func FormatTranscript(segments []db.Segment) string { return db.FormatTranscript(segments) }
 
 func sortSegmentsChronologically(segments []db.Segment) {
 	indexed := indexedSegments(segments)

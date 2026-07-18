@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type SegmentSource string
@@ -12,8 +13,17 @@ const (
 	SegmentSourceMicrophone SegmentSource = "microphone"
 	SegmentSourceSystem     SegmentSource = "system"
 
+	SpeakerYou   = "You"
+	SpeakerOther = "Other"
+
 	SpeakerAssignmentReasonMicrophone               SpeakerAssignmentReason = "microphone"
 	SpeakerAssignmentReasonPendingSystemAttribution SpeakerAssignmentReason = "pending_system_attribution"
+	SpeakerAssignmentReasonThresholdAssignment      SpeakerAssignmentReason = "threshold_assignment"
+	SpeakerAssignmentReasonAmbiguousSupport         SpeakerAssignmentReason = "ambiguous_support"
+	SpeakerAssignmentReasonInsufficientCoverage     SpeakerAssignmentReason = "insufficient_coverage"
+	SpeakerAssignmentReasonNoEvidence               SpeakerAssignmentReason = "no_evidence"
+	SpeakerAssignmentReasonDominantFallback         SpeakerAssignmentReason = "dominant_fallback"
+	SpeakerAssignmentReasonSingleTurnFallback       SpeakerAssignmentReason = "single_turn_fallback"
 )
 
 type Segment struct {
@@ -117,6 +127,14 @@ func insertSegmentRow(stmt *sql.Stmt, segment *Segment) error {
 		return fmt.Errorf("insert segment %s: %w", segment.ID, err)
 	}
 	return nil
+}
+
+func FormatTranscript(segments []Segment) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
+	}
+	return b.String()
 }
 
 func (d *DB) GetSegments(meetingID string) ([]Segment, error) {
