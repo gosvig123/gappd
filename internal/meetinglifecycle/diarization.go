@@ -43,7 +43,6 @@ func (w Module) finishDiarization(ctx context.Context, id, token string, state d
 		db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
 }
 
-// RetryDiarization is the manual retry action. Only a degraded result is eligible.
 func (w Module) RetryDiarization(ctx context.Context, id string, at time.Time) (Result, error) {
 	return w.updateDiarization(ctx, id, `UPDATE meetings SET diarization_state=?,diarization_error=NULL,diarization_json=NULL,
 		processing_status=?,processing_status_updated_at=?,processing_failure_message=NULL,

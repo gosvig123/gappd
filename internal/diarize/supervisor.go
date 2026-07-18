@@ -21,11 +21,10 @@ const (
 	sampleRate       = int64(16000)
 	windowFrames     = 600 * sampleRate
 	windowStepFrames = 570 * sampleRate
-	// maxReportBytes caps compact window reports at 3 MiB.
-	maxReportBytes = 3 << 20
-	maxStderrBytes = 4 << 10
-	Engine         = "fluidaudio-offline-vbx"
-	EngineRevision = "300165b240c45375add402265f62410b6df33cf1"
+	maxReportBytes   = 3 << 20
+	maxStderrBytes   = 4 << 10
+	Engine           = "fluidaudio-offline-vbx"
+	EngineRevision   = "300165b240c45375add402265f62410b6df33cf1"
 )
 
 // Supervisor validates a retained recording and runs one isolated helper per window.
@@ -124,17 +123,13 @@ func frameRanges(frames int64) []frameRange {
 
 type limitedBuffer struct {
 	bytes.Buffer
-	limit    int
-	overflow bool
+	limit int
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
-	n, left := len(p), b.limit-b.Len()
+	n, left := len(p), b.limit+1-b.Len()
 	if left > 0 {
 		_, _ = b.Buffer.Write(p[:min(left, n)])
-	}
-	if n > left {
-		b.overflow = true
 	}
 	return n, nil
 }
@@ -154,7 +149,7 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 	go func() { done <- cmd.Wait() }()
 	select {
 	case err := <-done:
-		if stdout.overflow || stderr.overflow {
+		if stdout.Len() > stdout.limit || stderr.Len() > stderr.limit {
 			return nil, "helper output too large"
 		}
 		if err != nil {
@@ -163,20 +158,12 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 		return stdout.Bytes(), ""
 	case <-ctx.Done():
 		_ = processgroup.Signal(cmd, syscall.SIGTERM)
-		timer := time.NewTimer(2 * time.Second)
 		select {
 		case <-done:
-		case <-timer.C:
+		case <-time.After(2 * time.Second):
 			_ = processgroup.Signal(cmd, syscall.SIGKILL)
 			<-done
 		}
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		// Leader may exit before descendants; kill remaining group members.
 		_ = processgroup.Signal(cmd, syscall.SIGKILL)
 		return nil, "helper canceled"
 	}
