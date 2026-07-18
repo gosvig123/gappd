@@ -4,6 +4,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { access } from 'node:fs/promises'
+import macReleaseUtils from './mac-release-utils.cjs'
+
+const { verifyModelManifest } = macReleaseUtils
 
 const DEFAULT_MACOS_MIN_VERSION = '26.0'
 const MAC_BUILD_NATIVE = 'native'
@@ -22,6 +25,8 @@ const desktopRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const repoRoot = path.resolve(desktopRoot, '..')
 const buildDir = path.join(repoRoot, 'build')
 const gappdBinaryPath = path.join(buildDir, 'gappd')
+const diarizerPath = path.join(buildDir, 'gappd-diarizer')
+const diarizationModelsPath = path.join(repoRoot, 'gappd-diarizer', 'models', 'speaker-diarization')
 const captureAppPath = path.join(buildDir, 'GappdCapture.app')
 const captureBinaryPath = path.join(captureAppPath, 'Contents', 'MacOS', 'gappd-capture')
 const speechTranscriberAppPath = path.join(buildDir, 'GappdSpeechTranscriber.app')
@@ -34,13 +39,17 @@ await buildNativeArtifacts()
 await requirePath(gappdBinaryPath, `Native gappd binary missing at ${gappdBinaryPath} after build.`)
 if (shouldRunLocalBinaryCheck()) runBinaryCheck()
 else console.log(`Skipping local runtime verification for cross-compiled ${macBuildProfile} gappd binary.`)
+await verifyModelManifest(diarizationModelsPath)
 
 if (process.platform === 'darwin') {
+  await requirePath(diarizerPath, `Native diarization helper missing at ${diarizerPath} after build.`)
   await requirePath(captureAppPath, `Native capture helper missing at ${captureAppPath} after build.`)
   await requirePath(captureBinaryPath, `Native capture helper binary missing at ${captureBinaryPath} after build.`)
   await requirePath(speechTranscriberAppPath, `Native Apple speech transcriber app missing at ${speechTranscriberAppPath} after build.`)
   await requirePath(speechTranscriberPath, `Native Apple speech transcriber missing at ${speechTranscriberPath} after build.`)
+  if (shouldRunLocalBinaryCheck()) runDiarizerCheck()
   verifyBinaryCompatibility('gappd binary', gappdBinaryPath)
+  verifyBinaryCompatibility('diarization helper', diarizerPath)
   verifyBinaryCompatibility('capture helper binary', captureBinaryPath)
   verifyBinaryCompatibility('Apple speech transcriber', speechTranscriberPath)
 }
@@ -58,6 +67,10 @@ async function buildNativeArtifacts() {
     GAPPD_MACOS_MIN_VERSION: macosMinVersion,
   })
   runMake(['build-speech'], {
+    GAPPD_MAC_BUILD: macBuildProfile,
+    GAPPD_MACOS_MIN_VERSION: macosMinVersion,
+  })
+  runMake(['build-diarizer'], {
     GAPPD_MAC_BUILD: macBuildProfile,
     GAPPD_MACOS_MIN_VERSION: macosMinVersion,
   })
@@ -114,6 +127,12 @@ function runBinaryCheck() {
     `${label(workflow)} native verification failed for \`${path.relative(repoRoot, gappdBinaryPath)} app config show --json\`. ` +
       `Desktop would otherwise launch with a stale or broken binary.\n${commandOutput(result)}`.trim(),
   )
+}
+
+function runDiarizerCheck() {
+  const result = spawnSync(diarizerPath, ['--version'], { cwd: repoRoot, stdio: 'pipe' })
+  if (!result.error && result.status === 0) return
+  throw new Error(`${label(workflow)} native verification failed for diarization helper --version.\n${commandOutput(result)}`.trim())
 }
 
 function shouldRunLocalBinaryCheck() {

@@ -1,12 +1,14 @@
 const path = require('node:path')
 const {
   resolveAppPath,
+  verifyModelManifest,
   verifyRequiredNestedCode,
 } = require('./mac-release-utils.cjs')
 
 async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return
   const appPath = await resolveAppPath(context.appOutDir, context.packager.appInfo.productFilename)
+  await verifyModelManifest(path.join(appPath, 'Contents', 'Resources', 'diarization-models', 'speaker-diarization'))
   await verifyRequiredNestedCode(appPath)
   await runScript('./sign-mac-nested-code.cjs', appPath)
 }

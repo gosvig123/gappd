@@ -17,6 +17,8 @@ module.exports = {
   files: ['dist/**', 'dist-electron/**'],
   extraResources: [
     { from: '../build/gappd', to: 'bin/gappd' },
+    { from: '../build/gappd-diarizer', to: 'bin/gappd-diarizer' },
+    { from: '../gappd-diarizer/models', to: 'diarization-models' },
     { from: '../build/GappdSpeechTranscriber.app', to: 'GappdSpeechTranscriber.app' },
     { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
     { from: 'resources/llamacpp', to: 'llamacpp' },

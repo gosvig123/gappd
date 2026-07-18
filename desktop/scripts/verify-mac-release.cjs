@@ -13,11 +13,13 @@ const {
   shouldNotarize,
   validateStaple,
   verifyCodeSignature,
+  verifyModelManifest,
   verifyRequiredNestedCode,
 } = require('./mac-release-utils.cjs')
 
 const COMPATIBILITY_LIMITS = {
   'gappd binary': DEFAULT_MACOS_MIN_VERSION,
+  'diarization helper': DEFAULT_MACOS_MIN_VERSION,
   'Apple speech transcriber': DEFAULT_MACOS_MIN_VERSION,
   'llama-server binary': DEFAULT_MACOS_MIN_VERSION,
   'capture helper binary': DEFAULT_MACOS_MIN_VERSION,
@@ -26,6 +28,7 @@ const COMPATIBILITY_LIMITS = {
 async function main() {
   if (process.platform !== 'darwin') return
   const appPath = process.argv[2] ? path.resolve(process.argv[2]) : await defaultAppPath()
+  await verifyModelManifest(path.join(appPath, 'Contents', 'Resources', 'diarization-models', 'speaker-diarization'))
   const targets = await verifyRequiredNestedCode(appPath)
   verifyCodeSignature(appPath)
   for (const target of targets) verifyCodeSignature(target.path)
