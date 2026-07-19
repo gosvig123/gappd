@@ -24,7 +24,7 @@ function SpeakerFilter({ speakers, hidden, onChange }: { speakers: string[]; hid
   if (speakers.length < 2) return null
   const visible = speakers.length - hidden.filter((speaker) => speakers.includes(speaker)).length
   return (
-    <details className="transcript-speaker-filter">
+    <details className="transcript-speaker-filter" data-page-search-ignore>
       <summary className="transcript-chip">{visible === speakers.length ? 'All speakers' : `${visible} of ${speakers.length} speakers`}</summary>
       <div className="transcript-speaker-menu" role="group" aria-label="Filter speakers">
         <label className="transcript-speaker-option"><input type="checkbox" checked={visible === speakers.length} onChange={(event) => onChange(event.target.checked ? [] : speakers)} />{ALL_SPEAKERS}</label>
