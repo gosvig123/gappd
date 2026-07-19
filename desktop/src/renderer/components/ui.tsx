@@ -44,7 +44,7 @@ export function MultiSelect({ ariaLabel, allLabel, options, selected, onChange }
     onChange(next); if (next.length === 0) setOpen(false)
   }
   return (
-    <div className={cx('ui-multi-select', open && 'open')} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}>
+    <div className={cx('ui-multi-select', open && 'open')} onBlur={(event) => { const root = event.currentTarget; requestAnimationFrame(() => { if (!root.contains(document.activeElement)) setOpen(false) }) }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}>
       <Button type="button" className="compact-action ui-multi-select-trigger" aria-label={ariaLabel} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{all ? allLabel : count ? `${count} selected` : 'None selected'}</span><ChevronDownIcon aria-hidden="true" /></Button>
       {open ? <div className="ui-card ui-multi-select-menu" role="group" aria-label={ariaLabel}>
         <label className="list-row ui-multi-select-option all"><input type="checkbox" checked={all} onChange={(event) => { const next = event.target.checked ? options.map((option) => option.value) : []; onChange(next); if (next.length === 0) setOpen(false) }} /><span>{allLabel}</span></label>
