@@ -35,21 +35,22 @@ export function Button({ variant = 'secondary', className, ...props }: ButtonPro
 }
 
 export function MultiSelect({ ariaLabel, allLabel, options, selected, onChange }: MultiSelectProps) {
+  const [open, setOpen] = useState(false)
   const values = new Set(selected)
   const count = options.filter((option) => values.has(option.value)).length
   const all = count === options.length
-  const toggle = (value: string, target: HTMLInputElement) => {
+  const toggle = (value: string) => {
     const next = options.filter((option) => values.has(option.value) !== (option.value === value)).map((option) => option.value)
-    onChange(next); if (next.length === 0) target.closest('details')?.removeAttribute('open')
+    onChange(next); if (next.length === 0) setOpen(false)
   }
   return (
-    <details className="ui-multi-select" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute('open') }} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.removeAttribute('open') }}>
-      <summary className="ui-button ui-button-secondary compact-action ui-multi-select-trigger" aria-label={ariaLabel}><span>{all ? allLabel : count ? `${count} selected` : 'None selected'}</span><ChevronDownIcon aria-hidden="true" /></summary>
-      <div className="ui-card ui-multi-select-menu" role="group" aria-label={ariaLabel}>
-        <label className="list-row ui-multi-select-option all"><input type="checkbox" checked={all} onChange={(event) => { onChange(event.target.checked ? options.map((option) => option.value) : []); if (!event.target.checked) event.currentTarget.closest('details')?.removeAttribute('open') }} /><span>{allLabel}</span></label>
-        {options.map((option) => <label key={option.value} className="list-row ui-multi-select-option"><input type="checkbox" checked={values.has(option.value)} onChange={(event) => toggle(option.value, event.currentTarget)} /><span>{option.label}</span></label>)}
-      </div>
-    </details>
+    <div className={cx('ui-multi-select', open && 'open')} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}>
+      <Button type="button" className="compact-action ui-multi-select-trigger" aria-label={ariaLabel} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{all ? allLabel : count ? `${count} selected` : 'None selected'}</span><ChevronDownIcon aria-hidden="true" /></Button>
+      {open ? <div className="ui-card ui-multi-select-menu" role="group" aria-label={ariaLabel}>
+        <label className="list-row ui-multi-select-option all"><input type="checkbox" checked={all} onChange={(event) => { const next = event.target.checked ? options.map((option) => option.value) : []; onChange(next); if (next.length === 0) setOpen(false) }} /><span>{allLabel}</span></label>
+        {options.map((option) => <label key={option.value} className="list-row ui-multi-select-option"><input type="checkbox" checked={values.has(option.value)} onChange={() => toggle(option.value)} /><span>{option.label}</span></label>)}
+      </div> : null}
+    </div>
   )
 }
 
