@@ -232,10 +232,9 @@ button:focus-visible {
 
 .ui-multi-select { position: relative; width: max-content; }
 .ui-multi-select-trigger { display: inline-flex; align-items: center; gap: var(--space-4); cursor: pointer; list-style: none; }
-.ui-multi-select-trigger::-webkit-details-marker { display: none; }
 .ui-multi-select-trigger svg { width: 1rem; transition: transform var(--transition-quick); }
-.ui-multi-select[open] .ui-multi-select-trigger { border-color: var(--color-accent-border); box-shadow: var(--focus-ring); }
-.ui-multi-select[open] .ui-multi-select-trigger svg { transform: rotate(180deg); }
+.ui-multi-select.open .ui-multi-select-trigger { border-color: var(--color-accent-border); box-shadow: var(--focus-ring); }
+.ui-multi-select.open .ui-multi-select-trigger svg { transform: rotate(180deg); }
 .ui-multi-select-menu {
   position: absolute; z-index: 20;
   top: calc(100% + 6px); left: 0;
