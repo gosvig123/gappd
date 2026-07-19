@@ -1,8 +1,8 @@
 import { type CSSProperties, useMemo, useState } from 'react'
 import type { MeetingSegment } from '../../shared/contracts'
+import { MultiSelect } from '../components/ui'
 import './transcript-view.css'
 
-const ALL_SPEAKERS = 'All'
 const EMPTY_FILTER_TEXT = 'No transcript lines for this speaker yet.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 type TranscriptGroup = { speaker: string | null; lines: string[] }
@@ -22,16 +22,9 @@ function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
 
 function SpeakerFilter({ speakers, hidden, onChange }: { speakers: string[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
   if (speakers.length < 2) return null
-  const visible = speakers.length - hidden.filter((speaker) => speakers.includes(speaker)).length
-  return (
-    <details className="transcript-speaker-filter" data-page-search-ignore>
-      <summary className="transcript-chip">{visible === speakers.length ? 'All speakers' : `${visible} of ${speakers.length} speakers`}</summary>
-      <div className="transcript-speaker-menu" role="group" aria-label="Filter speakers">
-        <label className="transcript-speaker-option"><input type="checkbox" checked={visible === speakers.length} onChange={(event) => onChange(event.target.checked ? [] : speakers)} />{ALL_SPEAKERS}</label>
-        {speakers.map((speaker) => <label key={speaker} className="transcript-speaker-option" style={speakerStyle(speaker)}><input type="checkbox" checked={!hidden.includes(speaker)} onChange={() => onChange(hidden.includes(speaker) ? hidden.filter((value) => value !== speaker) : [...hidden, speaker])} /><span className="transcript-chip-dot" aria-hidden="true" /><SpeakerName speaker={speaker} /></label>)}
-      </div>
-    </details>
-  )
+  const selected = speakers.filter((speaker) => !hidden.includes(speaker))
+  const options = speakers.map((speaker) => ({ value: speaker, label: <><span className="transcript-chip-dot" style={speakerStyle(speaker)} aria-hidden="true" /><SpeakerName speaker={speaker} /></> }))
+  return <div className="transcript-speaker-filter" data-page-search-ignore><MultiSelect ariaLabel="Filter speakers" allLabel="All speakers" options={options} selected={selected} onChange={(values) => onChange(speakers.filter((speaker) => !values.includes(speaker)))} /></div>
 }
 
 function TranscriptSegmentList({ segments }: { segments: MeetingSegment[] }) {
