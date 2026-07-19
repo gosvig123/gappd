@@ -68,7 +68,7 @@ function renderInline(text: string): ReactNode {
   if (parts.length === 1) return text
   return parts.map((part, index) => {
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{renderInline(part.slice(2, -2))}</strong>
-    if (/^Speaker [1-9][0-9]*$/.test(part)) return <Fragment key={index}><span data-page-search-ignore>{part}</span><small data-page-search-ignore> Experimental</small></Fragment>
+    if (/^Speaker [1-9][0-9]*$/.test(part)) return <span key={index} data-page-search-ignore>{part}</span>
     return <Fragment key={index}>{part}</Fragment>
   })
 }

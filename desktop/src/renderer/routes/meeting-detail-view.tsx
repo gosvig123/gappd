@@ -125,14 +125,14 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
 function DiarizationStatus({ meeting }: { meeting: MeetingDetail }) {
   const { state, speakerCount } = meeting.diarization
   const label = state === PENDING_STATE ? 'Speaker labels pending' : state === PROCESSING_STATUS ? 'Speaker labels processing' : state === COMPLETED_STATE ? `Speaker count ${speakerCount ?? 0}` : ''
-  return label ? <><span>{label}</span><StatusPill tone="idle"><span data-page-search-ignore>Experimental</span></StatusPill></> : null
+  return label ? <span>{label}</span> : null
 }
 
 function DiarizationNotice({ meeting }: { meeting: MeetingDetail }) {
   const [busy, setBusy] = useState(false)
   if (meeting.diarization.state !== DEGRADED_STATE) return null
   const retry = async () => { setBusy(true); try { await window.gappd.meetings.retryDiarization(meeting.id) } catch {} finally { setBusy(false) } }
-  return <div className="detail-surface"><span><span data-page-search-ignore>Experimental</span> · {meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span><div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
+  return <div className="detail-surface"><span>{meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span><div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
 }
 
 function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {
