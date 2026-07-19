@@ -1,6 +1,5 @@
 import { type CSSProperties, useMemo, useState } from 'react'
 import type { MeetingSegment } from '../../shared/contracts'
-import { Button } from '../components/ui'
 import './transcript-view.css'
 
 const ALL_SPEAKERS = 'All'
@@ -15,23 +14,23 @@ export function TranscriptText({ value, segments }: { value: string; segments: M
 }
 
 function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
-  const [speaker, setSpeaker] = useState(ALL_SPEAKERS)
+  const [hidden, setHidden] = useState<string[]>([])
   const speakers = useMemo(() => transcriptSpeakers(segments), [segments])
-  const visible = visibleTranscriptSegments(segments, speaker)
-  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} speaker={speaker} onSpeaker={setSpeaker} /><TranscriptSegmentList segments={visible} /></div>
+  const visible = visibleTranscriptSegments(segments, speakers.length < 2 ? [] : hidden)
+  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} /></div>
 }
 
-function SpeakerFilter({ speakers, speaker, onSpeaker }: { speakers: string[]; speaker: string; onSpeaker: (speaker: string) => void }) {
+function SpeakerFilter({ speakers, hidden, onChange }: { speakers: string[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
   if (speakers.length < 2) return null
+  const visible = speakers.length - hidden.filter((speaker) => speakers.includes(speaker)).length
   return (
-    <div className="transcript-speaker-filter" aria-label="Speaker filter">
-      {[ALL_SPEAKERS, ...speakers].map((option) => (
-        <Button key={option} className="compact-action transcript-chip" style={speakerStyle(option)} aria-pressed={speaker === option} onClick={() => onSpeaker(option)}>
-          {option === ALL_SPEAKERS ? null : <span className="transcript-chip-dot" aria-hidden="true" />}
-          <SpeakerName speaker={option} />
-        </Button>
-      ))}
-    </div>
+    <details className="transcript-speaker-filter">
+      <summary className="transcript-chip">{visible === speakers.length ? 'All speakers' : `${visible} of ${speakers.length} speakers`}</summary>
+      <div className="transcript-speaker-menu" role="group" aria-label="Filter speakers">
+        <label className="transcript-speaker-option"><input type="checkbox" checked={visible === speakers.length} onChange={(event) => onChange(event.target.checked ? [] : speakers)} />{ALL_SPEAKERS}</label>
+        {speakers.map((speaker) => <label key={speaker} className="transcript-speaker-option" style={speakerStyle(speaker)}><input type="checkbox" checked={!hidden.includes(speaker)} onChange={() => onChange(hidden.includes(speaker) ? hidden.filter((value) => value !== speaker) : [...hidden, speaker])} /><span className="transcript-chip-dot" aria-hidden="true" /><SpeakerName speaker={speaker} /></label>)}
+      </div>
+    </details>
   )
 }
 
@@ -112,9 +111,8 @@ function transcriptSpeakers(segments: MeetingSegment[]): string[] {
   return Array.from(new Set(segments.map((segment) => segment.speaker).filter(Boolean)))
 }
 
-function visibleTranscriptSegments(segments: MeetingSegment[], speaker: string): MeetingSegment[] {
-  if (speaker === ALL_SPEAKERS) return segments
-  return segments.filter((segment) => segment.speaker === speaker)
+function visibleTranscriptSegments(segments: MeetingSegment[], hidden: string[]): MeetingSegment[] {
+  return hidden.length ? segments.filter((segment) => !hidden.includes(segment.speaker)) : segments
 }
 
 function segmentKey(segment: MeetingSegment, index: number): string {

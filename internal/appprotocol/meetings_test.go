@@ -18,11 +18,11 @@ func TestMeetingDetailShowsOnlyValidLiveTranscriptSegments(t *testing.T) {
 	if pending.TranscriptProvisional || len(pending.Segments) != 0 || pending.TranscriptText != "" {
 		t.Fatalf("pending detail exposed incomplete transcript: %+v", pending)
 	}
-	provenance, internalError := `{"speakerCount":2,"coverage":0.75}`, "private engine failure"
-	recording.DiarizationJSON, recording.DiarizationError = &provenance, &internalError
+	internalError := "private engine failure"
+	recording.DiarizationError = &internalError
 	diarization := BuildMeetingDetail(recording, nil).Diarization
-	if diarization.SpeakerCount == nil || *diarization.SpeakerCount != 2 || diarization.Coverage == nil || *diarization.Coverage != .75 || diarization.Error == nil || *diarization.Error == internalError {
-		t.Fatalf("unsafe or invalid diarization detail: %+v", diarization)
+	if diarization.Error == nil || *diarization.Error == internalError {
+		t.Fatalf("unsafe diarization detail: %+v", diarization)
 	}
 }
 
