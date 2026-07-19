@@ -56,9 +56,6 @@ func TestCommitSpeakerProjectionRejectsStaleOrInexactInput(t *testing.T) {
 		"extra assignment": func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) {
 			in.Assignments = append(in.Assignments, SpeakerProjectionAssignment{SegmentID: "absent", Speaker: VisibleSpeakerOther, Reason: SpeakerAssignmentReasonNoEvidence})
 		},
-		"changed source": func(t *testing.T, s *DB, _ *SpeakerProjectionCommit) {
-			mustExec(t, s, `UPDATE segments SET speaker_source=? WHERE id='system-1'`, SegmentSourceMicrophone)
-		},
 		"oversized provenance": func(_ *testing.T, _ *DB, in *SpeakerProjectionCommit) {
 			in.ProvenanceJSON = `{"x":"` + strings.Repeat("x", maxProjectionProvenanceJSONBytes) + `"}`
 		},

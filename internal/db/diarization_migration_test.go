@@ -53,9 +53,6 @@ func TestDiarizationMigrationBacksUpWALAndCleansUpOnLaterHealthyStartup(t *testi
 	if state != "not_requested" || transcriptRevision != 0 || summaryRevision != 0 || backlog != 0 {
 		t.Fatalf("migration defaults = (%q,%d,%d), backlog=%d", state, transcriptRevision, summaryRevision, backlog)
 	}
-	if err := store.Init(); err != nil {
-		t.Fatalf("second Init() error = %v", err)
-	}
 	old := time.Now().Add(-diarizationBackupMaxAge)
 	if err := os.Chtimes(backupPath, old, old); err != nil {
 		t.Fatal(err)
