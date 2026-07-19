@@ -80,8 +80,6 @@ export type MeetingSegment = {
 export type DiarizationInfo = {
   state: DiarizationState
   error?: string
-  speakerCount?: number
-  coverage?: number
 }
 
 export type MeetingDeleteInput = {

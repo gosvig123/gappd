@@ -9,7 +9,7 @@ import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
-const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded', COMPLETED_STATE = 'completed'
+const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
@@ -123,8 +123,8 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
 }
 
 function DiarizationStatus({ meeting }: { meeting: MeetingDetail }) {
-  const { state, speakerCount } = meeting.diarization
-  const label = state === PENDING_STATE ? 'Speaker labels pending' : state === PROCESSING_STATUS ? 'Speaker labels processing' : state === COMPLETED_STATE ? `Speaker count ${speakerCount ?? 0}` : ''
+  const state = meeting.diarization.state
+  const label = state === PENDING_STATE ? 'Speaker labels pending' : state === PROCESSING_STATUS ? 'Speaker labels processing' : ''
   return label ? <span>{label}</span> : null
 }
 
