@@ -95,7 +95,7 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
     <Panel className="detail-panel readable-detail-panel">
       <div className="panel-header compact meeting-detail-header">
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
-        <div className="meeting-detail-actions"><DiarizationStatus meeting={selectedMeeting} />{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
+        <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
       <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} />
     </Panel>
@@ -120,12 +120,6 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       </div>
     </div>
   )
-}
-
-function DiarizationStatus({ meeting }: { meeting: MeetingDetail }) {
-  const state = meeting.diarization.state
-  const label = state === PENDING_STATE ? 'Speaker labels pending' : state === PROCESSING_STATUS ? 'Speaker labels processing' : ''
-  return label ? <span>{label}</span> : null
 }
 
 function DiarizationNotice({ meeting }: { meeting: MeetingDetail }) {
@@ -161,6 +155,7 @@ function TrackingIndicator() { return <div className="detail-surface detail-bloc
 
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
+  if (meeting.diarization.state === PENDING_STATE || meeting.diarization.state === PROCESSING_STATUS) return 'Labeling speakers locally.'
   if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary with local AI.'
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
   if (progress.hasTranscript && progress.hasSummary) return ''
