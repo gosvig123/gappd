@@ -244,7 +244,8 @@ button:focus-visible {
 }
 .ui-multi-select .ui-multi-select-option { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); cursor: pointer; white-space: nowrap; }
 .ui-multi-select-option.all { margin-bottom: 4px; border-bottom-color: var(--color-border); }
-.ui-multi-select-option input { margin: 0; accent-color: var(--color-accent); }
+.ui-multi-select-option::before { content: ''; width: 0.75rem; height: 0.75rem; border: 1px solid var(--color-border-strong); border-radius: 3px; box-sizing: border-box; }
+.ui-multi-select-option[aria-checked='true']::before { content: '✓'; border-color: var(--color-accent); background: var(--color-accent); color: var(--color-accent-contrast); font-size: 0.65rem; line-height: 0.7rem; text-align: center; }
 .ui-multi-select-option > span { display: flex; align-items: center; gap: var(--space-2); }
 
 .ui-density-compact {
