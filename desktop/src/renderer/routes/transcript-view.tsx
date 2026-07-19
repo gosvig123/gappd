@@ -3,7 +3,7 @@ import type { MeetingSegment } from '../../shared/contracts'
 import { MultiSelect } from '../components/ui'
 import './transcript-view.css'
 
-const EMPTY_FILTER_TEXT = 'No transcript lines for this speaker yet.'
+const EMPTY_FILTER_TEXT = 'No speakers selected.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 type TranscriptGroup = { speaker: string | null; lines: string[] }
 type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: string }
