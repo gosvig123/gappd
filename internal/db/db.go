@@ -50,7 +50,7 @@ func (d *DB) Init() error {
 		return err
 	}
 	if !migrationStartup {
-		return d.cleanupDiarizationBackup(ctx, conn)
+		_ = d.cleanupDiarizationBackup(ctx, conn)
 	}
 	return nil
 }
