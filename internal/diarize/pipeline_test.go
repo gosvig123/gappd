@@ -67,6 +67,33 @@ func TestAlignmentRules(t *testing.T) {
 	}
 }
 
+func TestWeakRivalCountsTowardPhraseSupport(t *testing.T) {
+	spans := []stitchedSpan{
+		sspan(1, 0, 6, 1),
+		sspan(2, 6, 10, 1),
+		sspan(1, 20, 23, 1),
+		sspan(1, 24, 27, 1),
+	}
+
+	got, _, _ := align([]Phrase{{"p", 0, 10}}, spans)
+	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport || got[0].Confidence != nil {
+		t.Fatalf("assignment = %+v", got[0])
+	}
+}
+
+func TestSingleTurnFallbackIgnoresUnselectedTurns(t *testing.T) {
+	spans := []stitchedSpan{
+		sspan(1, 0, 2, .8),
+		sspan(1, 4, 6, .7),
+		sspan(2, 8, 9, .6),
+	}
+
+	got, _, _ := align([]Phrase{{"p", 0, 6}}, spans)
+	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonInsufficientCoverage || got[0].Confidence != nil {
+		t.Fatalf("assignment = %+v", got[0])
+	}
+}
+
 func TestNumberingCountAndCoverage(t *testing.T) {
 	spans := []stitchedSpan{sspan(2, 0, 3, 1), sspan(2, 4, 7, 1), sspan(1, 10, 13, 1), sspan(1, 14, 17, 1), sspan(3, 20, 21, 1)}
 	phrases := []Phrase{{"first", 0, 3}, {"second", 10, 13}, {"other", 20, 21}}

@@ -267,10 +267,11 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 		duration := phrase.EndSeconds - phrase.StartSeconds
 		totalDuration += duration
 		support, raw := make(map[int]float64), make(map[int]float64)
+		visibleSupport := make(map[int]bool)
 		var intervals [][2]float64
 		for i, span := range spans {
 			reason := active[span.speaker]
-			if reason == "" || span.confidence < VisibleSpanThreshold || reason == db.SpeakerAssignmentReasonSingleTurnFallback && !selected[i] {
+			if span.confidence < VisibleSpanThreshold || reason == db.SpeakerAssignmentReasonSingleTurnFallback && !selected[i] {
 				continue
 			}
 			speaker := span.speaker
@@ -282,6 +283,9 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 				support[speaker] += seconds * span.confidence
 				raw[speaker] += seconds
 				intervals = append(intervals, [2]float64{math.Max(phrase.StartSeconds, span.start), math.Min(phrase.EndSeconds, span.end)})
+				if reason != "" {
+					visibleSupport[speaker] = true
+				}
 			}
 		}
 		winner, winnerSupport, totalSupport := 0, 0.0, 0.0
@@ -300,7 +304,7 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 			assignment.Reason = db.SpeakerAssignmentReasonAmbiguousSupport
 		} else if totalSupport > 0 && covered < PhraseCoverageThreshold {
 			assignment.Reason = db.SpeakerAssignmentReasonInsufficientCoverage
-		} else if totalSupport > 0 {
+		} else if totalSupport > 0 && visibleSupport[winner] {
 			label, found := visible[winner]
 			if !found {
 				label = db.VisibleSpeaker(fmt.Sprintf("Speaker %d", len(visible)+1))
