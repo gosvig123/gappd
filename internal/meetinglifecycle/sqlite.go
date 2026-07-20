@@ -12,12 +12,14 @@ type meetingVersion struct {
 	captureUpdatedAt    string
 	processingStatus    db.ProcessingStatus
 	processingUpdatedAt string
+	transcriptRevision  int
 }
 
 func versionOf(meeting *db.Meeting) meetingVersion {
 	return meetingVersion{
 		captureStatus: meeting.CaptureStatus, captureUpdatedAt: meeting.CaptureStatusUpdatedAt,
 		processingStatus: meeting.ProcessingStatus, processingUpdatedAt: meeting.ProcessingStatusUpdatedAt,
+		transcriptRevision: meeting.TranscriptRevision,
 	}
 }
 
@@ -38,7 +40,7 @@ func updateArgs(m *db.Meeting, v meetingVersion) []any {
 		m.Title, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
 		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage,
 		m.Transcript, m.TranscriptRevision, m.Summary, m.SummaryTranscriptRevision, m.ExtractionJSON, m.ID,
-		v.captureStatus, v.captureUpdatedAt, v.processingStatus, v.processingUpdatedAt,
+		v.captureStatus, v.captureUpdatedAt, v.processingStatus, v.processingUpdatedAt, v.transcriptRevision,
 	}
 }
 
@@ -47,4 +49,4 @@ const updateMeetingSQL = `UPDATE meetings SET title=?, ended_at=?,
 	processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
 	transcript=?, transcript_revision=?, summary=?, summary_transcript_revision=?, extraction_json=?
 	WHERE id=? AND capture_status=? AND capture_status_updated_at=?
-	AND processing_status=? AND processing_status_updated_at=?`
+	AND processing_status=? AND processing_status_updated_at=? AND transcript_revision=?`
