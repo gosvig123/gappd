@@ -41,8 +41,33 @@ func TestCommitSpeakerProjectionNoOpDoesNotBumpRevision(t *testing.T) {
 	mustExec(t, store, `UPDATE segments SET speaker='Speaker 1',speaker_confidence=.91,speaker_assignment_reason=? WHERE id='system-1'`, SpeakerAssignmentReasonThresholdAssignment)
 	mustExec(t, store, `UPDATE meetings SET transcript='[You] microphone words\n[Speaker 1] remote words\n' WHERE id=?`, id)
 	meeting, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id))
-	if err != nil || !applied || meeting.TranscriptRevision != 7 || meeting.SummaryTranscriptRevision != 7 {
-		t.Fatalf("no-op = applied %v, revision %d, error %v", applied, meeting.TranscriptRevision, err)
+	if err != nil || !applied || meeting.TranscriptRevision != 7 || meeting.SummaryTranscriptRevision != 7 ||
+		meeting.ProcessingStatus != ProcessingStatusCompleted || DeriveQueueStage(*meeting) != QueueStageNone {
+		t.Fatalf("no-op = applied %v, revision %d, status %q, stage %q, error %v", applied,
+			meeting.TranscriptRevision, meeting.ProcessingStatus, DeriveQueueStage(*meeting), err)
+	}
+}
+
+func TestCommitSpeakerProjectionNoOpWithStaleOrMissingArtifactsRemainsPending(t *testing.T) {
+	tests := map[string]string{
+		"stale summary":      `UPDATE meetings SET summary_transcript_revision=6 WHERE id=?`,
+		"missing summary":    `UPDATE meetings SET summary=NULL WHERE id=?`,
+		"missing extraction": `UPDATE meetings SET extraction_json=NULL WHERE id=?`,
+	}
+	for name, query := range tests {
+		t.Run(name, func(t *testing.T) {
+			store, id := projectionFixture(t)
+			mustExec(t, store, `UPDATE segments SET speaker='Speaker 1',speaker_confidence=.91,speaker_assignment_reason=? WHERE id='system-1'`, SpeakerAssignmentReasonThresholdAssignment)
+			mustExec(t, store, `UPDATE meetings SET transcript='[You] microphone words\n[Speaker 1] remote words\n' WHERE id=?`, id)
+			mustExec(t, store, query, id)
+
+			meeting, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id))
+			if err != nil || !applied || meeting.TranscriptRevision != 7 ||
+				meeting.ProcessingStatus != ProcessingStatusPending || DeriveQueueStage(*meeting) != QueueStageSummarization {
+				t.Fatalf("no-op = applied %v, revision %d, status %q, stage %q, error %v", applied,
+					meeting.TranscriptRevision, meeting.ProcessingStatus, DeriveQueueStage(*meeting), err)
+			}
+		})
 	}
 }
 
