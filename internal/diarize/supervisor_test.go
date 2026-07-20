@@ -115,8 +115,14 @@ func TestWAVValidationAndRanges(t *testing.T) {
 		frames int64
 		want   []frameRange
 	}{
-		{windowFrames - 1, []frameRange{{0, windowFrames - 1}, {windowStepFrames, windowFrames - windowStepFrames - 1}}},
-		{windowFrames, []frameRange{{0, windowFrames}, {windowStepFrames, windowFrames - windowStepFrames}}},
+		{570 * sampleRate, []frameRange{{0, 570 * sampleRate}}},
+		{571 * sampleRate, []frameRange{{0, 571 * sampleRate}}},
+		{599 * sampleRate, []frameRange{{0, 599 * sampleRate}}},
+		{600 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 30 * sampleRate}}},
+		{601 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 31 * sampleRate}}},
+		{1140 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 570 * sampleRate}}},
+		{1141 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 571 * sampleRate}}},
+		{1169 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 599 * sampleRate}}},
 		{windowStepFrames + windowFrames + 10, []frameRange{{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}}},
 	}
 	for _, tc := range tests {
