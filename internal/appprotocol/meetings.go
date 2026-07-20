@@ -1,6 +1,10 @@
 package appprotocol
 
-import "github.com/gappd-dev/gappd/internal/db"
+import (
+	"encoding/json"
+
+	"github.com/gappd-dev/gappd/internal/db"
+)
 
 type MeetingListItem struct {
 	ID            string        `json:"id"`
@@ -27,8 +31,9 @@ type MeetingDetail struct {
 }
 
 type DiarizationInfo struct {
-	State db.DiarizationState `json:"state"`
-	Error *string             `json:"error,omitempty"`
+	State        db.DiarizationState `json:"state"`
+	Error        *string             `json:"error,omitempty"`
+	SpeakerCount *int                `json:"speakerCount,omitempty"`
 }
 
 type MeetingSegment struct {
@@ -72,6 +77,14 @@ func diarizationInfo(meeting db.Meeting) DiarizationInfo {
 	if meeting.DiarizationError != nil {
 		message := "Speaker labeling unavailable."
 		info.Error = &message
+	}
+	if meeting.DiarizationState == db.DiarizationStateCompleted && meeting.DiarizationJSON != nil {
+		var provenance struct {
+			SpeakerCount *int `json:"speakerCount"`
+		}
+		if json.Unmarshal([]byte(*meeting.DiarizationJSON), &provenance) == nil && provenance.SpeakerCount != nil && *provenance.SpeakerCount >= 0 {
+			info.SpeakerCount = provenance.SpeakerCount
+		}
 	}
 	return info
 }

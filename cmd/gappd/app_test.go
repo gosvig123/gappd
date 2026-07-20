@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
@@ -63,6 +64,50 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	}
 	if len(detail.Segments) != 1 || detail.Segments[0].Text != "hello" {
 		t.Fatalf("segments = %#v, want one segment with text", detail.Segments)
+	}
+}
+
+func TestAppRetryDiarizationReturnsSafeErrorWhenRetryIsNotApplied(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	_, store, err := loadStore()
+	if err != nil {
+		t.Fatalf("loadStore() error = %v", err)
+	}
+	meeting := &db.Meeting{
+		ID: "meeting-busy", Title: "Busy meeting", StartedAt: "2026-04-10T12:00:00Z",
+		CaptureStatus: db.CaptureStatusCaptured, CaptureStatusUpdatedAt: "2026-04-10T12:30:00Z",
+		ProcessingStatus: db.ProcessingStatusProcessing, ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
+		DiarizationState: db.DiarizationStateDegraded, Tags: "[]", Source: "listen",
+	}
+	if err := store.CreateMeeting(meeting); err != nil {
+		store.Close()
+		t.Fatalf("CreateMeeting() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	cmd := appMeetingsRetryDiarizationCmd()
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{meeting.ID, "--json"})
+	err = cmd.Execute()
+	if err == nil || err.Error() != speakerLabelingRetryUnavailableMessage {
+		t.Fatalf("retry error = %v, want user-safe unavailable message", err)
+	}
+	if strings.Contains(err.Error(), "transition") || strings.Contains(err.Error(), "processing_status") {
+		t.Fatalf("retry exposed internal error: %v", err)
+	}
+}
+
+func TestAppRetryDiarizationHidesMissingMeetingError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cmd := appMeetingsRetryDiarizationCmd()
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"missing-meeting", "--json"})
+
+	err := cmd.Execute()
+	if err == nil || err.Error() != speakerLabelingRetryUnavailableMessage {
+		t.Fatalf("retry error = %v, want user-safe unavailable message", err)
 	}
 }
 
