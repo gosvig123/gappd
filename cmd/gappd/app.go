@@ -1,6 +1,8 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +14,8 @@ import (
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
+
+const speakerLabelingRetryUnavailableMessage = "speaker labeling retry is not available for this meeting"
 
 func appCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -182,8 +186,15 @@ func appMeetingsRetryDiarizationCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		if _, err = meetinglifecycle.New(store).RetryDiarization(cmdContext(), args[0], time.Now()); err != nil {
+		result, err := meetinglifecycle.New(store).RetryDiarization(cmdContext(), args[0], time.Now())
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New(speakerLabelingRetryUnavailableMessage)
+		}
+		if err != nil {
 			return err
+		}
+		if !result.Applied {
+			return errors.New(speakerLabelingRetryUnavailableMessage)
 		}
 		detail, err := appMeetingDetailFor(store, args[0])
 		if err != nil {

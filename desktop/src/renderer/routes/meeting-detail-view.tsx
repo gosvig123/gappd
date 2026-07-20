@@ -13,7 +13,7 @@ const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_S
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
-type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string }
+type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onRetryDiarization: (id: string) => Promise<void> }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
@@ -84,7 +84,7 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
-function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
+function SelectedMeetingDetail({ selectedMeeting, transcript, onRetryDiarization }: { selectedMeeting: MeetingDetail; transcript: string; onRetryDiarization: (id: string) => Promise<void> }) {
   const detailTranscriptText = detailTranscript(selectedMeeting, transcript)
   const hasTranscript = Boolean(detailTranscriptText)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
@@ -97,12 +97,12 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
         <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
-      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} />
+      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} onRetryDiarization={onRetryDiarization} />
     </Panel>
   )
 }
 
-function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
+function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript, onRetryDiarization }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean; onRetryDiarization: (id: string) => Promise<void> }) {
   const recording = selectedMeeting.status.state === RECORDING_STATE
   const copyValue = tabCopyValue(activeTab, selectedMeeting, transcript)
   const reading = useReadingOverflow(copyValue, `${selectedMeeting.id}:${activeTab}`)
@@ -111,7 +111,8 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
     <div className="detail-grid detail-reading-stack">
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
-      <DiarizationNotice meeting={selectedMeeting} />
+      <DiarizationNotice meeting={selectedMeeting} onRetry={onRetryDiarization} />
+      <DiarizationTrustCue meeting={selectedMeeting} />
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
@@ -122,11 +123,22 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
   )
 }
 
-function DiarizationNotice({ meeting }: { meeting: MeetingDetail }) {
+function DiarizationNotice({ meeting, onRetry }: { meeting: MeetingDetail; onRetry: (id: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
+  useEffect(() => setRetryError(null), [meeting.id])
   if (meeting.diarization.state !== DEGRADED_STATE) return null
-  const retry = async () => { setBusy(true); try { await window.gappd.meetings.retryDiarization(meeting.id) } catch {} finally { setBusy(false) } }
-  return <div className="detail-surface"><span>{meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span><div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
+  const retry = async () => {
+    setBusy(true)
+    setRetryError(null)
+    try { await onRetry(meeting.id) } catch (error) { setRetryError(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+  }
+  return <div className="detail-surface"><span>{meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span>{retryError ? <span className="diarization-retry-error" role="alert">{retryError}</span> : null}<div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
+}
+
+function DiarizationTrustCue({ meeting }: { meeting: MeetingDetail }) {
+  if (meeting.diarization.speakerCount === undefined) return null
+  return <div className="detail-surface diarization-trust-cue"><strong>Speaker count: {meeting.diarization.speakerCount} · Experimental</strong><span>Speaker labels may not always be accurate.</span></div>
 }
 
 function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {
@@ -193,7 +205,7 @@ export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><SelectedMeetingError message={selectedMeetingError} /></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onRetryDiarization={props.onRetryDiarization} />
 }
 
 function SelectedMeetingError({ message }: { message: string }) {

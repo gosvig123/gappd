@@ -35,12 +35,23 @@ func (w Module) MarkDiarizationNotApplicable(ctx context.Context, id, token stri
 }
 
 func (w Module) finishDiarization(ctx context.Context, id, token string, state db.DiarizationState, diarizationError, resultJSON *string, at time.Time) (Result, error) {
+	processingStatus := `?`
+	processingArgs := []any{db.ProcessingStatusPending}
+	switch state {
+	case db.DiarizationStateCompleted, db.DiarizationStateDegraded, db.DiarizationStateNotApplicable:
+		processingStatus = `CASE WHEN transcript IS NOT NULL AND trim(transcript)<>''
+			AND summary IS NOT NULL AND trim(summary)<>''
+			AND extraction_json IS NOT NULL AND trim(extraction_json)<>''
+			AND summary_transcript_revision=transcript_revision THEN ? ELSE ? END`
+		processingArgs = []any{db.ProcessingStatusCompleted, db.ProcessingStatusPending}
+	}
+	args := []any{state, diarizationError, resultJSON}
+	args = append(args, processingArgs...)
+	args = append(args, timestamp(at), id, db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
 	return w.updateDiarization(ctx, id, `UPDATE meetings SET diarization_state=?,diarization_error=?,diarization_json=?,
-		processing_status=?,processing_status_updated_at=?,processing_failure_message=NULL,
+		processing_status=`+processingStatus+`,processing_status_updated_at=?,processing_failure_message=NULL,
 		processing_claim_token=NULL,processing_claim_expires_at=NULL
-		WHERE id=? AND diarization_state=? AND processing_status=? AND processing_claim_token=?`,
-		state, diarizationError, resultJSON, db.ProcessingStatusPending, timestamp(at), id,
-		db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
+		WHERE id=? AND diarization_state=? AND processing_status=? AND processing_claim_token=?`, args...)
 }
 
 func (w Module) RetryDiarization(ctx context.Context, id string, at time.Time) (Result, error) {

@@ -285,7 +285,7 @@ type AppCommandDefinitions = { [K in keyof AppCommandInput]: CommandDefinition<A
 func writeCommandMap(b *strings.Builder) {
 	b.WriteString("\nexport const APP_COMMANDS = {\n")
 	for _, command := range appprotocol.Commands {
-		fmt.Fprintf(b, "  %s: { mode: %s, args: (input: %s) => %s, env: %s, terminal: %s },\n", quote(command.ID), quote(string(command.Mode)), inputTypeName(command), argsExpr(command.Args), stringList(command.Env), eventList(command.Terminal))
+		fmt.Fprintf(b, "  %s: { mode: %s, args: (input: %s) => %s, env: %s, terminal: %s },\n", quote(command.ID), quote(string(command.Mode)), inputTypeName(command), argsExpr(command.Input, command.Args), stringList(command.Env), eventList(command.Terminal))
 	}
 	b.WriteString("} as const satisfies AppCommandDefinitions\n")
 }
@@ -316,15 +316,15 @@ func writeMapType(b *strings.Builder, name string, value func(appprotocol.Comman
 	b.WriteString("}\n")
 }
 
-func argsExpr(args []appprotocol.CommandArg) string {
+func argsExpr(input reflect.Type, args []appprotocol.CommandArg) string {
 	parts := make([]string, 0, len(args))
 	for _, arg := range args {
-		parts = append(parts, argExpr(arg))
+		parts = append(parts, argExpr(input, arg))
 	}
 	return "[" + strings.Join(parts, ", ") + "]"
 }
 
-func argExpr(arg appprotocol.CommandArg) string {
+func argExpr(input reflect.Type, arg appprotocol.CommandArg) string {
 	if arg.Literal != "" {
 		return quote(arg.Literal)
 	}
@@ -332,13 +332,28 @@ func argExpr(arg appprotocol.CommandArg) string {
 		return fieldExpr(arg)
 	}
 	if arg.Optional {
-		return optionalFlagExpr(arg)
+		return optionalFlagExpr(input, arg)
 	}
 	return quote("--"+arg.Flag) + ", " + fieldExpr(arg)
 }
 
-func optionalFlagExpr(arg appprotocol.CommandArg) string {
+func optionalFlagExpr(input reflect.Type, arg appprotocol.CommandArg) string {
+	if commandFieldType(input, arg.Field).Kind() == reflect.Bool {
+		return fmt.Sprintf("...(input.%s === undefined ? [] : [%s + String(input.%s)])", arg.Field, quote("--"+arg.Flag+"="), arg.Field)
+	}
 	return fmt.Sprintf("...(input.%s === undefined ? [] : [%s, %s])", arg.Field, quote("--"+arg.Flag), fieldExpr(arg))
+}
+
+func commandFieldType(input reflect.Type, jsonField string) reflect.Type {
+	input = deref(input)
+	for i := 0; i < input.NumField(); i++ {
+		field := input.Field(i)
+		name, _ := jsonName(field)
+		if name == jsonField {
+			return deref(field.Type)
+		}
+	}
+	panic(fmt.Sprintf("protocol input %s has no JSON field %q", input.Name(), jsonField))
 }
 
 func fieldExpr(arg appprotocol.CommandArg) string {

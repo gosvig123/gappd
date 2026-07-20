@@ -65,6 +65,38 @@ func TestDiarizationMigrationBacksUpWALAndCleansUpOnLaterHealthyStartup(t *testi
 	}
 }
 
+func TestDiarizationBackupCleanupFailureDoesNotBlockHealthyStartup(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "gappd.db")
+	store := openFileDB(t, dbPath)
+	defer store.Close()
+	if err := store.Init(); err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	backupPath := dbPath + diarizationBackupSuffix
+	if err := os.Mkdir(backupPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(backupPath, "keep"), []byte("backup"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-diarizationBackupMaxAge - time.Hour)
+	if err := os.Chtimes(backupPath, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.Init(); err != nil {
+		t.Fatalf("Init() with undeletable aged backup error = %v", err)
+	}
+	var integrity string
+	if err := store.Conn.QueryRow(`PRAGMA quick_check`).Scan(&integrity); err != nil || integrity != "ok" {
+		t.Fatalf("primary database integrity = %q, %v", integrity, err)
+	}
+	if _, err := os.Stat(filepath.Join(backupPath, "keep")); err != nil {
+		t.Fatalf("undeleted backup contents: %v", err)
+	}
+}
+
 func migrationExec(t *testing.T, store *DB, query string) {
 	t.Helper()
 	if _, err := store.Conn.Exec(query); err != nil {
