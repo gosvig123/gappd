@@ -84,13 +84,17 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 	result, err := tx.ExecContext(ctx, `UPDATE meetings SET
 		transcript=?, transcript_revision=transcript_revision+?,
 		diarization_state=?, diarization_error=NULL, diarization_json=?,
-		processing_status=?, processing_status_updated_at=?, processing_failure_message=NULL,
+		processing_status=CASE WHEN ? OR summary IS NULL OR trim(summary)='' OR
+			extraction_json IS NULL OR trim(extraction_json)='' OR summary_transcript_revision<>transcript_revision+?
+			THEN ? ELSE ? END,
+		processing_status_updated_at=?, processing_failure_message=NULL,
 		processing_claim_token=NULL, processing_claim_expires_at=NULL
 		WHERE id=? AND processing_status=? AND processing_claim_token=?
 		AND diarization_state=? AND transcript_revision=?`,
 		FormatTranscript(segments), changed, DiarizationStateCompleted, provenanceJSON,
-		ProcessingStatusPending, stamp(input.CompletedAt), input.MeetingID, ProcessingStatusProcessing,
-		input.ClaimToken, DiarizationStateProcessing, input.CapturedTranscriptRevision)
+		changed, changed, ProcessingStatusPending, ProcessingStatusCompleted, stamp(input.CompletedAt),
+		input.MeetingID, ProcessingStatusProcessing, input.ClaimToken, DiarizationStateProcessing,
+		input.CapturedTranscriptRevision)
 	applied, err := rowsChanged(result, err, "commit speaker projection")
 	if err != nil || !applied {
 		return meeting, false, err

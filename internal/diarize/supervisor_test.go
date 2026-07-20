@@ -102,8 +102,14 @@ func TestWAVValidationAndRanges(t *testing.T) {
 		}
 	}
 	tests := map[int64][]frameRange{
-		windowFrames - 1:                     {{0, windowFrames - 1}, {windowStepFrames, windowFrames - windowStepFrames - 1}},
-		windowFrames:                         {{0, windowFrames}, {windowStepFrames, windowFrames - windowStepFrames}},
+		570 * sampleRate:                     {{0, 570 * sampleRate}},
+		571 * sampleRate:                     {{0, 571 * sampleRate}},
+		599 * sampleRate:                     {{0, 599 * sampleRate}},
+		600 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 30 * sampleRate}},
+		601 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 31 * sampleRate}},
+		1140 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 570 * sampleRate}},
+		1141 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 571 * sampleRate}},
+		1169 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 599 * sampleRate}},
 		windowStepFrames + windowFrames + 10: {{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}},
 	}
 	for frames, want := range tests {
