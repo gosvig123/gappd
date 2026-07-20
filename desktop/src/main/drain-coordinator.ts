@@ -57,7 +57,7 @@ function requestReadinessChange(snapshot: ManagedRuntimeSnapshot): void {
 
 function requestReadyDrains(snapshot: ManagedRuntimeSnapshot): void {
   for (const capability of CAPABILITIES) {
-    if (snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
+    if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
   }
 }
 
@@ -79,7 +79,8 @@ function startNextFlight(): void {
 
 async function runDrain(current: Flight): Promise<void> {
   try {
-    const result = await managedRuntime.using([current.capability], () => requestCommand('processing.drain', { capability: current.capability }, {}, current.controller.signal))
+    const runtimeCapabilities = current.capability === 'diarization' ? [] : [current.capability]
+    const result = await managedRuntime.using(runtimeCapabilities, () => requestCommand('processing.drain', { capability: current.capability }, {}, current.controller.signal))
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
   } catch (error) {
