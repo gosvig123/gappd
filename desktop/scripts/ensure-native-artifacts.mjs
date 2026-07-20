@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { access } from 'node:fs/promises'
 import macReleaseUtils from './mac-release-utils.cjs'
 
-const { verifyModelManifest } = macReleaseUtils
+const { verifyFluidAudioLicenseFile, verifyModelManifest } = macReleaseUtils
 
 const DEFAULT_MACOS_MIN_VERSION = '26.0'
 const MAC_BUILD_NATIVE = 'native'
@@ -27,6 +27,7 @@ const buildDir = path.join(repoRoot, 'build')
 const gappdBinaryPath = path.join(buildDir, 'gappd')
 const diarizerPath = path.join(buildDir, 'gappd-diarizer')
 const diarizationModelsPath = path.join(repoRoot, 'gappd-diarizer', 'models', 'speaker-diarization')
+const fluidAudioLicensePath = path.join(repoRoot, 'gappd-diarizer', 'legal', 'FluidAudio', 'LICENSE')
 const captureAppPath = path.join(buildDir, 'GappdCapture.app')
 const captureBinaryPath = path.join(captureAppPath, 'Contents', 'MacOS', 'gappd-capture')
 const speechTranscriberAppPath = path.join(buildDir, 'GappdSpeechTranscriber.app')
@@ -40,6 +41,7 @@ await requirePath(gappdBinaryPath, `Native gappd binary missing at ${gappdBinary
 if (shouldRunLocalBinaryCheck()) runBinaryCheck()
 else console.log(`Skipping local runtime verification for cross-compiled ${macBuildProfile} gappd binary.`)
 await verifyModelManifest(diarizationModelsPath)
+await verifyFluidAudioLicenseFile(fluidAudioLicensePath)
 
 if (process.platform === 'darwin') {
   await requirePath(diarizerPath, `Native diarization helper missing at ${diarizerPath} after build.`)

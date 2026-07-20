@@ -13,6 +13,7 @@ const {
   shouldNotarize,
   validateStaple,
   verifyCodeSignature,
+  verifyFluidAudioLicense,
   verifyModelManifest,
   verifyRequiredNestedCode,
 } = require('./mac-release-utils.cjs')
@@ -29,6 +30,7 @@ async function main() {
   if (process.platform !== 'darwin') return
   const appPath = process.argv[2] ? path.resolve(process.argv[2]) : await defaultAppPath()
   await verifyModelManifest(path.join(appPath, 'Contents', 'Resources', 'diarization-models', 'speaker-diarization'))
+  await verifyFluidAudioLicense(appPath)
   const targets = await verifyRequiredNestedCode(appPath)
   verifyCodeSignature(appPath)
   for (const target of targets) verifyCodeSignature(target.path)
