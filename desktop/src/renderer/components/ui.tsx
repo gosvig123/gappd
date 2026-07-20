@@ -1,8 +1,8 @@
-import { type ButtonHTMLAttributes, type HTMLAttributes, type ReactNode, useState } from 'react'
+import { type ButtonHTMLAttributes, type HTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, useId, useRef, useState } from 'react'
 import { ChevronDownIcon } from './icons'
 
 type PanelProps = HTMLAttributes<HTMLElement> & { children: ReactNode }
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' }
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary'; ref?: Ref<HTMLButtonElement> }
 type FieldProps = { label: string; children: ReactNode; className?: string; hint?: ReactNode }
 type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; middle?: ReactNode; className?: string }
 type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string; dismissible?: boolean; dismissKey?: string; dismissLabel?: string }
@@ -36,15 +36,30 @@ export function Button({ variant = 'secondary', className, ...props }: ButtonPro
 
 export function MultiSelect({ ariaLabel, allLabel, options, selected, onChange }: MultiSelectProps) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const groupId = useId()
   const values = new Set(selected)
   const count = options.filter((option) => values.has(option.value)).length
   const all = count === options.length
-  const apply = (next: string[]) => { onChange(next); if (next.length === 0) setOpen(false) }
+  const apply = (next: string[]) => {
+    onChange(next)
+    if (next.length === 0) {
+      setOpen(false)
+      triggerRef.current?.focus()
+    }
+  }
   const toggle = (value: string) => apply(options.filter((option) => values.has(option.value) !== (option.value === value)).map((option) => option.value))
+  const handleEscape = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape' || !open) return
+    event.preventDefault()
+    event.stopPropagation()
+    setOpen(false)
+    triggerRef.current?.focus()
+  }
   return (
-    <div className={cx('ui-multi-select', open && 'open')} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false) }}>
-      <Button type="button" className="compact-action ui-multi-select-trigger" aria-label={ariaLabel} aria-haspopup="true" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{all ? allLabel : count ? `${count} selected` : 'None selected'}</span><ChevronDownIcon aria-hidden="true" /></Button>
-      {open ? <div className="ui-card ui-multi-select-menu" role="group" aria-label={ariaLabel}>
+    <div className={cx('ui-multi-select', open && 'open')} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={handleEscape}>
+      <Button ref={triggerRef} type="button" className="compact-action ui-multi-select-trigger" aria-label={ariaLabel} aria-controls={groupId} aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{all ? allLabel : count ? `${count} selected` : 'None selected'}</span><ChevronDownIcon aria-hidden="true" /></Button>
+      {open ? <div id={groupId} className="ui-card ui-multi-select-menu" role="group" aria-label={ariaLabel}>
         <button type="button" className="list-row ui-multi-select-option all" role="checkbox" aria-checked={all} onClick={() => apply(all ? [] : options.map((option) => option.value))}><span>{allLabel}</span></button>
         {options.map((option) => <button type="button" key={option.value} className="list-row ui-multi-select-option" role="checkbox" aria-checked={values.has(option.value)} onClick={() => toggle(option.value)}><span>{option.label}</span></button>)}
       </div> : null}
