@@ -118,6 +118,9 @@ func frameRanges(frames int64) []frameRange {
 			count = windowFrames
 		}
 		out = append(out, frameRange{start, count})
+		if count < windowFrames {
+			break
+		}
 	}
 	return out
 }
@@ -162,13 +165,24 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 		}
 		return stdout.Bytes(), ""
 	case <-ctx.Done():
+		// Wait and cancellation can become ready together. Re-check before
+		// signaling so a completed helper's process group is left untouched.
+		select {
+		case <-done:
+			return nil, "helper canceled"
+		default:
+		}
 		_ = processgroup.Signal(cmd, syscall.SIGTERM)
 		timer := time.NewTimer(2 * time.Second)
 		select {
 		case <-done:
 		case <-timer.C:
-			_ = processgroup.Signal(cmd, syscall.SIGKILL)
-			<-done
+			select {
+			case <-done:
+			default:
+				_ = processgroup.Signal(cmd, syscall.SIGKILL)
+				<-done
+			}
 		}
 		if !timer.Stop() {
 			select {
@@ -176,8 +190,6 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 			default:
 			}
 		}
-		// Leader may exit before descendants; kill remaining group members.
-		_ = processgroup.Signal(cmd, syscall.SIGKILL)
 		return nil, "helper canceled"
 	}
 }
