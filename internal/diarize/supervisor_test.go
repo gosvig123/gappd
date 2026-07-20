@@ -92,10 +92,21 @@ func TestAudioContractRangesAndTimeouts(t *testing.T) {
 			t.Fatalf("accepted invalid WAV mutation at %d", at)
 		}
 	}
-	got := frameRanges(windowStepFrames + windowFrames + 10)
-	want := []frameRange{{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}}
-	if fmt.Sprint(got) != fmt.Sprint(want) {
-		t.Fatalf("ranges=%v want %v", got, want)
+	tests := map[int64][]frameRange{
+		570 * sampleRate:                     {{0, 570 * sampleRate}},
+		571 * sampleRate:                     {{0, 571 * sampleRate}},
+		599 * sampleRate:                     {{0, 599 * sampleRate}},
+		600 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 30 * sampleRate}},
+		601 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 31 * sampleRate}},
+		1140 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 570 * sampleRate}},
+		1141 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 571 * sampleRate}},
+		1169 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 599 * sampleRate}},
+		windowStepFrames + windowFrames + 10: {{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}},
+	}
+	for frames, want := range tests {
+		if got := frameRanges(frames); fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("ranges(%d)=%v want %v", frames, got, want)
+		}
 	}
 	if attemptTimeout(15*60*sampleRate) != 45*time.Second || attemptTimeout(60*60*sampleRate) != 90*time.Second || attemptTimeout(120*60*sampleRate) != 150*time.Second {
 		t.Fatal("attempt timeout contract changed")
