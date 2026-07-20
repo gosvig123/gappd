@@ -77,18 +77,30 @@ func drainListenCapabilities(store *db.DB) error {
 	}
 	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
 	service := newMeetingProcessingService(store, pipeline, recordingOutputConsole)
-	transcription, err := service.Drain(cmdContext(), meetingprocessing.CapabilityTranscription)
-	if err != nil {
-		return err
+	return drainListenPipeline(func(capability meetingprocessing.Capability) (meetingprocessing.DrainResult, error) {
+		return service.Drain(cmdContext(), capability)
+	})
+}
+
+func drainListenPipeline(drain func(meetingprocessing.Capability) (meetingprocessing.DrainResult, error)) error {
+	capabilities := []meetingprocessing.Capability{
+		meetingprocessing.CapabilityTranscription,
+		meetingprocessing.CapabilityDiarization,
+		meetingprocessing.CapabilitySummarization,
 	}
-	if err := drainOutcomeError(transcription); err != nil {
-		return err
+	for _, capability := range capabilities {
+		result, err := drain(capability)
+		if err != nil {
+			return err
+		}
+		if capability == meetingprocessing.CapabilityDiarization && result.Requeued == 0 {
+			continue
+		}
+		if err := drainOutcomeError(result); err != nil {
+			return err
+		}
 	}
-	summarization, err := service.Drain(cmdContext(), meetingprocessing.CapabilitySummarization)
-	if err != nil {
-		return err
-	}
-	return drainOutcomeError(summarization)
+	return nil
 }
 
 func drainOutcomeError(result meetingprocessing.DrainResult) error {
