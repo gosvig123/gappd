@@ -9,7 +9,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-type DB struct{ Conn *sql.DB }
+type DB struct {
+	Conn *sql.DB
+	path string
+}
 
 const sqliteBusyTimeoutMS = 5000
 
@@ -18,7 +21,7 @@ func Open(path string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
-	return &DB{Conn: conn}, nil
+	return &DB{Conn: conn, path: path}, nil
 }
 
 func (d *DB) Init() error {
@@ -31,10 +34,25 @@ func (d *DB) Init() error {
 	if err := prepareInitConnection(ctx, conn); err != nil {
 		return err
 	}
+	migrationStartup, err := needsDiarizationMigration(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if migrationStartup {
+		if err := d.backupBeforeDiarization(ctx, conn); err != nil {
+			return err
+		}
+	}
 	if err := d.initializeSchema(ctx, conn); err != nil {
 		return err
 	}
-	return finishInitConnection(ctx, conn)
+	if err := finishInitConnection(ctx, conn); err != nil {
+		return err
+	}
+	if !migrationStartup {
+		_ = d.cleanupDiarizationBackup(ctx, conn)
+	}
+	return nil
 }
 
 func finishInitConnection(ctx context.Context, conn *sql.Conn) error {
@@ -69,6 +87,9 @@ func (d *DB) initializeSchema(ctx context.Context, conn *sql.Conn) (err error) {
 		}
 	}()
 	if err = d.migrateMeetings(ctx, conn); err != nil {
+		return err
+	}
+	if err = migrateDiarizationSchema(ctx, conn); err != nil {
 		return err
 	}
 	if err = installSchema(ctx, conn); err != nil {

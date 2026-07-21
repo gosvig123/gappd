@@ -21,8 +21,14 @@ CREATE TABLE IF NOT EXISTS meetings (
     processing_claim_expires_at TEXT,
     audio_path TEXT,
     transcript TEXT,
+    transcript_revision INTEGER NOT NULL DEFAULT 0,
     summary    TEXT,
+    summary_transcript_revision INTEGER NOT NULL DEFAULT 0,
     extraction_json TEXT,
+    diarization_state TEXT NOT NULL DEFAULT 'not_requested'
+               CHECK (diarization_state IN ('not_requested', 'not_applicable', 'pending', 'processing', 'completed', 'degraded')),
+    diarization_error TEXT,
+    diarization_json TEXT,
     language   TEXT NOT NULL DEFAULT 'en_US',
     tags       TEXT NOT NULL DEFAULT '[]',
     source     TEXT NOT NULL DEFAULT 'manual',
@@ -36,6 +42,9 @@ CREATE TABLE IF NOT EXISTS segments (
     end_sec    REAL NOT NULL,
     text       TEXT NOT NULL,
     speaker    TEXT NOT NULL DEFAULT '',
+    speaker_source TEXT,
+    speaker_confidence REAL,
+    speaker_assignment_reason TEXT,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
