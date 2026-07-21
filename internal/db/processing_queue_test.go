@@ -43,6 +43,18 @@ func TestClaimExclusiveExpiryAndStaleToken(t *testing.T) {
 	}
 }
 
+func TestClaimQueuesStaleSummaryWithoutClearingIt(t *testing.T) {
+	store := openQueueDB(t)
+	defer store.Close()
+	meeting := queueMeeting(t, store, "stale-summary", "2026-01-01T00:00:00Z")
+	_, _ = store.Conn.Exec(`UPDATE meetings SET transcript='new',transcript_revision=2,summary='visible',
+		summary_transcript_revision=1,extraction_json='{}',diarization_state=? WHERE id=?`, DiarizationStateCompleted, meeting.ID)
+	claim, err := store.ClaimNext(context.Background(), QueueStageSummarization, time.Now(), time.Minute, nil)
+	if err != nil || claim == nil || claim.Meeting.Summary == nil || *claim.Meeting.Summary != "visible" {
+		t.Fatalf("stale summary claim = %#v, %v", claim, err)
+	}
+}
+
 func TestClaimRecoversStaleUnclaimedProcessing(t *testing.T) {
 	store := openQueueDB(t)
 	defer store.Close()

@@ -9,6 +9,20 @@ import (
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
+func TestRecordingStartSnapshotsSpeakerLabels(t *testing.T) {
+	module, store := openLifecycle(t)
+	defer store.Close()
+	if meeting := beginRecording(t, module); meeting.DiarizationState != db.DiarizationStateNotRequested {
+		t.Fatalf("unavailable diarization = %q", meeting.DiarizationState)
+	}
+	disabled := false
+	meeting, err := module.BeginRecording(context.Background(), RecordingStart{Title: "Disabled", SessionDir: t.TempDir(),
+		Language: "en_US", SpeakerLabelsEnabled: &disabled, At: testTime(1)})
+	if err != nil || meeting.DiarizationState != db.DiarizationStateNotRequested {
+		t.Fatalf("disabled diarization = %#v, %v", meeting, err)
+	}
+}
+
 func TestTransitionRejectsContradictionAndAcceptsRepeat(t *testing.T) {
 	module, store := openLifecycle(t)
 	defer store.Close()

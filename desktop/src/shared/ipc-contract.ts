@@ -5,7 +5,7 @@ export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './con
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean }
 

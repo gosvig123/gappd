@@ -47,10 +47,11 @@ type audioRecorder interface {
 type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
 
 type Request struct {
-	DeviceIdx int
-	Title     string
-	Mode      capture.CaptureMode
-	Language  string
+	DeviceIdx            int
+	Title                string
+	Mode                 capture.CaptureMode
+	Language             string
+	SpeakerLabelsEnabled *bool
 }
 
 type Service struct {
@@ -98,7 +99,7 @@ func (w meetingRecordingWorkflow) run(req Request) error {
 	if err != nil {
 		return err
 	}
-	meeting, err := w.startMeeting(req.Title, sessionDir, req.Language)
+	meeting, err := w.startMeeting(req.Title, sessionDir, req.Language, req.SpeakerLabelsEnabled)
 	if err != nil {
 		return errors.Join(err, audioartifact.DeleteSessionUnder(w.baseDir, sessionDir))
 	}
