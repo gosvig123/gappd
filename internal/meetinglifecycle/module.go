@@ -11,7 +11,7 @@ import (
 
 type Module struct{ store *db.DB }
 
-const speakerDiarizationAvailable = false
+const speakerDiarizationAvailable = true
 
 type RecordingStart struct {
 	Title                string
