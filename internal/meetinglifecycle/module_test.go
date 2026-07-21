@@ -12,11 +12,17 @@ import (
 func TestRecordingStartSnapshotsSpeakerLabels(t *testing.T) {
 	module, store := openLifecycle(t)
 	defer store.Close()
-	if meeting := beginRecording(t, module); meeting.DiarizationState != db.DiarizationStateNotRequested {
-		t.Fatalf("unavailable diarization = %q", meeting.DiarizationState)
+	if meeting := beginRecording(t, module); meeting.DiarizationState != db.DiarizationStatePending {
+		t.Fatalf("default diarization = %q", meeting.DiarizationState)
+	}
+	enabled := true
+	meeting, err := module.BeginRecording(context.Background(), RecordingStart{Title: "Enabled", SessionDir: t.TempDir(),
+		Language: "en_US", SpeakerLabelsEnabled: &enabled, At: testTime(1)})
+	if err != nil || meeting.DiarizationState != db.DiarizationStatePending {
+		t.Fatalf("enabled diarization = %#v, %v", meeting, err)
 	}
 	disabled := false
-	meeting, err := module.BeginRecording(context.Background(), RecordingStart{Title: "Disabled", SessionDir: t.TempDir(),
+	meeting, err = module.BeginRecording(context.Background(), RecordingStart{Title: "Disabled", SessionDir: t.TempDir(),
 		Language: "en_US", SpeakerLabelsEnabled: &disabled, At: testTime(1)})
 	if err != nil || meeting.DiarizationState != db.DiarizationStateNotRequested {
 		t.Fatalf("disabled diarization = %#v, %v", meeting, err)
