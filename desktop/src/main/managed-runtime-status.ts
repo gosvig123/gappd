@@ -5,6 +5,7 @@ import { appleSpeechAssetAvailable, missingAppleSpeechAssetMessage } from './app
 import { managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
 import { getManagedLlamaCppRuntimeStatus, missingBundledLlamaCppMessage } from './llamacpp'
 import { toManagedRuntimeErrorState } from './managed-runtime-errors'
+import { diarizationAssetsAvailable, missingDiarizationAssetsMessage } from './diarization'
 
 export type RuntimeProbe = { config: AIConfig | null; error?: string }
 
@@ -22,6 +23,7 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const runtime = await getManagedLlamaCppRuntimeStatus()
   const modelReady = runtime.bundled && await managedLanguageModelAvailable(MANAGED_LLAMACPP_MODEL)
   const speechReady = runtime.supported && await appleSpeechAssetAvailable()
+  const diarizationReady = runtime.supported && await diarizationAssetsAvailable()
   const configured = isManagedConfig(input.config)
   const operation = probeOperation(runtime.supported, runtime.bundled, modelReady, speechReady, configured)
   return {
@@ -31,6 +33,7 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
     capabilities: {
       summarization: { readiness: modelReady ? 'ready' : runtime.bundled ? 'missing' : 'unavailable', message: modelReady ? undefined : runtime.bundled ? missingManagedLanguageModelMessage() : missingBundledLlamaCppMessage() },
       transcription: { readiness: speechReady ? 'ready' : 'missing', message: speechReady ? undefined : missingAppleSpeechAssetMessage() },
+      diarization: { readiness: diarizationReady ? 'ready' : 'missing', message: diarizationReady ? undefined : missingDiarizationAssetsMessage() },
     },
   }
 }
@@ -45,7 +48,7 @@ export function baseSnapshot(operation: ManagedRuntimeOperation, message: string
     operation, activity: 'idle', endpoint: MANAGED_LLAMACPP_ENDPOINT, model: MANAGED_LLAMACPP_MODEL,
     message, supported: process.platform === 'darwin', configured: false, bundled: false, running: false,
     canRetry: false, canRepair: false,
-    capabilities: { summarization: { readiness: 'missing' }, transcription: { readiness: 'missing' } },
+    capabilities: { summarization: { readiness: 'missing' }, transcription: { readiness: 'missing' }, diarization: { readiness: 'missing' } },
   }
 }
 

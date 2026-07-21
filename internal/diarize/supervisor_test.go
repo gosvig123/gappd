@@ -14,7 +14,6 @@ import (
 	"time"
 )
 
-// The test binary doubles as the real, freshly launched helper process.
 func TestMain(m *testing.M) {
 	if mode := os.Getenv("GAPPD_DIARIZE_FAKE"); mode != "" {
 		fakeHelper(mode)
@@ -41,20 +40,17 @@ func fakeHelper(mode string) {
 		}
 	case "malformed":
 		fmt.Print("{")
-		return
 	case "trailing":
 		fmt.Print(validJSON(start, count), "{}")
-		return
 	case "oversized":
 		fmt.Print(strings.Repeat("x", maxReportBytes+1))
-		return
 	case "wrong":
 		start++
 	}
 	fmt.Print(validJSON(start, count))
 }
 func validJSON(start, count int64) string {
-	return fmt.Sprintf(`{"schemaVersion":1,"engine":%q,"engineRevision":%q,"requestedStartFrame":%d,"requestedFrameCount":%d,"clusters":[{"localClusterID":"a","centroid":[1,0]}],"spans":[{"localClusterID":"a","startSeconds":0,"endSeconds":1,"qualityScore":0.8,"identityScore":0.7}]}`, reportEngine, reportRevision, start, count)
+	return fmt.Sprintf(`{"schemaVersion":1,"engine":%q,"engineRevision":%q,"requestedStartFrame":%d,"requestedFrameCount":%d,"clusters":[{"localClusterID":"a","centroid":[1,0]}],"spans":[{"localClusterID":"a","startSeconds":0,"endSeconds":1,"qualityScore":0.8,"identityScore":0.7}]}`, Engine, EngineRevision, start, count)
 }
 func writeWAV(t *testing.T, frames int64) string {
 	t.Helper()
@@ -96,38 +92,29 @@ func TestWAVValidationAndRanges(t *testing.T) {
 		t.Fatalf("frames=%d err=%v", got, err)
 	}
 	good, _ := os.ReadFile(path)
-	for _, tc := range []struct {
-		name  string
-		at    int
-		value byte
-	}{{"riff", 0, 'X'}, {"pcm", 20, 2}, {"mono", 22, 2}, {"rate", 24, 1}, {"data", 36, 'X'}, {"size", 40, 1}} {
-		t.Run(tc.name, func(t *testing.T) {
-			bad := filepath.Join(t.TempDir(), "bad.wav")
-			b := append([]byte(nil), good...)
-			b[tc.at] = tc.value
-			_ = os.WriteFile(bad, b, 0600)
-			if _, err := wavFrames(bad); err == nil {
-				t.Fatal("accepted invalid WAV")
-			}
-		})
+	for at, value := range map[int]byte{0: 'X', 20: 2, 22: 2, 24: 1, 36: 'X', 40: 1} {
+		bad := filepath.Join(t.TempDir(), "bad.wav")
+		b := append([]byte(nil), good...)
+		b[at] = value
+		_ = os.WriteFile(bad, b, 0600)
+		if _, err := wavFrames(bad); err == nil {
+			t.Fatalf("accepted invalid WAV mutation at %d", at)
+		}
 	}
-	tests := []struct {
-		frames int64
-		want   []frameRange
-	}{
-		{570 * sampleRate, []frameRange{{0, 570 * sampleRate}}},
-		{571 * sampleRate, []frameRange{{0, 571 * sampleRate}}},
-		{599 * sampleRate, []frameRange{{0, 599 * sampleRate}}},
-		{600 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 30 * sampleRate}}},
-		{601 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 31 * sampleRate}}},
-		{1140 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 570 * sampleRate}}},
-		{1141 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 571 * sampleRate}}},
-		{1169 * sampleRate, []frameRange{{0, windowFrames}, {windowStepFrames, 599 * sampleRate}}},
-		{windowStepFrames + windowFrames + 10, []frameRange{{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}}},
+	tests := map[int64][]frameRange{
+		570 * sampleRate:                     {{0, 570 * sampleRate}},
+		571 * sampleRate:                     {{0, 571 * sampleRate}},
+		599 * sampleRate:                     {{0, 599 * sampleRate}},
+		600 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 30 * sampleRate}},
+		601 * sampleRate:                     {{0, windowFrames}, {windowStepFrames, 31 * sampleRate}},
+		1140 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 570 * sampleRate}},
+		1141 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 571 * sampleRate}},
+		1169 * sampleRate:                    {{0, windowFrames}, {windowStepFrames, 599 * sampleRate}},
+		windowStepFrames + windowFrames + 10: {{0, windowFrames}, {windowStepFrames, windowFrames}, {2 * windowStepFrames, windowFrames - windowStepFrames + 10}},
 	}
-	for _, tc := range tests {
-		if got := frameRanges(tc.frames); fmt.Sprint(got) != fmt.Sprint(tc.want) {
-			t.Errorf("ranges(%d)=%v want %v", tc.frames, got, tc.want)
+	for frames, want := range tests {
+		if got := frameRanges(frames); fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("ranges(%d)=%v want %v", frames, got, want)
 		}
 	}
 }
@@ -158,12 +145,10 @@ func TestSupervisorSequentialWindows(t *testing.T) {
 }
 func TestSupervisorRejectsReports(t *testing.T) {
 	for _, mode := range []string{"malformed", "trailing", "oversized", "wrong"} {
-		t.Run(mode, func(t *testing.T) {
-			s, audio := supervisorFor(t, sampleRate*2, mode)
-			if _, err := s.Run(context.Background(), audio); err == nil {
-				t.Fatal("accepted report")
-			}
-		})
+		s, audio := supervisorFor(t, sampleRate*2, mode)
+		if _, err := s.Run(context.Background(), audio); err == nil {
+			t.Fatalf("accepted %s report", mode)
+		}
 	}
 }
 func TestSupervisorCancelsHungGroup(t *testing.T) {

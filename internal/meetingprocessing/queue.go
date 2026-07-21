@@ -2,12 +2,16 @@ package meetingprocessing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/diarize"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
@@ -51,6 +55,8 @@ func capabilityStage(capability Capability) (db.QueueStage, error) {
 	switch capability {
 	case CapabilityTranscription:
 		return db.QueueStageTranscription, nil
+	case CapabilityDiarization:
+		return db.QueueStageDiarization, nil
 	case CapabilitySummarization:
 		return db.QueueStageSummarization, nil
 	default:
@@ -62,11 +68,99 @@ func (s Service) runClaim(ctx context.Context, store *db.DB, claim *db.Processin
 	lifecycle := meetinglifecycle.New(store)
 	stopRenewal := s.maintainClaim(ctx, store, claim)
 	defer stopRenewal()
+	if claim.Stage == db.QueueStageDiarization {
+		return s.diarizeClaim(ctx, store, lifecycle, claim, result)
+	}
 	if err := s.processClaim(ctx, lifecycle, claim); err != nil {
 		return s.finalizeClaimError(ctx, lifecycle, claim, result, err)
 	}
 	result.Completed++
 	return nil
+}
+
+func (s Service) diarizeClaim(ctx context.Context, store *db.DB, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult) error {
+	started, err := lifecycle.StartDiarization(context.WithoutCancel(ctx), claim.Meeting.ID, claim.Token)
+	if err != nil {
+		return s.finalizeClaimError(context.WithoutCancel(ctx), lifecycle, claim, result, err)
+	}
+	if !started.Applied {
+		return nil
+	}
+	segments, err := store.GetSegments(claim.Meeting.ID)
+	if err != nil {
+		return s.failDiarization(ctx, lifecycle, claim, result, err)
+	}
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return s.interruptDiarization(ctx, lifecycle, claim, result)
+	}
+	phrases, mic := []diarize.Phrase{}, false
+	for _, segment := range segments {
+		if segment.SpeakerSource == nil {
+			continue
+		}
+		if *segment.SpeakerSource == db.SegmentSourceSystem {
+			phrases = append(phrases, diarize.Phrase{SegmentID: segment.ID, StartSeconds: segment.Start, EndSeconds: segment.End})
+		} else if *segment.SpeakerSource == db.SegmentSourceMicrophone && strings.TrimSpace(segment.Text) != "" {
+			mic = true
+		}
+	}
+	if len(phrases) == 0 {
+		finished, finishErr := lifecycle.MarkDiarizationNotApplicable(context.WithoutCancel(ctx), claim.Meeting.ID, claim.Token, s.now())
+		if finishErr == nil && finished.Applied {
+			result.Completed++
+		}
+		return finishErr
+	}
+	if claim.Meeting.AudioPath == nil || strings.TrimSpace(*claim.Meeting.AudioPath) == "" {
+		return s.failDiarization(ctx, lifecycle, claim, result, errors.New("missing audio"))
+	}
+	windows, runErr := s.runDiarization(ctx, audioartifact.New(*claim.Meeting.AudioPath).SystemPath())
+	if runErr != nil {
+		if errors.Is(runErr, context.Canceled) {
+			return s.interruptDiarization(ctx, lifecycle, claim, result)
+		}
+		return s.failDiarization(ctx, lifecycle, claim, result, runErr)
+	}
+	output, transformErr := diarize.Transform(diarize.Input{Windows: windows, Phrases: phrases, HasMicrophoneSpeech: mic})
+	if transformErr != nil {
+		return s.failDiarization(ctx, lifecycle, claim, result, transformErr)
+	}
+	provenance, _ := json.Marshal(struct {
+		Engine         string  `json:"engine"`
+		EngineRevision string  `json:"engineRevision"`
+		Semantics      string  `json:"semantics"`
+		SpeakerCount   int     `json:"speakerCount"`
+		Coverage       float64 `json:"coverage"`
+	}{diarize.Engine, diarize.EngineRevision, "v1", output.SpeakerCount, output.Coverage})
+	_, applied, err := store.CommitSpeakerProjection(ctx, db.SpeakerProjectionCommit{MeetingID: claim.Meeting.ID, ClaimToken: claim.Token,
+		CapturedTranscriptRevision: claim.Meeting.TranscriptRevision, Assignments: output.Assignments, ProvenanceJSON: string(provenance), CompletedAt: s.now()})
+	if errors.Is(err, context.Canceled) {
+		return s.interruptDiarization(ctx, lifecycle, claim, result)
+	}
+	if err != nil {
+		return s.failDiarization(ctx, lifecycle, claim, result, err)
+	}
+	if !applied {
+		return s.interruptDiarization(ctx, lifecycle, claim, result)
+	}
+	result.Completed++
+	return nil
+}
+
+func (s Service) interruptDiarization(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult) error {
+	finished, err := lifecycle.InterruptDiarization(context.WithoutCancel(ctx), claim.Meeting.ID, claim.Token, s.now())
+	if err == nil && finished.Applied {
+		result.Requeued++
+	}
+	return err
+}
+
+func (s Service) failDiarization(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult, _ error) error {
+	finished, err := lifecycle.DegradeDiarization(context.WithoutCancel(ctx), claim.Meeting.ID, claim.Token, errors.New("Speaker labeling failed"), s.now())
+	if err == nil && finished.Applied {
+		result.Failed++
+	}
+	return err
 }
 
 func (s Service) finalizeClaimError(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult, claimErr error) error {

@@ -10,8 +10,8 @@ import (
 
 func (w Module) StartDiarization(ctx context.Context, id, token string) (Result, error) {
 	return w.updateDiarization(ctx, id, `UPDATE meetings SET diarization_state=?,diarization_error=NULL,diarization_json=NULL
-		WHERE id=? AND diarization_state=? AND processing_status=? AND processing_claim_token=?`,
-		db.DiarizationStateProcessing, id, db.DiarizationStatePending, db.ProcessingStatusProcessing, token)
+		WHERE id=? AND diarization_state IN (?,?) AND processing_status=? AND processing_claim_token=?`,
+		db.DiarizationStateProcessing, id, db.DiarizationStatePending, db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
 }
 
 func (w Module) CompleteDiarization(ctx context.Context, id, token, resultJSON string, at time.Time) (Result, error) {
@@ -54,7 +54,6 @@ func (w Module) finishDiarization(ctx context.Context, id, token string, state d
 		WHERE id=? AND diarization_state=? AND processing_status=? AND processing_claim_token=?`, args...)
 }
 
-// RetryDiarization is the manual retry action. Only a degraded result is eligible.
 func (w Module) RetryDiarization(ctx context.Context, id string, at time.Time) (Result, error) {
 	return w.updateDiarization(ctx, id, `UPDATE meetings SET diarization_state=?,diarization_error=NULL,diarization_json=NULL,
 		processing_status=?,processing_status_updated_at=?,processing_failure_message=NULL,

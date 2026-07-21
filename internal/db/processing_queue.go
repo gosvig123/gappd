@@ -66,7 +66,7 @@ func (d *DB) ClaimNext(ctx context.Context, stage QueueStage, now time.Time, ttl
 	if err != nil {
 		return nil, fmt.Errorf("claim processing meeting: %w", err)
 	}
-	return &ProcessingClaim{Meeting: *meeting, Token: token, Stage: DeriveQueueStage(*meeting), ExpiresAt: expires}, nil
+	return &ProcessingClaim{Meeting: *meeting, Token: token, Stage: stage, ExpiresAt: expires}, nil
 }
 
 func claimStatement(stage QueueStage, token string, now, expires time.Time, excluded []string) (string, []any) {
@@ -74,8 +74,8 @@ func claimStatement(stage QueueStage, token string, now, expires time.Time, excl
 	conditionArgs := []any{}
 	switch stage {
 	case QueueStageDiarization:
-		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state=?`
-		conditionArgs = append(conditionArgs, DiarizationStatePending)
+		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?)`
+		conditionArgs = append(conditionArgs, DiarizationStatePending, DiarizationStateProcessing)
 	case QueueStageSummarization:
 		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?,?,?) AND
 			(summary IS NULL OR trim(summary)='' OR extraction_json IS NULL OR trim(extraction_json)='' OR summary_transcript_revision<>transcript_revision)`

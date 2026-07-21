@@ -3,23 +3,26 @@ package meetingprocessing
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/diarize"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 type Service struct {
-	Store       Store
-	Lifecycle   Lifecycle
-	Pipeline    *ai.Pipeline
-	Transcriber Transcriber
-	Notes       NotesGenerator
-	Reporter    Reporter
-	Events      EventSink
-	Clock       func() time.Time
+	Store          Store
+	Lifecycle      Lifecycle
+	Pipeline       *ai.Pipeline
+	Transcriber    Transcriber
+	RunDiarization func(context.Context, string) ([]diarize.WindowReport, error)
+	Notes          NotesGenerator
+	Reporter       Reporter
+	Events         EventSink
+	Clock          func() time.Time
 }
 
 type appleSpeechTranscriber struct{}
@@ -47,6 +50,13 @@ func (s Service) transcriber() Transcriber {
 		return s.Transcriber
 	}
 	return appleSpeechTranscriber{}
+}
+
+func (s Service) runDiarization(ctx context.Context, path string) ([]diarize.WindowReport, error) {
+	if s.RunDiarization != nil {
+		return s.RunDiarization(ctx, path)
+	}
+	return (diarize.Supervisor{HelperPath: os.Getenv("GAPPD_DIARIZER_BIN"), ModelsDirectory: os.Getenv("GAPPD_DIARIZATION_MODELS")}).Run(ctx, path)
 }
 
 func (s Service) now() time.Time {

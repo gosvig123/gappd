@@ -21,11 +21,10 @@ const (
 	sampleRate       = int64(16000)
 	windowFrames     = 600 * sampleRate
 	windowStepFrames = 570 * sampleRate
-	// maxReportBytes caps compact window reports at 3 MiB.
-	maxReportBytes = 3 << 20
-	maxStderrBytes = 4 << 10
-	reportEngine   = "fluidaudio-offline-vbx"
-	reportRevision = "300165b240c45375add402265f62410b6df33cf1"
+	maxReportBytes   = 3 << 20
+	maxStderrBytes   = 4 << 10
+	Engine           = "fluidaudio-offline-vbx"
+	EngineRevision   = "300165b240c45375add402265f62410b6df33cf1"
 )
 
 // Supervisor validates a retained recording and runs one isolated helper per window.
@@ -127,17 +126,13 @@ func frameRanges(frames int64) []frameRange {
 
 type limitedBuffer struct {
 	bytes.Buffer
-	limit    int
-	overflow bool
+	limit int
 }
 
 func (b *limitedBuffer) Write(p []byte) (int, error) {
-	n, left := len(p), b.limit-b.Len()
+	n, left := len(p), b.limit+1-b.Len()
 	if left > 0 {
 		_, _ = b.Buffer.Write(p[:min(left, n)])
-	}
-	if n > left {
-		b.overflow = true
 	}
 	return n, nil
 }
@@ -157,7 +152,7 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 	go func() { done <- cmd.Wait() }()
 	select {
 	case err := <-done:
-		if stdout.overflow || stderr.overflow {
+		if stdout.Len() > stdout.limit || stderr.Len() > stderr.limit {
 			return nil, "helper output too large"
 		}
 		if err != nil {
@@ -202,7 +197,7 @@ func decodeReport(data []byte, r frameRange, dimension *int) (WindowReport, erro
 		return WindowReport{}, errors.New("json")
 	}
 	var trailing any
-	if decoder.Decode(&trailing) != io.EOF || raw.SchemaVersion != 1 || raw.Engine != reportEngine || raw.EngineRevision != reportRevision ||
+	if decoder.Decode(&trailing) != io.EOF || raw.SchemaVersion != 1 || raw.Engine != Engine || raw.EngineRevision != EngineRevision ||
 		raw.RequestedStartFrame != r.start || raw.RequestedFrameCount != r.count {
 		return WindowReport{}, errors.New("metadata")
 	}
