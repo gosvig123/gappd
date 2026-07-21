@@ -115,11 +115,12 @@ async function buildGoBinary() {
 function runMake(targets, extraEnv = {}) {
   const result = spawnSync('make', targets, {
     cwd: repoRoot,
-    stdio: 'pipe',
+    stdio: 'inherit',
     env: { ...process.env, ...extraEnv },
   })
   if (!result.error && result.status === 0) return
-  throw new Error(`${label(workflow)} native build failed via \`make ${targets.join(' ')}\`.\n${commandOutput(result)}`.trim())
+  const detail = result.error?.message || `Command exited with status ${result.status}`
+  throw new Error(`${label(workflow)} native build failed via \`make ${targets.join(' ')}\`.\n${detail}`)
 }
 
 function runBinaryCheck() {
