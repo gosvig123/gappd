@@ -57,8 +57,13 @@ private struct Report: Codable {
             let manager = OfflineDiarizerManager(config: config)
             let models = try await OfflineDiarizerModels.load(from: URL(fileURLWithPath: args[3]))
             manager.initialize(models: models)
-            let result = try await manager.process(audioSource: source, audioLoadingSeconds: 0)
-            let report = makeReport(result, start: start, count: count)
+            let report: Report
+            do {
+                report = makeReport(try await manager.process(audioSource: source, audioLoadingSeconds: 0), start: start, count: count)
+            } catch OfflineDiarizationError.noSpeechDetected {
+                report = Report(schemaVersion: 1, engine: engine, engineRevision: revision,
+                                requestedStartFrame: start, requestedFrameCount: count, clusters: [], spans: [])
+            }
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             FileHandle.standardOutput.write(try encoder.encode(report))
