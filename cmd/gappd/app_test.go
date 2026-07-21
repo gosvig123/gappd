@@ -67,7 +67,7 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	}
 }
 
-func TestAppRetryDiarizationReturnsSafeErrorWhenRetryIsNotApplied(t *testing.T) {
+func TestAppRetryDiarizationExplainsActiveProcessing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	_, store, err := loadStore()
 	if err != nil {
@@ -88,11 +88,13 @@ func TestAppRetryDiarizationReturnsSafeErrorWhenRetryIsNotApplied(t *testing.T) 
 	}
 
 	cmd := appMeetingsRetryDiarizationCmd()
-	cmd.SilenceUsage = true
 	cmd.SetArgs([]string{meeting.ID, "--json"})
 	err = cmd.Execute()
-	if err == nil || err.Error() != speakerLabelingRetryUnavailableMessage {
-		t.Fatalf("retry error = %v, want user-safe unavailable message", err)
+	if !cmd.SilenceUsage {
+		t.Fatal("retry command did not silence usage after runtime error")
+	}
+	if err == nil || err.Error() != speakerLabelingRetryBusyMessage {
+		t.Fatalf("retry error = %v, want active-processing message", err)
 	}
 	if strings.Contains(err.Error(), "transition") || strings.Contains(err.Error(), "processing_status") {
 		t.Fatalf("retry exposed internal error: %v", err)

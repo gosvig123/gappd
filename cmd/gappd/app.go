@@ -15,7 +15,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const speakerLabelingRetryUnavailableMessage = "speaker labeling retry is not available for this meeting"
+const (
+	speakerLabelingRetryUnavailableMessage = "speaker labeling retry is not available for this meeting"
+	speakerLabelingRetryBusyMessage        = "speaker labeling retry is available after meeting processing finishes"
+)
 
 func appCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -178,6 +181,7 @@ func appMeetingsShowCmd() *cobra.Command {
 func appMeetingsRetryDiarizationCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{Use: "retry-diarization [meeting-id]", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.Root().SilenceUsage = true
 		if !asJSON {
 			return fmt.Errorf("app meetings retry-diarization requires --json")
 		}
@@ -194,6 +198,9 @@ func appMeetingsRetryDiarizationCmd() *cobra.Command {
 			return err
 		}
 		if !result.Applied {
+			if result.Meeting != nil && result.Meeting.DiarizationState == db.DiarizationStateDegraded && result.Meeting.ProcessingStatus == db.ProcessingStatusProcessing {
+				return errors.New(speakerLabelingRetryBusyMessage)
+			}
 			return errors.New(speakerLabelingRetryUnavailableMessage)
 		}
 		detail, err := appMeetingDetailFor(store, args[0])

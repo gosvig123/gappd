@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -155,7 +156,8 @@ func (s Service) interruptDiarization(ctx context.Context, lifecycle meetinglife
 	return err
 }
 
-func (s Service) failDiarization(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult, _ error) error {
+func (s Service) failDiarization(ctx context.Context, lifecycle meetinglifecycle.Module, claim *db.ProcessingClaim, result *DrainResult, cause error) error {
+	log.Printf("speaker labeling failed for meeting %s: %v", claim.Meeting.ID, cause)
 	finished, err := lifecycle.DegradeDiarization(context.WithoutCancel(ctx), claim.Meeting.ID, claim.Token, errors.New("Speaker labeling failed"), s.now())
 	if err == nil && finished.Applied {
 		result.Failed++
