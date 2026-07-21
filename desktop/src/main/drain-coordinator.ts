@@ -3,15 +3,18 @@ import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'summarization']
-type Flight = { running: boolean; rerun: boolean; controller?: AbortController; done?: Promise<void> }
-const flights = new Map<ManagedRuntimeCapability, Flight>()
+type Flight = { capability: ManagedRuntimeCapability; controller: AbortController; done?: Promise<void> }
+const pending = new Set<ManagedRuntimeCapability>()
+let flight: Flight | null = null
 let stopObserving: (() => void) | null = null
 let readinessKey = ''
+let pauses = 0
 let stopped = true
 
 export function startDrainCoordinator(): void {
   if (stopObserving) return
   stopped = false
+  pauses = 0
   stopObserving = managedRuntime.observe(requestReadinessChange)
   requestReadinessChange(managedRuntime.status())
 }
@@ -21,8 +24,24 @@ export async function stopDrainCoordinator(): Promise<void> {
   stopObserving?.()
   stopObserving = null
   readinessKey = ''
-  for (const flight of flights.values()) flight.controller?.abort()
-  await Promise.all([...flights.values()].map((flight) => flight.done).filter(Boolean))
+  pending.clear()
+  const current = flight
+  current?.controller.abort()
+  await current?.done
+}
+
+export async function pauseDrains(): Promise<void> {
+  pauses += 1
+  const current = flight
+  if (!current) return
+  pending.add(current.capability)
+  current.controller.abort()
+  await current.done
+}
+
+export function resumeDrains(): void {
+  pauses = Math.max(0, pauses - 1)
+  startNextFlight()
 }
 
 export function requestDrains(): void {
@@ -44,32 +63,28 @@ function requestReadyDrains(snapshot: ManagedRuntimeSnapshot): void {
 
 function requestDrain(capability: ManagedRuntimeCapability): void {
   if (stopped) return
-  const flight = flights.get(capability) ?? { running: false, rerun: false }
-  flights.set(capability, flight)
-  if (flight.running) { flight.rerun = true; return }
-  startFlight(capability, flight)
+  pending.add(capability)
+  startNextFlight()
 }
 
-function startFlight(capability: ManagedRuntimeCapability, flight: Flight): void {
-  flight.running = true
-  flight.controller = new AbortController()
-  flight.done = runDrain(capability, flight, flight.controller.signal)
+function startNextFlight(): void {
+  if (stopped || pauses || flight) return
+  const capability = CAPABILITIES.find((candidate) => pending.has(candidate))
+  if (!capability) return
+  pending.delete(capability)
+  const next: Flight = { capability, controller: new AbortController() }
+  flight = next
+  next.done = runDrain(next)
 }
 
-async function runDrain(capability: ManagedRuntimeCapability, flight: Flight, signal: AbortSignal): Promise<void> {
+async function runDrain(current: Flight): Promise<void> {
   try {
-    const result = await managedRuntime.using([capability], () => requestCommand('processing.drain', { capability }, {}, signal))
-    if (capability === 'transcription' && result.completed > 0) requestDrain('summarization')
+    const result = await managedRuntime.using([current.capability], () => requestCommand('processing.drain', { capability: current.capability }, {}, current.controller.signal))
+    if (current.capability === 'transcription' && result.completed > 0) requestDrain('summarization')
   } catch (error) {
-    if (!signal.aborted) console.error(`${capability} drain failed`, error)
+    if (!current.controller.signal.aborted) console.error(`${current.capability} drain failed`, error)
   } finally {
-    finishFlight(capability, flight)
+    if (flight === current) flight = null
+    startNextFlight()
   }
-}
-
-function finishFlight(capability: ManagedRuntimeCapability, flight: Flight): void {
-  flight.running = false
-  flight.controller = undefined
-  flight.done = undefined
-  if (flight.rerun && !stopped) { flight.rerun = false; requestDrain(capability) }
 }

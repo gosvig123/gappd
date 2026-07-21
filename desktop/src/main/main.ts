@@ -1,7 +1,7 @@
 import path from 'node:path'
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor } from 'electron'
 import { registerIpc } from './ipc'
-import { startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
+import { pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
 import { logMainProcessMemory } from './memory'
 import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
@@ -74,6 +74,8 @@ app.whenReady().then(async () => {
   logMainProcessMemory('ready')
 
   app.on('activate', showMainWindow)
+  powerMonitor.on('suspend', () => { void pauseDrains().catch((error) => console.error('Failed to pause drains for sleep', error)) })
+  powerMonitor.on('resume', resumeDrains)
 })
 
 nativeAutoUpdater.on(BEFORE_QUIT_FOR_UPDATE_EVENT, () => { updateInstallRequested = true })
