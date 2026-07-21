@@ -60,6 +60,7 @@ function useDashboardActions(setState: SetDashboardState, refs: MeetingRefs, sel
     refreshMeetings: (id?: string | null) => refreshMeetings(id, refs, setState, selectedRequest, refreshRequest),
     loadMeeting: (id: string) => loadMeeting(id, refs, setState, selectedRequest),
     clearSelectedMeeting: () => clearSelectedMeeting(refs, setState),
+    retryDiarization: (id: string) => retryDiarization(id, refs, setState, selectedRequest, refreshRequest),
     deleteMeeting: (id: string) => deleteMeeting(id, refs, setState, selectedRequest, refreshRequest),
     setError: (error: string | null) => setState((current) => ({ ...current, error })),
   }
@@ -90,6 +91,11 @@ function clearSelectedMeeting(refs: MeetingRefs, setState: SetDashboardState) {
   refs.selectedId.current = null
   refs.selected.current = null
   setState((current) => ({ ...current, selectedMeetingId: null, selectedMeeting: null, selectedMeetingLoading: false, selectedMeetingError: null }))
+}
+
+async function retryDiarization(id: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {
+  await window.gappd.meetings.retryDiarization(id)
+  await refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest)
 }
 
 async function deleteMeeting(id: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {

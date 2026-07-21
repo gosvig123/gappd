@@ -1,7 +1,10 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
@@ -11,6 +14,8 @@ import (
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
+
+const speakerLabelingRetryUnavailableMessage = "speaker labeling retry is not available for this meeting"
 
 func appCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -50,7 +55,7 @@ func appMeetingsCmd() *cobra.Command {
 		Use:   "meetings",
 		Short: "Machine-readable meeting access",
 	}
-	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
@@ -166,6 +171,37 @@ func appMeetingsShowCmd() *cobra.Command {
 			return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	return cmd
+}
+
+func appMeetingsRetryDiarizationCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{Use: "retry-diarization [meeting-id]", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		if !asJSON {
+			return fmt.Errorf("app meetings retry-diarization requires --json")
+		}
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := meetinglifecycle.New(store).RetryDiarization(cmdContext(), args[0], time.Now())
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New(speakerLabelingRetryUnavailableMessage)
+		}
+		if err != nil {
+			return err
+		}
+		if !result.Applied {
+			return errors.New(speakerLabelingRetryUnavailableMessage)
+		}
+		detail, err := appMeetingDetailFor(store, args[0])
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
+	}}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }

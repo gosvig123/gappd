@@ -6,6 +6,7 @@ import { pauseDrains, resumeDrains } from './drain-coordinator'
 import { getDevices } from './meetings'
 import { startRecording, stopRecording } from './recording-process'
 import { getRecordingState } from './state'
+import { getStartupSettings } from './startup-settings'
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
@@ -18,7 +19,7 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   await pauseDrains()
   try {
     await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
-      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled })
+      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled })
     return getRecordingState()
   } catch (error) {
     resumeDrains()

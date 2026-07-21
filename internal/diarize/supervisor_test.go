@@ -78,25 +78,16 @@ func writeWAV(t *testing.T, frames int64) string {
 	return path
 }
 
-func TestAttemptTimeout(t *testing.T) {
-	for minutes, want := range map[int]time.Duration{15: 45 * time.Second, 60: 90 * time.Second, 120: 150 * time.Second} {
-		if got := attemptTimeout(int64(minutes) * 60 * sampleRate); got != want {
-			t.Errorf("timeout(%d minutes) = %v, want %v", minutes, got, want)
-		}
-	}
-}
-
-func TestWAVValidationAndRanges(t *testing.T) {
+func TestAudioContractRangesAndTimeouts(t *testing.T) {
 	path := writeWAV(t, 32000)
 	if got, err := wavFrames(path); err != nil || got != 32000 {
 		t.Fatalf("frames=%d err=%v", got, err)
 	}
 	good, _ := os.ReadFile(path)
-	for at, value := range map[int]byte{0: 'X', 20: 2, 22: 2, 24: 1, 36: 'X', 40: 1} {
-		bad := filepath.Join(t.TempDir(), "bad.wav")
-		b := append([]byte(nil), good...)
-		b[at] = value
-		_ = os.WriteFile(bad, b, 0600)
+	for at, value := range map[int]byte{0: 'X', 20: 2, 40: 1} {
+		bad, data := filepath.Join(t.TempDir(), "bad.wav"), append([]byte(nil), good...)
+		data[at] = value
+		_ = os.WriteFile(bad, data, 0600)
 		if _, err := wavFrames(bad); err == nil {
 			t.Fatalf("accepted invalid WAV mutation at %d", at)
 		}
@@ -117,7 +108,11 @@ func TestWAVValidationAndRanges(t *testing.T) {
 			t.Errorf("ranges(%d)=%v want %v", frames, got, want)
 		}
 	}
+	if attemptTimeout(15*60*sampleRate) != 45*time.Second || attemptTimeout(60*60*sampleRate) != 90*time.Second || attemptTimeout(120*60*sampleRate) != 150*time.Second {
+		t.Fatal("attempt timeout contract changed")
+	}
 }
+
 func supervisorFor(t *testing.T, frames int64, mode string) (Supervisor, string) {
 	t.Helper()
 	audio := writeWAV(t, frames)

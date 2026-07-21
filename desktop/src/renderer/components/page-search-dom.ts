@@ -2,7 +2,7 @@ export type PageSearchResult = { activeMatchOrdinal: number; matches: number }
 
 const MARK_CLASS = 'page-search-match'
 const ACTIVE_CLASS = 'active'
-const SKIP_SELECTOR = '.page-search, script, style, noscript, textarea, input, select, option, [contenteditable="true"]'
+const SKIP_SELECTOR = '.page-search, script, style, noscript, textarea, input, select, option, [contenteditable="true"], [data-page-search-ignore]'
 
 type TextMatch = { node: Text; start: number; end: number }
 

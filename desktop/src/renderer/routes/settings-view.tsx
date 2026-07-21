@@ -24,15 +24,12 @@ function StartupPanel() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => loadStartupSettings(setSettings, setError), [])
-  const update = async (openAtLogin: boolean) => {
-    setBusy(true)
-    setError(null)
-    try { setSettings(await window.gappd.startup.setOpenAtLogin(openAtLogin)) }
-    catch (cause) { setError(errorMessage(cause)) }
-    finally { setBusy(false) }
+  const update = async (enabled: boolean, speakerLabels = false) => {
+    setBusy(true); setError(null)
+    try { setSettings(await (speakerLabels ? window.gappd.startup.setSpeakerLabelsEnabled(enabled) : window.gappd.startup.setOpenAtLogin(enabled))) }
+    catch (cause) { setError(errorMessage(cause)) } finally { setBusy(false) }
   }
-  const disabled = busy || !settings?.supported
-  return <Card className="settings-section"><SectionTitle title="Startup" note="Control whether Gappd starts with macOS." /><label className="startup-setting"><span className="startup-setting-copy"><strong>Open Gappd at login</strong><span>Starts in the background. Click Gappd in the Dock to open its window.</span></span><input type="checkbox" checked={settings?.openAtLogin ?? false} disabled={disabled} onChange={(event) => void update(event.target.checked)} /></label><div className={cx('status-note', error ? 'danger' : undefined)}>{error || startupNote(settings)}</div></Card>
+  return <Card className="settings-section"><SectionTitle title="Startup & meetings" note="Defaults for startup and future meetings." /><label className="startup-setting"><span className="startup-setting-copy"><strong>Open Gappd at login</strong><span>Starts in the background. Click Gappd in the Dock to open its window.</span></span><input type="checkbox" checked={settings?.openAtLogin ?? false} disabled={busy || !settings?.supported} onChange={(event) => void update(event.target.checked)} /></label><label className="startup-setting"><span className="startup-setting-copy"><strong>Automatic speaker labels</strong><span>Labels speakers in future meetings. Off affects future meetings only.</span></span><input type="checkbox" checked={settings?.speakerLabelsEnabled ?? true} disabled={busy || !settings} onChange={(event) => void update(event.target.checked, true)} /></label><div className={cx('status-note', error ? 'danger' : undefined)}>{error || startupNote(settings)}</div></Card>
 }
 
 function loadStartupSettings(setSettings: (settings: StartupSettings) => void, setError: (error: string) => void) {

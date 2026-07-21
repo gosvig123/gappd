@@ -1,12 +1,10 @@
 import { type CSSProperties, useMemo, useState } from 'react'
 import type { MeetingSegment } from '../../shared/contracts'
-import { Button } from '../components/ui'
+import { MultiSelect } from '../components/ui'
 import './transcript-view.css'
 
-const ALL_SPEAKERS = 'All'
-const EMPTY_FILTER_TEXT = 'No transcript lines for this speaker yet.'
+const EMPTY_FILTER_TEXT = 'No speakers selected.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
-
 type TranscriptGroup = { speaker: string | null; lines: string[] }
 type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: string }
 
@@ -16,24 +14,17 @@ export function TranscriptText({ value, segments }: { value: string; segments: M
 }
 
 function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
-  const [speaker, setSpeaker] = useState(ALL_SPEAKERS)
+  const [hidden, setHidden] = useState<string[]>([])
   const speakers = useMemo(() => transcriptSpeakers(segments), [segments])
-  const visible = visibleTranscriptSegments(segments, speaker)
-  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} speaker={speaker} onSpeaker={setSpeaker} /><TranscriptSegmentList segments={visible} /></div>
+  const visible = visibleTranscriptSegments(segments, speakers.length < 2 ? [] : hidden)
+  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} /></div>
 }
 
-function SpeakerFilter({ speakers, speaker, onSpeaker }: { speakers: string[]; speaker: string; onSpeaker: (speaker: string) => void }) {
+function SpeakerFilter({ speakers, hidden, onChange }: { speakers: string[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
   if (speakers.length < 2) return null
-  return (
-    <div className="transcript-speaker-filter" aria-label="Speaker filter">
-      {[ALL_SPEAKERS, ...speakers].map((option) => (
-        <Button key={option} className="compact-action transcript-chip" style={speakerStyle(option)} aria-pressed={speaker === option} onClick={() => onSpeaker(option)}>
-          {option === ALL_SPEAKERS ? null : <span className="transcript-chip-dot" aria-hidden="true" />}
-          {option}
-        </Button>
-      ))}
-    </div>
-  )
+  const selected = speakers.filter((speaker) => !hidden.includes(speaker))
+  const options = speakers.map((speaker) => ({ value: speaker, label: <><span className="transcript-chip-dot" style={speakerStyle(speaker)} aria-hidden="true" /><SpeakerName speaker={speaker} /></> }))
+  return <div className="transcript-speaker-filter" data-page-search-ignore><MultiSelect ariaLabel="Filter speakers" allLabel="All speakers" options={options} selected={selected} onChange={(values) => onChange(speakers.filter((speaker) => !values.includes(speaker)))} /></div>
 }
 
 function TranscriptSegmentList({ segments }: { segments: MeetingSegment[] }) {
@@ -48,7 +39,7 @@ function TranscriptTurnRow({ turn }: { turn: SegmentTurn }) {
       <SpeakerAvatar speaker={turn.speaker} />
       <div className="transcript-turn-body">
         <div className="transcript-turn-meta">
-          <span className="transcript-speaker">{turn.speaker}</span>
+          <span className="transcript-speaker"><SpeakerName speaker={turn.speaker} /></span>
           <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>
         </div>
         <div className="transcript-turn-lines">{turn.texts.map((text, index) => <p key={index} className="transcript-segment-text">{text}</p>)}</div>
@@ -65,11 +56,15 @@ function TranscriptGroupView({ group }: { group: TranscriptGroup }) {
     <article className="transcript-turn" style={speakerStyle(group.speaker)}>
       <SpeakerAvatar speaker={group.speaker} />
       <div className="transcript-turn-body">
-        <div className="transcript-turn-meta"><span className="transcript-speaker">{group.speaker}</span></div>
+        <div className="transcript-turn-meta"><span className="transcript-speaker"><SpeakerName speaker={group.speaker} /></span></div>
         <div className="transcript-turn-lines">{group.lines.map((line, index) => <p key={index} className="transcript-segment-text">{line}</p>)}</div>
       </div>
     </article>
   )
+}
+
+function SpeakerName({ speaker }: { speaker: string }) {
+  return <span data-page-search-ignore>{speaker}</span>
 }
 
 function SpeakerAvatar({ speaker }: { speaker: string }) {
@@ -109,9 +104,8 @@ function transcriptSpeakers(segments: MeetingSegment[]): string[] {
   return Array.from(new Set(segments.map((segment) => segment.speaker).filter(Boolean)))
 }
 
-function visibleTranscriptSegments(segments: MeetingSegment[], speaker: string): MeetingSegment[] {
-  if (speaker === ALL_SPEAKERS) return segments
-  return segments.filter((segment) => segment.speaker === speaker)
+function visibleTranscriptSegments(segments: MeetingSegment[], hidden: string[]): MeetingSegment[] {
+  return hidden.length ? segments.filter((segment) => !hidden.includes(segment.speaker)) : segments
 }
 
 function segmentKey(segment: MeetingSegment, index: number): string {

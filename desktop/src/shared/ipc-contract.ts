@@ -7,7 +7,7 @@ export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
-export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -21,6 +21,7 @@ export type IpcInvokeContract = {
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
     show: OperationSpec<[id: string], MeetingDetail>
+    retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
   }
   recording: {
@@ -42,6 +43,7 @@ export type IpcInvokeContract = {
   startup: {
     getSettings: OperationSpec<[], StartupSettings>
     setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
+    setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
 }
 
@@ -60,7 +62,7 @@ export const IPC_OPERATIONS = {
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
-  meetings: { list: 'meetings:list', show: 'meetings:show', delete: 'meetings:delete' },
+  meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   update: {
@@ -73,6 +75,7 @@ export const IPC_OPERATIONS = {
   startup: {
     getSettings: 'startup:getSettings',
     setOpenAtLogin: 'startup:setOpenAtLogin',
+    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled',
   },
 } as const satisfies IpcOperationChannels
 

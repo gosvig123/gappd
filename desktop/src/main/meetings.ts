@@ -1,5 +1,6 @@
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import { requestCommand } from './app-protocol'
+import { requestDrains } from './drain-coordinator'
 
 export async function getDevices(): Promise<Device[]> {
   const result = await requestCommand('devices.list', {})
@@ -13,6 +14,12 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 
 export async function showMeeting(id: string): Promise<MeetingDetail> {
   const result = await requestCommand('meetings.show', { id })
+  return result.meeting
+}
+
+export async function retryDiarization(id: string): Promise<MeetingDetail> {
+  const result = await requestCommand('meetings.retryDiarization', { id })
+  requestDrains()
   return result.meeting
 }
 

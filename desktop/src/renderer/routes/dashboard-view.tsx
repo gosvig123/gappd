@@ -42,6 +42,7 @@ type DashboardViewProps = {
   onStop: () => void
   onSelectMeeting: (id: string) => void
   onClearSelection: () => void
+  onRetryDiarization: (id: string) => Promise<void>
   onDeleteMeeting: (id: string) => Promise<void>
 }
 
@@ -61,7 +62,7 @@ export function DashboardView(props: DashboardViewProps) {
     <div className="dashboard-grid ui-density-compact">
       <div className={open ? 'dashboard-stage is-detail' : 'dashboard-stage is-list'}>
         {open ? (
-          <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onBack={props.onClearSelection} record={props} />
+          <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onBack={props.onClearSelection} onRetryDiarization={props.onRetryDiarization} record={props} />
         ) : (
           <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} onDeleteMeeting={props.onDeleteMeeting} record={props} />
         )}
@@ -86,14 +87,14 @@ function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingL
   )
 }
 
-function MeetingDetailScreen(props: { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onBack: () => void; record: DashboardViewProps }) {
+function MeetingDetailScreen(props: { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onBack: () => void; onRetryDiarization: (id: string) => Promise<void>; record: DashboardViewProps }) {
   return (
     <div className="meeting-detail-screen">
       <div className="detail-topbar">
         <button className="back-link" aria-label="Back to all meetings" onClick={props.onBack}><ArrowLeftIcon aria-hidden="true" /> <span>All meetings</span></button>
         <RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />
       </div>
-      <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} />
+      <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onRetryDiarization={props.onRetryDiarization} />
     </div>
   )
 }

@@ -3,11 +3,11 @@ import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
 import { managedRuntime } from './managed-runtime'
-import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings'
+import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
-import { getStartupSettings, setOpenAtLogin } from './startup-settings'
+import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
@@ -36,6 +36,7 @@ const IPC_HANDLERS: MainHandlers = {
   meetings: {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
+    retryDiarization: (_event, id: string) => retryDiarization(id),
     delete: (_event, id: string) => deleteMeeting(id),
   },
   recording: {
@@ -57,6 +58,7 @@ const IPC_HANDLERS: MainHandlers = {
   startup: {
     getSettings: () => getStartupSettings(),
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
+    setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
   },
 }
 
