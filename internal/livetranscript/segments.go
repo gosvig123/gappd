@@ -51,12 +51,17 @@ func withSpeaker(segments []transcribe.Segment, speaker string) {
 }
 
 func canonicalSegments(meetingID string, event Event, values []transcribe.Segment) []db.Segment {
+	source, reason := db.SegmentSourceSystem, db.SpeakerAssignmentReasonPendingSystemAttribution
+	if event.Source == SourceMic {
+		source, reason = db.SegmentSourceMicrophone, db.SpeakerAssignmentReasonMicrophone
+	}
 	segments := make([]db.Segment, 0, len(values))
 	for _, value := range values {
 		start, end := value.Start+event.Start, value.End+event.Start
 		midpoint := start + (end-start)/2
 		if midpoint >= event.CanonicalStart && midpoint < event.CanonicalEnd {
-			segments = append(segments, db.Segment{MeetingID: meetingID, Start: start, End: end, Text: value.Text, Speaker: value.Speaker})
+			segments = append(segments, db.Segment{MeetingID: meetingID, Start: start, End: end, Text: value.Text, Speaker: value.Speaker,
+				SpeakerSource: &source, SpeakerAssignmentReason: &reason})
 		}
 	}
 	return segments

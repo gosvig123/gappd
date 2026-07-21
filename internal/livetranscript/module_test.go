@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 func TestFinishCommitsCompleteLiveTranscript(t *testing.T) {
@@ -18,6 +20,16 @@ func TestFinishCommitsCompleteLiveTranscript(t *testing.T) {
 	}
 	if !strings.Contains(*meeting.Transcript, "mic.wav") || !strings.Contains(*meeting.Transcript, "system.wav") {
 		t.Fatalf("transcript = %q", *meeting.Transcript)
+	}
+	segments, err := rig.store.GetSegments(rig.meetingID)
+	sources := map[string]db.SegmentSource{}
+	for _, segment := range segments {
+		if segment.SpeakerSource != nil {
+			sources[segment.Speaker] = *segment.SpeakerSource
+		}
+	}
+	if err != nil || len(segments) != 2 || sources["You"] != db.SegmentSourceMicrophone || sources["Other"] != db.SegmentSourceSystem {
+		t.Fatalf("segment provenance = %#v, %v", segments, err)
 	}
 }
 

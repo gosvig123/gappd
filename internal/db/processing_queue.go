@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ func (d *DB) ClaimNext(ctx context.Context, stage QueueStage, now time.Time, ttl
 	expires := now.UTC().Add(ttl)
 	query, args := claimStatement(stage, token, now.UTC(), expires, excluded)
 	meeting, err := scanClaimRow(d.Conn.QueryRowContext(ctx, query, args...))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -83,14 +84,11 @@ func claimStatement(stage QueueStage, token string, now, expires time.Time, excl
 
 const meetingColumns = `id,title,started_at,ended_at,capture_status,capture_status_updated_at,capture_failure_message,
 	processing_status,processing_status_updated_at,processing_failure_message,processing_claim_token,processing_claim_expires_at,
-	audio_path,transcript,summary,extraction_json,language,tags,source,created_at`
+	audio_path,transcript,transcript_revision,summary,summary_transcript_revision,extraction_json,language,tags,source,created_at`
 
 func scanClaimRow(row *sql.Row) (*Meeting, error) {
-	m := &Meeting{}
-	err := row.Scan(&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
-		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage, &m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt)
-	return m, err
+	meeting, err := scanMeetingRow(row)
+	return &meeting, err
 }
 
 func stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000000000Z") }

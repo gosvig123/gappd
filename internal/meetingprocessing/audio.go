@@ -21,10 +21,11 @@ const (
 	repeatedArtifactDominance   = 0.8
 )
 
-func toDBSegments(meetingID string, segs []transcribe.Segment) []db.Segment {
+func toDBSegments(meetingID string, segs []transcribe.Segment, source db.SegmentSource, reason db.SpeakerAssignmentReason) []db.Segment {
 	out := make([]db.Segment, len(segs))
 	for i, s := range segs {
-		out[i] = db.Segment{MeetingID: meetingID, Start: s.Start, End: s.End, Text: s.Text, Speaker: s.Speaker}
+		out[i] = db.Segment{MeetingID: meetingID, Start: s.Start, End: s.End, Text: s.Text, Speaker: s.Speaker,
+			SpeakerSource: &source, SpeakerAssignmentReason: &reason}
 	}
 	return out
 }

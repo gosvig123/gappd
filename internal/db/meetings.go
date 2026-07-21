@@ -42,7 +42,9 @@ type Meeting struct {
 	ProcessingClaimExpiresAt  *string
 	AudioPath                 *string
 	Transcript                *string
+	TranscriptRevision        int
 	Summary                   *string
+	SummaryTranscriptRevision int
 	ExtractionJSON            *string
 	Language                  string
 	Tags                      string
@@ -59,13 +61,14 @@ type MeetingListEntry struct {
 const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
 	processing_claim_token, processing_claim_expires_at, audio_path,
-	transcript, summary, extraction_json, language, tags, source, created_at
+	transcript, transcript_revision, summary, summary_transcript_revision, extraction_json, language, tags, source, created_at
 	FROM meetings`
 
 const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
 	processing_claim_token, processing_claim_expires_at, audio_path,
-	transcript IS NOT NULL AND trim(transcript)<>'', summary IS NOT NULL AND trim(summary)<>'', language, tags, source, created_at
+	transcript IS NOT NULL AND trim(transcript)<>'', transcript_revision,
+	summary IS NOT NULL AND trim(summary)<>'', summary_transcript_revision, language, tags, source, created_at
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
@@ -85,34 +88,23 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 
 const insertMeetingSQL = `INSERT INTO meetings (id,title,started_at,ended_at,capture_status,capture_status_updated_at,
 	capture_failure_message,processing_status,processing_status_updated_at,processing_failure_message,
-	processing_claim_token,processing_claim_expires_at,audio_path,transcript,summary,extraction_json,language,tags,source)
-	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	processing_claim_token,processing_claim_expires_at,audio_path,transcript,transcript_revision,summary,summary_transcript_revision,
+	extraction_json,language,tags,source)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
 func meetingInsertArgs(m *Meeting) []any {
 	return []any{m.ID, m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
 		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.ProcessingClaimToken,
-		m.ProcessingClaimExpiresAt, m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Language, m.Tags, m.Source}
+		m.ProcessingClaimExpiresAt, m.AudioPath, m.Transcript, m.TranscriptRevision, m.Summary, m.SummaryTranscriptRevision,
+		m.ExtractionJSON, m.Language, m.Tags, m.Source}
 }
 
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
-	row := d.Conn.QueryRow(
-		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
-		 processing_status, processing_status_updated_at, processing_failure_message,
-		 processing_claim_token, processing_claim_expires_at, audio_path,
-		 transcript, summary, extraction_json, language, tags, source, created_at
-		 FROM meetings WHERE id=?`, id,
-	)
-	m := &Meeting{}
-	err := row.Scan(
-		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
-		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt, &m.AudioPath,
-		&m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
-	)
+	m, err := scanMeetingRow(d.Conn.QueryRow(selectMeetingsSQL+` WHERE id=?`, id))
 	if err != nil {
 		return nil, fmt.Errorf("get meeting: %w", err)
 	}
-	return m, nil
+	return &m, nil
 }
 
 func (d *DB) ListMeetings(limit int) ([]Meeting, error) {

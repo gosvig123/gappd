@@ -25,9 +25,11 @@ func (w Module) SaveClaimTranscript(ctx context.Context, id, token, transcript s
 	if err != nil || !owned {
 		return Result{Meeting: meeting}, err
 	}
+	revision := meeting.TranscriptRevision
 	if _, err := (TranscriptSaved{At: at, Transcript: transcript}).apply(meeting); err != nil {
 		return Result{Meeting: meeting}, err
 	}
+	meeting.TranscriptRevision = revision + 1
 	if _, err := (ProcessingRequeued{At: at}).apply(meeting); err != nil {
 		return Result{Meeting: meeting}, err
 	}

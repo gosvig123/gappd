@@ -29,6 +29,29 @@ func TestStageForArtifacts(t *testing.T) {
 	}
 }
 
+func TestTranscriptionDrainPersistsSourceAndRevision(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	meeting := createCapturedMeeting(t, store)
+	audioPath := writeUsableAudio(t)
+	if _, err := store.Conn.Exec(`UPDATE meetings SET audio_path=? WHERE id=?`, audioPath, meeting.ID); err != nil {
+		t.Fatal(err)
+	}
+	service := Service{Store: store, Transcriber: fakeTranscriber{}}
+	if result, err := service.Drain(context.Background(), CapabilityTranscription); err != nil || result.Completed != 1 {
+		t.Fatalf("Drain() = %#v, %v", result, err)
+	}
+	segments, err := store.GetSegments(meeting.ID)
+	if err != nil || len(segments) != 1 || segments[0].SpeakerSource == nil ||
+		*segments[0].SpeakerSource != db.SegmentSourceMicrophone || segments[0].SpeakerAssignmentReason == nil ||
+		*segments[0].SpeakerAssignmentReason != db.SpeakerAssignmentReasonMicrophone {
+		t.Fatalf("segments = %#v, %v", segments, err)
+	}
+	if got := getMeeting(t, store, meeting.ID).TranscriptRevision; got != 1 {
+		t.Fatalf("transcript revision = %d, want 1", got)
+	}
+}
+
 func TestTransientDrainAttemptsMeetingOnce(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()

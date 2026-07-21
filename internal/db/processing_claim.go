@@ -42,12 +42,13 @@ func commitClaim(ctx context.Context, exec claimExecer, meeting *Meeting, token 
 }
 
 func claimArgs(meeting *Meeting, token string) []any {
-	return []any{meeting.Title, meeting.Transcript, meeting.Summary, meeting.ExtractionJSON,
+	return []any{meeting.Title, meeting.Transcript, meeting.TranscriptRevision, meeting.Summary,
+		meeting.SummaryTranscriptRevision, meeting.ExtractionJSON,
 		meeting.ProcessingStatus, meeting.ProcessingStatusUpdatedAt, meeting.ProcessingFailureMessage,
 		meeting.ID, ProcessingStatusProcessing, token}
 }
 
-const commitClaimSQL = `UPDATE meetings SET title=?, transcript=?, summary=?, extraction_json=?,
+const commitClaimSQL = `UPDATE meetings SET title=?, transcript=?, transcript_revision=MAX(transcript_revision,?), summary=?, summary_transcript_revision=?, extraction_json=?,
 	processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
 	processing_claim_token=NULL, processing_claim_expires_at=NULL
 	WHERE id=? AND processing_status=? AND processing_claim_token=?`

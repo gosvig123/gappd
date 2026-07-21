@@ -24,6 +24,7 @@ func (w Module) CommitLiveTranscript(ctx context.Context, id, transcript string,
 		return Result{Meeting: meeting, Applied: applied}, err
 	}
 	meeting.Transcript = &transcript
+	meeting.TranscriptRevision++
 	meeting.ProcessingStatusUpdatedAt = timestamp(at)
 	return Result{Meeting: meeting, Applied: true}, nil
 }
@@ -40,6 +41,7 @@ func (w Module) DiscardLiveTranscript(ctx context.Context, id string, at time.Ti
 	if err != nil || !applied {
 		return Result{Meeting: meeting, Applied: applied}, err
 	}
+	meeting.TranscriptRevision++
 	meeting.ProcessingStatusUpdatedAt = timestamp(at)
 	return Result{Meeting: meeting, Applied: true}, nil
 }
