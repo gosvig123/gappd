@@ -49,10 +49,9 @@ func needsConservativeExtraction(extraction *Extraction, transcript string) bool
 
 func conservativeExtraction(transcript string) *Extraction {
 	return &Extraction{
-		Title:         "Transcript Notes",
-		Topics:        []Topic{{Name: "Transcript excerpt", Summary: compactString(transcript)}},
-		OpenQuestions: transcriptQuestions(transcript),
-		Sentiment:     "neutral",
+		Title:     "Transcript Notes",
+		Topics:    []Topic{{Name: "Transcript excerpt", Summary: compactString(transcript)}},
+		Sentiment: "neutral",
 	}
 }
 
@@ -103,23 +102,4 @@ func stemGroundingWord(word string) string {
 		}
 	}
 	return word
-}
-
-func transcriptQuestions(transcript string) []string {
-	questions := []string{}
-	for _, part := range strings.Split(transcript, "\n") {
-		if question := compactQuestion(part); question != "" {
-			questions = append(questions, question)
-		}
-	}
-	return limitSlice(uniqueStrings(questions), maxMergedOpenQuestions)
-}
-
-func compactQuestion(value string) string {
-	value = strings.TrimSpace(strings.TrimPrefix(value, "[Other]"))
-	value = strings.TrimSpace(strings.TrimPrefix(value, "[You]"))
-	if !strings.HasSuffix(value, "?") {
-		return ""
-	}
-	return compactString(value)
 }

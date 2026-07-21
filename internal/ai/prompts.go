@@ -61,6 +61,9 @@ Rules:
 - Decision status must be one of: decided, rejected, tentative
 - Do not broaden negative scope: rejecting one approach is not rejecting the whole project
 - Put exploratory discussion under topics or open questions, not decisions
+- Open questions must be work-relevant decisions, blockers, dependencies, or missing facts that still require follow-up after the transcript ends
+- Omit answered questions, greetings, small talk, rhetorical questions, resolved logistics, and questions already captured as action items
+- Rewrite each retained open question as a standalone question without speaker labels; when uncertain, omit it
 - Capture only real follow-up action items; omit casual wrap-up comments
 - Leave owner and deadline empty when absent; never write "unspecified" or "unknown"
 - Never invent dates, speakers, logistics, budgets, or action owners
@@ -110,6 +113,9 @@ Rules:
 - Prefer a unique supported outcome over repeated low-value discussion
 - Treat recurrence as a secondary signal only; never use repetition, verbosity, duration, item count, or chunk order alone as importance
 - Compress or omit routine status, tangents, logistics, and pleasantries unless they explain an outcome
+- Keep only work-relevant open questions that still require follow-up after the whole meeting
+- Omit answered questions, greetings, small talk, rhetorical questions, resolved logistics, and questions already captured as action items
+- Rewrite each retained open question as a standalone question without speaker labels; never concatenate unrelated questions to fit the item limit
 - User relevance guidance may boost supported content but must not create facts or suppress unrelated explicit outcomes
 - Order each output array from highest to lowest global importance
 - Keep arrays short and respect schema maxItems and maxLength limits

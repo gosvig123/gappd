@@ -38,6 +38,9 @@ func TestPipelineExtract(t *testing.T) {
 		t.Fatalf("Extract returned error: %v", err)
 	}
 	assertRequest(t, provider.requests, 0, structuredTemperature, "Ada: let's ship beta on Friday")
+	if !strings.Contains(provider.requests[0].System, "Open questions must be work-relevant") {
+		t.Fatal("extraction system missing open-question relevance rule")
+	}
 	if extraction.Title != "Beta Launch Planning" {
 		t.Fatalf("extraction.Title = %q, want generated title", extraction.Title)
 	}
@@ -51,7 +54,7 @@ func TestPipelineExtract(t *testing.T) {
 
 func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
 	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers.","evidence":[{"speaker":"Alex","text":"Dr. Emily Carter confirmed keynote"}]}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints","status":"decided","evidence":[{"speaker":"Alex","text":"Proceed with marketing plan"}]}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10","evidence":[{"speaker":"Ben","text":"Draft content calendar by March"}]}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
-	transcript := "[Other] Did I do everything right?\n[Other] Did I forget something?\n[Other] Am I prepared?"
+	transcript := "[You] Hello?\n[Other] Hey there, how's it going?\n[You] How's it going, Phil?\n[Speaker 1] So you're in Barcelona now?\n[Other] Whereabouts?"
 
 	extraction, err := pipeline.Extract(context.Background(), transcript)
 	if err != nil {
@@ -60,8 +63,8 @@ func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
 	if extraction.Title != "Transcript Notes" || len(extraction.ActionItems) != 0 || len(extraction.Decisions) != 0 {
 		t.Fatalf("extraction = %#v, want conservative transcript-grounded extraction", extraction)
 	}
-	if len(extraction.OpenQuestions) != 3 {
-		t.Fatalf("open questions = %#v, want transcript questions", extraction.OpenQuestions)
+	if len(extraction.OpenQuestions) != 0 {
+		t.Fatalf("open questions = %#v, want none from conservative fallback", extraction.OpenQuestions)
 	}
 }
 
@@ -140,6 +143,9 @@ func assertWeightedRefinement(t *testing.T, requests []CompletionRequest, extrac
 	}
 	if !strings.Contains(refinement.System, "Prefer a unique supported outcome") {
 		t.Fatalf("refinement system missing outcome-first weighting")
+	}
+	if !strings.Contains(refinement.System, "never concatenate unrelated questions") {
+		t.Fatal("refinement system missing open-question precision rule")
 	}
 	if extraction.Title != "Roadmap Launch Planning" || strings.Join(extraction.Participants, ",") != "Ada,Ben" {
 		t.Fatalf("extraction = %#v, want refined global title and participants", extraction)
