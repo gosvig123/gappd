@@ -10,6 +10,7 @@ import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
 const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded'
+const DIARIZATION_RETRY_WAITING_MESSAGE = 'Retry available after meeting processing finishes.'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
@@ -126,14 +127,19 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
 function DiarizationNotice({ meeting, onRetry }: { meeting: MeetingDetail; onRetry: (id: string) => Promise<void> }) {
   const [busy, setBusy] = useState(false)
   const [retryError, setRetryError] = useState<string | null>(null)
-  useEffect(() => setRetryError(null), [meeting.id])
+  const retrying = useRef(false)
+  const processing = meeting.status.processing.state === PROCESSING_STATUS
+  useEffect(() => { retrying.current = false; setBusy(false); setRetryError(null) }, [meeting.id])
   if (meeting.diarization.state !== DEGRADED_STATE) return null
   const retry = async () => {
+    if (processing || retrying.current) return
+    retrying.current = true
     setBusy(true)
     setRetryError(null)
-    try { await onRetry(meeting.id) } catch (error) { setRetryError(error instanceof Error ? error.message : String(error)) } finally { setBusy(false) }
+    try { await onRetry(meeting.id) } catch (error) { setRetryError(error instanceof Error ? error.message : String(error)) } finally { retrying.current = false; setBusy(false) }
   }
-  return <div className="detail-surface"><span>{meeting.diarization.error ?? 'Speaker labeling unavailable.'}</span>{retryError ? <span className="diarization-retry-error" role="alert">{retryError}</span> : null}<div><Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry'}</Button></div></div>
+  const message = processing ? `${meeting.diarization.error ?? 'Speaker labeling unavailable.'} ${DIARIZATION_RETRY_WAITING_MESSAGE}` : meeting.diarization.error ?? 'Speaker labeling unavailable.'
+  return <div className="detail-surface"><span>{message}</span>{retryError ? <span className="diarization-retry-error" role="alert">{retryError}</span> : null}<div><Button className="compact-action" disabled={processing || busy} onClick={() => void retry()}>{processing ? 'Finishing meeting…' : busy ? 'Retrying…' : 'Retry'}</Button></div></div>
 }
 
 function DiarizationTrustCue({ meeting }: { meeting: MeetingDetail }) {

@@ -67,7 +67,11 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
   child.stdout?.on('data', (chunk) => { stdout += chunk.toString() })
   child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
   child.on('error', (error) => signal?.aborted ? child.once('close', () => reject(error)) : reject(error))
-  child.on('exit', (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr || stdout || `gappd exited with code ${code}`)))
+  child.on('exit', (code) => {
+    if (code !== 0) return reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
+    if (stderr.trim()) console.warn(stderr.trim())
+    resolve(stdout)
+  })
 }
 
 function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id: ID, handlers: StreamHandlers<ID>): void {

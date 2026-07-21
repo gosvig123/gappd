@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -79,7 +80,7 @@ func (s Supervisor) Run(ctx context.Context, audioPath string) ([]WindowReport, 
 		}
 		report, err := decodeReport(data, r, &dimension)
 		if err != nil {
-			return nil, fmt.Errorf("diarize window %d: invalid helper report", i)
+			return nil, fmt.Errorf("diarize window %d: invalid helper report: %w", i, err)
 		}
 		out = append(out, report)
 	}
@@ -156,6 +157,10 @@ func (s Supervisor) run(ctx context.Context, audio string, r frameRange) ([]byte
 			return nil, "helper output too large"
 		}
 		if err != nil {
+			detail := strings.TrimSpace(stderr.String())
+			if detail != "" {
+				return nil, "helper failed: " + detail
+			}
 			return nil, "helper failed"
 		}
 		return stdout.Bytes(), ""

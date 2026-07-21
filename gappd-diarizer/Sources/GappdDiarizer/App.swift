@@ -18,6 +18,12 @@ private struct Report: Codable {
     let spans: [Span]
 }
 
+func clippedTimeRange(start: Double, end: Double, duration: Double) -> (start: Double, end: Double)? {
+    let clippedStart = max(0, start)
+    let clippedEnd = min(duration, end)
+    return clippedEnd > clippedStart ? (clippedStart, clippedEnd) : nil
+}
+
 @main enum GappdDiarizer {
     static func main() async {
         let args = Array(CommandLine.arguments.dropFirst())
@@ -74,7 +80,11 @@ private struct Report: Codable {
     }
 
     private static func makeReport(_ result: DiarizationResult, start: Int, count: Int) -> Report {
-        let grouped = Dictionary(grouping: result.segments, by: \.speakerId)
+        let duration = Double(count) / 16_000
+        let segments = result.segments.filter {
+            clippedTimeRange(start: Double($0.startTimeSeconds), end: Double($0.endTimeSeconds), duration: duration) != nil
+        }
+        let grouped = Dictionary(grouping: segments, by: \.speakerId)
         let ids = grouped.keys.sorted()
         let clusters = ids.map { id -> Cluster in
             let segments = grouped[id]!, total = segments.reduce(0.0) { $0 + max(0.001, Double($1.durationSeconds)) }
@@ -85,7 +95,7 @@ private struct Report: Codable {
         }
         let centroids = Dictionary(uniqueKeysWithValues: clusters.map { ($0.localClusterID, $0.centroid) })
         let observations = result.chunkEmbeddings ?? []
-        let spans = result.segments.map { segment -> Span in
+        let spans = segments.map { segment -> Span in
             let scores = observations.filter {
                 $0.speakerId == segment.speakerId && min(Double(segment.endTimeSeconds), $0.endTimeSeconds) > max(Double(segment.startTimeSeconds), $0.startTimeSeconds)
             }.map { observation -> Double in
@@ -95,9 +105,9 @@ private struct Report: Codable {
                 let second = alternatives.map { cosine(observation.embedding256, centroids[$0]!) }.max()!
                 return min(clamp((assigned - 0.5) / 0.5), clamp((assigned - second) / 0.15))
             }
-            return Span(localClusterID: segment.speakerId, startSeconds: Double(segment.startTimeSeconds),
-                        endSeconds: Double(segment.endTimeSeconds), qualityScore: Double(segment.qualityScore),
-                        identityScore: scores.min() ?? 0)
+            let range = clippedTimeRange(start: Double(segment.startTimeSeconds), end: Double(segment.endTimeSeconds), duration: duration)!
+            return Span(localClusterID: segment.speakerId, startSeconds: range.start,
+                        endSeconds: range.end, qualityScore: Double(segment.qualityScore), identityScore: scores.min() ?? 0)
         }
         return Report(schemaVersion: 1, engine: engine, engineRevision: revision,
                       requestedStartFrame: start, requestedFrameCount: count, clusters: clusters, spans: spans)
