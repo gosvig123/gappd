@@ -134,11 +134,3 @@ func countRepeatedSegment(counts map[string]int, maxCount int, segment transcrib
 	}
 	return maxCount
 }
-
-func formatTranscript(segments []db.Segment) string {
-	var builder strings.Builder
-	for _, segment := range segments {
-		fmt.Fprintf(&builder, "[%s] %s\n", segment.Speaker, segment.Text)
-	}
-	return builder.String()
-}

@@ -1,11 +1,6 @@
 package appprotocol
 
-import (
-	"fmt"
-	"strings"
-
-	"github.com/gappd-dev/gappd/internal/db"
-)
+import "github.com/gappd-dev/gappd/internal/db"
 
 type MeetingListItem struct {
 	ID            string        `json:"id"`
@@ -81,7 +76,7 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if len(visible) == 0 {
 		return ""
 	}
-	return formatTranscript(visible)
+	return db.FormatTranscript(visible)
 }
 
 func visibleTranscriptSegments(meeting db.Meeting, segments []db.Segment) []db.Segment {
@@ -91,14 +86,6 @@ func visibleTranscriptSegments(meeting db.Meeting, segments []db.Segment) []db.S
 		return nil
 	}
 	return segments
-}
-
-func formatTranscript(segments []db.Segment) string {
-	var b strings.Builder
-	for _, segment := range segments {
-		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
-	}
-	return b.String()
 }
 
 func buildSegmentViews(segments []db.Segment) []MeetingSegment {

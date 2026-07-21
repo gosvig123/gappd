@@ -123,7 +123,7 @@ func (m Module) commit(ctx context.Context, meetingID string) (Outcome, error) {
 	if err != nil {
 		return "", fmt.Errorf("load Live Transcript segments: %w", err)
 	}
-	result, err := m.lifecycle.CommitLiveTranscript(ctx, meetingID, formatTranscript(segments), segments, time.Now())
+	result, err := m.lifecycle.CommitLiveTranscript(ctx, meetingID, db.FormatTranscript(segments), segments, time.Now())
 	if err != nil {
 		return "", m.commitFailure(ctx, meetingID, err)
 	}

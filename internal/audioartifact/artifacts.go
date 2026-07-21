@@ -10,8 +10,8 @@ import (
 const (
 	MicFilename    = "mic.wav"
 	SystemFilename = "system.wav"
-	MicSpeaker     = "You"
-	SystemSpeaker  = "Other"
+	MicSpeaker     = db.SpeakerYou
+	SystemSpeaker  = db.SpeakerOther
 	wavHeaderBytes = 44
 )
 
