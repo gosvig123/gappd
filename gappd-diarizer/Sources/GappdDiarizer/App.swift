@@ -2,7 +2,7 @@ import Darwin
 import FluidAudio
 import Foundation
 
-private let revision = "300165b240c45375add402265f62410b6df33cf1"
+private let revision = "300165b240c45375add402265f62410b6df33cf1+gappd.1"
 private let engine = "fluidaudio-offline-vbx"
 
 private struct Cluster: Codable { let localClusterID: String; let centroid: [Double] }
@@ -22,6 +22,12 @@ func clippedTimeRange(start: Double, end: Double, duration: Double) -> (start: D
     let clippedStart = max(0, start)
     let clippedEnd = min(duration, end)
     return clippedEnd > clippedStart ? (clippedStart, clippedEnd) : nil
+}
+
+func makeOfflineDiarizerConfig() -> OfflineDiarizerConfig {
+    var config = OfflineDiarizerConfig(clusteringThreshold: 0.6, minSegmentDuration: 0.75)
+    config.exposeChunkEmbeddings = true
+    return config
 }
 
 @main enum GappdDiarizer {
@@ -58,9 +64,7 @@ func clippedTimeRange(start: Double, end: Double, duration: Double) -> (start: D
         defer { watchdog.cancel() }
         do {
             ModelHub.offlineMode = true
-            var config = OfflineDiarizerConfig(clusteringThreshold: 0.6)
-            config.exposeChunkEmbeddings = true
-            let manager = OfflineDiarizerManager(config: config)
+            let manager = OfflineDiarizerManager(config: makeOfflineDiarizerConfig())
             let models = try await OfflineDiarizerModels.load(from: URL(fileURLWithPath: args[3]))
             manager.initialize(models: models)
             let report: Report

@@ -78,7 +78,7 @@ func TestDiarizationDrainOutcomes(t *testing.T) {
 			valid := false
 			switch mode {
 			case "success":
-				valid = result.Completed == 1 && segments[1].Speaker == "Speaker 1" && segments[2].Speaker == "Other" && got.DiarizationJSON != nil && strings.Contains(*got.DiarizationJSON, `"engine":"`+diarize.Engine+`"`) && strings.Contains(*got.DiarizationJSON, `"engineRevision":"`+diarize.EngineRevision+`"`) && strings.Contains(*got.DiarizationJSON, `"semantics":"v1"`) && strings.Contains(*got.DiarizationJSON, `"speakerCount":2`) && strings.Contains(*got.DiarizationJSON, `"coverage":`)
+				valid = result.Completed == 1 && segments[1].Speaker == "Speaker 1" && segments[2].Speaker == "Other" && got.DiarizationJSON != nil && strings.Contains(*got.DiarizationJSON, `"engine":"`+diarize.Engine+`"`) && strings.Contains(*got.DiarizationJSON, `"engineRevision":"`+diarize.EngineRevision+`"`) && strings.Contains(*got.DiarizationJSON, `"semantics":"`+diarize.ProjectionSemantics+`"`) && strings.Contains(*got.DiarizationJSON, `"speakerCount":2`) && strings.Contains(*got.DiarizationJSON, `"coverage":`)
 			case "cancel":
 				valid = result.Requeued == 1 && got.DiarizationState == db.DiarizationStatePending
 			case "failure":

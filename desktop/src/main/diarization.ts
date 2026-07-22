@@ -7,7 +7,7 @@ import { isExecutableFile } from './binaries'
 import { resolveDiarizationModels, resolveDiarizerBinary } from './native-runtime'
 const run = promisify(execFile)
 const ENGINE = 'fluidaudio-offline-vbx'
-const ENGINE_REVISION = '300165b240c45375add402265f62410b6df33cf1'
+const ENGINE_REVISION = '300165b240c45375add402265f62410b6df33cf1+gappd.1'
 export const missingDiarizationAssetsMessage = (): string => 'Speaker labeling assets are missing or invalid.'
 export async function diarizationAssetsAvailable(): Promise<boolean> {
   const binary = resolveDiarizerBinary()

@@ -132,7 +132,7 @@ func (s Service) diarizeClaim(ctx context.Context, store *db.DB, lifecycle meeti
 		Semantics      string  `json:"semantics"`
 		SpeakerCount   int     `json:"speakerCount"`
 		Coverage       float64 `json:"coverage"`
-	}{diarize.Engine, diarize.EngineRevision, "v1", output.SpeakerCount, output.Coverage})
+	}{diarize.Engine, diarize.EngineRevision, diarize.ProjectionSemantics, output.SpeakerCount, output.Coverage})
 	_, applied, err := store.CommitSpeakerProjection(ctx, db.SpeakerProjectionCommit{MeetingID: claim.Meeting.ID, ClaimToken: claim.Token,
 		CapturedTranscriptRevision: claim.Meeting.TranscriptRevision, Assignments: output.Assignments, ProvenanceJSON: string(provenance), CompletedAt: s.now()})
 	if errors.Is(err, context.Canceled) {

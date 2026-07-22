@@ -144,7 +144,7 @@ function DiarizationNotice({ meeting, onRetry }: { meeting: MeetingDetail; onRet
 
 function DiarizationTrustCue({ meeting }: { meeting: MeetingDetail }) {
   if (meeting.diarization.speakerCount === undefined) return null
-  return <div className="detail-surface diarization-trust-cue"><strong>Speaker count: {meeting.diarization.speakerCount} · Experimental</strong><span>Speaker labels may not always be accurate.</span></div>
+  return <div className="detail-surface diarization-trust-cue"><strong>Speaker count: {meeting.diarization.speakerCount}</strong><span>Speaker labels may not always be accurate.</span></div>
 }
 
 function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {

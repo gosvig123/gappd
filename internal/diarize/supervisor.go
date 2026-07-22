@@ -25,7 +25,7 @@ const (
 	maxReportBytes   = 3 << 20
 	maxStderrBytes   = 4 << 10
 	Engine           = "fluidaudio-offline-vbx"
-	EngineRevision   = "300165b240c45375add402265f62410b6df33cf1"
+	EngineRevision   = "300165b240c45375add402265f62410b6df33cf1+gappd.1"
 )
 
 // Supervisor validates a retained recording and runs one isolated helper per window.
