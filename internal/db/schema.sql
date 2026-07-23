@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS segments (
     speaker_source TEXT,
     speaker_confidence REAL,
     speaker_assignment_reason TEXT,
+    speaker_group_start_sec REAL,
+    speaker_group_end_sec REAL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 

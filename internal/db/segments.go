@@ -36,15 +36,19 @@ type Segment struct {
 	SpeakerSource           *SegmentSource
 	SpeakerConfidence       *float64
 	SpeakerAssignmentReason *SpeakerAssignmentReason
+	SpeakerGroupStart       *float64
+	SpeakerGroupEnd         *float64
 	CreatedAt               string
 }
 
 const insertSegmentSQL = `INSERT INTO segments
-	(id, meeting_id, start_sec, end_sec, text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason)
-	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	(id, meeting_id, start_sec, end_sec, text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason,
+	 speaker_group_start_sec, speaker_group_end_sec)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const selectSegmentsSQL = `SELECT id, meeting_id, start_sec, end_sec,
-	text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason, created_at
+	text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason,
+	speaker_group_start_sec, speaker_group_end_sec, created_at
 	FROM segments WHERE meeting_id = ? ORDER BY start_sec ASC`
 
 const deleteSegmentsSQL = `DELETE FROM segments WHERE meeting_id = ?`
@@ -63,7 +67,7 @@ func (d *DB) InsertSegment(s *Segment) error {
 	}
 	defer tx.Rollback()
 	if _, err := tx.Exec(insertSegmentSQL, s.ID, s.MeetingID, s.Start, s.End, s.Text, s.Speaker,
-		s.SpeakerSource, s.SpeakerConfidence, s.SpeakerAssignmentReason); err != nil {
+		s.SpeakerSource, s.SpeakerConfidence, s.SpeakerAssignmentReason, s.SpeakerGroupStart, s.SpeakerGroupEnd); err != nil {
 		return err
 	}
 	if err := incrementTranscriptRevision(tx, s.MeetingID); err != nil {
@@ -122,7 +126,7 @@ func insertSegmentRow(stmt *sql.Stmt, segment *Segment) error {
 		segment.ID = id
 	}
 	_, err := stmt.Exec(segment.ID, segment.MeetingID, segment.Start, segment.End, segment.Text, segment.Speaker,
-		segment.SpeakerSource, segment.SpeakerConfidence, segment.SpeakerAssignmentReason)
+		segment.SpeakerSource, segment.SpeakerConfidence, segment.SpeakerAssignmentReason, segment.SpeakerGroupStart, segment.SpeakerGroupEnd)
 	if err != nil {
 		return fmt.Errorf("insert segment %s: %w", segment.ID, err)
 	}
@@ -151,7 +155,8 @@ func scanSegments(rows *sql.Rows) ([]Segment, error) {
 	for rows.Next() {
 		var s Segment
 		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Start, &s.End, &s.Text, &s.Speaker,
-			&s.SpeakerSource, &s.SpeakerConfidence, &s.SpeakerAssignmentReason, &s.CreatedAt); err != nil {
+			&s.SpeakerSource, &s.SpeakerConfidence, &s.SpeakerAssignmentReason,
+			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan segment: %w", err)
 		}
 		out = append(out, s)

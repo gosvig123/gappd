@@ -23,8 +23,13 @@ const (
 func toDBSegments(meetingID string, segs []transcribe.Segment, source db.SegmentSource, reason db.SpeakerAssignmentReason) []db.Segment {
 	out := make([]db.Segment, len(segs))
 	for i, s := range segs {
+		var groupStart, groupEnd *float64
+		if s.GroupEnd > s.GroupStart {
+			start, end := s.GroupStart, s.GroupEnd
+			groupStart, groupEnd = &start, &end
+		}
 		out[i] = db.Segment{MeetingID: meetingID, Start: s.Start, End: s.End, Text: s.Text, Speaker: s.Speaker,
-			SpeakerSource: &source, SpeakerAssignmentReason: &reason}
+			SpeakerSource: &source, SpeakerAssignmentReason: &reason, SpeakerGroupStart: groupStart, SpeakerGroupEnd: groupEnd}
 	}
 	return out
 }

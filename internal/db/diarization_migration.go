@@ -24,6 +24,8 @@ var diarizationColumns = map[string][]columnMigration{
 		{"speaker_source", `ALTER TABLE segments ADD COLUMN speaker_source TEXT`},
 		{"speaker_confidence", `ALTER TABLE segments ADD COLUMN speaker_confidence REAL`},
 		{"speaker_assignment_reason", `ALTER TABLE segments ADD COLUMN speaker_assignment_reason TEXT`},
+		{"speaker_group_start_sec", `ALTER TABLE segments ADD COLUMN speaker_group_start_sec REAL`},
+		{"speaker_group_end_sec", `ALTER TABLE segments ADD COLUMN speaker_group_end_sec REAL`},
 	},
 }
 

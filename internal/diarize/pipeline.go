@@ -33,7 +33,7 @@ const (
 	MinimumSingleSpeakerWindows      = 3
 	SingleSpeakerAnchorSimilarity    = 0.80
 	SingleSpeakerAnchorDominance     = 0.80
-	ProjectionSemantics              = "v2"
+	ProjectionSemantics              = "v3"
 )
 
 type WindowReport struct {
@@ -54,9 +54,14 @@ type Phrase struct {
 	SegmentID                string
 	StartSeconds, EndSeconds float64
 }
+type ProjectionGroup struct {
+	Phrase     Phrase
+	SegmentIDs []string
+}
 type Input struct {
 	Windows             []WindowReport
 	Phrases             []Phrase
+	ProjectionGroups    []ProjectionGroup
 	HasMicrophoneSpeech bool
 }
 type Output struct {
@@ -102,7 +107,18 @@ func Transform(in Input) (Output, error) {
 			}
 		}
 	}
-	assignments, count, coverage := alignWithSuppressed(in.Phrases, spans, suppressed)
+	visible := make(map[int]db.VisibleSpeaker)
+	assignments, coverage := alignWithVisible(in.Phrases, spans, suppressed, visible)
+	if len(in.ProjectionGroups) > 0 {
+		groupPhrases := make([]Phrase, len(in.ProjectionGroups))
+		for i, group := range in.ProjectionGroups {
+			groupPhrases[i] = group.Phrase
+		}
+		groupAssignments, _ := alignWithVisible(groupPhrases, spans, suppressed, visible)
+		assignments = preserveGroupAssignments(assignments, in.Phrases, groupAssignments, in.ProjectionGroups)
+		coverage = assignmentCoverage(assignments, in.Phrases)
+	}
+	count := compactSpeakerLabels(assignments)
 	if in.HasMicrophoneSpeech {
 		count++
 	}
@@ -139,13 +155,29 @@ func validate(in Input) error {
 			last = span.StartSeconds
 		}
 	}
-	ids, last := make(map[string]bool, len(in.Phrases)), -1.0
+	ids, phrasesByID, last := make(map[string]bool, len(in.Phrases)), make(map[string]Phrase, len(in.Phrases)), -1.0
 	for i, phrase := range in.Phrases {
 		if phrase.SegmentID == "" || ids[phrase.SegmentID] || !finite(phrase.StartSeconds, phrase.EndSeconds) ||
 			phrase.StartSeconds < 0 || phrase.EndSeconds <= phrase.StartSeconds || phrase.StartSeconds < last {
 			return fmt.Errorf("diarize: invalid phrase %d", i)
 		}
-		ids[phrase.SegmentID], last = true, phrase.StartSeconds
+		ids[phrase.SegmentID], phrasesByID[phrase.SegmentID], last = true, phrase, phrase.StartSeconds
+	}
+	grouped, last := make(map[string]bool), -1.0
+	for i, group := range in.ProjectionGroups {
+		phrase := group.Phrase
+		if phrase.SegmentID == "" || len(group.SegmentIDs) == 0 || !finite(phrase.StartSeconds, phrase.EndSeconds) ||
+			phrase.StartSeconds < 0 || phrase.EndSeconds <= phrase.StartSeconds || phrase.StartSeconds < last {
+			return fmt.Errorf("diarize: invalid projection group %d", i)
+		}
+		for _, id := range group.SegmentIDs {
+			child, found := phrasesByID[id]
+			if !found || grouped[id] || child.StartSeconds < phrase.StartSeconds || child.EndSeconds > phrase.EndSeconds {
+				return fmt.Errorf("diarize: invalid projection group %d", i)
+			}
+			grouped[id] = true
+		}
+		last = phrase.StartSeconds
 	}
 	return nil
 }
@@ -416,6 +448,17 @@ func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssign
 }
 
 func alignWithSuppressed(phrases []Phrase, spans []stitchedSpan, suppressed map[int]bool) ([]db.SpeakerProjectionAssignment, int, float64) {
+	visible := make(map[int]db.VisibleSpeaker)
+	assignments, coverage := alignWithVisible(phrases, spans, suppressed, visible)
+	return assignments, len(visible), coverage
+}
+
+func alignWithVisible(
+	phrases []Phrase,
+	spans []stitchedSpan,
+	suppressed map[int]bool,
+	visible map[int]db.VisibleSpeaker,
+) ([]db.SpeakerProjectionAssignment, float64) {
 	hidden := make(map[int]bool, len(suppressed))
 	for speaker, value := range suppressed {
 		hidden[speaker] = value
@@ -472,7 +515,6 @@ func alignWithSuppressed(phrases []Phrase, spans []stitchedSpan, suppressed map[
 		}
 	}
 	assignments := make([]db.SpeakerProjectionAssignment, 0, len(phrases))
-	visible := make(map[int]db.VisibleSpeaker)
 	totalDuration, assignedDuration := 0.0, 0.0
 	for _, phrase := range phrases {
 		duration := phrase.EndSeconds - phrase.StartSeconds
@@ -562,7 +604,62 @@ func alignWithSuppressed(phrases []Phrase, spans []stitchedSpan, suppressed map[
 	if totalDuration > 0 {
 		assignedDuration /= totalDuration
 	}
-	return assignments, len(visible), assignedDuration
+	return assignments, assignedDuration
+}
+
+func preserveGroupAssignments(
+	assignments []db.SpeakerProjectionAssignment,
+	phrases []Phrase,
+	groupAssignments []db.SpeakerProjectionAssignment,
+	groups []ProjectionGroup,
+) []db.SpeakerProjectionAssignment {
+	indexes := make(map[string]int, len(phrases))
+	for i, phrase := range phrases {
+		indexes[phrase.SegmentID] = i
+	}
+	for i, group := range groups {
+		assignment := groupAssignments[i]
+		if assignment.Speaker == db.VisibleSpeakerOther {
+			continue
+		}
+		for _, id := range group.SegmentIDs {
+			at := indexes[id]
+			assignments[at] = assignment
+			assignments[at].SegmentID = id
+		}
+	}
+	return assignments
+}
+
+func compactSpeakerLabels(assignments []db.SpeakerProjectionAssignment) int {
+	labels := make(map[db.VisibleSpeaker]db.VisibleSpeaker)
+	for i := range assignments {
+		if assignments[i].Speaker == db.VisibleSpeakerOther {
+			continue
+		}
+		label, found := labels[assignments[i].Speaker]
+		if !found {
+			label = db.VisibleSpeaker(fmt.Sprintf("Speaker %d", len(labels)+1))
+			labels[assignments[i].Speaker] = label
+		}
+		assignments[i].Speaker = label
+	}
+	return len(labels)
+}
+
+func assignmentCoverage(assignments []db.SpeakerProjectionAssignment, phrases []Phrase) float64 {
+	total, assigned := 0.0, 0.0
+	for i, phrase := range phrases {
+		duration := phrase.EndSeconds - phrase.StartSeconds
+		total += duration
+		if assignments[i].Speaker != db.VisibleSpeakerOther {
+			assigned += duration
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return assigned / total
 }
 
 func metricFor(indexes []int, spans []stitchedSpan) (float64, int) {

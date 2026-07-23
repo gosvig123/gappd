@@ -17,6 +17,16 @@ func TestSortSegmentsOrdersNearTieQuestionBeforeAnswer(t *testing.T) {
 	}
 }
 
+func TestToDBSegmentsPreservesSpeakerGroup(t *testing.T) {
+	segments := toDBSegments("meeting", []transcribe.Segment{{
+		Start: 2, End: 4, GroupStart: 1, GroupEnd: 8, Text: "words", Speaker: "Other",
+	}}, db.SegmentSourceSystem, db.SpeakerAssignmentReasonPendingSystemAttribution)
+	if len(segments) != 1 || segments[0].SpeakerGroupStart == nil || segments[0].SpeakerGroupEnd == nil ||
+		*segments[0].SpeakerGroupStart != 1 || *segments[0].SpeakerGroupEnd != 8 {
+		t.Fatalf("segments=%#v", segments)
+	}
+}
+
 func TestCleanTranscriptionArtifactsDropsBlankAudio(t *testing.T) {
 	segments := []transcribe.Segment{{Text: "[BLANK_AUDIO]"}, {Text: " useful words "}}
 

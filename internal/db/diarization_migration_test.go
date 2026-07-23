@@ -53,6 +53,10 @@ func TestDiarizationMigrationBacksUpWALAndCleansUpOnLaterHealthyStartup(t *testi
 	if state != "not_requested" || transcriptRevision != 0 || summaryRevision != 0 || backlog != 0 {
 		t.Fatalf("migration defaults = (%q,%d,%d), backlog=%d", state, transcriptRevision, summaryRevision, backlog)
 	}
+	segmentColumns, err := tableColumns(t.Context(), store.Conn, "segments")
+	if err != nil || !segmentColumns["speaker_group_start_sec"] || !segmentColumns["speaker_group_end_sec"] {
+		t.Fatalf("segment columns=%v err=%v", segmentColumns, err)
+	}
 	old := time.Now().Add(-diarizationBackupMaxAge)
 	if err := os.Chtimes(backupPath, old, old); err != nil {
 		t.Fatal(err)

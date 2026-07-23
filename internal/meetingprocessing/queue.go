@@ -94,13 +94,26 @@ func (s Service) diarizeClaim(ctx context.Context, store *db.DB, lifecycle meeti
 	if errors.Is(ctx.Err(), context.Canceled) {
 		return s.interruptDiarization(ctx, lifecycle, claim, result)
 	}
-	phrases, mic := []diarize.Phrase{}, false
+	phrases, groups, mic := []diarize.Phrase{}, []diarize.ProjectionGroup{}, false
+	groupIndexes := make(map[[2]float64]int)
 	for _, segment := range segments {
 		if segment.SpeakerSource == nil {
 			continue
 		}
 		if *segment.SpeakerSource == db.SegmentSourceSystem {
 			phrases = append(phrases, diarize.Phrase{SegmentID: segment.ID, StartSeconds: segment.Start, EndSeconds: segment.End})
+			if segment.SpeakerGroupStart != nil && segment.SpeakerGroupEnd != nil && *segment.SpeakerGroupEnd > *segment.SpeakerGroupStart {
+				key := [2]float64{*segment.SpeakerGroupStart, *segment.SpeakerGroupEnd}
+				index, found := groupIndexes[key]
+				if !found {
+					index = len(groups)
+					groupIndexes[key] = index
+					groups = append(groups, diarize.ProjectionGroup{Phrase: diarize.Phrase{
+						SegmentID: segment.ID, StartSeconds: key[0], EndSeconds: key[1],
+					}})
+				}
+				groups[index].SegmentIDs = append(groups[index].SegmentIDs, segment.ID)
+			}
 		} else if *segment.SpeakerSource == db.SegmentSourceMicrophone && strings.TrimSpace(segment.Text) != "" {
 			mic = true
 		}
@@ -122,7 +135,9 @@ func (s Service) diarizeClaim(ctx context.Context, store *db.DB, lifecycle meeti
 		}
 		return s.failDiarization(ctx, lifecycle, claim, result, runErr)
 	}
-	output, transformErr := diarize.Transform(diarize.Input{Windows: windows, Phrases: phrases, HasMicrophoneSpeech: mic})
+	output, transformErr := diarize.Transform(diarize.Input{
+		Windows: windows, Phrases: phrases, ProjectionGroups: groups, HasMicrophoneSpeech: mic,
+	})
 	if transformErr != nil {
 		return s.failDiarization(ctx, lifecycle, claim, result, transformErr)
 	}

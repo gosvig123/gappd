@@ -299,6 +299,84 @@ func TestSingleTurnFallbackIgnoresUnselectedTurns(t *testing.T) {
 	}
 }
 
+func TestProjectionGroupsPreserveEstablishedAssignments(t *testing.T) {
+	windows := []WindowReport{window(0, 20, []LocalCluster{{"a", []float64{1, 0}}}, []LocalSpan{
+		span("a", 0, 3, 1), span("a", 3.1, 6, 1),
+	})}
+	phrases := []Phrase{{"first", 0, 6}, {"second", 6, 10}}
+	baseline, err := Transform(Input{Windows: windows, Phrases: phrases})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if baseline.Assignments[0].Speaker != "Speaker 1" || baseline.Assignments[1].Speaker != db.VisibleSpeakerOther {
+		t.Fatalf("baseline=%+v", baseline.Assignments)
+	}
+	grouped, err := Transform(Input{Windows: windows, Phrases: phrases, ProjectionGroups: []ProjectionGroup{{
+		Phrase: Phrase{"first", 0, 10}, SegmentIDs: []string{"first", "second"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if grouped.Assignments[0].Speaker != "Speaker 1" || grouped.Assignments[1].Speaker != "Speaker 1" || grouped.Coverage != 1 {
+		t.Fatalf("grouped=%+v coverage=%f", grouped.Assignments, grouped.Coverage)
+	}
+	if _, err := Transform(Input{Windows: windows, Phrases: phrases, ProjectionGroups: []ProjectionGroup{{
+		Phrase: Phrase{"first", 0, 10}, SegmentIDs: []string{"missing"},
+	}}}); err == nil {
+		t.Fatal("accepted projection group with unknown child")
+	}
+}
+
+func TestProjectionGroupsShareSpeakerNumbering(t *testing.T) {
+	windows := []WindowReport{window(0, 20, []LocalCluster{{"a", []float64{1, 0}}, {"b", []float64{0, 1}}}, []LocalSpan{
+		span("a", 0, 3, 1), span("a", 4, 7, 1), span("b", 10, 13, 1), span("b", 14, 17, 1),
+	})}
+	phrases := []Phrase{{"a", 0, 7}, {"b1", 10, 13}, {"b2", 14, 17}}
+	output, err := Transform(Input{Windows: windows, Phrases: phrases, ProjectionGroups: []ProjectionGroup{{
+		Phrase: Phrase{"b1", 10, 17}, SegmentIDs: []string{"b1", "b2"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Assignments[0].Speaker != "Speaker 1" || output.Assignments[1].Speaker != "Speaker 2" ||
+		output.Assignments[2].Speaker != "Speaker 2" || output.SpeakerCount != 2 {
+		t.Fatalf("output=%+v", output)
+	}
+}
+
+func TestProjectionGroupsRemoveOverriddenSpeakerLabels(t *testing.T) {
+	windows := []WindowReport{window(0, 40, []LocalCluster{{"a", []float64{1, 0}}, {"b", []float64{0, 1}}}, []LocalSpan{
+		span("a", 0, 3, 1), span("a", 3.1, 6, 1), span("b", 6, 20, 1), span("b", 20.1, 40, 1),
+	})}
+	phrases := []Phrase{{"a", 0, 6}, {"b", 6, 40}}
+	output, err := Transform(Input{Windows: windows, Phrases: phrases, ProjectionGroups: []ProjectionGroup{{
+		Phrase: Phrase{"a", 0, 40}, SegmentIDs: []string{"a", "b"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Assignments[0].Speaker != "Speaker 1" || output.Assignments[1].Speaker != "Speaker 1" || output.SpeakerCount != 1 {
+		t.Fatalf("output=%+v", output)
+	}
+}
+
+func TestProjectionGroupsRecoverOnlyConfidentChildren(t *testing.T) {
+	windows := []WindowReport{window(0, 30, []LocalCluster{{"a", []float64{1, 0}}, {"b", []float64{0, 1}}}, []LocalSpan{
+		span("a", 0, 4, 1), span("b", 4, 10, .1), span("a", 20, 23, 1), span("a", 24, 27, 1),
+	})}
+	phrases := []Phrase{{"first", 0, 4}, {"second", 4, 10}}
+	output, err := Transform(Input{Windows: windows, Phrases: phrases, ProjectionGroups: []ProjectionGroup{{
+		Phrase: Phrase{"first", 0, 10}, SegmentIDs: []string{"first", "second"},
+	}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output.Assignments[0].Speaker != "Speaker 1" || output.Assignments[1].Speaker != db.VisibleSpeakerOther ||
+		output.SpeakerCount != 1 || math.Abs(output.Coverage-.4) > 1e-9 {
+		t.Fatalf("output=%+v", output)
+	}
+}
+
 func TestNumberingCountAndCoverage(t *testing.T) {
 	spans := []stitchedSpan{sspan(2, 0, 3, 1), sspan(2, 4, 7, 1), sspan(1, 10, 13, 1), sspan(1, 14, 17, 1), sspan(3, 20, 21, 1)}
 	phrases := []Phrase{{"first", 0, 3}, {"second", 10, 13}, {"other", 20, 21}}
