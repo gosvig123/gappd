@@ -23,9 +23,11 @@ const (
 	ModeSystem CaptureMode = "system"
 	ModeBoth   CaptureMode = "both"
 
-	captureHelperEnv       = "GAPPD_CAPTURE_HELPER_PATH"
-	captureChunkSecondsEnv = "GAPPD_CAPTURE_CHUNK_SECONDS"
-	captureChunkOverlapEnv = "GAPPD_CAPTURE_CHUNK_OVERLAP_SECONDS"
+	captureHelperEnv          = "GAPPD_CAPTURE_HELPER_PATH"
+	captureChunkSecondsEnv    = "GAPPD_CAPTURE_CHUNK_SECONDS"
+	captureChunkOverlapEnv    = "GAPPD_CAPTURE_CHUNK_OVERLAP_SECONDS"
+	captureStartupTimeout     = 15 * time.Second
+	captureStartupStopTimeout = 2 * time.Second
 )
 
 type Recorder struct {
@@ -38,6 +40,7 @@ type Recorder struct {
 	stdoutBuf        bytes.Buffer
 	stdout           io.Writer
 	transcriptEvents chan livetranscript.Event
+	readyCh          chan struct{}
 	stopFile         string
 }
 
@@ -73,7 +76,8 @@ func (r *Recorder) prepareCommand(launch captureLaunch) {
 	r.cmd = exec.Command(launch.command, launch.args...)
 	r.stdoutBuf.Reset()
 	r.transcriptEvents = make(chan livetranscript.Event, 32)
-	r.cmd.Stdout = newChunkEventWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.transcriptEvents)
+	r.readyCh = make(chan struct{}, 1)
+	r.cmd.Stdout = newCaptureOutputWriter(io.MultiWriter(r.stdout, &r.stdoutBuf), r.transcriptEvents, r.readyCh)
 	r.stderr.Reset()
 	r.cmd.Stderr = &r.stderr
 	processgroup.Configure(r.cmd)
@@ -89,16 +93,37 @@ func (r *Recorder) waitForExit() chan error {
 }
 
 func (r *Recorder) awaitStartup(ctx context.Context, exited chan error) error {
+	timer := time.NewTimer(captureStartupTimeout)
+	defer timer.Stop()
 	select {
 	case err := <-exited:
 		return r.startupFailure(err)
-	case <-ctx.Done():
-		_ = r.stopCaptureProcess(syscall.SIGINT)
-		<-exited
-		return ctx.Err()
-	case <-time.After(500 * time.Millisecond):
+	case <-r.readyCh:
 		r.waitCh = exited
 		return nil
+	case <-ctx.Done():
+		r.stopStartingCapture(exited)
+		return ctx.Err()
+	case <-timer.C:
+		r.stopStartingCapture(exited)
+		return fmt.Errorf("capture process did not become ready within %s", captureStartupTimeout)
+	}
+}
+
+func (r *Recorder) stopStartingCapture(exited <-chan error) {
+	_ = r.stopCaptureProcess(syscall.SIGINT)
+	timer := time.NewTimer(captureStartupStopTimeout)
+	defer timer.Stop()
+	select {
+	case <-exited:
+		return
+	case <-timer.C:
+		_ = r.killProcessGroup(syscall.SIGKILL)
+		timer.Reset(captureStartupStopTimeout)
+		select {
+		case <-exited:
+		case <-timer.C:
+		}
 	}
 }
 

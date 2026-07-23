@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 func TestMissingSourceQueuesRebuildAndHidesPartial(t *testing.T) {
@@ -39,6 +41,27 @@ func TestDrainTimeoutQueuesRebuild(t *testing.T) {
 	session := rig.module.Start(context.Background(), StartInput{MeetingID: rig.meetingID, Events: stream})
 	outcome, err := session.Finish(context.Background())
 	assertRebuildHidden(t, rig, outcome, err)
+}
+
+func TestFailedCaptureDiscardsProvisionalSegments(t *testing.T) {
+	rig := newTestRig(t, fakeTranscriber{})
+	if err := rig.store.InsertSegment(&db.Segment{MeetingID: rig.meetingID, Start: 0, End: 1, Text: "partial"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rig.store.Conn.Exec(`UPDATE meetings SET capture_status=?,processing_status=? WHERE id=?`,
+		db.CaptureStatusFailed, db.ProcessingStatusNotStarted, rig.meetingID); err != nil {
+		t.Fatal(err)
+	}
+	stream := make(chan Event)
+	close(stream)
+	session := rig.module.Start(context.Background(), StartInput{MeetingID: rig.meetingID, Events: stream})
+	if outcome, err := session.Finish(context.Background()); err != nil || outcome != OutcomeRebuildQueued {
+		t.Fatalf("Finish() = %q, %v", outcome, err)
+	}
+	segments, err := rig.store.GetSegments(rig.meetingID)
+	if err != nil || len(segments) != 0 {
+		t.Fatalf("segments = %d, error = %v", len(segments), err)
+	}
 }
 
 func TestCommitFailureLeavesNoCommittedTranscript(t *testing.T) {

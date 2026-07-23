@@ -32,6 +32,27 @@ func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
 	assertEventNames(t, events, EventStarted, EventStopping, EventCaptured)
 }
 
+func TestRunFailsAfterMissingMicrophoneCleanup(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir(), omitMic: true}
+	events := &recordingEvents{onEvent: interruptOnStarted(t)}
+	lifecycle := meetinglifecycle.New(store)
+	service := New(lifecycle, livetranscript.New(store, lifecycle, fakeTranscriber{}))
+	service.BaseDir, service.Events = t.TempDir(), events
+	service.recorder = func(capture.CaptureMode, string, int) audioRecorder { return recorder }
+
+	if err := service.Run(Request{Title: "Missing mic", Mode: capture.ModeBoth}); err == nil || err.Error() != "microphone audio was not captured" {
+		t.Fatalf("Run() error = %v", err)
+	}
+	meeting := latestMeeting(t, store)
+	if meeting.CaptureStatus != db.CaptureStatusFailed {
+		t.Fatalf("capture_status = %q", meeting.CaptureStatus)
+	}
+	assertStoredSegmentCount(t, store, meeting.ID, 0)
+	assertEventNames(t, events, EventStarted, EventStopping, EventFailed)
+}
+
 func latestMeeting(t *testing.T, store *db.DB) *db.Meeting {
 	t.Helper()
 	meetings, err := store.ListMeetings(1)

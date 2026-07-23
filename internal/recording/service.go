@@ -129,15 +129,21 @@ func (w meetingRecordingWorkflow) record(req Request, session recordingSession, 
 	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
 	if err := w.waitForStop(ctx, recorder, session); err != nil {
 		stopHeartbeat()
-		return err
+		w.finishLiveTranscript(live)
+		return session.failCapture(err)
 	}
 	stopHeartbeat()
-	return w.finalizeRecording(session, recorder, live)
+	return w.finalizeRecording(session, recorder, live, req.Mode)
 }
 
-func (w meetingRecordingWorkflow) finalizeRecording(session recordingSession, recorder audioRecorder, live *livetranscript.Session) error {
+func (w meetingRecordingWorkflow) finalizeRecording(session recordingSession, recorder audioRecorder, live *livetranscript.Session, mode capture.CaptureMode) error {
 	session = w.completeCapture(session, recorder)
+	if captureErr := session.requireAudio(mode); captureErr != nil {
+		w.finishLiveTranscript(live)
+		return session.failCapture(captureErr)
+	}
 	if err := session.capture(context.Background()); err != nil {
+		w.finishLiveTranscript(live)
 		return err
 	}
 	w.finishLiveTranscript(live)
@@ -170,7 +176,10 @@ func (w meetingRecordingWorkflow) waitForStop(ctx context.Context, recorder audi
 	case <-ctx.Done():
 		return w.stopCapture(recorder, session)
 	case err := <-recorder.Done():
-		return session.failUnexpectedCaptureStop(err)
+		if err != nil {
+			return fmt.Errorf("capture stopped unexpectedly: %w", err)
+		}
+		return fmt.Errorf("capture stopped unexpectedly")
 	}
 }
 

@@ -42,7 +42,9 @@ func (d *DB) DiscardLiveTranscript(ctx context.Context, id string, at time.Time)
 
 func discardLiveTranscriptTx(ctx context.Context, tx *sql.Tx, id string, at time.Time) (bool, error) {
 	result, err := tx.ExecContext(ctx, discardLiveTranscriptSQL, stamp(at), id,
-		CaptureStatusCaptured, ProcessingStatusPending)
+		CaptureStatusRecording, ProcessingStatusNotStarted,
+		CaptureStatusCaptured, ProcessingStatusPending,
+		CaptureStatusFailed, ProcessingStatusNotStarted)
 	ok, err := rowsChanged(result, err, "discard Live Transcript")
 	if err != nil || !ok {
 		return ok, err
@@ -60,4 +62,5 @@ const commitLiveTranscriptSQL = `UPDATE meetings SET transcript=?, processing_st
 	WHERE id=? AND capture_status=? AND processing_status=? AND transcript IS NULL`
 
 const discardLiveTranscriptSQL = `UPDATE meetings SET processing_status_updated_at=?
-	WHERE id=? AND capture_status=? AND processing_status=? AND transcript IS NULL`
+	WHERE id=? AND ((capture_status=? AND processing_status=?) OR (capture_status=? AND processing_status=?)
+		OR (capture_status=? AND processing_status=?)) AND transcript IS NULL`

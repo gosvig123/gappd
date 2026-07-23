@@ -20,6 +20,25 @@ func TestChunkEventWriterForwardsLiveTranscriptEvent(t *testing.T) {
 	}
 }
 
+func TestCaptureOutputWriterSignalsReadiness(t *testing.T) {
+	events := make(chan livetranscript.Event, 1)
+	ready := make(chan struct{}, 1)
+	writer := newCaptureOutputWriter(io.Discard, events, ready)
+	if _, err := writer.Write([]byte("● " + captureReadyOutput + "\n")); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+	select {
+	case <-ready:
+	default:
+		t.Fatal("readiness was not signaled")
+	}
+	select {
+	case event := <-events:
+		t.Fatalf("readiness emitted transcript event %#v", event)
+	default:
+	}
+}
+
 func TestChunkEventWriterConvertsInvalidEventToDrop(t *testing.T) {
 	events := make(chan livetranscript.Event, 1)
 	writer := newChunkEventWriter(io.Discard, events)

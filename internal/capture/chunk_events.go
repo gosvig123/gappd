@@ -7,14 +7,21 @@ import (
 	"github.com/gappd-dev/gappd/internal/livetranscript"
 )
 
+const captureReadyOutput = "Recording... send SIGINT to stop"
+
 type chunkEventWriter struct {
 	forward io.Writer
 	events  chan<- livetranscript.Event
+	ready   chan<- struct{}
 	buf     bytes.Buffer
 }
 
 func newChunkEventWriter(forward io.Writer, events chan<- livetranscript.Event) io.Writer {
-	return &chunkEventWriter{forward: forward, events: events}
+	return newCaptureOutputWriter(forward, events, nil)
+}
+
+func newCaptureOutputWriter(forward io.Writer, events chan<- livetranscript.Event, ready chan<- struct{}) io.Writer {
+	return &chunkEventWriter{forward: forward, events: events, ready: ready}
 }
 
 func (w *chunkEventWriter) Write(p []byte) (int, error) {
@@ -41,6 +48,13 @@ func (w *chunkEventWriter) consumeLine() {
 	line := bytes.TrimSpace(w.buf.Bytes())
 	w.buf.Reset()
 	if len(line) == 0 {
+		return
+	}
+	if bytes.Contains(line, []byte(captureReadyOutput)) {
+		select {
+		case w.ready <- struct{}{}:
+		default:
+		}
 		return
 	}
 	event, matched, err := livetranscript.DecodeEvent(line)

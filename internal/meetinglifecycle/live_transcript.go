@@ -34,7 +34,7 @@ func (w Module) DiscardLiveTranscript(ctx context.Context, id string, at time.Ti
 	if err != nil {
 		return Result{}, err
 	}
-	if err := requireLiveTranscriptPending(meeting); err != nil {
+	if err := requireLiveTranscriptDiscardable(meeting); err != nil {
 		return Result{Meeting: meeting}, err
 	}
 	applied, err := w.store.DiscardLiveTranscript(ctx, id, at)
@@ -49,6 +49,19 @@ func (w Module) DiscardLiveTranscript(ctx context.Context, id string, at time.Ti
 func requireLiveTranscriptPending(meeting *db.Meeting) error {
 	if meeting.CaptureStatus != db.CaptureStatusCaptured || meeting.ProcessingStatus != db.ProcessingStatusPending {
 		return fmt.Errorf("Live Transcript requires captured meeting with pending processing")
+	}
+	if meeting.Transcript != nil {
+		return fmt.Errorf("Live Transcript already committed")
+	}
+	return nil
+}
+
+func requireLiveTranscriptDiscardable(meeting *db.Meeting) error {
+	recording := meeting.CaptureStatus == db.CaptureStatusRecording && meeting.ProcessingStatus == db.ProcessingStatusNotStarted
+	pending := meeting.CaptureStatus == db.CaptureStatusCaptured && meeting.ProcessingStatus == db.ProcessingStatusPending
+	failed := meeting.CaptureStatus == db.CaptureStatusFailed && meeting.ProcessingStatus == db.ProcessingStatusNotStarted
+	if !recording && !pending && !failed {
+		return fmt.Errorf("Live Transcript cannot be discarded from current meeting state")
 	}
 	if meeting.Transcript != nil {
 		return fmt.Errorf("Live Transcript already committed")

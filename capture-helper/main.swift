@@ -356,6 +356,19 @@ class MicRecorder {
         try engine.start()
     }
 
+    var isRunning: Bool { engine.isRunning }
+
+    func restart() throws {
+        try engine.start()
+    }
+
+    func verifyRunning() throws {
+        guard engine.isRunning else {
+            throw NSError(domain: "GappdCapture", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "microphone capture stopped during startup"])
+        }
+    }
+
     func stop() {
         engine.inputNode.removeTap(onBus: 0)
         engine.stop()
@@ -490,6 +503,10 @@ func stderrPrint(_ message: String) {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
 }
 
+func emitCaptureReady() {
+    FileHandle.standardOutput.write(Data("● Recording... send SIGINT to stop\n".utf8))
+}
+
 @MainActor
 func requestPermissionsAndExit(outputPath: String? = nil) {
     let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -615,17 +632,6 @@ if let stopFile = config.stopFile {
     watchStopFile(stopFile, stopSemaphore: stopSemaphore)
 }
 
-if let mic = micRecorder {
-    let micPath = (config.outputDir as NSString).appendingPathComponent("mic.wav")
-    do {
-        try mic.start(outputPath: micPath)
-        print("● Mic recording to \(micPath)")
-    } catch {
-        stderrPrint("error: could not start microphone capture: \(error)")
-        exit(1)
-    }
-}
-
 Task { @MainActor in
     if let sys = systemRecorder {
         let sysPath = (config.outputDir as NSString).appendingPathComponent("system.wav")
@@ -638,7 +644,24 @@ Task { @MainActor in
         }
     }
 
-    print("● Recording... send SIGINT to stop")
+    if let mic = micRecorder {
+        let micPath = (config.outputDir as NSString).appendingPathComponent("mic.wav")
+        do {
+            try mic.start(outputPath: micPath)
+            try await Task.sleep(nanoseconds: 250_000_000)
+            if !mic.isRunning {
+                try mic.restart()
+                try await Task.sleep(nanoseconds: 250_000_000)
+            }
+            try mic.verifyRunning()
+            print("● Mic recording to \(micPath)")
+        } catch {
+            stderrPrint("error: could not start microphone capture: \(error)")
+            exit(1)
+        }
+    }
+
+    emitCaptureReady()
     DispatchQueue.global().async {
         stopSemaphore.wait()
         Task { @MainActor in

@@ -45,7 +45,7 @@ func TestTranscriptionDrainPersistsSourceAndRevision(t *testing.T) {
 		t.Fatalf("Drain() = %#v, %v", result, err)
 	}
 	segments, err := store.GetSegments(meeting.ID)
-	if err != nil || len(segments) != 1 || segments[0].SpeakerSource == nil ||
+	if err != nil || len(segments) != 1 || segments[0].Speaker != db.SpeakerYou || segments[0].SpeakerSource == nil ||
 		*segments[0].SpeakerSource != db.SegmentSourceMicrophone || segments[0].SpeakerAssignmentReason == nil ||
 		*segments[0].SpeakerAssignmentReason != db.SpeakerAssignmentReasonMicrophone ||
 		getMeeting(t, store, meeting.ID).TranscriptRevision != 1 {

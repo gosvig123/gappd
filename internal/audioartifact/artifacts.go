@@ -49,6 +49,14 @@ func (a Artifacts) Sources() []Source {
 	}
 }
 
+func (a Artifacts) HasMicrophoneAudio() bool {
+	return Source{Path: a.MicPath()}.HasAudio()
+}
+
+func (a Artifacts) HasSystemAudio() bool {
+	return Source{Path: a.SystemPath()}.HasAudio()
+}
+
 func (a Artifacts) HasAudio() bool {
 	for _, source := range a.Sources() {
 		if source.HasAudio() {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
@@ -44,21 +45,7 @@ func (r recordingSession) failCapture(captureErr error) error {
 	return captureErr
 }
 
-func (r recordingSession) failUnexpectedCaptureStop(err error) error {
-	unexpectedErr := fmt.Errorf("capture stopped unexpectedly")
-	if err != nil {
-		unexpectedErr = fmt.Errorf("capture stopped unexpectedly: %w", err)
-	}
-	if failErr := r.failCapture(unexpectedErr); failErr != nil {
-		return failErr
-	}
-	return unexpectedErr
-}
-
 func (r recordingSession) capture(ctx context.Context) error {
-	if err := r.requireAudio(); err != nil {
-		return err
-	}
 	return r.apply(ctx, meetinglifecycle.Captured{At: time.Now()})
 }
 
@@ -71,13 +58,13 @@ func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle
 	return nil
 }
 
-func (r recordingSession) requireAudio() error {
-	if r.artifacts.HasAudio() {
+func (r recordingSession) requireAudio(mode capture.CaptureMode) error {
+	switch {
+	case mode != capture.ModeSystem && !r.artifacts.HasMicrophoneAudio():
+		return fmt.Errorf("microphone audio was not captured")
+	case mode != capture.ModeMic && !r.artifacts.HasSystemAudio():
+		return fmt.Errorf("system audio was not captured")
+	default:
 		return nil
 	}
-	captureErr := fmt.Errorf("no audio captured")
-	if err := r.failCapture(captureErr); err != nil {
-		return err
-	}
-	return captureErr
 }

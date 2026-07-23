@@ -30,12 +30,15 @@ type fakeRecorder struct {
 	dir              string
 	done             chan error
 	transcriptEvents chan livetranscript.Event
+	omitMic          bool
 }
 
 func (r *fakeRecorder) Start(context.Context) error {
 	artifacts := r.Artifacts()
-	if err := os.WriteFile(artifacts.MicPath(), []byte(strings.Repeat("m", 45)), 0o644); err != nil {
-		return err
+	if !r.omitMic {
+		if err := os.WriteFile(artifacts.MicPath(), []byte(strings.Repeat("m", 45)), 0o644); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(artifacts.SystemPath(), []byte(strings.Repeat("s", 45)), 0o644)
 }
