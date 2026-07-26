@@ -17,7 +17,9 @@
 - Pushes to `beta` publish prereleases named `v<next-version>-beta.<run-number>` from the pushed commit
 - Beta builds use prerelease package versions while keeping macOS bundle/build versions numeric
 - Release assets include the first-install DMG plus the updater ZIP, blockmaps, and `*-mac.yml` metadata
-- Beta pushes also update the mutable `beta` release's `latest.json` so old beta apps can find the bridge release
+- Beta serials use the workflow-wide GitHub run number; manual stable runs consume numbers too, so gaps between beta serials are expected
+- Stable releases retain `beta-mac.yml` so beta-channel installs can move onto a promoted stable build
+- Beta pushes update the mutable `beta` release's `latest.json` so old beta apps can find the bridge release; its title and notes identify the current versioned beta, while its source archives remain tied to the compatibility tag's original commit
 - `release_tag`: existing `vMAJOR.MINOR.PATCH` tag for manual stable release runs
 - `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application certificate
 - `APPLE_CERTIFICATE_PASSWORD`: password for the `.p12`
