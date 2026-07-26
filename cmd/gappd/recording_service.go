@@ -8,7 +8,11 @@ import (
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/livetranscript"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
 type recordingOutput int
@@ -19,16 +23,20 @@ const (
 	recordingOutputQuiet
 )
 
-func newRecordingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput) recording.Service {
-	service := recording.Service{Store: store, Pipeline: pipeline, Out: os.Stdout, ErrOut: os.Stderr}
+func newMeetingProcessingService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput) meetingprocessing.Service {
+	service := meetingprocessing.Service{Store: store, Lifecycle: meetinglifecycle.New(store), Pipeline: pipeline}
 	if output == recordingOutputConsole {
-		service.Reporter = recording.NewConsoleProcessingReporter(os.Stdout, os.Stderr)
+		service.Reporter = meetingprocessing.NewConsoleReporter(os.Stdout, os.Stderr)
 	}
 	return service
 }
 
-func newRecordingWorkflowService(store *db.DB, pipeline *ai.Pipeline, output recordingOutput, suppressProcessingFailure bool) (recording.Service, error) {
-	service := newRecordingService(store, pipeline, output)
+func newRecordingWorkflowService(store *db.DB, output recordingOutput, suppressProcessingFailure bool) (recording.Service, error) {
+	lifecycle := meetinglifecycle.New(store)
+	liveTranscript := livetranscript.New(store, lifecycle, livetranscript.TranscriberFunc(transcribe.TranscribeFile))
+	service := recording.New(lifecycle, liveTranscript)
+	service.Out = os.Stdout
+	service.ErrOut = os.Stderr
 	baseDir, err := config.GappdDir()
 	if err != nil {
 		return recording.Service{}, fmt.Errorf("resolve gappd dir for session path: %w", err)

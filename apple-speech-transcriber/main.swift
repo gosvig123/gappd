@@ -11,6 +11,13 @@ struct TranscriptSegment: Encodable {
     let start: Double
     let end: Double
     let text: String
+    let words: [TranscriptWord]
+}
+
+struct TranscriptWord: Encodable {
+    let start: Double
+    let end: Double
+    let text: String
 }
 
 struct AssetStatus: Encodable {
@@ -145,7 +152,12 @@ struct AppleSpeechTranscriberCLI {
     static func segment(from result: SpeechTranscriber.Result) -> TranscriptSegment? {
         let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty { return nil }
-        return TranscriptSegment(start: seconds(result.range.start), end: seconds(result.range.end), text: text)
+        let words = result.text.runs.compactMap { run -> TranscriptWord? in
+            guard let range = run.audioTimeRange else { return nil }
+            let word = String(result.text[run.range].characters)
+            return TranscriptWord(start: seconds(range.start), end: seconds(range.end), text: word)
+        }
+        return TranscriptSegment(start: seconds(result.range.start), end: seconds(result.range.end), text: text, words: words)
     }
 
     static func seconds(_ time: CMTime) -> Double {

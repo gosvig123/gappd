@@ -8,7 +8,7 @@ import {
   type AppStreamID,
 } from '../shared/generated/app-protocol'
 import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
-import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
   onEvent(event: AppStreamEvent<ID>): void
@@ -18,8 +18,10 @@ type StreamHandlers<ID extends AppStreamID> = {
 
 type CommandEnv = NodeJS.ProcessEnv
 
-export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}): Promise<AppCommandOutput[ID]> {
-  const output = await runCommand(id, commandArgs(id, input), env)
+const PROCESSING_TIMING_MARKER = '● Timing '
+
+export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}, signal?: AbortSignal): Promise<AppCommandOutput[ID]> {
+  const output = await runCommand(id, commandArgs(id, input), env, signal)
   return parseCommandOutput(id, output)
 }
 
@@ -30,17 +32,17 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), ...overrides })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), ...overrides })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {
   return APP_COMMANDS[id].args(input as never)
 }
 
-function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv): Promise<string> {
+function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), stdio: ['ignore', 'pipe', 'pipe'] })
-    collectCommandOutput(child, resolve, reject)
+    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: ['ignore', 'pipe', 'pipe'] })
+    collectCommandOutput(child, resolve, reject, signal)
   })
 }
 
@@ -59,22 +61,40 @@ function parseCommandOutput<ID extends AppRequestID>(id: ID, output: string): Ap
   }
 }
 
-function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void): void {
+function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void, signal?: AbortSignal): void {
   let stdout = ''
   let stderr = ''
   child.stdout?.on('data', (chunk) => { stdout += chunk.toString() })
   child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
-  child.on('error', reject)
-  child.on('exit', (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr || stdout || `gappd exited with code ${code}`)))
+  child.on('error', (error) => signal?.aborted ? child.once('close', () => reject(error)) : reject(error))
+  child.on('exit', (code) => {
+    if (code !== 0) return reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
+    if (stderr.trim()) console.warn(stderr.trim())
+    resolve(stdout)
+  })
 }
 
 function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id: ID, handlers: StreamHandlers<ID>): void {
   let stderr = ''
+  let settled = false
   const state = { buffer: '', sawEvent: false, sawTerminal: false, protocolError: null as string | null }
   child.stdout?.on('data', (chunk) => readProtocolChunk(id, state, chunk.toString(), handlers))
-  child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
-  child.on('error', (error) => handlers.onError(error.message))
-  child.on('exit', (code, signal) => finishStream(state, stderr, code, signal, handlers))
+  child.stderr?.on('data', (chunk) => { stderr = captureStreamStderr(stderr, chunk.toString()) })
+  child.once('error', (error) => {
+    if (settled) return
+    settled = true
+    handlers.onError(error.message)
+  })
+  child.once('close', (code, signal) => {
+    if (settled) return
+    settled = true
+    finishStream(state, stderr, code, signal, handlers)
+  })
+}
+
+function captureStreamStderr(current: string, chunk: string): string {
+  if (chunk.includes(PROCESSING_TIMING_MARKER)) console.info(chunk.trim())
+  return current + chunk
 }
 
 function readProtocolChunk<ID extends AppStreamID>(id: ID, state: StreamState, chunk: string, handlers: StreamHandlers<ID>): void {

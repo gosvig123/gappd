@@ -5,6 +5,8 @@ import (
 	"io"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
 
@@ -46,11 +48,19 @@ type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
 }
 
+type ProcessingDrainResponse struct {
+	Capability meetingprocessing.Capability `json:"capability"`
+	Attempted  int                          `json:"attempted"`
+	Completed  int                          `json:"completed"`
+	Requeued   int                          `json:"requeued"`
+	Failed     int                          `json:"failed"`
+}
+
 type MeetingStatus struct {
-	State      db.MeetingState      `json:"state"`
-	UpdatedAt  string               `json:"updatedAt"`
-	Capture    CaptureStatusInfo    `json:"capture"`
-	Processing ProcessingStatusInfo `json:"processing"`
+	State      meetinglifecycle.MeetingState `json:"state"`
+	UpdatedAt  string                        `json:"updatedAt"`
+	Capture    CaptureStatusInfo             `json:"capture"`
+	Processing ProcessingStatusInfo          `json:"processing"`
 }
 
 type CaptureStatusInfo struct {
@@ -101,7 +111,7 @@ func NewRecordingEvent(name recording.EventName, meeting db.Meeting, err error) 
 }
 
 func MeetingStatusFor(meeting db.Meeting) MeetingStatus {
-	status := db.MeetingLifecycleStatusFor(meeting)
+	status := meetinglifecycle.ViewFor(meeting)
 	return MeetingStatus{State: status.State, UpdatedAt: status.UpdatedAt, Capture: CaptureStatusInfoFor(meeting), Processing: ProcessingStatusInfoFor(meeting)}
 }
 

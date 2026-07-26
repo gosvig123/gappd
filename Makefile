@@ -10,7 +10,7 @@ UNAME_S   := $(shell uname -s)
 
 export MACOSX_DEPLOYMENT_TARGET ?= 26.0
 
-.PHONY: build build-capture build-speech ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
+.PHONY: build build-capture build-speech build-diarizer ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -22,6 +22,11 @@ build-capture: ensure-macos
 
 build-speech: ensure-macos
 	@bash apple-speech-transcriber/build.sh
+
+build-diarizer: ensure-macos
+	@bash gappd-diarizer/build.sh
+	@mkdir -p $(BUILD_DIR)
+	@cp gappd-diarizer/.build/gappd-diarizer $(BUILD_DIR)/gappd-diarizer
 
 ensure-macos:
 	@if [ "$(UNAME_S)" != "Darwin" ]; then \

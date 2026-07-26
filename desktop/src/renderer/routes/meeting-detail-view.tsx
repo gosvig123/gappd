@@ -9,11 +9,12 @@ import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
 import { TranscriptText } from './transcript-view'
 
-const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', CAPTURED_STATE = 'captured'
+const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded'
+const DIARIZATION_RETRY_WAITING_MESSAGE = 'Retry available after meeting processing finishes.'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
 type MeetingSegment = MeetingDetail['segments'][number]
-type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string }
+type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onRetryDiarization: (id: string) => Promise<void> }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
@@ -84,7 +85,7 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
-function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeeting: MeetingDetail; transcript: string }) {
+function SelectedMeetingDetail({ selectedMeeting, transcript, onRetryDiarization }: { selectedMeeting: MeetingDetail; transcript: string; onRetryDiarization: (id: string) => Promise<void> }) {
   const detailTranscriptText = detailTranscript(selectedMeeting, transcript)
   const hasTranscript = Boolean(detailTranscriptText)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
@@ -97,12 +98,12 @@ function SelectedMeetingDetail({ selectedMeeting, transcript }: { selectedMeetin
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
         <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
-      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} />
+      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} onRetryDiarization={onRetryDiarization} />
     </Panel>
   )
 }
 
-function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean }) {
+function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript, onRetryDiarization }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean; onRetryDiarization: (id: string) => Promise<void> }) {
   const recording = selectedMeeting.status.state === RECORDING_STATE
   const copyValue = tabCopyValue(activeTab, selectedMeeting, transcript)
   const reading = useReadingOverflow(copyValue, `${selectedMeeting.id}:${activeTab}`)
@@ -111,14 +112,39 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
     <div className="detail-grid detail-reading-stack">
       <MeetingFailureState message={selectedMeeting.status.capture.failureMessage} />
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
+      <DiarizationNotice meeting={selectedMeeting} onRetry={onRetryDiarization} />
+      <DiarizationTrustCue meeting={selectedMeeting} />
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
-        {activeTab === TRANSCRIPT_TAB && recording ? <TrackingIndicator /> : null}
-        {activeTab === TRANSCRIPT_TAB && !recording ? <ReadingCard value={transcript} emptyText={transcriptEmptyText(selectedMeeting)} reading={reading}><TranscriptText value={transcript} segments={selectedMeeting.segments ?? []} /></ReadingCard> : null}
+        {activeTab === TRANSCRIPT_TAB && recording && !hasLiveSegments(selectedMeeting) ? <TrackingIndicator /> : null}
+        {activeTab === TRANSCRIPT_TAB && (hasLiveSegments(selectedMeeting) || !recording) ? <TranscriptPanel meeting={selectedMeeting} transcript={transcript} reading={reading} /> : null}
       </div>
     </div>
   )
+}
+
+function DiarizationNotice({ meeting, onRetry }: { meeting: MeetingDetail; onRetry: (id: string) => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  const [retryError, setRetryError] = useState<string | null>(null)
+  const retrying = useRef(false)
+  const processing = meeting.status.processing.state === PROCESSING_STATUS
+  useEffect(() => { retrying.current = false; setBusy(false); setRetryError(null) }, [meeting.id])
+  if (meeting.diarization.state !== DEGRADED_STATE) return null
+  const retry = async () => {
+    if (processing || retrying.current) return
+    retrying.current = true
+    setBusy(true)
+    setRetryError(null)
+    try { await onRetry(meeting.id) } catch (error) { setRetryError(error instanceof Error ? error.message : String(error)) } finally { retrying.current = false; setBusy(false) }
+  }
+  const message = processing ? `${meeting.diarization.error ?? 'Speaker labeling unavailable.'} ${DIARIZATION_RETRY_WAITING_MESSAGE}` : meeting.diarization.error ?? 'Speaker labeling unavailable.'
+  return <div className="detail-surface"><span>{message}</span>{retryError ? <span className="diarization-retry-error" role="alert">{retryError}</span> : null}<div><Button className="compact-action" disabled={processing || busy} onClick={() => void retry()}>{processing ? 'Finishing meeting…' : busy ? 'Retrying…' : 'Retry'}</Button></div></div>
+}
+
+function DiarizationTrustCue({ meeting }: { meeting: MeetingDetail }) {
+  if (meeting.diarization.speakerCount === undefined) return null
+  return <div className="detail-surface diarization-trust-cue"><strong>Speaker count: {meeting.diarization.speakerCount}</strong><span>Speaker labels may not always be accurate.</span></div>
 }
 
 function SummaryPanel({ selectedMeeting, hasTranscript, reading }: { selectedMeeting: MeetingDetail; hasTranscript: boolean; reading: ReturnType<typeof useReadingOverflow> }) {
@@ -137,15 +163,22 @@ function showPostMeetingProgress(meeting: MeetingDetail, progress: MeetingProgre
   return meeting.status.state !== RECORDING_STATE && (meetingHasWork(progress) || meetingFailed(progress))
 }
 
-function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Tracking</div><p>Recording audio. Transcript appears after meeting ends.</p></div> }
+function TranscriptPanel({ meeting, transcript, reading }: { meeting: MeetingDetail; transcript: string; reading: ReturnType<typeof useReadingOverflow> }) {
+  const provisional = meeting.transcriptProvisional
+  return <><div className="meeting-section-label">{provisional ? 'Live Transcript' : 'Transcript'}</div><ReadingCard value={transcript} emptyText={transcriptEmptyText(meeting)} reading={reading}><TranscriptText value={transcript} segments={meeting.segments ?? []} /></ReadingCard></>
+}
+
+function hasLiveSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
+function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
 
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
+  if (meeting.diarization.state === PENDING_STATE || meeting.diarization.state === PROCESSING_STATUS) return 'Labeling speakers locally.'
   if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary with local AI.'
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
   if (progress.hasTranscript && progress.hasSummary) return ''
   if (progress.hasTranscript) return 'Transcript available.'
-  if (meeting.status.state === CAPTURED_STATE) return 'Audio captured · waiting to process.'
+  if (meeting.status.state === PENDING_STATE) return 'Audio captured · waiting to process.'
   return 'Analysis and transcript for selected meeting.'
 }
 
@@ -157,7 +190,7 @@ function transcriptEmptyText(meeting: MeetingDetail): string {
 }
 
 function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
-  return { status: meeting.status, hasTranscript, hasSummary: Boolean(meeting.summary) }
+  return { status: meeting.status, hasTranscript: hasTranscript && !meeting.transcriptProvisional, hasSummary: Boolean(meeting.summary) }
 }
 
 function detailTranscript(meeting: MeetingDetail, transcript: string): string {
@@ -178,7 +211,7 @@ export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><SelectedMeetingError message={selectedMeetingError} /></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onRetryDiarization={props.onRetryDiarization} />
 }
 
 function SelectedMeetingError({ message }: { message: string }) {

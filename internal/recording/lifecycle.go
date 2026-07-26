@@ -1,6 +1,7 @@
 package recording
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 func (w meetingRecordingWorkflow) startCaptureHeartbeat(meeting *db.Meeting) func() {
@@ -36,25 +38,34 @@ func (w meetingRecordingWorkflow) runCaptureHeartbeat(meeting *db.Meeting, done 
 }
 
 func (w meetingRecordingWorkflow) saveCaptureHeartbeat(meeting *db.Meeting) {
-	updatedAt := nowUTC()
-	if err := w.meetings().UpdateRecordingHeartbeat(meeting.ID, updatedAt); err != nil && w.errOut != nil {
-		fmt.Fprintf(w.errOut, "warning: update recording heartbeat: %v\n", err)
+	result, err := w.lifecycle.Heartbeat(context.Background(), meeting.ID, time.Now())
+	if err != nil {
+		if w.errOut != nil {
+			fmt.Fprintf(w.errOut, "warning: update recording heartbeat: %v\n", err)
+		}
+		return
 	}
-	meeting.CaptureStatusUpdatedAt = updatedAt
+	*meeting = *result.Meeting
 }
 
 func (w meetingRecordingWorkflow) createSessionDir(title string) (string, error) {
-	dir := filepath.Join(w.baseDir, "sessions", fmt.Sprintf("%s-%s", time.Now().Format("2006-01-02T1504"), sanitize(title)))
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	root := filepath.Join(w.baseDir, "sessions")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return "", fmt.Errorf("create sessions root: %w", err)
+	}
+	prefix := fmt.Sprintf("%s-%s-", time.Now().Format("2006-01-02T1504"), sanitize(title))
+	dir, err := os.MkdirTemp(root, prefix)
+	if err != nil {
 		return "", fmt.Errorf("create session dir: %w", err)
 	}
 	return dir, nil
 }
 
-func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string) (*db.Meeting, error) {
-	now := nowUTC()
-	meeting := db.NewRecordingMeeting(title, sessionDir, language, now)
-	if err := w.meetings().CreateMeeting(meeting); err != nil {
+func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string, speakerLabelsEnabled *bool) (*db.Meeting, error) {
+	start := meetinglifecycle.RecordingStart{Title: title, SessionDir: sessionDir, Language: language,
+		SpeakerLabelsEnabled: speakerLabelsEnabled, At: time.Now()}
+	meeting, err := w.lifecycle.BeginRecording(context.Background(), start)
+	if err != nil {
 		return nil, fmt.Errorf("create meeting: %w", err)
 	}
 	return meeting, nil
@@ -98,8 +109,4 @@ func sanitize(s string) string {
 		}
 	}
 	return b.String()
-}
-
-func nowUTC() string {
-	return time.Now().UTC().Format(time.RFC3339)
 }

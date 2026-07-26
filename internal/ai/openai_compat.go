@@ -28,6 +28,7 @@ type openAIRequest struct {
 	Temperature    float64         `json:"temperature"`
 	Stream         bool            `json:"stream"`
 	ResponseFormat any             `json:"response_format,omitempty"`
+	MaxTokens      int             `json:"max_tokens,omitempty"`
 }
 
 type openAIResponse struct {
@@ -41,7 +42,7 @@ type openAIResponse struct {
 }
 
 func NewOpenAICompat(endpoint, model string) *OpenAICompatProvider {
-	return &OpenAICompatProvider{endpoint: strings.TrimRight(endpoint, "/"), model: model, client: &http.Client{Timeout: 5 * time.Minute}}
+	return &OpenAICompatProvider{endpoint: strings.TrimRight(endpoint, "/"), model: model, client: &http.Client{Timeout: 20 * time.Minute}}
 }
 
 func (p *OpenAICompatProvider) Complete(ctx context.Context, req CompletionRequest) (string, error) {
@@ -86,7 +87,7 @@ func (p *OpenAICompatProvider) doChat(ctx context.Context, req CompletionRequest
 }
 
 func (p *OpenAICompatProvider) buildRequest(req CompletionRequest, responseFormat any) (*bytes.Reader, error) {
-	data, err := json.Marshal(openAIRequest{Model: p.model, Stream: false, Temperature: req.Temperature, ResponseFormat: responseFormat, Messages: []openAIMessage{{Role: "system", Content: req.System}, {Role: "user", Content: req.User}}})
+	data, err := json.Marshal(openAIRequest{Model: p.model, Stream: false, Temperature: req.Temperature, ResponseFormat: responseFormat, MaxTokens: req.MaxTokens, Messages: []openAIMessage{{Role: "system", Content: req.System}, {Role: "user", Content: req.User}}})
 	if err != nil {
 		return nil, err
 	}

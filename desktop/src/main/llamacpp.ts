@@ -5,13 +5,17 @@ import { lastLines } from '../shared/subprocess-output'
 import { isExecutableFile, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
 import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
-import { type LocalAISetupErrorState, toLocalAISetupErrorState } from './local-ai-setup-errors'
-import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
+import { type ManagedRuntimeErrorState, toManagedRuntimeErrorState } from './managed-runtime-errors'
+import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, reclaimStaleLlamaCppProcess, spawnLlamaCpp, stopLlamaCppProcess, waitForLlamaCppReadiness, type LlamaCppChild } from './llamacpp-process'
 
-type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: LocalAISetupErrorState }
-export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: LocalAISetupErrorState }
+type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; stopPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: ManagedRuntimeErrorState }
+type ModelListResponse = { models?: Array<{ name?: string; model?: string }> }
+export type ManagedLlamaCppLease = { endpoint: string; release(): Promise<void> }
+export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: ManagedRuntimeErrorState }
 
-const runtime: LlamaCppRuntime = { process: null, startPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
+const MODEL_CHECK_TIMEOUT_MS = 2_000
+const runtime: LlamaCppRuntime = { process: null, startPromise: null, stopPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
+let runtimeUsers = 0
 
 export function resolveBundledLlamaCppBinary(): string {
   return resolveBinary({ packaged: ['llamacpp', BUNDLED_LLAMACPP_BINARY_NAME], dev: ['resources', 'llamacpp', BUNDLED_LLAMACPP_BINARY_NAME] })
@@ -21,25 +25,52 @@ export function managedLlamaCppEndpoint(): string { return runtime.endpoint }
 
 export async function getManagedLlamaCppRuntimeStatus(): Promise<ManagedLlamaCppRuntimeStatus> {
   const supported = managedLlamaCppSupported()
-  const bundled = supported ? await bundledLlamaCppAvailable() : false
+  const bundled = supported ? await managedLlamaCppAvailable() : false
   const running = bundled ? await managedLlamaCppReadiness() : false
   return { supported, bundled, running, endpoint: runtime.endpoint, error: runtime.lastError }
 }
 
-export async function ensureManagedLlamaCppRunning(): Promise<string> {
+async function ensureManagedLlamaCppRunning(): Promise<string> {
+  if (runtime.stopPromise) await runtime.stopPromise
   if (!managedLlamaCppSupported()) throw new Error('Managed llama.cpp is only supported on macOS')
-  if (!(await bundledLlamaCppAvailable())) throw new Error(missingBundledLlamaCppMessage())
+  if (!(await managedLlamaCppAvailable())) throw new Error(missingBundledLlamaCppMessage())
   if (!(await managedLanguageModelAvailable())) throw new Error('Managed llama.cpp model is missing. Run Local AI setup to download it.')
+  await reclaimStaleLlamaCppProcess(runtime.process, resolveBundledLlamaCppBinary(), endpointPort(runtime.endpoint))
   if (await managedLlamaCppReadiness()) return runtime.endpoint
   if (!runtime.startPromise) runtime.startPromise = startManagedLlamaCpp()
   try { await runtime.startPromise; return runtime.endpoint } finally { runtime.startPromise = null }
 }
 
+export async function acquireManagedLlamaCpp(): Promise<ManagedLlamaCppLease> {
+  runtimeUsers += 1
+  try {
+    const endpoint = await ensureManagedLlamaCppRunning()
+    return createLease(endpoint)
+  } catch (error) {
+    runtimeUsers -= 1
+    throw error
+  }
+}
+
 export async function stopManagedLlamaCpp(): Promise<void> {
+  if (runtime.stopPromise) return runtime.stopPromise
   const child = runtime.process
   if (!child) return
-  await stopLlamaCppProcess(child)
-  if (runtime.process === child) resetProcess()
+  runtime.stopPromise = stopLlamaCppProcess(child).finally(() => {
+    if (runtime.process === child) resetProcess()
+    runtime.stopPromise = null
+  })
+  return runtime.stopPromise
+}
+
+function createLease(endpoint: string): ManagedLlamaCppLease {
+  let released = false
+  return { endpoint, release: async () => {
+    if (released) return
+    released = true
+    runtimeUsers -= 1
+    if (runtimeUsers === 0) await stopManagedLlamaCpp()
+  } }
 }
 
 async function startManagedLlamaCpp(): Promise<void> {
@@ -75,17 +106,40 @@ function runtimeEnv(binaryPath: string): NodeJS.ProcessEnv {
 }
 
 function wireEvents(child: LlamaCppChild, binaryPath: string): void {
-  child.stderr?.on('data', (chunk) => { if (runtime.process === child) runtime.lastError = toLocalAISetupErrorState(lastLines(chunk.toString()), 'error', 'Managed llama.cpp reported an error') })
-  child.on('exit', (code, signal) => { if (runtime.process !== child) return; resetProcess(); if (signal !== 'SIGTERM') runtime.lastError = toLocalAISetupErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed llama.cpp exited before becoming ready') })
-  child.on('error', (error) => { if (runtime.process !== child) return; resetProcess(); runtime.lastError = toLocalAISetupErrorState(`Failed to start managed llama.cpp at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed llama.cpp') })
+  child.stderr?.on('data', (chunk) => { if (runtime.process === child) runtime.lastError = toManagedRuntimeErrorState(lastLines(chunk.toString()), 'error', 'Managed llama.cpp reported an error') })
+  child.on('exit', (code, signal) => { if (runtime.process !== child) return; resetProcess(); if (signal !== 'SIGTERM') runtime.lastError = toManagedRuntimeErrorState(startupExitMessage(binaryPath, code, signal), 'error', 'Managed llama.cpp exited before becoming ready') })
+  child.on('error', (error) => { if (runtime.process !== child) return; resetProcess(); runtime.lastError = toManagedRuntimeErrorState(`Failed to start managed llama.cpp at ${binaryPath}: ${error.message}`, 'error', 'Failed to start managed llama.cpp') })
 }
 
 function resetProcess(): void { runtime.ownedBySession = false; runtime.process = null }
-function bundledLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
-async function managedLlamaCppReadiness(): Promise<boolean> { return runtime.ownedBySession && await managedLlamaCppOwnedAndHealthy(runtime.process) }
+export function managedLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
+async function managedLlamaCppReadiness(): Promise<boolean> {
+  if (runtime.ownedBySession) return managedLlamaCppOwnedAndHealthy(runtime.process)
+  if (await endpointServesManagedModel(runtime.endpoint)) return true
+  return false
+}
 
 async function managedLlamaCppOwnedAndHealthy(child: LlamaCppChild | null): Promise<boolean> {
   return processServesEndpoint(child, endpointPort(runtime.endpoint), runtime.endpoint)
+}
+
+async function endpointServesManagedModel(endpoint: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${endpoint}/v1/models`, { signal: AbortSignal.timeout(MODEL_CHECK_TIMEOUT_MS) })
+    if (!response.ok) return false
+    return modelListContains(await response.json())
+  } catch {
+    return false
+  }
+}
+
+function modelListContains(value: unknown): boolean {
+  if (!isModelList(value)) return false
+  return value.models.some((model) => model.name === MANAGED_LLAMACPP_MODEL || model.model === MANAGED_LLAMACPP_MODEL)
+}
+
+function isModelList(value: unknown): value is ModelListResponse & { models: NonNullable<ModelListResponse['models']> } {
+  return typeof value === 'object' && value !== null && Array.isArray((value as ModelListResponse).models)
 }
 
 async function waitForLlamaCpp(child: LlamaCppChild, binaryPath: string, port: number, endpoint: string): Promise<void> {

@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 func TestArtifactsSourcesUseCaptureConvention(t *testing.T) {
@@ -14,8 +16,8 @@ func TestArtifactsSourcesUseCaptureConvention(t *testing.T) {
 	if len(sources) != 2 {
 		t.Fatalf("sources = %d, want 2", len(sources))
 	}
-	assertSource(t, sources[0], filepath.Join("session", MicFilename), MicSpeaker)
-	assertSource(t, sources[1], filepath.Join("session", SystemFilename), SystemSpeaker)
+	assertSource(t, sources[0], filepath.Join("session", MicFilename), MicSpeaker, db.SegmentSourceMicrophone)
+	assertSource(t, sources[1], filepath.Join("session", SystemFilename), SystemSpeaker, db.SegmentSourceSystem)
 }
 
 func TestArtifactsHasAudioWhenAnySourceHasAudio(t *testing.T) {
@@ -37,10 +39,10 @@ func TestSourceWithoutAudio(t *testing.T) {
 	}
 }
 
-func assertSource(t *testing.T, source Source, path, speaker string) {
+func assertSource(t *testing.T, source Source, path, speaker string, kind db.SegmentSource) {
 	t.Helper()
-	if source.Path != path || source.Speaker != speaker {
-		t.Fatalf("source = %#v, want path %q speaker %q", source, path, speaker)
+	if source.Path != path || source.Speaker != speaker || source.Kind != kind {
+		t.Fatalf("source = %#v, want path %q speaker %q kind %q", source, path, speaker, kind)
 	}
 }
 

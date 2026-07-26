@@ -16,10 +16,27 @@ var groundingStopWords = map[string]bool{
 }
 
 func groundExtraction(extraction *Extraction, transcript string) *Extraction {
-	if !needsConservativeExtraction(extraction, transcript) {
-		return boundExtraction(extraction)
+	bounded := boundExtraction(extraction)
+	beforeClaims := claimCount(bounded)
+	grounded := requireSupportedEvidence(bounded, transcript)
+	if supportedClaimsDropped(beforeClaims, grounded) {
+		return conservativeExtraction(transcript)
+	}
+	if !needsConservativeExtraction(grounded, transcript) {
+		return grounded
 	}
 	return conservativeExtraction(transcript)
+}
+
+func supportedClaimsDropped(beforeClaims int, after *Extraction) bool {
+	if beforeClaims == 0 {
+		return false
+	}
+	return claimCount(after) == 0
+}
+
+func claimCount(extraction *Extraction) int {
+	return len(extraction.Topics) + len(extraction.Decisions) + len(extraction.ActionItems)
 }
 
 func needsConservativeExtraction(extraction *Extraction, transcript string) bool {
@@ -32,10 +49,9 @@ func needsConservativeExtraction(extraction *Extraction, transcript string) bool
 
 func conservativeExtraction(transcript string) *Extraction {
 	return &Extraction{
-		Title:         "Transcript Notes",
-		Topics:        []Topic{{Name: "Transcript excerpt", Summary: compactString(transcript)}},
-		OpenQuestions: transcriptQuestions(transcript),
-		Sentiment:     "neutral",
+		Title:     "Transcript Notes",
+		Topics:    []Topic{{Name: "Transcript excerpt", Summary: compactString(transcript)}},
+		Sentiment: "neutral",
 	}
 }
 
@@ -86,23 +102,4 @@ func stemGroundingWord(word string) string {
 		}
 	}
 	return word
-}
-
-func transcriptQuestions(transcript string) []string {
-	questions := []string{}
-	for _, part := range strings.Split(transcript, "\n") {
-		if question := compactQuestion(part); question != "" {
-			questions = append(questions, question)
-		}
-	}
-	return limitSlice(uniqueStrings(questions), maxMergedOpenQuestions)
-}
-
-func compactQuestion(value string) string {
-	value = strings.TrimSpace(strings.TrimPrefix(value, "[Other]"))
-	value = strings.TrimSpace(strings.TrimPrefix(value, "[You]"))
-	if !strings.HasSuffix(value, "?") {
-		return ""
-	}
-	return compactString(value)
 }

@@ -3,24 +3,52 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
+)
+
+type SegmentSource string
+type SpeakerAssignmentReason string
+
+const (
+	SegmentSourceMicrophone SegmentSource = "microphone"
+	SegmentSourceSystem     SegmentSource = "system"
+
+	SpeakerYou   = "You"
+	SpeakerOther = "Other"
+
+	SpeakerAssignmentReasonMicrophone               SpeakerAssignmentReason = "microphone"
+	SpeakerAssignmentReasonPendingSystemAttribution SpeakerAssignmentReason = "pending_system_attribution"
+	SpeakerAssignmentReasonThresholdAssignment      SpeakerAssignmentReason = "threshold_assignment"
+	SpeakerAssignmentReasonAmbiguousSupport         SpeakerAssignmentReason = "ambiguous_support"
+	SpeakerAssignmentReasonInsufficientCoverage     SpeakerAssignmentReason = "insufficient_coverage"
+	SpeakerAssignmentReasonNoEvidence               SpeakerAssignmentReason = "no_evidence"
+	SpeakerAssignmentReasonDominantFallback         SpeakerAssignmentReason = "dominant_fallback"
+	SpeakerAssignmentReasonSingleTurnFallback       SpeakerAssignmentReason = "single_turn_fallback"
 )
 
 type Segment struct {
-	ID        string
-	MeetingID string
-	Start     float64
-	End       float64
-	Text      string
-	Speaker   string
-	CreatedAt string
+	ID                      string
+	MeetingID               string
+	Start                   float64
+	End                     float64
+	Text                    string
+	Speaker                 string
+	SpeakerSource           *SegmentSource
+	SpeakerConfidence       *float64
+	SpeakerAssignmentReason *SpeakerAssignmentReason
+	SpeakerGroupStart       *float64
+	SpeakerGroupEnd         *float64
+	CreatedAt               string
 }
 
 const insertSegmentSQL = `INSERT INTO segments
-	(id, meeting_id, start_sec, end_sec, text, speaker)
-	VALUES (?, ?, ?, ?, ?, ?)`
+	(id, meeting_id, start_sec, end_sec, text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason,
+	 speaker_group_start_sec, speaker_group_end_sec)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 const selectSegmentsSQL = `SELECT id, meeting_id, start_sec, end_sec,
-	text, speaker, created_at
+	text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason,
+	speaker_group_start_sec, speaker_group_end_sec, created_at
 	FROM segments WHERE meeting_id = ? ORDER BY start_sec ASC`
 
 const deleteSegmentsSQL = `DELETE FROM segments WHERE meeting_id = ?`
@@ -33,9 +61,19 @@ func (d *DB) InsertSegment(s *Segment) error {
 		}
 		s.ID = id
 	}
-	_, err := d.Conn.Exec(insertSegmentSQL,
-		s.ID, s.MeetingID, s.Start, s.End, s.Text, s.Speaker)
-	return err
+	tx, err := d.Conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(insertSegmentSQL, s.ID, s.MeetingID, s.Start, s.End, s.Text, s.Speaker,
+		s.SpeakerSource, s.SpeakerConfidence, s.SpeakerAssignmentReason, s.SpeakerGroupStart, s.SpeakerGroupEnd); err != nil {
+		return err
+	}
+	if err := incrementTranscriptRevision(tx, s.MeetingID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (d *DB) ReplaceSegments(meetingID string, segments []Segment) error {
@@ -44,13 +82,25 @@ func (d *DB) ReplaceSegments(meetingID string, segments []Segment) error {
 		return fmt.Errorf("begin replace segments: %w", err)
 	}
 	defer tx.Rollback()
+	if err := replaceSegmentsTx(tx, meetingID, segments); err != nil {
+		return fmt.Errorf("replace segments for meeting %s: %w", meetingID, err)
+	}
+	return tx.Commit()
+}
+
+func replaceSegmentsTx(tx *sql.Tx, meetingID string, segments []Segment) error {
 	if _, err := tx.Exec(deleteSegmentsSQL, meetingID); err != nil {
-		return fmt.Errorf("delete segments for meeting %s: %w", meetingID, err)
+		return err
 	}
 	if err := insertSegmentsTx(tx, segments); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return incrementTranscriptRevision(tx, meetingID)
+}
+
+func incrementTranscriptRevision(tx *sql.Tx, meetingID string) error {
+	_, err := tx.Exec(`UPDATE meetings SET transcript_revision=transcript_revision+1 WHERE id=?`, meetingID)
+	return err
 }
 
 func insertSegmentsTx(tx *sql.Tx, segments []Segment) error {
@@ -75,11 +125,20 @@ func insertSegmentRow(stmt *sql.Stmt, segment *Segment) error {
 		}
 		segment.ID = id
 	}
-	_, err := stmt.Exec(segment.ID, segment.MeetingID, segment.Start, segment.End, segment.Text, segment.Speaker)
+	_, err := stmt.Exec(segment.ID, segment.MeetingID, segment.Start, segment.End, segment.Text, segment.Speaker,
+		segment.SpeakerSource, segment.SpeakerConfidence, segment.SpeakerAssignmentReason, segment.SpeakerGroupStart, segment.SpeakerGroupEnd)
 	if err != nil {
 		return fmt.Errorf("insert segment %s: %w", segment.ID, err)
 	}
 	return nil
+}
+
+func FormatTranscript(segments []Segment) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
+	}
+	return b.String()
 }
 
 func (d *DB) GetSegments(meetingID string) ([]Segment, error) {
@@ -95,8 +154,9 @@ func scanSegments(rows *sql.Rows) ([]Segment, error) {
 	var out []Segment
 	for rows.Next() {
 		var s Segment
-		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Start,
-			&s.End, &s.Text, &s.Speaker, &s.CreatedAt); err != nil {
+		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Start, &s.End, &s.Text, &s.Speaker,
+			&s.SpeakerSource, &s.SpeakerConfidence, &s.SpeakerAssignmentReason,
+			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan segment: %w", err)
 		}
 		out = append(out, s)

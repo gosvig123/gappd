@@ -1,15 +1,23 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"fmt"
+	"time"
 
-	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
-	"github.com/gappd-dev/gappd/internal/recording"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
+)
+
+const (
+	speakerLabelingRetryUnavailableMessage = "speaker labeling retry is not available for this meeting"
+	speakerLabelingRetryBusyMessage        = "speaker labeling retry is available after meeting processing finishes"
 )
 
 func appCmd() *cobra.Command {
@@ -17,7 +25,7 @@ func appCmd() *cobra.Command {
 		Use:   "app",
 		Short: "Machine-readable commands for the desktop app",
 	}
-	cmd.AddCommand(appConfigCmd(), appDevicesCmd(), appMeetingsCmd(), appRecordCmd())
+	cmd.AddCommand(appConfigCmd(), appDevicesCmd(), appMeetingsCmd(), appProcessingCmd(), appRecordCmd())
 	return cmd
 }
 
@@ -50,7 +58,7 @@ func appMeetingsCmd() *cobra.Command {
 		Use:   "meetings",
 		Short: "Machine-readable meeting access",
 	}
-	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
@@ -68,18 +76,20 @@ func appRecordStartCmd() *cobra.Command {
 	var title string
 	var mode string
 	var language string
+	var speakerLabelsEnabled bool
 
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, true)
+			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, &speakerLabelsEnabled, true)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
 	cmd.Flags().StringVar(&title, "title", "", "Session title")
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
 	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
+	cmd.Flags().BoolVar(&speakerLabelsEnabled, "speaker-labels-enabled", true, "Run speaker labeling before summary")
 	return cmd
 }
 
@@ -100,21 +110,21 @@ func runAppRecoverStale(asJSON bool) error {
 	if !asJSON {
 		return fmt.Errorf("app record recover-stale requires --json")
 	}
-	_, store, pipeline, err := loadDeps()
+	_, store, err := loadStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
-	recovered, err := recoverStaleRecordings(store, pipeline)
+	recovered, err := recoverStaleRecordings(store)
 	if err != nil {
 		return err
 	}
 	return writeJSON(appprotocol.RecoverStaleRecordingsResponse{Recovered: recovered})
 }
 
-func recoverStaleRecordings(store *db.DB, pipeline *ai.Pipeline) (int, error) {
-	service := newRecordingService(store, pipeline, recordingOutputQuiet)
-	return service.RecoverStale(cmdContext(), recording.RecoverStaleOptions{SuppressProcessingFailure: true})
+func recoverStaleRecordings(store *db.DB) (int, error) {
+	recovery := meetingprocessing.Recovery{Store: store, Lifecycle: meetinglifecycle.New(store)}
+	return recovery.RecoverStale(cmdContext(), meetingprocessing.RecoveryOptions{})
 }
 
 func appMeetingsListCmd() *cobra.Command {
@@ -164,6 +174,41 @@ func appMeetingsShowCmd() *cobra.Command {
 			return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	return cmd
+}
+
+func appMeetingsRetryDiarizationCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{Use: "retry-diarization [meeting-id]", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.Root().SilenceUsage = true
+		if !asJSON {
+			return fmt.Errorf("app meetings retry-diarization requires --json")
+		}
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		result, err := meetinglifecycle.New(store).RetryDiarization(cmdContext(), args[0], time.Now())
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New(speakerLabelingRetryUnavailableMessage)
+		}
+		if err != nil {
+			return err
+		}
+		if !result.Applied {
+			if result.Meeting != nil && result.Meeting.DiarizationState == db.DiarizationStateDegraded && result.Meeting.ProcessingStatus == db.ProcessingStatusProcessing {
+				return errors.New(speakerLabelingRetryBusyMessage)
+			}
+			return errors.New(speakerLabelingRetryUnavailableMessage)
+		}
+		detail, err := appMeetingDetailFor(store, args[0])
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
+	}}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }

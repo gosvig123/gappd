@@ -14,8 +14,9 @@ function buildOperationApi(): IpcInvokeApi {
     system: invokeGroup('system'),
     meetings: invokeGroup('meetings'),
     recording: invokeGroup('recording'),
-    localAISetup: invokeGroup('localAISetup'),
+    managedRuntime: invokeGroup('managedRuntime'),
     update: invokeGroup('update'),
+    startup: invokeGroup('startup'),
   }
 }
 
@@ -39,7 +40,7 @@ const operationApi = buildOperationApi()
 const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
-  localAISetup: { ...operationApi.localAISetup, onStatusChanged: subscribe(IPC_EVENTS.localAISetup.statusChanged) },
+  managedRuntime: { ...operationApi.managedRuntime, observe: subscribe(IPC_EVENTS.managedRuntime.changed) },
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
 

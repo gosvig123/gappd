@@ -1,5 +1,6 @@
 const { spawnSync } = require('node:child_process')
-const { access, mkdtemp, readdir, rm, stat } = require('node:fs/promises')
+const { createHash } = require('node:crypto')
+const { access, mkdtemp, readFile, readdir, rm, stat } = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
 
@@ -10,12 +11,14 @@ const MAC_BUILD_X64 = 'x64'
 const MAC_BUILD_UNIVERSAL = 'universal'
 const MAC_ARCH_ARM64 = 'arm64'
 const MAC_ARCH_X64 = 'x86_64'
+const FLUID_AUDIO_LICENSE_SHA256 = 'c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4'
 const desktopRoot = path.resolve(__dirname, '..')
 const distRoot = path.join(desktopRoot, 'release')
 const entitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.plist')
 const inheritEntitlementsPath = path.join(desktopRoot, 'build', 'entitlements.mac.inherit.plist')
 const nestedCodeLayout = [
   { label: 'gappd binary', relativePath: ['Contents', 'Resources', 'bin', 'gappd'], executable: true },
+  { label: 'diarization helper', relativePath: ['Contents', 'Resources', 'bin', 'gappd-diarizer'], executable: true },
   { label: 'Apple speech transcriber app', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app'], executable: false },
   { label: 'Apple speech transcriber', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app', 'Contents', 'MacOS', 'apple-speech-transcriber'], executable: true },
   { label: 'llama-server binary', relativePath: ['Contents', 'Resources', 'llamacpp', 'llama-server'], executable: true },
@@ -54,6 +57,32 @@ async function verifyRequiredNestedCode(appPath) {
   const targets = nestedCodeTargets(appPath)
   for (const target of targets) await verifyTarget(target)
   return targets
+}
+
+async function verifyFluidAudioLicense(appPath) {
+  const licensePath = path.join(appPath, 'Contents', 'Resources', 'legal', 'FluidAudio', 'LICENSE')
+  await verifyFluidAudioLicenseFile(licensePath)
+}
+
+async function verifyFluidAudioLicenseFile(licensePath) {
+  const licenseStat = await stat(licensePath).catch(() => null)
+  if (!licenseStat?.isFile()) throw new Error(`FluidAudio license missing at ${licensePath}`)
+  const actual = createHash('sha256').update(await readFile(licensePath)).digest('hex')
+  if (actual !== FLUID_AUDIO_LICENSE_SHA256) throw new Error(`FluidAudio license SHA-256 mismatch at ${licensePath}`)
+}
+
+async function verifyModelManifest(modelsPath) {
+  const manifest = await readFile(path.join(modelsPath, 'SHA256SUMS'), 'utf8')
+  const lines = manifest.trim().split('\n')
+  if (lines.length === 0) throw new Error(`Empty model manifest at ${modelsPath}`)
+  for (const line of lines) {
+    const match = line.match(/^([0-9a-f]{64})  (.+)$/)
+    if (!match) throw new Error(`Invalid model manifest line: ${line}`)
+    const payloadPath = path.resolve(modelsPath, match[2])
+    if (!payloadPath.startsWith(`${path.resolve(modelsPath)}${path.sep}`)) throw new Error(`Unsafe model manifest path: ${match[2]}`)
+    const actual = createHash('sha256').update(await readFile(payloadPath)).digest('hex')
+    if (actual !== match[1]) throw new Error(`Model SHA-256 mismatch at ${payloadPath}`)
+  }
 }
 
 async function verifyTarget(target) {
@@ -253,6 +282,9 @@ module.exports = {
   staple,
   validateStaple,
   verifyCodeSignature,
+  verifyFluidAudioLicense,
+  verifyFluidAudioLicenseFile,
+  verifyModelManifest,
   verifyRequiredNestedCode,
   zipAppForNotary,
 }

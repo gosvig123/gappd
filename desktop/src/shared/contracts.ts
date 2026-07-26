@@ -1,71 +1,9 @@
-import type { AIConfig } from './generated/contracts'
 
 export * from './generated/protocol'
 export { RECORDING_STATUSES } from './meeting-recording-workflow'
 export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
 export type { RecordingState, RecordingStatus } from './meeting-recording-workflow'
-
-export type LocalAIConfig = AIConfig
-
-export function isLocalAIConfigured(config: LocalAIConfig | null | undefined): boolean {
-  return Boolean(config?.provider && config.endpoint && config.model)
-}
-
-export function isManagedLocalAIConfigured(config: LocalAIConfig | null | undefined): boolean {
-  return Boolean(config?.managed && isLocalAIConfigured(config))
-}
-
-export type LocalAISetupPhase =
-  | 'checking'
-  | 'needs_setup'
-  | 'starting_runtime'
-  | 'pulling_model'
-  | 'saving_config'
-  | 'ready'
-  | 'error'
-
-export type LocalAISetupPullStage = 'preparing' | 'downloading' | 'verifying' | 'finalizing' | 'complete'
-
-export type LocalAISetupErrorKind = 'pull_timeout' | 'pull_network' | 'pull_blob_host_network' | 'disk_space' | 'permission' | 'ownership_mismatch' | 'runtime'
-
-export type LocalAISetupErrorDebug = {
-  rawDetail?: string
-  url?: string
-  host?: string
-  ip?: string
-}
-
-export type OwnershipConflict = {
-  pid: number
-  port: number
-  summary?: string
-  stopCommand?: string
-}
-
-export type LocalAISetupStatus = {
-  phase: LocalAISetupPhase
-  managed: boolean
-  endpoint: string
-  model: string
-  message: string
-  progress?: number
-  error?: string
-  errorDetail?: string
-  debugDetail?: string
-  errorDebug?: LocalAISetupErrorDebug
-  pullStage?: LocalAISetupPullStage
-  errorKind?: LocalAISetupErrorKind
-  ownershipConflict?: OwnershipConflict
-  canRetry: boolean
-}
-
-export type LocalAIStatus = LocalAISetupStatus & {
-  supported: boolean
-  configured: boolean
-  bundled: boolean
-  running: boolean
-  canRepair: boolean
-}
+export type { ManagedRuntimeSnapshot, ManagedRuntimeOperation, ManagedRuntimeErrorDebug, ManagedRuntimeErrorKind, ManagedRuntimePullStage, OwnershipConflict } from './managed-runtime'
 
 export const STABLE_UPDATE_CHANNEL = 'stable'
 export const BETA_UPDATE_CHANNEL = 'beta'

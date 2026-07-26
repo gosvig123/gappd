@@ -20,9 +20,10 @@ vendor/
 *.raw
 *.wav
 sessions/
-
+.pi-subagents
 # Config with real credentials
 config.toml
+desktop/.env.local
 .apple-signing/
 apple-signing/
 
@@ -46,6 +47,7 @@ Thumbs.db
 
 /gappd
 # Desktop generated artifacts
+/main.js
 desktop/.cache/
 desktop/resources/llamacpp/
 desktop/resources/ollama/

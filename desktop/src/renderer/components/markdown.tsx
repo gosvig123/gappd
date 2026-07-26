@@ -64,9 +64,13 @@ function parseBlocks(source: string): Block[] {
 }
 
 function renderInline(text: string): ReactNode {
-  const parts = text.split(/\*\*(.+?)\*\*/g)
+  const parts = text.split(/(\*\*.+?\*\*|Speaker [1-9][0-9]*)/g)
   if (parts.length === 1) return text
-  return parts.map((part, index) => (index % 2 === 1 ? <strong key={index}>{part}</strong> : <Fragment key={index}>{part}</Fragment>))
+  return parts.map((part, index) => {
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{renderInline(part.slice(2, -2))}</strong>
+    if (/^Speaker [1-9][0-9]*$/.test(part)) return <span key={index} data-page-search-ignore>{part}</span>
+    return <Fragment key={index}>{part}</Fragment>
+  })
 }
 
 function renderListItem(item: { text: string; indent: number; checked?: boolean }, index: number): ReactNode {

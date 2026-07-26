@@ -33,7 +33,7 @@ func mergeExtraction(dst *Extraction, src *Extraction) {
 
 func boundExtraction(extraction *Extraction) *Extraction {
 	extraction.Title = compactString(extraction.Title)
-	extraction.Participants = limitSlice(uniqueStrings(extraction.Participants), maxMergedParticipants)
+	extraction.Participants = limitSlice(uniqueStrings(namedSpeakers(extraction.Participants)), maxMergedParticipants)
 	extraction.Topics = limitSlice(uniqueBy(cleanTopics(extraction.Topics), topicKey), maxMergedTopics)
 	extraction.Decisions = limitSlice(uniqueBy(cleanDecisions(extraction.Decisions), decisionKey), maxMergedDecisions)
 	extraction.ActionItems = limitSlice(uniqueBy(cleanActions(extraction.ActionItems), actionKey), maxMergedActionItems)
@@ -58,7 +58,7 @@ func cleanDecisions(values []Decision) []Decision {
 	for _, value := range values {
 		value.What = compactString(value.What)
 		value.Context = compactString(value.Context)
-		value.WhoDecided = limitSlice(uniqueStrings(value.WhoDecided), maxMergedParticipants)
+		value.WhoDecided = limitSlice(uniqueStrings(namedSpeakers(value.WhoDecided)), maxMergedParticipants)
 		if value.What != "" {
 			out = append(out, value)
 		}
@@ -137,7 +137,7 @@ func topicKey(value Topic) string {
 }
 
 func decisionKey(value Decision) string {
-	return normalizedKey(value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context)
+	return normalizedKey(value.Status + "\n" + value.What + "\n" + strings.Join(value.WhoDecided, ",") + "\n" + value.Context)
 }
 
 func actionKey(value ExtractedAction) string {

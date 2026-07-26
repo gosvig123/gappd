@@ -34,12 +34,16 @@ build_arch_binary() {
 
     swiftc \
         -O \
+        -swift-version 6 \
+        -strict-concurrency=complete \
         -target "${arch}-apple-macos${MACOS_MIN_VERSION}" \
         -framework AppKit \
         -framework AVFoundation \
         -framework ScreenCaptureKit \
         -framework CoreMedia \
         -framework CoreAudio \
+        "${SCRIPT_DIR}/AudioChunks.swift" \
+        "${SCRIPT_DIR}/MeetingObserver.swift" \
         "${SCRIPT_DIR}/main.swift" \
         -o "${output_path}"
 }

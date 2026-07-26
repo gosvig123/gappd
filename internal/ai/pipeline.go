@@ -14,6 +14,11 @@ const (
 	ProgressRefineExtraction ProgressStage = "refine_extraction"
 	ProgressSynthesize       ProgressStage = "synthesize"
 	ProgressRefineNotes      ProgressStage = "refine_notes"
+
+	structuredTemperature     = 0
+	maxExtractionTokens       = 4096
+	maxRefineExtractionTokens = 8192
+	maxNotesTokens            = 4096
 )
 
 type Progress struct {
@@ -41,14 +46,14 @@ func NewPipeline(provider Provider, temperature float64) *Pipeline {
 }
 
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractChunk(ctx, transcript, "")
+	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
 func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractLong(ctx, transcript, nil, "")
+	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
-func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language string) (*Extraction, error) {
+func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language, relevance string) (*Extraction, error) {
 	chunks := transcriptChunks(transcript)
 	if len(chunks) > maxTranscriptChunks {
 		return nil, fmt.Errorf("transcript too large: %d chunks exceeds limit %d", len(chunks), maxTranscriptChunks)
@@ -60,7 +65,7 @@ func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress 
 	if err != nil {
 		return nil, err
 	}
-	return p.refineMergedExtraction(ctx, extractions, progress, language)
+	return p.refineMergedExtraction(ctx, extractions, progress, language, relevance)
 }
 
 func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress func(Progress), language string) ([]*Extraction, error) {
@@ -76,15 +81,15 @@ func (p *Pipeline) extractChunks(ctx context.Context, chunks []string, progress 
 	return extractions, nil
 }
 
-func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress), language string) (*Extraction, error) {
+func (p *Pipeline) refineMergedExtraction(ctx context.Context, extractions []*Extraction, progress func(Progress), language, relevance string) (*Extraction, error) {
 	merged := mergeExtractions(extractions)
 	emitProgress(progress, ProgressRefineExtraction, 1, 1)
-	return p.refineExtraction(ctx, merged, language)
+	return p.refineExtraction(ctx, merged, relevance, language)
 }
 
 func (p *Pipeline) extractChunk(ctx context.Context, transcript string, language string) (*Extraction, error) {
 	system, user := Stage1Prompt(transcript, language)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, JSONSchema: ExtractionJSONSchema()}
+	req := CompletionRequest{System: system, User: user, Temperature: structuredTemperature, JSONSchema: ExtractionJSONSchema(), MaxTokens: maxExtractionTokens}
 	raw, err := p.provider.CompleteJSON(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
@@ -106,7 +111,7 @@ func (p *Pipeline) synthesize(ctx context.Context, extraction *Extraction, userN
 		return "", fmt.Errorf("marshal extraction: %w", err)
 	}
 	system, user := Stage2Prompt(string(data), userNotes, language)
-	req := CompletionRequest{System: system, User: user, Temperature: p.temperature}
+	req := CompletionRequest{System: system, User: user, Temperature: p.temperature, MaxTokens: maxNotesTokens}
 	result, err := p.provider.Complete(ctx, req)
 	if err != nil {
 		return "", fmt.Errorf("synthesis failed: %w", err)
@@ -119,7 +124,7 @@ func (p *Pipeline) Run(ctx context.Context, transcript string, userNotes string)
 }
 
 func (p *Pipeline) RunWithOptions(ctx context.Context, transcript string, options RunOptions) (*Extraction, string, error) {
-	extraction, err := p.extractLong(ctx, transcript, options.OnProgress, options.Language)
+	extraction, err := p.extractVerified(ctx, transcript, options.OnProgress, options.Language, options.UserNotes)
 	if err != nil {
 		return nil, "", err
 	}

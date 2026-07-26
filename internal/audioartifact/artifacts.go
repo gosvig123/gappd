@@ -3,13 +3,15 @@ package audioartifact
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 const (
 	MicFilename    = "mic.wav"
 	SystemFilename = "system.wav"
-	MicSpeaker     = "You"
-	SystemSpeaker  = "Other"
+	MicSpeaker     = db.SpeakerYou
+	SystemSpeaker  = db.SpeakerOther
 	wavHeaderBytes = 44
 )
 
@@ -21,6 +23,7 @@ type Artifacts struct {
 type Source struct {
 	Path    string
 	Speaker string
+	Kind    db.SegmentSource
 }
 
 func New(dir string) Artifacts {
@@ -40,7 +43,18 @@ func (a Artifacts) SystemPath() string {
 }
 
 func (a Artifacts) Sources() []Source {
-	return []Source{{a.MicPath(), MicSpeaker}, {a.SystemPath(), SystemSpeaker}}
+	return []Source{
+		{Path: a.MicPath(), Speaker: MicSpeaker, Kind: db.SegmentSourceMicrophone},
+		{Path: a.SystemPath(), Speaker: SystemSpeaker, Kind: db.SegmentSourceSystem},
+	}
+}
+
+func (a Artifacts) HasMicrophoneAudio() bool {
+	return Source{Path: a.MicPath()}.HasAudio()
+}
+
+func (a Artifacts) HasSystemAudio() bool {
+	return Source{Path: a.SystemPath()}.HasAudio()
 }
 
 func (a Artifacts) HasAudio() bool {

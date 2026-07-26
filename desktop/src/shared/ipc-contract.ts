@@ -1,11 +1,13 @@
-import type { Device, LocalAISetupStatus, LocalAIStatus, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
-export type { LocalAISetupStatus, RecordingState, UpdateStatus } from './contracts'
+import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
+import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
+export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string }
-export type LocalAISetupInput = { model?: string }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
+export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -19,6 +21,7 @@ export type IpcInvokeContract = {
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
     show: OperationSpec<[id: string], MeetingDetail>
+    retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
   }
   recording: {
@@ -26,12 +29,9 @@ export type IpcInvokeContract = {
     stop: OperationSpec<[], RecordingState>
     getStatus: OperationSpec<[], RecordingState>
   }
-  localAISetup: {
-    getStatus: OperationSpec<[], LocalAISetupStatus>
-    getDetails: OperationSpec<[], LocalAIStatus>
-    start: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-    retry: OperationSpec<[input?: LocalAISetupInput], LocalAISetupStatus>
-    repair: OperationSpec<[], LocalAIStatus>
+  managedRuntime: {
+    status: OperationSpec<[], ManagedRuntimeSnapshot>
+    prepare: OperationSpec<[input: ManagedRuntimePrepareInput], ManagedRuntimeSnapshot>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -39,6 +39,11 @@ export type IpcInvokeContract = {
     downloadUpdate: OperationSpec<[], UpdateStatus>
     installAndRestart: OperationSpec<[], UpdateStatus>
     openUpdatePage: OperationSpec<[], void>
+  }
+  startup: {
+    getSettings: OperationSpec<[], StartupSettings>
+    setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
+    setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
 }
 
@@ -57,9 +62,9 @@ export const IPC_OPERATIONS = {
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
-  meetings: { list: 'meetings:list', show: 'meetings:show', delete: 'meetings:delete' },
+  meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
-  localAISetup: { getStatus: 'localAISetup:getStatus', getDetails: 'localAISetup:getDetails', start: 'localAISetup:start', retry: 'localAISetup:retry', repair: 'localAISetup:repair' },
+  managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -67,14 +72,19 @@ export const IPC_OPERATIONS = {
     installAndRestart: 'update:installAndRestart',
     openUpdatePage: 'update:openUpdatePage',
   },
+  startup: {
+    getSettings: 'startup:getSettings',
+    setOpenAtLogin: 'startup:setOpenAtLogin',
+    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled',
+  },
 } as const satisfies IpcOperationChannels
 
 export const IPC_EVENTS = {
   recording: {
     statusChanged: 'recording:status-changed',
   },
-  localAISetup: {
-    statusChanged: 'localAISetup:status-changed',
+  managedRuntime: {
+    changed: 'managedRuntime:changed',
   },
   update: {
     statusChanged: 'update:status-changed',
@@ -86,8 +96,8 @@ export type GappdApi = IpcInvokeApi & {
   recording: IpcInvokeApi['recording'] & {
     onStatusChanged(listener: (state: RecordingState) => void): () => void
   }
-  localAISetup: IpcInvokeApi['localAISetup'] & {
-    onStatusChanged(listener: (state: LocalAISetupStatus) => void): () => void
+  managedRuntime: IpcInvokeApi['managedRuntime'] & {
+    observe(listener: (state: ManagedRuntimeSnapshot) => void): () => void
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void

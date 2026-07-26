@@ -107,7 +107,8 @@ async function handleRecordingChange(next: RecordingState, effects: RecordingWor
 async function startRecording(device: number, language: string, setState: SetRecordingWorkflowState, setError: (error: string | null) => void) {
   try {
     setError(null)
-    const recording = await window.gappd.recording.start({ device, language })
+    const { speakerLabelsEnabled } = await window.gappd.startup.getSettings()
+    const recording = await window.gappd.recording.start({ device, language, speakerLabelsEnabled })
     setState((current) => ({ ...current, recording }))
   } catch (err) {
     setError(errorMessage(err))

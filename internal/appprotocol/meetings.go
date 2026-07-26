@@ -1,8 +1,7 @@
 package appprotocol
 
 import (
-	"fmt"
-	"strings"
+	"encoding/json"
 
 	"github.com/gappd-dev/gappd/internal/db"
 )
@@ -19,14 +18,22 @@ type MeetingListItem struct {
 }
 
 type MeetingDetail struct {
-	ID             string           `json:"id"`
-	Title          string           `json:"title"`
-	StartedAt      string           `json:"startedAt"`
-	EndedAt        *string          `json:"endedAt,omitempty"`
-	Status         MeetingStatus    `json:"status"`
-	TranscriptText string           `json:"transcriptText,omitempty"`
-	Summary        string           `json:"summary,omitempty"`
-	Segments       []MeetingSegment `json:"segments"`
+	ID                    string           `json:"id"`
+	Title                 string           `json:"title"`
+	StartedAt             string           `json:"startedAt"`
+	EndedAt               *string          `json:"endedAt,omitempty"`
+	Status                MeetingStatus    `json:"status"`
+	TranscriptText        string           `json:"transcriptText,omitempty"`
+	TranscriptProvisional bool             `json:"transcriptProvisional"`
+	Summary               string           `json:"summary,omitempty"`
+	Segments              []MeetingSegment `json:"segments"`
+	Diarization           DiarizationInfo  `json:"diarization"`
+}
+
+type DiarizationInfo struct {
+	State        db.DiarizationState `json:"state"`
+	Error        *string             `json:"error,omitempty"`
+	SpeakerCount *int                `json:"speakerCount,omitempty"`
 }
 
 type MeetingSegment struct {
@@ -60,11 +67,30 @@ func BuildAppMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDet
 
 func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript string) MeetingDetail {
 	status := MeetingStatusFor(meeting)
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(segments)}
+	visible := visibleTranscriptSegments(meeting, segments)
+	provisional := meeting.Transcript == nil && len(visible) > 0
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Diarization: diarizationInfo(meeting)}
+}
+
+func diarizationInfo(meeting db.Meeting) DiarizationInfo {
+	info := DiarizationInfo{State: meeting.DiarizationState}
+	if meeting.DiarizationError != nil {
+		message := "Speaker labeling unavailable."
+		info.Error = &message
+	}
+	if meeting.DiarizationState == db.DiarizationStateCompleted && meeting.DiarizationJSON != nil {
+		var provenance struct {
+			SpeakerCount *int `json:"speakerCount"`
+		}
+		if json.Unmarshal([]byte(*meeting.DiarizationJSON), &provenance) == nil && provenance.SpeakerCount != nil && *provenance.SpeakerCount >= 0 {
+			info.SpeakerCount = provenance.SpeakerCount
+		}
+	}
+	return info
 }
 
 func appTranscriptText(meeting db.Meeting, segments []db.Segment) string {
-	if len(segments) > 0 {
+	if len(visibleTranscriptSegments(meeting, segments)) > 0 {
 		return ""
 	}
 	return transcriptText(meeting, segments)
@@ -74,18 +100,20 @@ func transcriptText(meeting db.Meeting, segments []db.Segment) string {
 	if meeting.Transcript != nil {
 		return *meeting.Transcript
 	}
-	if len(segments) == 0 {
+	visible := visibleTranscriptSegments(meeting, segments)
+	if len(visible) == 0 {
 		return ""
 	}
-	return formatTranscript(segments)
+	return db.FormatTranscript(visible)
 }
 
-func formatTranscript(segments []db.Segment) string {
-	var b strings.Builder
-	for _, segment := range segments {
-		fmt.Fprintf(&b, "[%s] %s\n", segment.Speaker, segment.Text)
+func visibleTranscriptSegments(meeting db.Meeting, segments []db.Segment) []db.Segment {
+	incomplete := meeting.CaptureStatus == db.CaptureStatusCaptured &&
+		meeting.ProcessingStatus == db.ProcessingStatusPending && meeting.Transcript == nil
+	if incomplete {
+		return nil
 	}
-	return b.String()
+	return segments
 }
 
 func buildSegmentViews(segments []db.Segment) []MeetingSegment {

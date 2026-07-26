@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 	"github.com/gappd-dev/gappd/internal/recording"
 )
 
@@ -45,8 +47,8 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("appMeetingDetailFor() error = %v", err)
 	}
-	if detail.Status.State != db.MeetingStateFailed {
-		t.Fatalf("status.state = %q, want %q", detail.Status.State, db.MeetingStateFailed)
+	if detail.Status.State != meetinglifecycle.MeetingStateFailed {
+		t.Fatalf("status.state = %q, want %q", detail.Status.State, meetinglifecycle.MeetingStateFailed)
 	}
 	if detail.Status.UpdatedAt != meeting.ProcessingStatusUpdatedAt {
 		t.Fatalf("status.updatedAt = %q, want %q", detail.Status.UpdatedAt, meeting.ProcessingStatusUpdatedAt)
@@ -62,6 +64,52 @@ func TestAppMeetingDetailForIncludesStructuredStatus(t *testing.T) {
 	}
 	if len(detail.Segments) != 1 || detail.Segments[0].Text != "hello" {
 		t.Fatalf("segments = %#v, want one segment with text", detail.Segments)
+	}
+}
+
+func TestAppRetryDiarizationExplainsActiveProcessing(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	_, store, err := loadStore()
+	if err != nil {
+		t.Fatalf("loadStore() error = %v", err)
+	}
+	meeting := &db.Meeting{
+		ID: "meeting-busy", Title: "Busy meeting", StartedAt: "2026-04-10T12:00:00Z",
+		CaptureStatus: db.CaptureStatusCaptured, CaptureStatusUpdatedAt: "2026-04-10T12:30:00Z",
+		ProcessingStatus: db.ProcessingStatusProcessing, ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
+		DiarizationState: db.DiarizationStateDegraded, Tags: "[]", Source: "listen",
+	}
+	if err := store.CreateMeeting(meeting); err != nil {
+		store.Close()
+		t.Fatalf("CreateMeeting() error = %v", err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	cmd := appMeetingsRetryDiarizationCmd()
+	cmd.SetArgs([]string{meeting.ID, "--json"})
+	err = cmd.Execute()
+	if !cmd.SilenceUsage {
+		t.Fatal("retry command did not silence usage after runtime error")
+	}
+	if err == nil || err.Error() != speakerLabelingRetryBusyMessage {
+		t.Fatalf("retry error = %v, want active-processing message", err)
+	}
+	if strings.Contains(err.Error(), "transition") || strings.Contains(err.Error(), "processing_status") {
+		t.Fatalf("retry exposed internal error: %v", err)
+	}
+}
+
+func TestAppRetryDiarizationHidesMissingMeetingError(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cmd := appMeetingsRetryDiarizationCmd()
+	cmd.SilenceUsage = true
+	cmd.SetArgs([]string{"missing-meeting", "--json"})
+
+	err := cmd.Execute()
+	if err == nil || err.Error() != speakerLabelingRetryUnavailableMessage {
+		t.Fatalf("retry error = %v, want user-safe unavailable message", err)
 	}
 }
 
@@ -86,7 +134,7 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 		ProcessingStatus:          db.ProcessingStatusProcessing,
 		ProcessingStatusUpdatedAt: "2026-04-10T12:31:00Z",
 	}
-	if err := emitter.EmitRecordingEvent(recording.EventProcessing, meeting, nil); err != nil {
+	if err := emitter.EmitRecordingEvent(recording.EventCaptured, meeting, nil); err != nil {
 		t.Fatalf("EmitRecordingEvent() error = %v", err)
 	}
 	if err := writer.Close(); err != nil {
@@ -102,8 +150,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &event); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v\noutput=%s", err, buf.String())
 	}
-	if event.Type != recording.EventProcessing {
-		t.Fatalf("event.type = %q, want %q", event.Type, recording.EventProcessing)
+	if event.Type != recording.EventCaptured {
+		t.Fatalf("event.type = %q, want %q", event.Type, recording.EventCaptured)
 	}
 	if event.MeetingID != meeting.ID {
 		t.Fatalf("event.meetingId = %q, want %q", event.MeetingID, meeting.ID)
@@ -111,8 +159,8 @@ func TestAppRecordingEventEmitterEncodesMeetingStatus(t *testing.T) {
 	if event.Title != meeting.Title {
 		t.Fatalf("event.title = %q, want %q", event.Title, meeting.Title)
 	}
-	if event.Status.State != db.MeetingStateProcessing {
-		t.Fatalf("event.status.state = %q, want %q", event.Status.State, db.MeetingStateProcessing)
+	if event.Status.State != meetinglifecycle.MeetingStateProcessing {
+		t.Fatalf("event.status.state = %q, want %q", event.Status.State, meetinglifecycle.MeetingStateProcessing)
 	}
 	if event.Status.Processing.State != db.ProcessingStatusProcessing {
 		t.Fatalf("event.status.processing.state = %q, want %q", event.Status.Processing.State, db.ProcessingStatusProcessing)

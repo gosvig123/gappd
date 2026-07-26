@@ -19,6 +19,47 @@ func TestParseAppleSpeechJSON(t *testing.T) {
 	}
 }
 
+func TestParseAppleSpeechJSONSplitsLongTimedSegments(t *testing.T) {
+	data := []byte(`{"segments":[{"start":0,"end":12,"text":"One two three, four five six seven.","words":[{"start":0,"end":1,"text":" One"},{"start":1,"end":2,"text":" two"},{"start":2,"end":4.2,"text":" three,"},{"start":4.2,"end":5,"text":" four"},{"start":5,"end":6,"text":" five"},{"start":6,"end":7,"text":" six"},{"start":7,"end":10.5,"text":" seven."}]}]}`)
+
+	got, err := parseAppleSpeechJSON(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 3 || got[0].Start != 0 || got[0].End != 4.2 || got[0].Text != "One two three," ||
+		got[1].Start != 4.2 || got[1].End != 7 || got[1].Text != "four five six" ||
+		got[2].Start != 7 || got[2].End != 10.5 || got[2].Text != "seven." {
+		t.Fatalf("segments = %#v", got)
+	}
+	for _, segment := range got {
+		if segment.GroupStart != 0 || segment.GroupEnd != 12 || segment.End-segment.Start > maximumSegmentSeconds {
+			t.Fatalf("segment = %#v", segment)
+		}
+	}
+}
+
+func TestParseAppleSpeechJSONKeepsFallbackSegments(t *testing.T) {
+	tests := map[string]struct {
+		data []byte
+		text string
+	}{
+		"short":          {[]byte(`{"segments":[{"start":0,"end":3,"text":"short phrase","words":[{"start":0,"end":1,"text":" short"},{"start":1,"end":3,"text":" phrase"}]}]}`), "short phrase"},
+		"mismatched":     {[]byte(`{"segments":[{"start":0,"end":8,"text":"original phrase","words":[{"start":0,"end":8,"text":" different"}]}]}`), "original phrase"},
+		"overlapping":    {[]byte(`{"segments":[{"start":0,"end":8,"text":"one two","words":[{"start":0,"end":5,"text":" one"},{"start":4,"end":8,"text":" two"}]}]}`), "one two"},
+		"zero duration":  {[]byte(`{"segments":[{"start":0,"end":8,"text":"one two","words":[{"start":0,"end":0,"text":" one"},{"start":0,"end":8,"text":" two"}]}]}`), "one two"},
+		"missing timing": {[]byte(`{"segments":[{"start":0,"end":8,"text":"one two","words":[{"end":1,"text":" one"},{"start":1,"end":8,"text":" two"}]}]}`), "one two"},
+		"null timing":    {[]byte(`{"segments":[{"start":0,"end":8,"text":"one two","words":[{"start":null,"end":1,"text":" one"},{"start":1,"end":8,"text":" two"}]}]}`), "one two"},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseAppleSpeechJSON(test.data)
+			if err != nil || len(got) != 1 || got[0].Text != test.text {
+				t.Fatalf("segments = %#v, err = %v", got, err)
+			}
+		})
+	}
+}
+
 func TestParseAppleSpeechJSONRejectsEndBeforeStart(t *testing.T) {
 	data := []byte(`{"segments":[{"start":2,"end":1.5,"text":"hello"}]}`)
 

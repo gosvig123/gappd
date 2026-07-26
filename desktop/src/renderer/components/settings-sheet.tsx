@@ -6,10 +6,11 @@ const ESCAPE_KEY = 'Escape'
 
 type SettingsSheetProps = {
   children: ReactNode
+  currentVersion?: string
   onClose: () => void
 }
 
-export function SettingsSheet({ children, onClose }: SettingsSheetProps) {
+export function SettingsSheet({ children, currentVersion, onClose }: SettingsSheetProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<Element | null>(null)
 
@@ -34,6 +35,7 @@ export function SettingsSheet({ children, onClose }: SettingsSheetProps) {
           <span className="settings-sheet-mark"><GearIcon /></span>
           <div className="settings-sheet-titles">
             <h1>Settings</h1>
+            {currentVersion ? <p>Gappd {currentVersion}</p> : null}
             <p>Speech-to-text runs entirely on your device — no audio ever leaves your Mac.</p>
           </div>
           <button ref={closeRef} className="settings-sheet-close" onClick={onClose} aria-label="Close settings"><CloseIcon /></button>

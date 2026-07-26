@@ -1,21 +1,25 @@
 package recording
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/audioartifact"
+	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 type recordingSession struct {
-	store     meetingStore
+	lifecycle meetinglifecycle.Module
 	events    EventSink
 	meeting   *db.Meeting
 	artifacts audioartifact.Artifacts
 }
 
 func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
-	return recordingSession{store: w.meetings(), events: w.events, meeting: meeting, artifacts: artifacts}
+	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting, artifacts: artifacts}
 }
 
 func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recordingSession {
@@ -31,7 +35,8 @@ func (r recordingSession) emit(name EventName, err error) error {
 }
 
 func (r recordingSession) failCapture(captureErr error) error {
-	if err := r.store.MarkCaptureFailed(r.meeting, nowUTC(), captureErr); err != nil {
+	transition := meetinglifecycle.CaptureFailed{At: time.Now(), Cause: captureErr}
+	if err := r.apply(context.Background(), transition); err != nil {
 		return err
 	}
 	if err := r.emit(EventFailed, captureErr); err != nil {
@@ -40,31 +45,26 @@ func (r recordingSession) failCapture(captureErr error) error {
 	return captureErr
 }
 
-func (r recordingSession) failUnexpectedCaptureStop(err error) error {
-	unexpectedErr := fmt.Errorf("capture stopped unexpectedly")
-	if err != nil {
-		unexpectedErr = fmt.Errorf("capture stopped unexpectedly: %w", err)
-	}
-	if failErr := r.failCapture(unexpectedErr); failErr != nil {
-		return failErr
-	}
-	return unexpectedErr
+func (r recordingSession) capture(ctx context.Context) error {
+	return r.apply(ctx, meetinglifecycle.Captured{At: time.Now()})
 }
 
-func (r recordingSession) finish(processing meetingProcessing, req processingRequest) error {
-	if err := r.requireAudio(); err != nil {
+func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle.Transition) error {
+	result, err := r.lifecycle.Transition(ctx, r.meeting.ID, transition)
+	if err != nil {
 		return err
 	}
-	return processing.processAfterCapture(r, req)
+	*r.meeting = *result.Meeting
+	return nil
 }
 
-func (r recordingSession) requireAudio() error {
-	if r.artifacts.HasAudio() {
+func (r recordingSession) requireAudio(mode capture.CaptureMode) error {
+	switch {
+	case mode != capture.ModeSystem && !r.artifacts.HasMicrophoneAudio():
+		return fmt.Errorf("microphone audio was not captured")
+	case mode != capture.ModeMic && !r.artifacts.HasSystemAudio():
+		return fmt.Errorf("system audio was not captured")
+	default:
 		return nil
 	}
-	captureErr := fmt.Errorf("no audio captured")
-	if err := r.failCapture(captureErr); err != nil {
-		return err
-	}
-	return captureErr
 }

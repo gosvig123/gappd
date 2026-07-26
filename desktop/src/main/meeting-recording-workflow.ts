@@ -2,9 +2,11 @@ import type { Device, RecordingState } from '../shared/contracts'
 import type { StartRecordingInput } from '../shared/ipc-contract'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE } from '../shared/transcription-languages'
 import { requestCapturePermissions } from './capture-permissions'
+import { pauseDrains, resumeDrains } from './drain-coordinator'
 import { getDevices } from './meetings'
 import { startRecording, stopRecording } from './recording-process'
 import { getRecordingState } from './state'
+import { getStartupSettings } from './startup-settings'
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
@@ -14,8 +16,15 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   if (selectedDevice === null) throw new Error(NO_INPUT_DEVICE_ERROR)
   const permissionError = capturePermissionError(await requestCapturePermissions())
   if (permissionError) throw new Error(permissionError)
-  await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE, language: recordingLanguage(input.language) })
-  return getRecordingState()
+  await pauseDrains()
+  try {
+    await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
+      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled })
+    return getRecordingState()
+  } catch (error) {
+    resumeDrains()
+    throw error
+  }
 }
 
 export function stopMeetingRecordingWorkflow(): RecordingState {

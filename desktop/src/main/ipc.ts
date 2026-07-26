@@ -1,12 +1,13 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type LocalAISetupInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
-import { getLocalAISetupDetails, getLocalAISetupStatus, onLocalAISetupStatusChange, repairLocalAISetup, retryLocalAISetup, startLocalAISetup } from './local-ai-setup-operation'
-import { deleteMeeting, getDevices, listMeetings, showMeeting } from './meetings'
+import { managedRuntime } from './managed-runtime'
+import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
+import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
@@ -35,6 +36,7 @@ const IPC_HANDLERS: MainHandlers = {
   meetings: {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
+    retryDiarization: (_event, id: string) => retryDiarization(id),
     delete: (_event, id: string) => deleteMeeting(id),
   },
   recording: {
@@ -42,12 +44,9 @@ const IPC_HANDLERS: MainHandlers = {
     stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
   },
-  localAISetup: {
-    getStatus: () => getLocalAISetupStatus(),
-    getDetails: () => getLocalAISetupDetails(),
-    start: (_event, input?: LocalAISetupInput) => startLocalAISetup(input),
-    retry: (_event, input?: LocalAISetupInput) => retryLocalAISetup(input),
-    repair: () => repairLocalAISetup(),
+  managedRuntime: {
+    status: () => managedRuntime.status(),
+    prepare: (_event, input: ManagedRuntimePrepareInput) => managedRuntime.prepare(input.mode, input.model),
   },
   update: {
     getStatus: () => getUpdateStatus(),
@@ -55,6 +54,11 @@ const IPC_HANDLERS: MainHandlers = {
     downloadUpdate: () => downloadUpdate(),
     installAndRestart: () => installAndRestart(),
     openUpdatePage: () => openUpdatePage(),
+  },
+  startup: {
+    getSettings: () => getStartupSettings(),
+    setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
+    setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
   },
 }
 
@@ -70,7 +74,7 @@ export function registerIpc(mainWindow: BrowserWindow): void {
   disposeWindowSubscriptions(mainWindow)
   const disposers = [
     forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
-    forwardToWindow(mainWindow, IPC_EVENTS.localAISetup.statusChanged, onLocalAISetupStatusChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.managedRuntime.changed, managedRuntime.observe),
     forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
   ]
   windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))

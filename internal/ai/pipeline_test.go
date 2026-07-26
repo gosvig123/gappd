@@ -31,13 +31,16 @@ func (p *fakeProvider) CompleteJSON(_ context.Context, req CompletionRequest) (j
 func (p *fakeProvider) Available() error { return nil }
 
 func TestPipelineExtract(t *testing.T) {
-	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Roadmap","summary":"Reviewed next steps"}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"After demo feedback"}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday"}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`)
+	provider, pipeline := newFakePipeline(`{"title":"Beta Launch Planning","participants":["Ada"],"topics":[{"name":"Beta launch","summary":"Ada discussed shipping beta on Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"decisions":[{"what":"Ship beta","who_decided":["Ada"],"context":"Ada proposed shipping beta on Friday","status":"decided","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"action_items":[{"task":"Draft launch plan","owner":"Ada","deadline":"Friday","evidence":[{"speaker":"Ada","text":"let's ship beta on Friday"}]}],"open_questions":["Who owns onboarding?"],"sentiment":"productive"}`, `{"verdicts":[{"index":0,"speech_act":"commitment","entailed":true}]}`)
 
 	extraction, err := pipeline.Extract(context.Background(), "Ada: let's ship beta on Friday")
 	if err != nil {
 		t.Fatalf("Extract returned error: %v", err)
 	}
-	assertRequest(t, provider.requests, 0, 0.3, "Ada: let's ship beta on Friday")
+	assertRequest(t, provider.requests, 0, structuredTemperature, "Ada: let's ship beta on Friday")
+	if !strings.Contains(provider.requests[0].System, "Open questions must be work-relevant") {
+		t.Fatal("extraction system missing open-question relevance rule")
+	}
 	if extraction.Title != "Beta Launch Planning" {
 		t.Fatalf("extraction.Title = %q, want generated title", extraction.Title)
 	}
@@ -50,8 +53,8 @@ func TestPipelineExtract(t *testing.T) {
 }
 
 func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
-	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers."}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints"}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10"}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
-	transcript := "[Other] Did I do everything right?\n[Other] Did I forget something?\n[Other] Am I prepared?"
+	_, pipeline := newFakePipeline(`{"title":"Pre-Conference Preparation Meeting","participants":["Alex","Ben"],"topics":[{"name":"Speaker Lineup","summary":"Dr. Emily Carter and Kenji Tanaka confirmed as keynote speakers.","evidence":[{"speaker":"Alex","text":"Dr. Emily Carter confirmed keynote"}]}],"decisions":[{"what":"Proceed with marketing plan","who_decided":["Alex"],"context":"Budget constraints","status":"decided","evidence":[{"speaker":"Alex","text":"Proceed with marketing plan"}]}],"action_items":[{"task":"Draft content calendar","owner":"Ben","deadline":"2024-03-10","evidence":[{"speaker":"Ben","text":"Draft content calendar by March"}]}],"open_questions":["What is the estimated attendance?"],"sentiment":"brainstorming"}`)
+	transcript := "[You] Hello?\n[Other] Hey there, how's it going?\n[You] How's it going, Phil?\n[Speaker 1] So you're in Barcelona now?\n[Other] Whereabouts?"
 
 	extraction, err := pipeline.Extract(context.Background(), transcript)
 	if err != nil {
@@ -60,8 +63,8 @@ func TestPipelineExtractReplacesUngroundedHallucination(t *testing.T) {
 	if extraction.Title != "Transcript Notes" || len(extraction.ActionItems) != 0 || len(extraction.Decisions) != 0 {
 		t.Fatalf("extraction = %#v, want conservative transcript-grounded extraction", extraction)
 	}
-	if len(extraction.OpenQuestions) != 3 {
-		t.Fatalf("open questions = %#v, want transcript questions", extraction.OpenQuestions)
+	if len(extraction.OpenQuestions) != 0 {
+		t.Fatalf("open questions = %#v, want none from conservative fallback", extraction.OpenQuestions)
 	}
 }
 
@@ -77,6 +80,9 @@ func TestPipelineSynthesize(t *testing.T) {
 		t.Fatalf("Synthesize result = %q, want provider output", notes)
 	}
 	assertRequestContains(t, provider.requests, 0, 0.3, "## Extracted Data", "Emphasize launch blockers")
+	if !strings.Contains(provider.requests[0].System, "A unique outcome should outweigh repeated low-value discussion") {
+		t.Fatal("synthesis system missing outcome-first weighting")
+	}
 }
 
 func TestPipelineSynthesizeClearsEmptyDecisionSection(t *testing.T) {
@@ -101,10 +107,10 @@ func TestPipelineRun(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
-	if extraction == nil || notes != "## Meeting Title\nWeekly sync" {
+	if extraction == nil || notes != "## Meeting Title\nWeekly Sync" {
 		t.Fatalf("Run extraction=%v notes=%q, want extraction and notes", extraction, notes)
 	}
-	assertRequest(t, provider.requests, 0, 0.3, "Ada: weekly sync")
+	assertRequest(t, provider.requests, 0, structuredTemperature, "Ada: weekly sync")
 	if strings.Contains(provider.requests[1].User, "## User Notes") {
 		t.Fatalf("synthesize request user = %q, want no notes section", provider.requests[1].User)
 	}
@@ -117,20 +123,32 @@ func TestPipelineRunChunksLongTranscript(t *testing.T) {
 		`{"title":"Wrap Up","participants":["Ada"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		`{"title":"Roadmap Launch Planning","participants":["Ada","Ben"],"topics":[],"decisions":[],"action_items":[],"open_questions":[],"sentiment":"productive"}`,
 		"## Meeting Title\nMerged")
-	transcript := strings.Repeat("[Ada] roadmap\n", 1000) + strings.Repeat("[Ben] launch\n", 1000)
+	transcript := strings.Repeat("[Ada] roadmap\n", 500) + strings.Repeat("[Ben] launch\n", 500)
 
-	extraction, notes, err := pipeline.Run(context.Background(), transcript, "")
+	extraction, notes, err := pipeline.Run(context.Background(), transcript, "Focus launch blockers")
 	if err != nil {
 		t.Fatalf("Run returned error: %v", err)
 	}
 	if len(provider.requests) != 5 || notes == "" {
 		t.Fatalf("requests=%d notes=%q, want chunked extraction, refinement, and synthesis", len(provider.requests), notes)
 	}
-	if extraction.Title != "Roadmap Launch Planning" {
-		t.Fatalf("title = %q, want refined global title", extraction.Title)
+	assertWeightedRefinement(t, provider.requests, extraction)
+}
+
+func assertWeightedRefinement(t *testing.T, requests []CompletionRequest, extraction *Extraction) {
+	t.Helper()
+	refinement := requests[len(requests)-2]
+	if !strings.Contains(refinement.User, "## User Relevance Guidance\nFocus launch blockers") {
+		t.Fatalf("refinement user = %q, want relevance guidance", refinement.User)
 	}
-	if strings.Join(extraction.Participants, ",") != "Ada,Ben" {
-		t.Fatalf("participants = %#v, want merged participants", extraction.Participants)
+	if !strings.Contains(refinement.System, "Prefer a unique supported outcome") {
+		t.Fatalf("refinement system missing outcome-first weighting")
+	}
+	if !strings.Contains(refinement.System, "never concatenate unrelated questions") {
+		t.Fatal("refinement system missing open-question precision rule")
+	}
+	if extraction.Title != "Roadmap Launch Planning" || strings.Join(extraction.Participants, ",") != "Ada,Ben" {
+		t.Fatalf("extraction = %#v, want refined global title and participants", extraction)
 	}
 }
 

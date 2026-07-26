@@ -5,7 +5,7 @@ import (
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
-	"github.com/gappd-dev/gappd/internal/recording"
+	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
 
@@ -24,9 +24,8 @@ func enhanceCmd() *cobra.Command {
 				return err
 			}
 			defer store.Close()
-			service := newRecordingService(store, pipeline, recordingOutputConsole)
-			options := recording.EnhanceOptions{Notes: notes, Feedback: feedback, Refine: refine}
-			return service.EnhanceWithOptions(cmdContext(), args[0], options)
+			service := newMeetingProcessingService(store, pipeline, recordingOutputConsole)
+			return service.EnhanceStored(cmdContext(), meetingprocessing.StoredRequest{MeetingID: args[0], Notes: notes, Feedback: feedback, Refine: refine})
 		},
 	}
 	cmd.Flags().StringVarP(&notes, "notes", "n", "", "Your rough notes")

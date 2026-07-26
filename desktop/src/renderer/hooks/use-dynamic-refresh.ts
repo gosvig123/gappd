@@ -3,7 +3,7 @@ import type { MeetingListItem, RecordingState } from '../../shared/contracts'
 import { needsRecordingRefresh } from '../../shared/meeting-recording-workflow'
 
 const DYNAMIC_REFRESH_INTERVAL_MS = 5000
-const DYNAMIC_REFRESH_MEETING_STATES: MeetingListItem['status']['state'][] = ['recording', 'processing']
+const DYNAMIC_REFRESH_MEETING_STATES: MeetingListItem['status']['state'][] = ['recording', 'pending', 'processing']
 const VISIBLE_DOCUMENT_STATE: DocumentVisibilityState = 'visible'
 
 type RefreshMeetings = (id?: string | null) => Promise<void>

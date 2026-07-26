@@ -3,11 +3,11 @@ import { createReadStream } from 'node:fs'
 import { mkdir, open, rename, rm, stat, type FileHandle } from 'node:fs/promises'
 import path from 'node:path'
 import { app } from 'electron'
-import type { LocalAISetupPullStage } from '../shared/contracts'
+import type { ManagedRuntimePullStage } from '../shared/contracts'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT, MANAGED_LLAMACPP_MODELS_DIRNAME } from '../shared/managed-local-ai'
 
 type LanguageModel = typeof MANAGED_LLAMACPP_MODEL_ARTIFACT
-export type LanguageModelProgress = { progress?: number; message?: string; pullStage?: LocalAISetupPullStage }
+export type LanguageModelProgress = { progress?: number; message?: string; pullStage?: ManagedRuntimePullStage }
 
 type ProgressSink = (progress: LanguageModelProgress) => void
 let downloadPromise: Promise<string> | null = null
@@ -88,7 +88,7 @@ async function verifyDownload(model: LanguageModel, tempPath: string): Promise<v
   if (actual !== model.sha256) throw new Error(`Download ${model.label} failed sha256 check: ${actual}`)
 }
 
-function emitProgress(pullStage: LocalAISetupPullStage, message: string, progress?: number, onProgress?: ProgressSink): void {
+function emitProgress(pullStage: ManagedRuntimePullStage, message: string, progress?: number, onProgress?: ProgressSink): void {
   onProgress?.({ pullStage, message, progress })
 }
 

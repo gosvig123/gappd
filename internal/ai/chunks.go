@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	maxTranscriptChunkChars = 12000
+	maxTranscriptChunkChars = 6000
 	maxTranscriptChunks     = 24
 	chunkOverlapLines       = 6
 )

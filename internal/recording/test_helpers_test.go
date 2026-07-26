@@ -1,11 +1,14 @@
 package recording
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 type recordingEvent struct {
@@ -52,9 +55,12 @@ func createRecordingMeeting(t *testing.T, store *db.DB) *db.Meeting {
 func createCapturedMeeting(t *testing.T, store *db.DB) *db.Meeting {
 	t.Helper()
 	meeting := createRecordingMeeting(t, store)
-	if err := store.MarkCaptured(meeting, "2026-04-10T12:30:00Z"); err != nil {
-		t.Fatalf("MarkCaptured() error = %v", err)
+	at := time.Date(2026, 4, 10, 12, 30, 0, 0, time.UTC)
+	result, err := meetinglifecycle.New(store).Transition(context.Background(), meeting.ID, meetinglifecycle.Captured{At: at})
+	if err != nil {
+		t.Fatalf("Captured transition error = %v", err)
 	}
+	meeting = result.Meeting
 	return meeting
 }
 

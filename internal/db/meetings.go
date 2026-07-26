@@ -8,16 +8,32 @@ import (
 
 type CaptureStatus string
 type ProcessingStatus string
+type DiarizationState string
 
 const (
 	CaptureStatusRecording CaptureStatus = "recording"
 	CaptureStatusCaptured  CaptureStatus = "captured"
 	CaptureStatusFailed    CaptureStatus = "failed"
 
-	ProcessingStatusNotStarted ProcessingStatus = "not_started"
+	ProcessingStatusPending ProcessingStatus = "pending"
+	// ProcessingStatusNotStarted is retained as a source-compatible alias.
+	ProcessingStatusNotStarted ProcessingStatus = ProcessingStatusPending
 	ProcessingStatusProcessing ProcessingStatus = "processing"
 	ProcessingStatusCompleted  ProcessingStatus = "completed"
 	ProcessingStatusFailed     ProcessingStatus = "failed"
+
+	DiarizationStateNotRequested  DiarizationState = "not_requested"
+	DiarizationStateNotApplicable DiarizationState = "not_applicable"
+	DiarizationStatePending       DiarizationState = "pending"
+	DiarizationStateProcessing    DiarizationState = "processing"
+	DiarizationStateCompleted     DiarizationState = "completed"
+	DiarizationStateDegraded      DiarizationState = "degraded"
+)
+
+var (
+	AllCaptureStatuses    = []CaptureStatus{CaptureStatusRecording, CaptureStatusCaptured, CaptureStatusFailed}
+	AllProcessingStatuses = []ProcessingStatus{ProcessingStatusPending, ProcessingStatusProcessing, ProcessingStatusCompleted, ProcessingStatusFailed}
+	AllDiarizationStates  = []DiarizationState{DiarizationStateNotRequested, DiarizationStateNotApplicable, DiarizationStatePending, DiarizationStateProcessing, DiarizationStateCompleted, DiarizationStateDegraded}
 )
 
 type Meeting struct {
@@ -31,10 +47,17 @@ type Meeting struct {
 	ProcessingStatus          ProcessingStatus
 	ProcessingStatusUpdatedAt string
 	ProcessingFailureMessage  *string
+	ProcessingClaimToken      *string
+	ProcessingClaimExpiresAt  *string
 	AudioPath                 *string
 	Transcript                *string
+	TranscriptRevision        int
 	Summary                   *string
+	SummaryTranscriptRevision int
 	ExtractionJSON            *string
+	DiarizationState          DiarizationState
+	DiarizationError          *string
+	DiarizationJSON           *string
 	Language                  string
 	Tags                      string
 	Source                    string
@@ -49,16 +72,24 @@ type MeetingListEntry struct {
 
 const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
-	audio_path, transcript, summary, extraction_json, language, tags, source, created_at
+	processing_claim_token, processing_claim_expires_at, audio_path,
+	transcript, transcript_revision, summary, summary_transcript_revision, extraction_json,
+	diarization_state, diarization_error, diarization_json, language, tags, source, created_at
 	FROM meetings`
 
 const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
 	processing_status, processing_status_updated_at, processing_failure_message,
-	audio_path, transcript IS NOT NULL, summary IS NOT NULL, language, tags, source, created_at
+	processing_claim_token, processing_claim_expires_at, audio_path,
+	transcript IS NOT NULL AND trim(transcript)<>'', transcript_revision,
+	summary IS NOT NULL AND trim(summary)<>'', summary_transcript_revision, extraction_json,
+	diarization_state, diarization_error, diarization_json, language, tags, source, created_at
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
 	m.Language = meetinglang.Normalize(m.Language)
+	if m.DiarizationState == "" {
+		m.DiarizationState = DiarizationStateNotRequested
+	}
 	if m.ID == "" {
 		id, err := newID()
 		if err != nil {
@@ -66,67 +97,31 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 		}
 		m.ID = id
 	}
-	_, err := d.Conn.Exec(
-		`INSERT INTO meetings (
-			id, title, started_at, ended_at,
-			capture_status, capture_status_updated_at, capture_failure_message,
-			processing_status, processing_status_updated_at, processing_failure_message,
-			audio_path, transcript, summary, extraction_json, language, tags, source
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		m.ID, m.Title, m.StartedAt, m.EndedAt,
-		m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
-		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage,
-		m.AudioPath, m.Transcript, m.Summary, m.ExtractionJSON, m.Language, m.Tags, m.Source,
-	)
-	if err != nil {
+	if _, err := d.Conn.Exec(insertMeetingSQL, meetingInsertArgs(m)...); err != nil {
 		return fmt.Errorf("create meeting: %w", err)
 	}
 	return nil
 }
 
-func (d *DB) UpdateMeeting(m *Meeting) error {
-	m.Language = meetinglang.Normalize(m.Language)
-	_, err := d.Conn.Exec(
-		`UPDATE meetings SET title=?, started_at=?, ended_at=?,
-		 capture_status=?, capture_status_updated_at=?, capture_failure_message=?, processing_status=?,
-		 processing_status_updated_at=?, processing_failure_message=?, audio_path=?, transcript=?, summary=?,
-		 extraction_json=?, language=?, tags=?, source=? WHERE id=?`,
-		m.Title, m.StartedAt, m.EndedAt,
-		m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage, m.ProcessingStatus,
-		m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.AudioPath, m.Transcript, m.Summary,
-		m.ExtractionJSON, m.Language, m.Tags, m.Source, m.ID,
-	)
-	if err != nil {
-		return fmt.Errorf("update meeting: %w", err)
-	}
-	return nil
-}
+const insertMeetingSQL = `INSERT INTO meetings (id,title,started_at,ended_at,capture_status,capture_status_updated_at,
+	capture_failure_message,processing_status,processing_status_updated_at,processing_failure_message,
+	processing_claim_token,processing_claim_expires_at,audio_path,transcript,transcript_revision,summary,summary_transcript_revision,
+	extraction_json,diarization_state,diarization_error,diarization_json,language,tags,source)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
-func (d *DB) UpdateRecordingHeartbeat(id, updatedAt string) error {
-	_, err := d.Conn.Exec(`UPDATE meetings SET capture_status_updated_at = ? WHERE id = ? AND capture_status = ?`, updatedAt, id, CaptureStatusRecording)
-	if err != nil {
-		return fmt.Errorf("update recording heartbeat: %w", err)
-	}
-	return nil
+func meetingInsertArgs(m *Meeting) []any {
+	return []any{m.ID, m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
+		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.ProcessingClaimToken,
+		m.ProcessingClaimExpiresAt, m.AudioPath, m.Transcript, m.TranscriptRevision, m.Summary, m.SummaryTranscriptRevision,
+		m.ExtractionJSON, m.DiarizationState, m.DiarizationError, m.DiarizationJSON, m.Language, m.Tags, m.Source}
 }
 
 func (d *DB) GetMeeting(id string) (*Meeting, error) {
-	row := d.Conn.QueryRow(
-		`SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
-		 processing_status, processing_status_updated_at, processing_failure_message,
-		 audio_path, transcript, summary, extraction_json, language, tags, source, created_at
-		 FROM meetings WHERE id=?`, id,
-	)
-	m := &Meeting{}
-	err := row.Scan(
-		&m.ID, &m.Title, &m.StartedAt, &m.EndedAt, &m.CaptureStatus, &m.CaptureStatusUpdatedAt, &m.CaptureFailureMessage,
-		&m.ProcessingStatus, &m.ProcessingStatusUpdatedAt, &m.ProcessingFailureMessage,
-		&m.AudioPath, &m.Transcript, &m.Summary, &m.ExtractionJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
-	)
+	m, err := scanMeetingRow(d.Conn.QueryRow(selectMeetingsSQL+` WHERE id=?`, id))
 	if err != nil {
 		return nil, fmt.Errorf("get meeting: %w", err)
 	}
-	return m, nil
+	return &m, nil
 }
 
 func (d *DB) ListMeetings(limit int) ([]Meeting, error) {

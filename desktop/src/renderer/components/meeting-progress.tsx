@@ -19,7 +19,7 @@ type ProgressStep = {
 }
 
 const MEETING_RECORDING = 'recording'
-const MEETING_CAPTURED = 'captured'
+const MEETING_PENDING = 'pending'
 const MEETING_FAILED = 'failed'
 const CAPTURE_CAPTURED = 'captured'
 const CAPTURE_FAILED = 'failed'
@@ -33,7 +33,7 @@ export function meetingProgressLabel(meeting: MeetingProgressInput): string {
   if (meetingFailed(meeting)) return 'Failed'
   if (meeting.status.processing.state === PROCESSING_PROCESSING) return activeWorkLabel(meeting)
   if (meetingReady(meeting)) return 'Ready'
-  if (meeting.status.state === MEETING_CAPTURED) return 'Captured'
+  if (meeting.status.state === MEETING_PENDING) return 'Pending'
   if (meeting.status.processing.state === PROCESSING_COMPLETED) return completedLabel()
   return 'Processing'
 }
