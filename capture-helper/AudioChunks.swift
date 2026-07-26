@@ -1,5 +1,14 @@
 import Foundation
 
+struct CaptureReadyEvent: Encodable {
+    let type = "capture_ready"
+    let sources: [String]
+}
+
+struct CaptureStopAcknowledgedEvent: Encodable {
+    let type = "capture_stop_acknowledged"
+}
+
 struct AudioChunkEvent: Encodable {
     let type = "audio_chunk"
     let source: String
@@ -26,6 +35,14 @@ struct AudioChunkSourceComplete: Encodable {
 struct AudioChunkStreamComplete: Encodable {
     let type = "audio_chunk_stream_complete"
     let sources: [String]
+}
+
+func emitCaptureReady(sources: [String]) {
+    printAudioChunkEvent(CaptureReadyEvent(sources: sources))
+}
+
+func emitCaptureStopAcknowledged() {
+    printAudioChunkEvent(CaptureStopAcknowledgedEvent())
 }
 
 func emitAudioChunkStreamComplete(sources: [String]) {

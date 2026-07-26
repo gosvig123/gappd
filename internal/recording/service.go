@@ -36,16 +36,6 @@ type EventSink interface {
 	EmitRecordingEvent(EventName, db.Meeting, error) error
 }
 
-type audioRecorder interface {
-	Start(context.Context) error
-	Stop() error
-	Done() <-chan error
-	Artifacts() audioartifact.Artifacts
-	TranscriptEvents() <-chan livetranscript.Event
-}
-
-type recorderFactory func(capture.CaptureMode, string, int) audioRecorder
-
 type Request struct {
 	DeviceIdx            int
 	Title                string
@@ -62,13 +52,12 @@ type Service struct {
 
 	lifecycle      meetinglifecycle.Module
 	liveTranscript livetranscript.Module
-	recorder       recorderFactory
 }
 
 type meetingRecordingWorkflow struct {
 	lifecycle      meetinglifecycle.Module
 	liveTranscript livetranscript.Module
-	recorder       recorderFactory
+	capture        capture.Module
 	baseDir        string
 	out            io.Writer
 	errOut         io.Writer
@@ -80,19 +69,28 @@ func New(lifecycle meetinglifecycle.Module, liveTranscript livetranscript.Module
 }
 
 func (s Service) Run(req Request) error {
-	return s.recordingWorkflow().run(req)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+	return s.run(ctx, req)
+}
+
+func (s Service) run(ctx context.Context, req Request) error {
+	return s.recordingWorkflow().run(ctx, req)
 }
 
 func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 	return meetingRecordingWorkflow{
-		lifecycle: s.lifecycle, liveTranscript: s.liveTranscript, recorder: s.recorder, baseDir: s.BaseDir,
+		lifecycle: s.lifecycle, liveTranscript: s.liveTranscript, capture: capture.New(), baseDir: s.BaseDir,
 		out: s.Out, errOut: s.ErrOut, events: s.Events,
 	}
 }
 
-func (w meetingRecordingWorkflow) run(req Request) error {
+func (w meetingRecordingWorkflow) run(ctx context.Context, req Request) error {
 	if req.Title == "" {
 		req.Title = time.Now().Format("2006-01-02 15:04 recording")
+	}
+	if req.Mode == "" {
+		req.Mode = capture.ModeBoth
 	}
 	req.Language = meetinglang.Normalize(req.Language)
 	sessionDir, err := w.createSessionDir(req.Title)
@@ -103,57 +101,55 @@ func (w meetingRecordingWorkflow) run(req Request) error {
 	if err != nil {
 		return errors.Join(err, audioartifact.DeleteSessionUnder(w.baseDir, sessionDir))
 	}
-	session := w.sessionFor(meeting, audioartifact.New(sessionDir))
-	return w.record(req, session, sessionDir)
+	session := w.sessionFor(meeting)
+	return w.record(ctx, req, session, sessionDir)
 }
 
-func (w meetingRecordingWorkflow) newRecorder(mode capture.CaptureMode, dir string, device int) audioRecorder {
-	if w.recorder != nil {
-		return w.recorder(mode, dir, device)
-	}
-	if w.events != nil {
-		return capture.NewRecorderWithOutput(mode, dir, device, io.Discard)
-	}
-	return capture.NewRecorder(mode, dir, device)
-}
-
-func (w meetingRecordingWorkflow) record(req Request, session recordingSession, sessionDir string) error {
+func (w meetingRecordingWorkflow) record(ctx context.Context, req Request, session recordingSession, sessionDir string) error {
 	w.printRecordingStart(req, sessionDir)
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-	recorder := w.newRecorder(req.Mode, sessionDir, req.DeviceIdx)
-	if err := w.startCapture(ctx, recorder, session); err != nil {
-		return err
+	captureCtx, cancelCapture := context.WithCancel(ctx)
+	defer cancelCapture()
+	var live *livetranscript.Session
+	stopHeartbeat := func() {}
+	var readyEventErr, stoppingEventErr error
+	observe := func(notice capture.Notice) {
+		switch notice.Kind {
+		case capture.NoticeReady:
+			live = w.startLiveTranscript(notice.TranscriptEvents, session.meeting.ID, req.Language)
+			if err := session.emit(EventStarted, nil); err != nil {
+				readyEventErr = err
+				cancelCapture()
+				return
+			}
+			stopHeartbeat = w.startCaptureHeartbeat(session.meeting)
+		case capture.NoticeStopRequested:
+			w.printStopping()
+			stoppingEventErr = session.emit(EventStopping, nil)
+		}
 	}
-	live := w.startLiveTranscript(recorder, session.meeting.ID, req.Language)
-	stopHeartbeat := w.startCaptureHeartbeat(session.meeting)
-	if err := w.waitForStop(ctx, recorder, session); err != nil {
-		stopHeartbeat()
-		w.finishLiveTranscript(live)
-		return session.failCapture(err)
-	}
+	result, captureErr := w.capture.Run(captureCtx, capture.Input{
+		Mode: req.Mode, OutputDir: sessionDir, DeviceIndex: req.DeviceIdx,
+	}, observe)
 	stopHeartbeat()
-	return w.finalizeRecording(session, recorder, live, req.Mode)
-}
-
-func (w meetingRecordingWorkflow) finalizeRecording(session recordingSession, recorder audioRecorder, live *livetranscript.Session, mode capture.CaptureMode) error {
-	session = w.completeCapture(session, recorder)
-	if captureErr := session.requireAudio(mode); captureErr != nil {
-		w.finishLiveTranscript(live)
-		return session.failCapture(captureErr)
+	if result.StopWarning != nil && w.errOut != nil {
+		fmt.Fprintf(w.errOut, "warning: capture helper did not exit cleanly: %v\n", result.StopWarning)
+		fmt.Fprintln(w.errOut, "  requested audio was preserved")
 	}
+	if readyEventErr != nil {
+		captureErr = errors.Join(readyEventErr, captureErr)
+	}
+	if captureErr != nil {
+		failureErr := session.failCapture(captureErr)
+		w.finishLiveTranscript(live)
+		return errors.Join(failureErr, stoppingEventErr)
+	}
+	w.printRecorded(session.meeting.StartedAt)
 	if err := session.capture(context.Background()); err != nil {
 		w.finishLiveTranscript(live)
-		return err
+		return errors.Join(err, stoppingEventErr)
 	}
 	w.finishLiveTranscript(live)
-	return session.emit(EventCaptured, nil)
-}
-
-func (w meetingRecordingWorkflow) completeCapture(session recordingSession, recorder audioRecorder) recordingSession {
-	session = session.withArtifacts(recorder.Artifacts())
-	w.printRecorded(session.meeting.StartedAt)
-	return session
+	return errors.Join(session.emit(EventCaptured, nil), stoppingEventErr)
 }
 
 func (w meetingRecordingWorkflow) printRecordingStart(req Request, sessionDir string) {
@@ -164,35 +160,8 @@ func (w meetingRecordingWorkflow) printRecordingStart(req Request, sessionDir st
 	fmt.Fprintf(w.out, "  mode: %s, device: [%d]\n\n", req.Mode, req.DeviceIdx)
 }
 
-func (w meetingRecordingWorkflow) startCapture(ctx context.Context, recorder audioRecorder, session recordingSession) error {
-	if err := recorder.Start(ctx); err != nil {
-		return session.failCapture(err)
-	}
-	return w.emit(EventStarted, *session.meeting, nil)
-}
-
-func (w meetingRecordingWorkflow) waitForStop(ctx context.Context, recorder audioRecorder, session recordingSession) error {
-	select {
-	case <-ctx.Done():
-		return w.stopCapture(recorder, session)
-	case err := <-recorder.Done():
-		if err != nil {
-			return fmt.Errorf("capture stopped unexpectedly: %w", err)
-		}
-		return fmt.Errorf("capture stopped unexpectedly")
-	}
-}
-
-func (w meetingRecordingWorkflow) stopCapture(recorder audioRecorder, session recordingSession) error {
+func (w meetingRecordingWorkflow) printStopping() {
 	if w.events == nil {
 		fmt.Fprintln(w.out, "\n● Stopping...")
 	}
-	if err := w.emit(EventStopping, *session.meeting, nil); err != nil {
-		return err
-	}
-	if err := recorder.Stop(); err != nil {
-		fmt.Fprintf(w.errOut, "warning: capture did not exit cleanly: %v\n", err)
-		fmt.Fprintln(w.errOut, "  audio files may be incomplete")
-	}
-	return nil
 }

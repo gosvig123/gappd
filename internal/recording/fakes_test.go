@@ -2,13 +2,9 @@ package recording
 
 import (
 	"context"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/gappd-dev/gappd/internal/ai"
-	"github.com/gappd-dev/gappd/internal/audioartifact"
-	"github.com/gappd-dev/gappd/internal/livetranscript"
 	"github.com/gappd-dev/gappd/internal/transcribe"
 )
 
@@ -25,31 +21,6 @@ func (e fakeEnhancer) RunWithOptions(context.Context, string, ai.RunOptions) (*a
 func (e fakeEnhancer) RefineNotes(context.Context, *ai.Extraction, string, string, string) (string, error) {
 	return e.summary, e.err
 }
-
-type fakeRecorder struct {
-	dir              string
-	done             chan error
-	transcriptEvents chan livetranscript.Event
-	omitMic          bool
-}
-
-func (r *fakeRecorder) Start(context.Context) error {
-	artifacts := r.Artifacts()
-	if !r.omitMic {
-		if err := os.WriteFile(artifacts.MicPath(), []byte(strings.Repeat("m", 45)), 0o644); err != nil {
-			return err
-		}
-	}
-	return os.WriteFile(artifacts.SystemPath(), []byte(strings.Repeat("s", 45)), 0o644)
-}
-
-func (r *fakeRecorder) Stop() error { return nil }
-
-func (r *fakeRecorder) Done() <-chan error { return r.done }
-
-func (r *fakeRecorder) Artifacts() audioartifact.Artifacts { return audioartifact.New(r.dir) }
-
-func (r *fakeRecorder) TranscriptEvents() <-chan livetranscript.Event { return r.transcriptEvents }
 
 type fakeTranscriber struct{}
 

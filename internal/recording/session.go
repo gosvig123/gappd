@@ -2,11 +2,9 @@ package recording
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
-	"github.com/gappd-dev/gappd/internal/audioartifact"
-	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
@@ -15,16 +13,10 @@ type recordingSession struct {
 	lifecycle meetinglifecycle.Module
 	events    EventSink
 	meeting   *db.Meeting
-	artifacts audioartifact.Artifacts
 }
 
-func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting, artifacts audioartifact.Artifacts) recordingSession {
-	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting, artifacts: artifacts}
-}
-
-func (r recordingSession) withArtifacts(artifacts audioartifact.Artifacts) recordingSession {
-	r.artifacts = artifacts
-	return r
+func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting) recordingSession {
+	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting}
 }
 
 func (r recordingSession) emit(name EventName, err error) error {
@@ -37,10 +29,10 @@ func (r recordingSession) emit(name EventName, err error) error {
 func (r recordingSession) failCapture(captureErr error) error {
 	transition := meetinglifecycle.CaptureFailed{At: time.Now(), Cause: captureErr}
 	if err := r.apply(context.Background(), transition); err != nil {
-		return err
+		return errors.Join(captureErr, err)
 	}
 	if err := r.emit(EventFailed, captureErr); err != nil {
-		return err
+		return errors.Join(captureErr, err)
 	}
 	return captureErr
 }
@@ -56,15 +48,4 @@ func (r recordingSession) apply(ctx context.Context, transition meetinglifecycle
 	}
 	*r.meeting = *result.Meeting
 	return nil
-}
-
-func (r recordingSession) requireAudio(mode capture.CaptureMode) error {
-	switch {
-	case mode != capture.ModeSystem && !r.artifacts.HasMicrophoneAudio():
-		return fmt.Errorf("microphone audio was not captured")
-	case mode != capture.ModeMic && !r.artifacts.HasSystemAudio():
-		return fmt.Errorf("system audio was not captured")
-	default:
-		return nil
-	}
 }

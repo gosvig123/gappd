@@ -503,10 +503,6 @@ func stderrPrint(_ message: String) {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
 }
 
-func emitCaptureReady() {
-    FileHandle.standardOutput.write(Data("● Recording... send SIGINT to stop\n".utf8))
-}
-
 @MainActor
 func requestPermissionsAndExit(outputPath: String? = nil) {
     let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -661,10 +657,11 @@ Task { @MainActor in
         }
     }
 
-    emitCaptureReady()
+    emitCaptureReady(sources: captureSources(config.mode))
     DispatchQueue.global().async {
         stopSemaphore.wait()
         Task { @MainActor in
+            emitCaptureStopAcknowledged()
             print("\n● Stopping...")
             micRecorder?.stop()
             do {
