@@ -56,19 +56,6 @@ if [ "$scenario" = "exit-before-ready" ]; then
   exit 8
 fi
 
-printf '{"type":"capture_ready","sources":%s}\n' "$sources"
-
-case "$scenario" in
-  unexpected)
-    write_requested
-    exit 0
-    ;;
-  unexpected-error)
-    write_requested
-    exit 9
-    ;;
-esac
-
 finish() {
   if [ "$scenario" != "no-stop-ack" ]; then
     printf '{"type":"capture_stop_acknowledged"}\n'
@@ -91,6 +78,18 @@ finish() {
 }
 
 trap finish INT TERM
+printf '{"type":"capture_ready","sources":%s}\n' "$sources"
+
+case "$scenario" in
+  unexpected)
+    write_requested
+    exit 0
+    ;;
+  unexpected-error)
+    write_requested
+    exit 9
+    ;;
+esac
 while :; do
   sleep 1 &
   wait $! || true
