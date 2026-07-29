@@ -2,7 +2,7 @@ package recording
 
 import (
 	"context"
-	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -36,6 +36,7 @@ func openTestDB(t *testing.T) *db.DB {
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
 	}
+	store.Conn.SetMaxOpenConns(1)
 	if err := store.Init(); err != nil {
 		store.Close()
 		t.Fatalf("Init() error = %v", err)
@@ -73,19 +74,27 @@ func getMeeting(t *testing.T, store *db.DB, id string) *db.Meeting {
 	return meeting
 }
 
-func interruptOnStarted(t *testing.T) func(EventName) {
+const (
+	captureHelperEnvName   = "GAPPD_CAPTURE_HELPER_PATH"
+	captureScenarioEnvName = "GAPPD_TEST_CAPTURE_SCENARIO"
+)
+
+func cancelOnStarted(cancel context.CancelFunc) func(EventName) {
 	return func(name EventName) {
-		if name != EventStarted {
-			return
-		}
-		process, err := os.FindProcess(os.Getpid())
-		if err != nil {
-			t.Fatalf("FindProcess() error = %v", err)
-		}
-		if err := process.Signal(os.Interrupt); err != nil {
-			t.Fatalf("Signal() error = %v", err)
+		if name == EventStarted {
+			cancel()
 		}
 	}
+}
+
+func setRecordingCaptureHelper(t *testing.T, scenario string) {
+	t.Helper()
+	helper, err := filepath.Abs(filepath.Join("..", "capture", "testdata", "capture-helper.sh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv(captureHelperEnvName, helper)
+	t.Setenv(captureScenarioEnvName, scenario)
 }
 
 func assertEventNames(t *testing.T, events *recordingEvents, want ...EventName) {

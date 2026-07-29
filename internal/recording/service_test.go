@@ -1,6 +1,8 @@
 package recording
 
 import (
+	"context"
+	"strings"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/capture"
@@ -9,40 +11,59 @@ import (
 	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
-func TestRunCompletesFullLifecycleWithInternalSeams(t *testing.T) {
+func TestRunCompletesFullLifecycleWithCaptureModule(t *testing.T) {
+	setRecordingCaptureHelper(t, "complete-stream")
 	store := openTestDB(t)
 	defer store.Close()
-	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir()}
-	events := &recordingEvents{onEvent: interruptOnStarted(t)}
+	ctx, cancel := context.WithCancel(context.Background())
+	events := &recordingEvents{onEvent: cancelOnStarted(cancel)}
 	lifecycle := meetinglifecycle.New(store)
 	liveTranscript := livetranscript.New(store, lifecycle, fakeTranscriber{})
 	service := New(lifecycle, liveTranscript)
 	service.BaseDir = t.TempDir()
 	service.Events = events
-	service.recorder = func(capture.CaptureMode, string, int) audioRecorder { return recorder }
 
-	err := service.Run(Request{Title: "Lifecycle"})
+	err := service.run(ctx, Request{Title: "Lifecycle"})
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
 
 	meeting := latestMeeting(t, store)
-	assertCapturedMeeting(t, meeting)
-	assertStoredSegmentCount(t, store, meeting.ID, 0)
+	assertCapturedMeetingWithLiveTranscript(t, meeting)
+	assertStoredSegmentCount(t, store, meeting.ID, 2)
 	assertEventNames(t, events, EventStarted, EventStopping, EventCaptured)
 }
 
-func TestRunFailsAfterMissingMicrophoneCleanup(t *testing.T) {
+func TestRunFailsUnexpectedCaptureExit(t *testing.T) {
+	setRecordingCaptureHelper(t, "unexpected")
 	store := openTestDB(t)
 	defer store.Close()
-	recorder := &fakeRecorder{done: make(chan error), dir: t.TempDir(), omitMic: true}
-	events := &recordingEvents{onEvent: interruptOnStarted(t)}
+	events := &recordingEvents{}
 	lifecycle := meetinglifecycle.New(store)
 	service := New(lifecycle, livetranscript.New(store, lifecycle, fakeTranscriber{}))
 	service.BaseDir, service.Events = t.TempDir(), events
-	service.recorder = func(capture.CaptureMode, string, int) audioRecorder { return recorder }
 
-	if err := service.Run(Request{Title: "Missing mic", Mode: capture.ModeBoth}); err == nil || err.Error() != "microphone audio was not captured" {
+	if err := service.run(context.Background(), Request{Title: "Unexpected exit"}); err == nil || !strings.Contains(err.Error(), "capture stopped unexpectedly") {
+		t.Fatalf("Run() error = %v", err)
+	}
+	meeting := latestMeeting(t, store)
+	if meeting.CaptureStatus != db.CaptureStatusFailed {
+		t.Fatalf("capture_status = %q", meeting.CaptureStatus)
+	}
+	assertEventNames(t, events, EventStarted, EventFailed)
+}
+
+func TestRunFailsAfterMissingMicrophoneCleanup(t *testing.T) {
+	setRecordingCaptureHelper(t, "missing-mic")
+	store := openTestDB(t)
+	defer store.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	events := &recordingEvents{onEvent: cancelOnStarted(cancel)}
+	lifecycle := meetinglifecycle.New(store)
+	service := New(lifecycle, livetranscript.New(store, lifecycle, fakeTranscriber{}))
+	service.BaseDir, service.Events = t.TempDir(), events
+
+	if err := service.run(ctx, Request{Title: "Missing mic", Mode: capture.ModeBoth}); err == nil || err.Error() != "microphone audio was not captured" {
 		t.Fatalf("Run() error = %v", err)
 	}
 	meeting := latestMeeting(t, store)
@@ -76,7 +97,7 @@ func assertStoredSegmentCount(t *testing.T, store *db.DB, id string, want int) {
 	}
 }
 
-func assertCapturedMeeting(t *testing.T, meeting *db.Meeting) {
+func assertCapturedMeetingWithLiveTranscript(t *testing.T, meeting *db.Meeting) {
 	t.Helper()
 	if meeting.CaptureStatus != db.CaptureStatusCaptured {
 		t.Fatalf("capture_status = %q, want %q", meeting.CaptureStatus, db.CaptureStatusCaptured)
@@ -84,7 +105,7 @@ func assertCapturedMeeting(t *testing.T, meeting *db.Meeting) {
 	if meeting.ProcessingStatus != db.ProcessingStatusPending {
 		t.Fatalf("processing_status = %q, want %q", meeting.ProcessingStatus, db.ProcessingStatusPending)
 	}
-	if meeting.Transcript != nil || meeting.Summary != nil {
-		t.Fatalf("capture synchronously produced transcript or summary")
+	if meeting.Transcript == nil || *meeting.Transcript == "" || meeting.Summary != nil {
+		t.Fatalf("Live Transcript was not committed before Pending Meeting Processing")
 	}
 }

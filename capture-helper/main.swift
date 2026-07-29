@@ -123,6 +123,17 @@ func printUsage() {
     print(usage)
 }
 
+func hasInputStreams(_ deviceID: AudioDeviceID) -> Bool {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyStreams,
+        mScope: kAudioDevicePropertyScopeInput,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    return AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size) == noErr
+        && size >= MemoryLayout<AudioStreamID>.size
+}
+
 func listDevices() {
     var address = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDevices,
@@ -146,17 +157,7 @@ func listDevices() {
 
     var idx = 0
     for id in ids {
-        var inputAddr = AudioObjectPropertyAddress(
-            mSelector: kAudioDevicePropertyStreamConfiguration,
-            mScope: kAudioDevicePropertyScopeInput,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var inputSize: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(id, &inputAddr, 0, nil, &inputSize) == noErr, inputSize > 0 else { continue }
-        let bufList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-        defer { bufList.deallocate() }
-        guard AudioObjectGetPropertyData(id, &inputAddr, 0, nil, &inputSize, bufList) == noErr else { continue }
-        guard bufList.pointee.mNumberBuffers > 0 else { continue }
+        guard hasInputStreams(id) else { continue }
 
         var nameAddr = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyDeviceNameCFString,
@@ -284,19 +285,7 @@ class MicRecorder {
         var ids = [AudioDeviceID](repeating: 0, count: count)
         AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &ids)
 
-        let inputDevices = ids.filter { id -> Bool in
-            var inputAddr = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyStreamConfiguration,
-                mScope: kAudioDevicePropertyScopeInput,
-                mElement: kAudioObjectPropertyElementMain
-            )
-            var inputSize: UInt32 = 0
-            guard AudioObjectGetPropertyDataSize(id, &inputAddr, 0, nil, &inputSize) == noErr, inputSize > 0 else { return false }
-            let bufList = UnsafeMutablePointer<AudioBufferList>.allocate(capacity: 1)
-            defer { bufList.deallocate() }
-            guard AudioObjectGetPropertyData(id, &inputAddr, 0, nil, &inputSize, bufList) == noErr else { return false }
-            return bufList.pointee.mNumberBuffers > 0
-        }
+        let inputDevices = ids.filter(hasInputStreams)
 
         guard idx < inputDevices.count else {
             print("  warning: device index \(idx) out of range, using default")
@@ -503,10 +492,6 @@ func stderrPrint(_ message: String) {
     FileHandle.standardError.write((message + "\n").data(using: .utf8)!)
 }
 
-func emitCaptureReady() {
-    FileHandle.standardOutput.write(Data("● Recording... send SIGINT to stop\n".utf8))
-}
-
 @MainActor
 func requestPermissionsAndExit(outputPath: String? = nil) {
     let micBefore = AVCaptureDevice.authorizationStatus(for: .audio)
@@ -661,10 +646,11 @@ Task { @MainActor in
         }
     }
 
-    emitCaptureReady()
+    emitCaptureReady(sources: captureSources(config.mode))
     DispatchQueue.global().async {
         stopSemaphore.wait()
         Task { @MainActor in
+            emitCaptureStopAcknowledged()
             print("\n● Stopping...")
             micRecorder?.stop()
             do {
