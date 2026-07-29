@@ -58,7 +58,7 @@ _Avoid_: final transcript, chunk transcript
 
 ## Example dialogue
 
-> **Dev:** "Should settings call the Whisper downloader directly?"
+> **Dev:** "Should settings prepare Apple Speech assets directly?"
 > **Domain expert:** "No — settings should ask the **Local AI Setup Operation** to repair the **Managed Runtime**."
 
 ## Flagged ambiguities

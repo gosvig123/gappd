@@ -88,9 +88,6 @@ Electron desktop
 More detail:
 
 - [Architecture](docs/architecture.md)
-- [Capture design](docs/capture-design.md)
-- [Inference pipeline](docs/inference-pipeline.md)
-- [Resilience and recovery](docs/resilience.md)
 - [macOS releases](docs/desktop-macos-release.md)
 
 ## License
