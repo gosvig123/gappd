@@ -3,7 +3,7 @@ import type { MeetingListItem, RecordingState } from '../../shared/contracts'
 import { postStopNoticeVisible } from '../../shared/meeting-recording-workflow'
 import { Button } from './ui'
 import { CircleDotIcon, CircleCheckIcon } from './icons'
-import { meetingHasWork, meetingReady, type MeetingProgressInput } from './meeting-progress'
+import { meetingHasWork, meetingReady } from './meeting-progress'
 import './meeting-announcements.css'
 
 type MeetingNotice = {
@@ -88,7 +88,7 @@ function completedMeeting(meetings: MeetingListItem[], previous: Map<string, Mee
 
 function becameReady(meeting: MeetingListItem, previous: MeetingSnapshot | undefined): boolean {
   if (!previous?.working || previous.ready) return false
-  return meetingReady(meetingProgressInput(meeting))
+  return meetingReady(meeting)
 }
 
 function meetingSnapshots(meetings: MeetingListItem[]): Map<string, MeetingSnapshot> {
@@ -96,12 +96,7 @@ function meetingSnapshots(meetings: MeetingListItem[]): Map<string, MeetingSnaps
 }
 
 function meetingSnapshot(meeting: MeetingListItem): MeetingSnapshot {
-  const input = meetingProgressInput(meeting)
-  return { ready: meetingReady(input), working: meetingHasWork(input) }
-}
-
-function meetingProgressInput(meeting: MeetingListItem): MeetingProgressInput {
-  return { status: meeting.status, hasTranscript: meeting.hasTranscript, hasSummary: meeting.hasSummary }
+  return { ready: meetingReady(meeting), working: meetingHasWork(meeting) }
 }
 
 function notifyNative(meeting: MeetingListItem) {
