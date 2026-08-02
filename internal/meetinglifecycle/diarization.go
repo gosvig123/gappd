@@ -39,10 +39,8 @@ func (w Module) finishDiarization(ctx context.Context, id, token string, state d
 	processingArgs := []any{db.ProcessingStatusPending}
 	switch state {
 	case db.DiarizationStateCompleted, db.DiarizationStateDegraded, db.DiarizationStateNotApplicable:
-		processingStatus = `CASE WHEN transcript IS NOT NULL AND trim(transcript)<>''
-			AND summary IS NOT NULL AND trim(summary)<>''
-			AND extraction_json IS NOT NULL AND trim(extraction_json)<>''
-			AND summary_transcript_revision=transcript_revision THEN ? ELSE ? END`
+		processingStatus = `CASE WHEN ` + db.ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") +
+			` THEN ? ELSE ? END`
 		processingArgs = []any{db.ProcessingStatusCompleted, db.ProcessingStatusPending}
 	}
 	args := []any{state, diarizationError, resultJSON}

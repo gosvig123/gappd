@@ -108,6 +108,39 @@ func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
 	}
 }
 
+func TestProcessingArtifactsCurrentSQLMatchesModel(t *testing.T) {
+	store := openQueueDB(t)
+	defer store.Close()
+	cases := map[string]Meeting{
+		"current":            artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 2),
+		"missing transcript": artifactMeeting(nil, artifact("summary"), artifact(`{}`), 2, 2),
+		"blank transcript":   artifactMeeting(artifact(" "), artifact("summary"), artifact(`{}`), 2, 2),
+		"missing summary":    artifactMeeting(artifact("transcript"), nil, artifact(`{}`), 2, 2),
+		"blank summary":      artifactMeeting(artifact("transcript"), artifact(" "), artifact(`{}`), 2, 2),
+		"missing extraction": artifactMeeting(artifact("transcript"), artifact("summary"), nil, 2, 2),
+		"blank extraction":   artifactMeeting(artifact("transcript"), artifact("summary"), artifact(" "), 2, 2),
+		"stale summary":      artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 1),
+	}
+	query := `SELECT ` + ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") + ` FROM (SELECT ? AS transcript,? AS transcript_revision,? AS summary,? AS summary_transcript_revision,? AS extraction_json)`
+	for name, meeting := range cases {
+		t.Run(name, func(t *testing.T) {
+			var got bool
+			err := store.Conn.QueryRow(query, meeting.Transcript, meeting.TranscriptRevision, meeting.Summary,
+				meeting.SummaryTranscriptRevision, meeting.ExtractionJSON).Scan(&got)
+			if err != nil || got != processingArtifactsCurrent(meeting) {
+				t.Fatalf("SQL current = %v, model current = %v, error = %v", got, processingArtifactsCurrent(meeting), err)
+			}
+		})
+	}
+}
+
+func artifactMeeting(transcript, summary, extraction *string, revision, summaryRevision int) Meeting {
+	return Meeting{Transcript: transcript, Summary: summary, ExtractionJSON: extraction,
+		TranscriptRevision: revision, SummaryTranscriptRevision: summaryRevision}
+}
+
+func artifact(value string) *string { return &value }
+
 func openQueueDB(t *testing.T) *DB {
 	t.Helper()
 	store, err := Open(":memory:")

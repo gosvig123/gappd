@@ -36,15 +36,32 @@ func DeriveQueueStage(m Meeting) QueueStage {
 	if m.DiarizationState == DiarizationStatePending {
 		return QueueStageDiarization
 	}
-	if diarizationTerminal(m.DiarizationState) && (!filledArtifact(m.Summary) || !filledArtifact(m.ExtractionJSON) ||
-		m.SummaryTranscriptRevision != m.TranscriptRevision) {
+	if diarizationTerminal(m.DiarizationState) && !processingArtifactsCurrent(m) {
 		return QueueStageSummarization
 	}
 	return QueueStageNone
 }
 
+func processingArtifactsCurrent(m Meeting) bool {
+	return filledArtifact(m.Transcript) && filledArtifact(m.Summary) && filledArtifact(m.ExtractionJSON) &&
+		m.SummaryTranscriptRevision == m.TranscriptRevision
+}
+
 func filledArtifact(value *string) bool {
 	return value != nil && strings.TrimSpace(*value) != ""
+}
+
+// ProcessingArtifactsCurrentSQL returns the SQL equivalent of processingArtifactsCurrent.
+func ProcessingArtifactsCurrentSQL(transcriptExpr, revisionExpr string) string {
+	return processingArtifactPresentSQL(transcriptExpr) + ` AND NOT (` + processingArtifactsStaleSQL(revisionExpr) + `)`
+}
+
+func processingArtifactPresentSQL(expression string) string {
+	return `NULLIF(trim(` + expression + `),'') IS NOT NULL`
+}
+
+func processingArtifactsStaleSQL(revisionExpr string) string {
+	return `NULLIF(trim(summary),'') IS NULL OR NULLIF(trim(extraction_json),'') IS NULL OR summary_transcript_revision<>` + revisionExpr
 }
 
 func diarizationTerminal(state DiarizationState) bool {
@@ -77,8 +94,8 @@ func claimStatement(stage QueueStage, token string, now, expires time.Time, excl
 		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?)`
 		conditionArgs = append(conditionArgs, DiarizationStatePending, DiarizationStateProcessing)
 	case QueueStageSummarization:
-		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?,?,?) AND
-			(summary IS NULL OR trim(summary)='' OR extraction_json IS NULL OR trim(extraction_json)='' OR summary_transcript_revision<>transcript_revision)`
+		condition = processingArtifactPresentSQL("transcript") + ` AND diarization_state IN (?,?,?,?) AND NOT (` +
+			ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") + `)`
 		conditionArgs = append(conditionArgs, DiarizationStateNotRequested, DiarizationStateNotApplicable, DiarizationStateCompleted, DiarizationStateDegraded)
 	}
 	staleUnclaimedAt := now.Add(-3 * expires.Sub(now))
