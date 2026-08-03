@@ -58,7 +58,7 @@ function requestReadinessChange(snapshot: ManagedRuntimeSnapshot): void {
 
 function requestReadyDrains(snapshot: ManagedRuntimeSnapshot): void {
   for (const capability of CAPABILITIES) {
-    if (capability !== 'transcription' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
+    if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
   }
 }
 

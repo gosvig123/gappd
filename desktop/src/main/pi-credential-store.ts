@@ -10,7 +10,7 @@ type Work<T> = () => Promise<T>
 
 export class PiCredentialStore {
   private readonly file: string
-  private readonly queues = new Map<string, Promise<void>>()
+  private queue = Promise.resolve()
 
   constructor(file = path.join(app.getPath('userData'), 'credentials', 'pi.bin')) {
     this.file = file
@@ -26,7 +26,7 @@ export class PiCredentialStore {
   }
 
   modify(providerId: string, update: (current: Credential | undefined) => Promise<Credential | undefined>): Promise<Credential | undefined> {
-    return this.enqueue(providerId, async () => {
+    return this.enqueue(async () => {
       const credentials = await this.load()
       const current = credentials[providerId]
       const next = await update(current)
@@ -38,7 +38,7 @@ export class PiCredentialStore {
   }
 
   delete(providerId: string): Promise<void> {
-    return this.enqueue(providerId, async () => {
+    return this.enqueue(async () => {
       const credentials = await this.load()
       if (!credentials[providerId]) return
       delete credentials[providerId]
@@ -46,10 +46,9 @@ export class PiCredentialStore {
     })
   }
 
-  private enqueue<T>(providerId: string, work: Work<T>): Promise<T> {
-    const previous = this.queues.get(providerId) ?? Promise.resolve()
-    const next = previous.catch(() => undefined).then(work)
-    this.queues.set(providerId, next.then(() => undefined, () => undefined))
+  private enqueue<T>(work: Work<T>): Promise<T> {
+    const next = this.queue.catch(() => undefined).then(work)
+    this.queue = next.then(() => undefined, () => undefined)
     return next
   }
 

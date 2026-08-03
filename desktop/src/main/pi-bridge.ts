@@ -50,7 +50,10 @@ class PiBridge {
     if (request.method !== 'POST' || request.url !== BRIDGE_PATH) return writeJSON(response, 404, { error: 'Not found' })
     if (!validBearer(request.headers.authorization, this.token)) return writeJSON(response, 401, { error: 'Unauthorized' })
     const controller = new AbortController()
-    request.once('aborted', () => controller.abort())
+    const abort = () => controller.abort()
+    const close = () => { if (!response.writableEnded) abort() }
+    request.once('aborted', abort)
+    response.once('close', close)
     try {
       const input = await readRequest(request)
       const result = await piRuntime.complete(input, controller.signal)
@@ -58,6 +61,9 @@ class PiBridge {
     } catch (error) {
       const configuration = error instanceof PiConfigurationError
       writeJSON(response, configuration ? 409 : 500, { code: configuration ? error.code : 'completion_failed', error: errorMessage(error) })
+    } finally {
+      request.off('aborted', abort)
+      response.off('close', close)
     }
   }
 }
