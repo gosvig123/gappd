@@ -25,9 +25,10 @@ class PiRuntime {
       const runtime = await this.runtime()
       const models = modelOptions(runtime)
       try {
-        const configured = Boolean(config.piProvider && await this.credentials.read(config.piProvider))
+        const credential = config.piProvider ? await this.credentials.read(config.piProvider) : undefined
+        const configured = Boolean(credential)
         if (base.selected && configured) await this.validateModel(runtime, requiredModel(runtime, base.provider, base.model))
-        return { ...base, configured, models }
+        return { ...base, configured, models, authType: credential?.type }
       } catch (error) {
         return { ...base, configured: false, models, error: errorMessage(error) }
       }
@@ -41,7 +42,7 @@ class PiRuntime {
     const model = runtime.getModel(input.provider, input.model)
     if (!model) throw new Error(`Unknown Pi model ${input.provider}/${input.model}`)
     if (input.apiKey?.trim()) await this.saveApiKey(input.provider, input.apiKey.trim())
-    if (!await this.credentials.read(input.provider)) throw new PiConfigurationError('API key required')
+    if ((await this.credentials.read(input.provider))?.type !== 'api_key') throw new PiConfigurationError('API key required')
     if (!await runtime.getAuth(model)) throw new PiConfigurationError(`Credential could not be resolved for ${input.provider}`)
     try { await this.validateModel(runtime, model) }
     catch (error) { throw new PiConfigurationError(`Credential validation failed: ${errorMessage(error)}`) }
@@ -54,10 +55,12 @@ class PiRuntime {
     const model = requiredModel(runtime, input.provider, input.model)
     if (!runtime.getProvider(input.provider)?.auth.oauth) throw new PiConfigurationError(`${input.provider} does not support sign-in`)
     await runtime.login(input.provider, 'oauth', interaction)
+    interaction.signal?.throwIfAborted()
     this.clearValidation(input.provider)
-    try { await this.validateModel(runtime, model) }
+    try { await this.validateModel(runtime, model, interaction.signal) }
     catch (error) { throw new PiConfigurationError(`Credential validation failed: ${errorMessage(error)}`) }
-    await requestCommand('config.usePi', { provider: input.provider, model: input.model })
+    interaction.signal?.throwIfAborted()
+    await requestCommand('config.usePi', { provider: input.provider, model: input.model }, {}, interaction.signal)
     return this.status()
   }
 
@@ -94,11 +97,11 @@ class PiRuntime {
     await runtime.refresh({ allowNetwork: false })
   }
 
-  private async validateModel(runtime: ModelRuntime, model: PiModel): Promise<void> {
+  private async validateModel(runtime: ModelRuntime, model: PiModel, signal?: AbortSignal): Promise<void> {
     const key = `${model.provider}/${model.id}`
     if ((this.validatedUntil.get(key) ?? 0) > Date.now()) return
     const response = await runtime.completeSimple(model, { messages: [{ role: 'user', content: 'Reply OK.', timestamp: Date.now() }] }, {
-      maxTokens: 16, temperature: 0, maxRetries: 1, timeoutMs: 30_000,
+      maxTokens: 16, temperature: 0, maxRetries: 1, timeoutMs: 30_000, signal,
     })
     if (response.stopReason === 'error' || response.stopReason === 'aborted') throw new Error(response.errorMessage || `Pi authentication ${response.stopReason}`)
     this.validatedUntil.set(key, Date.now() + AUTH_VALIDITY_MS)

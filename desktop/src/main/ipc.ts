@@ -4,7 +4,7 @@ import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOpera
 import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
-import { answerPiAuth, configurePiOAuth } from './pi-auth'
+import { answerPiAuth, cancelPiAuth, configurePiOAuth } from './pi-auth'
 import { piRuntime } from './pi-runtime'
 import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
@@ -56,6 +56,7 @@ const IPC_HANDLERS: MainHandlers = {
     configurePi: async (_event, input: PiConfigurationInput) => providerChanged(await piRuntime.configure(input)),
     configurePiOAuth: async (event, input: PiConfigurationInput) => providerChanged(await configurePiOAuth(event, input)),
     answerPiAuth: (event, answer: PiAuthAnswer) => answerPiAuth(event, answer),
+    cancelPiAuth: (event) => cancelPiAuth(event),
     useLocal: async () => providerChanged(await piRuntime.useLocal()),
     clearPiCredential: (_event, provider: string) => piRuntime.clearCredential(provider),
   },

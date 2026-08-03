@@ -6,15 +6,33 @@ import { piRuntime } from './pi-runtime'
 type Interaction = Parameters<typeof piRuntime.configureOAuth>[1]
 type ProviderPrompt = Parameters<Interaction['prompt']>[0]
 type ProviderNotice = Parameters<Interaction['notify']>[0]
-type PendingPrompt = { senderId: number; resolve(value: string): void; reject(error: Error): void }
+type PendingPrompt = { senderId: number; sessionId: string; resolve(value: string): void; reject(error: Error): void }
+type AuthSession = { id: string; controller: AbortController }
 const pending = new Map<string, PendingPrompt>()
+const sessions = new Map<number, AuthSession>()
 
-export function configurePiOAuth(event: IpcMainInvokeEvent, input: PiConfigurationInput): Promise<AIProviderStatus> {
+export async function configurePiOAuth(event: IpcMainInvokeEvent, input: PiConfigurationInput): Promise<AIProviderStatus> {
+  cancelSender(event.sender.id)
+  const controller = new AbortController()
+  const sessionId = randomUUID()
+  const destroyed = () => cancelSender(event.sender.id)
+  sessions.set(event.sender.id, { id: sessionId, controller })
+  event.sender.once('destroyed', destroyed)
   const interaction: Interaction = {
-    prompt: (prompt) => askRenderer(event.sender, prompt),
-    notify: (notice) => { void notifyRenderer(event.sender, notice) },
+    signal: controller.signal,
+    prompt: (prompt) => askRenderer(event.sender, prompt, sessionId),
+    notify: (notice) => { void notifyRenderer(event.sender, notice, sessionId).catch(() => controller.abort()) },
   }
-  return piRuntime.configureOAuth(input, interaction)
+  try { return await piRuntime.configureOAuth(input, interaction) }
+  finally {
+    event.sender.off('destroyed', destroyed)
+    if (sessions.get(event.sender.id)?.controller === controller) sessions.delete(event.sender.id)
+    rejectPrompts(event.sender.id, 'Sign-in ended', sessionId)
+  }
+}
+
+export function cancelPiAuth(event: IpcMainInvokeEvent): void {
+  cancelSender(event.sender.id)
 }
 
 export function answerPiAuth(event: IpcMainInvokeEvent, answer: PiAuthAnswer): void {
@@ -25,14 +43,29 @@ export function answerPiAuth(event: IpcMainInvokeEvent, answer: PiAuthAnswer): v
   prompt.resolve(answer.value)
 }
 
-function askRenderer(sender: WebContents, prompt: ProviderPrompt): Promise<string> {
+function askRenderer(sender: WebContents, prompt: ProviderPrompt, sessionId: string): Promise<string> {
+  if (!activeSession(sender, sessionId)) return Promise.reject(new Error('Sign-in cancelled'))
   const id = randomUUID()
   const payload: PiAuthPrompt = { id, type: prompt.type, message: prompt.message, ...('placeholder' in prompt ? { placeholder: prompt.placeholder } : {}), ...('options' in prompt ? { options: prompt.options } : {}) }
   return new Promise((resolve, reject) => {
-    pending.set(id, { senderId: sender.id, resolve, reject })
+    pending.set(id, { senderId: sender.id, sessionId, resolve, reject })
     prompt.signal?.addEventListener('abort', () => answerPiAuthAbort(id), { once: true })
     sender.send(IPC_EVENTS.aiProvider.auth, { type: 'prompt', prompt: payload } satisfies PiAuthEvent)
   })
+}
+
+function cancelSender(senderId: number): void {
+  sessions.get(senderId)?.controller.abort()
+  sessions.delete(senderId)
+  rejectPrompts(senderId, 'Sign-in cancelled')
+}
+
+function rejectPrompts(senderId: number, message: string, sessionId?: string): void {
+  for (const [id, prompt] of pending) {
+    if (prompt.senderId !== senderId || (sessionId && prompt.sessionId !== sessionId)) continue
+    pending.delete(id)
+    prompt.reject(new Error(message))
+  }
 }
 
 function answerPiAuthAbort(id: string): void {
@@ -42,11 +75,16 @@ function answerPiAuthAbort(id: string): void {
   prompt.reject(new Error('Sign-in prompt expired'))
 }
 
-async function notifyRenderer(sender: WebContents, notice: ProviderNotice): Promise<void> {
+async function notifyRenderer(sender: WebContents, notice: ProviderNotice, sessionId: string): Promise<void> {
+  if (!activeSession(sender, sessionId)) return
   const event = noticeEvent(notice)
   sender.send(IPC_EVENTS.aiProvider.auth, event)
   if (notice.type === 'auth_url') await shell.openExternal(notice.url)
   if (notice.type === 'device_code') await shell.openExternal(notice.verificationUri)
+}
+
+function activeSession(sender: WebContents, sessionId: string): boolean {
+  return !sender.isDestroyed() && sessions.get(sender.id)?.id === sessionId
 }
 
 function noticeEvent(notice: ProviderNotice): PiAuthEvent {

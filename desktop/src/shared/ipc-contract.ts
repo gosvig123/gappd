@@ -10,7 +10,7 @@ export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; mode
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
 export type PiAuthType = 'api_key' | 'oauth'
 export type PiModelOption = { provider: string; providerName: string; id: string; name: string; authTypes: PiAuthType[] }
-export type AIProviderStatus = { selected: boolean; configured: boolean; provider: string; model: string; models: PiModelOption[]; error?: string }
+export type AIProviderStatus = { selected: boolean; configured: boolean; provider: string; model: string; models: PiModelOption[]; authType?: PiAuthType; error?: string }
 export type PiConfigurationInput = { provider: string; model: string; apiKey?: string }
 export type PiAuthPrompt = { id: string; type: 'text' | 'secret' | 'select' | 'manual_code'; message: string; placeholder?: string; options?: readonly { id: string; label: string; description?: string }[] }
 export type PiAuthEvent = { type: 'prompt'; prompt: PiAuthPrompt } | { type: 'notice'; message: string; url?: string; userCode?: string }
@@ -45,6 +45,7 @@ export type IpcInvokeContract = {
     configurePi: OperationSpec<[input: PiConfigurationInput], AIProviderStatus>
     configurePiOAuth: OperationSpec<[input: PiConfigurationInput], AIProviderStatus>
     answerPiAuth: OperationSpec<[answer: PiAuthAnswer], void>
+    cancelPiAuth: OperationSpec<[], void>
     useLocal: OperationSpec<[], AIProviderStatus>
     clearPiCredential: OperationSpec<[provider: string], AIProviderStatus>
   }
@@ -80,7 +81,7 @@ export const IPC_OPERATIONS = {
   meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
-  aiProvider: { status: 'aiProvider:status', configurePi: 'aiProvider:configurePi', configurePiOAuth: 'aiProvider:configurePiOAuth', answerPiAuth: 'aiProvider:answerPiAuth', useLocal: 'aiProvider:useLocal', clearPiCredential: 'aiProvider:clearPiCredential' },
+  aiProvider: { status: 'aiProvider:status', configurePi: 'aiProvider:configurePi', configurePiOAuth: 'aiProvider:configurePiOAuth', answerPiAuth: 'aiProvider:answerPiAuth', cancelPiAuth: 'aiProvider:cancelPiAuth', useLocal: 'aiProvider:useLocal', clearPiCredential: 'aiProvider:clearPiCredential' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
