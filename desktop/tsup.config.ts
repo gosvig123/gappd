@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { defineConfig } from 'tsup'
 
 export default defineConfig([
@@ -12,6 +13,9 @@ export default defineConfig([
     clean: true,
     external: ['electron'],
     noExternal: ['electron-updater', '@earendil-works/pi-coding-agent'],
+    esbuildOptions(options) {
+      options.alias = { ...options.alias, 'brace-expansion': path.resolve('node_modules/brace-expansion/dist/esm/index.js') }
+    },
     splitting: false,
     sourcemap: false,
   },
