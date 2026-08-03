@@ -38,7 +38,7 @@ export function meetingProgressLabel(meeting: MeetingProgressInput): string {
   return 'Processing'
 }
 
-export function meetingHasWork(meeting: MeetingProgressInput): boolean {
+export function meetingHasWork(meeting: Pick<MeetingProgressInput, 'status'>): boolean {
   return meeting.status.state === MEETING_RECORDING || meeting.status.processing.state === PROCESSING_PROCESSING
 }
 
