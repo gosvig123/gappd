@@ -11,7 +11,7 @@ export default defineConfig([
     target: 'es2022',
     clean: true,
     external: ['electron'],
-    noExternal: ['electron-updater'],
+    noExternal: ['electron-updater', '@earendil-works/pi-coding-agent'],
     splitting: false,
     sourcemap: false,
   },
