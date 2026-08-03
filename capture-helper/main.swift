@@ -291,6 +291,7 @@ final class MicRecorder: @unchecked Sendable {
     private let persistedFrames = Atomic<UInt64>(0)
     private let droppedFrames = Atomic<UInt64>(0)
     private let renderError = Atomic<Int32>(0)
+    private let processingFailed = Atomic<Bool>(false)
     private let stopping = Atomic<Bool>(false)
     private(set) var isRunning = false
 
@@ -354,6 +355,7 @@ final class MicRecorder: @unchecked Sendable {
         let status = renderError.load(ordering: .acquiring)
         let healthy = isRunning && persistedFrames.load(ordering: .acquiring) > 0
             && droppedFrames.load(ordering: .acquiring) == 0 && status == 0
+            && !processingFailed.load(ordering: .acquiring)
         guard healthy else {
             let detail = status == 0 ? "" : " (CoreAudio \(status))"
             throw captureError("microphone produced no audio during startup\(detail)")
@@ -375,6 +377,9 @@ final class MicRecorder: @unchecked Sendable {
             converter = nil
         }
         let dropped = droppedFrames.load(ordering: .acquiring)
+        let status = renderError.load(ordering: .acquiring)
+        if status != 0 { throw captureError("microphone rendering failed (CoreAudio \(status))") }
+        if processingFailed.load(ordering: .acquiring) { throw captureError("microphone audio conversion failed") }
         if dropped > 0 { throw captureError("microphone buffer overrun dropped \(dropped) frames") }
     }
 
@@ -440,6 +445,7 @@ final class MicRecorder: @unchecked Sendable {
         persistedFrames.store(0, ordering: .relaxed)
         droppedFrames.store(0, ordering: .relaxed)
         renderError.store(0, ordering: .relaxed)
+        processingFailed.store(false, ordering: .relaxed)
         stopping.store(false, ordering: .relaxed)
         writerQueue.async { [self] in processBuffers() }
     }
@@ -484,10 +490,13 @@ final class MicRecorder: @unchecked Sendable {
     }
 
     private func writeConverted(_ input: AVAudioPCMBuffer) -> UInt64 {
-        guard let converter, let targetFormat else { return 0 }
+        guard let converter, let targetFormat else { processingFailed.store(true, ordering: .releasing); return 0 }
         let ratio = targetFormat.sampleRate / input.format.sampleRate
         let capacity = AVAudioFrameCount(Double(input.frameLength) * ratio) + 1
-        guard let output = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { return 0 }
+        guard let output = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else {
+            processingFailed.store(true, ordering: .releasing)
+            return 0
+        }
         var error: NSError?
         nonisolated(unsafe) let converterInput = input
         nonisolated(unsafe) var consumed = false
@@ -497,7 +506,10 @@ final class MicRecorder: @unchecked Sendable {
             status.pointee = .haveData
             return converterInput
         }
-        guard error == nil, output.frameLength > 0 else { return 0 }
+        guard error == nil, output.frameLength > 0 else {
+            processingFailed.store(true, ordering: .releasing)
+            return 0
+        }
         writer?.write(pcmBuffer: output)
         return UInt64(output.frameLength)
     }
@@ -726,6 +738,14 @@ func watchStopFile(_ path: String, stopSemaphore: DispatchSemaphore) {
     }
 }
 
+@MainActor
+func stopRecorders(_ mic: MicRecorder?, _ system: SystemAudioRecorder?) async throws {
+    var firstError: Error?
+    do { try mic?.stop() } catch { firstError = error }
+    do { try await system?.stop() } catch { if firstError == nil { firstError = error } }
+    if let firstError { throw firstError }
+}
+
 // MARK: - Main
 
 if CommandLine.arguments.contains("--observe-meetings") {
@@ -770,6 +790,7 @@ Task { @MainActor in
             try await sys.start(outputPath: sysPath)
             print("● System audio recording to \(sysPath)")
         } catch {
+            try? await sys.stop()
             stderrPrint("error: could not start system audio capture: \(error)")
             exit(1)
         }
@@ -787,8 +808,7 @@ Task { @MainActor in
             try mic.verifyRunning()
             print("● Mic recording to \(micPath)")
         } catch {
-            try? mic.stop()
-            try? await systemRecorder?.stop()
+            try? await stopRecorders(mic, systemRecorder)
             stderrPrint("error: could not start microphone capture: \(error)")
             exit(1)
         }
@@ -801,8 +821,7 @@ Task { @MainActor in
             emitCaptureStopAcknowledged()
             print("\n● Stopping...")
             do {
-                try micRecorder?.stop()
-                try await systemRecorder?.stop()
+                try await stopRecorders(micRecorder, systemRecorder)
                 if config.chunkSeconds != nil {
                     emitAudioChunkStreamComplete(sources: captureSources(config.mode))
                 }
