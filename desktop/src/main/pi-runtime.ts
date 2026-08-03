@@ -8,6 +8,7 @@ const JSON_TOOL = 'return_json'
 const AUTH_VALIDITY_MS = 30_000
 
 type PiModel = NonNullable<ReturnType<ModelRuntime['getModel']>>
+type PiAuthInteraction = Parameters<ModelRuntime['login']>[2]
 
 export type PiCompletionRequest = { system: string; user: string; temperature: number; maxTokens: number; jsonSchema?: object }
 export type PiCompletionResult = { text?: string; json?: object }
@@ -42,6 +43,18 @@ class PiRuntime {
     if (input.apiKey?.trim()) await this.saveApiKey(input.provider, input.apiKey.trim())
     if (!await this.credentials.read(input.provider)) throw new PiConfigurationError('API key required')
     if (!await runtime.getAuth(model)) throw new PiConfigurationError(`Credential could not be resolved for ${input.provider}`)
+    try { await this.validateModel(runtime, model) }
+    catch (error) { throw new PiConfigurationError(`Credential validation failed: ${errorMessage(error)}`) }
+    await requestCommand('config.usePi', { provider: input.provider, model: input.model })
+    return this.status()
+  }
+
+  async configureOAuth(input: PiConfiguration, interaction: PiAuthInteraction): Promise<PiStatus> {
+    const runtime = await this.runtime()
+    const model = requiredModel(runtime, input.provider, input.model)
+    if (!runtime.getProvider(input.provider)?.auth.oauth) throw new PiConfigurationError(`${input.provider} does not support sign-in`)
+    await runtime.login(input.provider, 'oauth', interaction)
+    this.clearValidation(input.provider)
     try { await this.validateModel(runtime, model) }
     catch (error) { throw new PiConfigurationError(`Credential validation failed: ${errorMessage(error)}`) }
     await requestCommand('config.usePi', { provider: input.provider, model: input.model })
@@ -114,10 +127,12 @@ function requiredModel(runtime: ModelRuntime, provider: string, model: string): 
 }
 
 function modelOptions(runtime: ModelRuntime): PiModelOption[] {
-  const names = new Map(runtime.getProviders().filter((provider) => provider.auth.apiKey).map((provider) => [provider.id, provider.name]))
-  return runtime.getModels().filter((model) => names.has(model.provider)).map((model) => ({
-    provider: model.provider, providerName: names.get(model.provider) ?? model.provider, id: model.id, name: model.name,
-  }))
+  const providers = new Map(runtime.getProviders().filter((item) => item.auth.apiKey || item.auth.oauth).map((item) => [item.id, item]))
+  return runtime.getModels().filter((model) => providers.has(model.provider)).map((model) => {
+    const provider = providers.get(model.provider)!
+    const authTypes = [provider.auth.apiKey ? 'api_key' : null, provider.auth.oauth ? 'oauth' : null].filter(Boolean) as PiModelOption['authTypes']
+    return { provider: model.provider, providerName: provider.name, id: model.id, name: model.name, authTypes }
+  })
 }
 
 function completionContext(request: PiCompletionRequest) {

@@ -8,9 +8,13 @@ export type CapturePermissions = { microphone: string; screen: string; details?:
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
-export type PiModelOption = { provider: string; providerName: string; id: string; name: string }
+export type PiAuthType = 'api_key' | 'oauth'
+export type PiModelOption = { provider: string; providerName: string; id: string; name: string; authTypes: PiAuthType[] }
 export type AIProviderStatus = { selected: boolean; configured: boolean; provider: string; model: string; models: PiModelOption[]; error?: string }
 export type PiConfigurationInput = { provider: string; model: string; apiKey?: string }
+export type PiAuthPrompt = { id: string; type: 'text' | 'secret' | 'select' | 'manual_code'; message: string; placeholder?: string; options?: readonly { id: string; label: string; description?: string }[] }
+export type PiAuthEvent = { type: 'prompt'; prompt: PiAuthPrompt } | { type: 'notice'; message: string; url?: string; userCode?: string }
+export type PiAuthAnswer = { id: string; value?: string; cancelled?: boolean }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -39,6 +43,8 @@ export type IpcInvokeContract = {
   aiProvider: {
     status: OperationSpec<[], AIProviderStatus>
     configurePi: OperationSpec<[input: PiConfigurationInput], AIProviderStatus>
+    configurePiOAuth: OperationSpec<[input: PiConfigurationInput], AIProviderStatus>
+    answerPiAuth: OperationSpec<[answer: PiAuthAnswer], void>
     useLocal: OperationSpec<[], AIProviderStatus>
     clearPiCredential: OperationSpec<[provider: string], AIProviderStatus>
   }
@@ -74,7 +80,7 @@ export const IPC_OPERATIONS = {
   meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
-  aiProvider: { status: 'aiProvider:status', configurePi: 'aiProvider:configurePi', useLocal: 'aiProvider:useLocal', clearPiCredential: 'aiProvider:clearPiCredential' },
+  aiProvider: { status: 'aiProvider:status', configurePi: 'aiProvider:configurePi', configurePiOAuth: 'aiProvider:configurePiOAuth', answerPiAuth: 'aiProvider:answerPiAuth', useLocal: 'aiProvider:useLocal', clearPiCredential: 'aiProvider:clearPiCredential' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -99,6 +105,9 @@ export const IPC_EVENTS = {
   update: {
     statusChanged: 'update:status-changed',
   },
+  aiProvider: {
+    auth: 'aiProvider:auth',
+  },
 
 } as const
 
@@ -111,5 +120,8 @@ export type GappdApi = IpcInvokeApi & {
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void
+  }
+  aiProvider: IpcInvokeApi['aiProvider'] & {
+    onAuthEvent(listener: (event: PiAuthEvent) => void): () => void
   }
 }

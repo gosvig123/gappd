@@ -1,9 +1,10 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type PiConfigurationInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type PiAuthAnswer, type PiConfigurationInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
+import { answerPiAuth, configurePiOAuth } from './pi-auth'
 import { piRuntime } from './pi-runtime'
 import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
@@ -53,6 +54,8 @@ const IPC_HANDLERS: MainHandlers = {
   aiProvider: {
     status: () => piRuntime.status(),
     configurePi: async (_event, input: PiConfigurationInput) => providerChanged(await piRuntime.configure(input)),
+    configurePiOAuth: async (event, input: PiConfigurationInput) => providerChanged(await configurePiOAuth(event, input)),
+    answerPiAuth: (event, answer: PiAuthAnswer) => answerPiAuth(event, answer),
     useLocal: async () => providerChanged(await piRuntime.useLocal()),
     clearPiCredential: (_event, provider: string) => piRuntime.clearCredential(provider),
   },
