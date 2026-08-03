@@ -1,4 +1,5 @@
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
+import { registerBunOAuthFlows } from '../../node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-ai/dist/bun-oauth.js'
 import type { AIProviderStatus as PiStatus, PiConfigurationInput as PiConfiguration, PiModelOption } from '../shared/ipc-contract'
 import { requestCommand } from './app-protocol'
 import { PiCredentialStore } from './pi-credential-store'
@@ -6,6 +7,8 @@ import { PiCredentialStore } from './pi-credential-store'
 const PI_BACKEND = 'pi'
 const JSON_TOOL = 'return_json'
 const AUTH_VALIDITY_MS = 30_000
+
+registerBunOAuthFlows()
 
 type PiModel = NonNullable<ReturnType<ModelRuntime['getModel']>>
 type PiAuthInteraction = Parameters<ModelRuntime['login']>[2]
