@@ -284,12 +284,12 @@ final class MicRecorder: @unchecked Sendable {
     private var targetFormat: AVAudioFormat?
     private var converter: AVAudioConverter?
     private let writerQueue = DispatchQueue(label: "dev.gappd.capture.microphone")
-    private let bufferReady = DispatchSemaphore(value: 0)
     private var buffers: [MicBuffer] = []
     private var scratchBuffer: MicBuffer?
     private let readIndex = Atomic<Int>(0)
     private let writeIndex = Atomic<Int>(0)
     private let persistedFrames = Atomic<UInt64>(0)
+    private let droppedFrames = Atomic<UInt64>(0)
     private let renderError = Atomic<Int32>(0)
     private let stopping = Atomic<Bool>(false)
     private(set) var isRunning = false
@@ -339,7 +339,7 @@ final class MicRecorder: @unchecked Sendable {
             try require(AudioOutputUnitStart(unit), "start microphone")
             isRunning = true
         } catch {
-            stop()
+            try? stop()
             throw error
         }
     }
@@ -352,14 +352,15 @@ final class MicRecorder: @unchecked Sendable {
 
     func verifyRunning() throws {
         let status = renderError.load(ordering: .acquiring)
-        let healthy = isRunning && persistedFrames.load(ordering: .acquiring) > 0 && status == 0
+        let healthy = isRunning && persistedFrames.load(ordering: .acquiring) > 0
+            && droppedFrames.load(ordering: .acquiring) == 0 && status == 0
         guard healthy else {
             let detail = status == 0 ? "" : " (CoreAudio \(status))"
             throw captureError("microphone produced no audio during startup\(detail)")
         }
     }
 
-    func stop() {
+    func stop() throws {
         if let audioUnit {
             AudioOutputUnitStop(audioUnit)
             AudioUnitUninitialize(audioUnit)
@@ -368,12 +369,13 @@ final class MicRecorder: @unchecked Sendable {
         audioUnit = nil
         isRunning = false
         stopping.store(true, ordering: .releasing)
-        bufferReady.signal()
         writerQueue.sync {
             writer?.finalize()
             writer = nil
             converter = nil
         }
+        let dropped = droppedFrames.load(ordering: .acquiring)
+        if dropped > 0 { throw captureError("microphone buffer overrun dropped \(dropped) frames") }
     }
 
     private func makeAudioUnit() throws -> AudioUnit {
@@ -436,6 +438,7 @@ final class MicRecorder: @unchecked Sendable {
         readIndex.store(0, ordering: .relaxed)
         writeIndex.store(0, ordering: .relaxed)
         persistedFrames.store(0, ordering: .relaxed)
+        droppedFrames.store(0, ordering: .relaxed)
         renderError.store(0, ordering: .relaxed)
         stopping.store(false, ordering: .relaxed)
         writerQueue.async { [self] in processBuffers() }
@@ -456,19 +459,17 @@ final class MicRecorder: @unchecked Sendable {
         destination.pcm.frameLength = frames
         let status = AudioUnitRender(audioUnit, flags, time, 1, frames, destination.pcm.mutableAudioBufferList)
         if status != noErr { renderError.store(status, ordering: .releasing) }
-        if status == noErr && !full {
-            writeIndex.store(next, ordering: .releasing)
-            bufferReady.signal()
-        }
+        if status == noErr && full { droppedFrames.wrappingAdd(UInt64(frames), ordering: .releasing) }
+        if status == noErr && !full { writeIndex.store(next, ordering: .releasing) }
         return status
     }
 
     private func processBuffers() {
         while true {
-            bufferReady.wait()
             drainBuffers()
             let empty = readIndex.load(ordering: .acquiring) == writeIndex.load(ordering: .acquiring)
             if stopping.load(ordering: .acquiring) && empty { return }
+            Thread.sleep(forTimeInterval: 0.001)
         }
     }
 
@@ -786,7 +787,7 @@ Task { @MainActor in
             try mic.verifyRunning()
             print("● Mic recording to \(micPath)")
         } catch {
-            mic.stop()
+            try? mic.stop()
             try? await systemRecorder?.stop()
             stderrPrint("error: could not start microphone capture: \(error)")
             exit(1)
@@ -799,8 +800,8 @@ Task { @MainActor in
         Task { @MainActor in
             emitCaptureStopAcknowledged()
             print("\n● Stopping...")
-            micRecorder?.stop()
             do {
+                try micRecorder?.stop()
                 try await systemRecorder?.stop()
                 if config.chunkSeconds != nil {
                     emitAudioChunkStreamComplete(sources: captureSources(config.mode))
@@ -808,7 +809,7 @@ Task { @MainActor in
                 print("● Capture stopped")
                 exit(0)
             } catch {
-                stderrPrint("error: could not stop system audio capture cleanly: \(error)")
+                stderrPrint("error: could not stop audio capture cleanly: \(error)")
                 exit(1)
             }
         }
