@@ -26,10 +26,11 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const diarizationReady = runtime.supported && await diarizationAssetsAvailable()
   const usesPi = input.config?.provider === 'pi'
   const summarizationReady = usesPi || modelReady
+  const runtimeReady = usesPi || runtime.bundled
   const configured = usesPi || isManagedConfig(input.config)
-  const operation = probeOperation(runtime.supported, runtime.bundled, summarizationReady, speechReady, configured)
+  const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, speechReady, configured)
   return {
-    ...baseSnapshot(operation, probeMessage(operation, runtime.bundled, summarizationReady, speechReady)),
+    ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, speechReady)),
     supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {

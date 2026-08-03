@@ -7,7 +7,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
+	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
@@ -37,11 +39,15 @@ func appProcessingDrainCmd() *cobra.Command {
 }
 
 func runProcessingDrain(capability meetingprocessing.Capability) error {
-	_, store, pipeline, err := loadDeps()
+	cfg, store, err := loadStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
+	pipeline, err := processingPipeline(cfg, capability)
+	if err != nil {
+		return err
+	}
 	service := newMeetingProcessingService(store, pipeline, recordingOutputQuiet)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -53,4 +59,15 @@ func runProcessingDrain(capability meetingprocessing.Capability) error {
 		Capability: result.Capability, Attempted: result.Attempted, Completed: result.Completed,
 		Requeued: result.Requeued, Failed: result.Failed,
 	})
+}
+
+func processingPipeline(cfg config.Config, capability meetingprocessing.Capability) (*ai.Pipeline, error) {
+	if capability != meetingprocessing.CapabilitySummarization {
+		return nil, nil
+	}
+	provider, err := newAIProvider(cfg.AI)
+	if err != nil {
+		return nil, err
+	}
+	return ai.NewPipeline(provider, cfg.AI.Temp), nil
 }

@@ -1,6 +1,7 @@
 import type { ManagedRuntimeCapability, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
 import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime'
+import { PiConfigurationError } from './pi-runtime'
 import { usingSummaryRuntime } from './summary-runtime'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
@@ -84,7 +85,7 @@ async function runDrain(current: Flight): Promise<void> {
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
   } catch (error) {
-    if (!current.controller.signal.aborted) console.error(`${current.capability} drain failed`, error)
+    if (!current.controller.signal.aborted && !(error instanceof PiConfigurationError)) console.error(`${current.capability} drain failed`, error)
   } finally {
     if (flight === current) flight = null
     startNextFlight()
