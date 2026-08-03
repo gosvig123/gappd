@@ -1,6 +1,6 @@
 import type { AIConfig } from '../shared/generated/contracts'
 import type { ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimePullStage, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
-import { MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
+import { LOCAL_AI_PROVIDER_LLAMACPP, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
 import { requestCommand } from './app-protocol'
 import { ensureAppleSpeechAsset } from './apple-speech'
 import { ensureManagedLanguageModel } from './language-model'
@@ -33,7 +33,7 @@ export const managedRuntime: ManagedRuntime = {
 export async function bootstrapManagedRuntime(): Promise<void> {
   const probe = await loadConfig()
   const snapshot = await publishProbe(probe)
-  if (probe.config?.managed && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
+  if (probe.config?.provider === LOCAL_AI_PROVIDER_LLAMACPP && probe.config.managed && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
 }
 
 async function refreshStatus(): Promise<ManagedRuntimeSnapshot> {

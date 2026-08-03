@@ -1,6 +1,7 @@
 import type { ManagedRuntimeCapability, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
 import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime'
+import { usingSummaryRuntime } from './summary-runtime'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
 type Flight = { capability: ManagedRuntimeCapability; controller: AbortController; done?: Promise<void> }
@@ -57,7 +58,7 @@ function requestReadinessChange(snapshot: ManagedRuntimeSnapshot): void {
 
 function requestReadyDrains(snapshot: ManagedRuntimeSnapshot): void {
   for (const capability of CAPABILITIES) {
-    if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
+    if (capability !== 'transcription' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
   }
 }
 
@@ -79,8 +80,7 @@ function startNextFlight(): void {
 
 async function runDrain(current: Flight): Promise<void> {
   try {
-    const runtimeCapabilities = current.capability === 'diarization' ? [] : [current.capability]
-    const result = await managedRuntime.using(runtimeCapabilities, () => requestCommand('processing.drain', { capability: current.capability }, {}, current.controller.signal))
+    const result = await drainCapability(current)
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
   } catch (error) {
@@ -89,4 +89,11 @@ async function runDrain(current: Flight): Promise<void> {
     if (flight === current) flight = null
     startNextFlight()
   }
+}
+
+function drainCapability(current: Flight) {
+  const drain = (env: NodeJS.ProcessEnv) => requestCommand('processing.drain', { capability: current.capability }, env, current.controller.signal)
+  if (current.capability === 'summarization') return usingSummaryRuntime(drain)
+  const capabilities = current.capability === 'diarization' ? [] : [current.capability]
+  return managedRuntime.using(capabilities, () => drain({}))
 }
