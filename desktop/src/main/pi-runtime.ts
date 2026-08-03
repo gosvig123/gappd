@@ -1,13 +1,11 @@
 import { ModelRuntime } from '@earendil-works/pi-coding-agent'
+import type { AIProviderStatus as PiStatus, PiConfigurationInput as PiConfiguration, PiModelOption } from '../shared/ipc-contract'
 import { requestCommand } from './app-protocol'
 import { PiCredentialStore } from './pi-credential-store'
 
 const PI_BACKEND = 'pi'
 const JSON_TOOL = 'return_json'
 
-export type PiModelOption = { provider: string; providerName: string; id: string; name: string }
-export type PiStatus = { selected: boolean; configured: boolean; provider: string; model: string; models: PiModelOption[]; error?: string }
-export type PiConfiguration = { provider: string; model: string; apiKey?: string }
 export type PiCompletionRequest = { system: string; user: string; temperature: number; maxTokens: number; jsonSchema?: object }
 export type PiCompletionResult = { text?: string; json?: object }
 
@@ -38,9 +36,10 @@ class PiRuntime {
     return this.status()
   }
 
-  async useLocal(): Promise<void> {
+  async useLocal(): Promise<PiStatus> {
     const config = (await requestCommand('config.show', {})).ai
     await requestCommand('config.useManagedLocalAI', { endpoint: config.endpoint, model: config.model })
+    return this.status()
   }
 
   async clearCredential(provider: string): Promise<PiStatus> {

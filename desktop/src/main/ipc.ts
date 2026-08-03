@@ -1,8 +1,10 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type PiConfigurationInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
+import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
+import { piRuntime } from './pi-runtime'
 import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -48,6 +50,12 @@ const IPC_HANDLERS: MainHandlers = {
     status: () => managedRuntime.status(),
     prepare: (_event, input: ManagedRuntimePrepareInput) => managedRuntime.prepare(input.mode, input.model),
   },
+  aiProvider: {
+    status: () => piRuntime.status(),
+    configurePi: async (_event, input: PiConfigurationInput) => notifyDrains(await piRuntime.configure(input)),
+    useLocal: async () => notifyDrains(await piRuntime.useLocal()),
+    clearPiCredential: (_event, provider: string) => piRuntime.clearCredential(provider),
+  },
   update: {
     getStatus: () => getUpdateStatus(),
     checkNow: () => checkForUpdate(),
@@ -60,6 +68,11 @@ const IPC_HANDLERS: MainHandlers = {
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
   },
+}
+
+function notifyDrains<T>(result: T): T {
+  requestDrains()
+  return result
 }
 
 let registered = false

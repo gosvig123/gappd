@@ -8,6 +8,9 @@ export type CapturePermissions = { microphone: string; screen: string; details?:
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
+export type PiModelOption = { provider: string; providerName: string; id: string; name: string }
+export type AIProviderStatus = { selected: boolean; configured: boolean; provider: string; model: string; models: PiModelOption[]; error?: string }
+export type PiConfigurationInput = { provider: string; model: string; apiKey?: string }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -32,6 +35,12 @@ export type IpcInvokeContract = {
   managedRuntime: {
     status: OperationSpec<[], ManagedRuntimeSnapshot>
     prepare: OperationSpec<[input: ManagedRuntimePrepareInput], ManagedRuntimeSnapshot>
+  }
+  aiProvider: {
+    status: OperationSpec<[], AIProviderStatus>
+    configurePi: OperationSpec<[input: PiConfigurationInput], AIProviderStatus>
+    useLocal: OperationSpec<[], AIProviderStatus>
+    clearPiCredential: OperationSpec<[provider: string], AIProviderStatus>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -65,6 +74,7 @@ export const IPC_OPERATIONS = {
   meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
+  aiProvider: { status: 'aiProvider:status', configurePi: 'aiProvider:configurePi', useLocal: 'aiProvider:useLocal', clearPiCredential: 'aiProvider:clearPiCredential' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
