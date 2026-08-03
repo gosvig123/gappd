@@ -12,9 +12,9 @@ type Provider interface {
 }
 
 type CompletionRequest struct {
-	System      string
-	User        string
-	Temperature float64
-	JSONSchema  json.RawMessage
-	MaxTokens   int
+	System      string          `json:"system"`
+	User        string          `json:"user"`
+	Temperature float64         `json:"temperature"`
+	JSONSchema  json.RawMessage `json:"jsonSchema,omitempty"`
+	MaxTokens   int             `json:"maxTokens"`
 }
