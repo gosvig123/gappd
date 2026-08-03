@@ -179,7 +179,9 @@ function useMeetingsLifecycle(enabled: boolean, actions: MeetingActions, setStat
 }
 
 function buildDashboardViewModel(state: DashboardState, recording: RecordingWorkflow, actions: DashboardActions) {
-  const bannerError = state.error ?? recording.recording.error ?? null
+  const recordingError = recording.recording.error
+  const selectedCaptureError = state.selectedMeeting?.status.capture.failureMessage
+  const bannerError = state.error ?? (recordingError === selectedCaptureError ? null : recordingError) ?? null
   return {
     ...state,
     devices: recording.devices,
