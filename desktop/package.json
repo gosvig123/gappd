@@ -29,6 +29,7 @@
     "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {
+    "@earendil-works/pi-coding-agent": "0.83.0",
     "@fontsource/hanken-grotesk": "^5.2.8",
     "@fontsource/jetbrains-mono": "^5.2.8",
     "@fontsource/newsreader": "^5.2.10",
