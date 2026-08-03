@@ -26,7 +26,8 @@
     "dist:mac:universal": "GAPPD_MAC_BUILD=universal npm run prepare:llamacpp && GAPPD_MAC_BUILD=universal npm run build && electron-builder --config electron-builder.config.cjs --mac --universal",
     "dist:dir:mac:universal": "GAPPD_MAC_BUILD=universal npm run prepare:llamacpp && GAPPD_MAC_BUILD=universal npm run build && electron-builder --config electron-builder.config.cjs --mac dir --universal",
     "install:mac": "node ./scripts/install-mac-build.cjs",
-    "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
+    "verify:mac-release": "node ./scripts/verify-mac-release.cjs",
+    "verify:pi-bundle": "npm run build:electron && node ./scripts/verify-pi-bundle.mjs"
   },
   "dependencies": {
     "@fontsource/hanken-grotesk": "^5.2.8",
