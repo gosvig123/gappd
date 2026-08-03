@@ -265,6 +265,14 @@ class WAVWriter {
 
 // MARK: - Mic Recorder
 
+private final class MicBuffer: @unchecked Sendable {
+    let pcm: AVAudioPCMBuffer
+    init?(_ format: AVAudioFormat, capacity: AVAudioFrameCount) {
+        guard let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+        self.pcm = pcm
+    }
+}
+
 final class MicRecorder: @unchecked Sendable {
     private var audioUnit: AudioUnit?
     private var writer: WAVWriter?
@@ -275,6 +283,12 @@ final class MicRecorder: @unchecked Sendable {
     private var sourceFormat: AVAudioFormat?
     private var targetFormat: AVAudioFormat?
     private var converter: AVAudioConverter?
+    private let writerQueue = DispatchQueue(label: "dev.gappd.capture.microphone")
+    private let stateLock = NSLock()
+    private var availableBuffers: [MicBuffer] = []
+    private var scratchBuffer: MicBuffer?
+    private var receivedFrames: UInt64 = 0
+    private var renderError: OSStatus?
     private(set) var isRunning = false
 
     init(sampleRate: Double, deviceIndex: Int?, chunkSeconds: Double?, chunkOverlapSeconds: Double) {
@@ -301,7 +315,7 @@ final class MicRecorder: @unchecked Sendable {
 
         guard idx >= 0, idx < inputDevices.count else {
             print("  warning: device index \(idx) out of range, using default")
-            return nil
+            return defaultInputDevice()
         }
         print("  mic device set to index \(idx)")
         return inputDevices[idx]
@@ -318,6 +332,7 @@ final class MicRecorder: @unchecked Sendable {
             sourceFormat = source
             targetFormat = format
             converter = AVAudioConverter(from: source, to: format)
+            try prepareBuffers(unit, format: source)
             try require(AudioUnitInitialize(unit), "initialize microphone")
             try require(AudioOutputUnitStart(unit), "start microphone")
             isRunning = true
@@ -334,7 +349,14 @@ final class MicRecorder: @unchecked Sendable {
     }
 
     func verifyRunning() throws {
-        guard isRunning else { throw captureError("microphone capture stopped during startup") }
+        stateLock.lock()
+        let healthy = isRunning && receivedFrames > 0 && renderError == nil
+        let status = renderError
+        stateLock.unlock()
+        guard healthy else {
+            let detail = status.map { " (CoreAudio \($0))" } ?? ""
+            throw captureError("microphone produced no audio during startup\(detail)")
+        }
     }
 
     func stop() {
@@ -345,9 +367,11 @@ final class MicRecorder: @unchecked Sendable {
         }
         audioUnit = nil
         isRunning = false
-        writer?.finalize()
-        writer = nil
-        converter = nil
+        writerQueue.sync {
+            writer?.finalize()
+            writer = nil
+            converter = nil
+        }
     }
 
     private func makeAudioUnit() throws -> AudioUnit {
@@ -395,18 +419,61 @@ final class MicRecorder: @unchecked Sendable {
         return format
     }
 
+    private func prepareBuffers(_ unit: AudioUnit, format: AVAudioFormat) throws {
+        var maximumFrames: UInt32 = 4096
+        var size = UInt32(MemoryLayout.size(ofValue: maximumFrames))
+        _ = AudioUnitGetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0,
+            &maximumFrames, &size)
+        let capacity = AVAudioFrameCount(maximumFrames)
+        let buffers = (0..<8).compactMap { _ in MicBuffer(format, capacity: capacity) }
+        guard buffers.count == 8, let scratch = MicBuffer(format, capacity: capacity) else {
+            throw captureError("microphone buffers unavailable")
+        }
+        stateLock.lock()
+        availableBuffers = buffers
+        scratchBuffer = scratch
+        receivedFrames = 0
+        renderError = nil
+        stateLock.unlock()
+    }
+
     private static let inputCallback: AURenderCallback = { ref, flags, time, _, frames, _ in
         Unmanaged<MicRecorder>.fromOpaque(ref).takeUnretainedValue().capture(flags, time, frames)
     }
 
     private func capture(_ flags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
                          _ time: UnsafePointer<AudioTimeStamp>, _ frames: UInt32) -> OSStatus {
-        guard let audioUnit, let sourceFormat,
-              let buffer = AVAudioPCMBuffer(pcmFormat: sourceFormat, frameCapacity: frames) else { return -1 }
-        buffer.frameLength = frames
-        let status = AudioUnitRender(audioUnit, flags, time, 1, frames, buffer.mutableAudioBufferList)
-        if status == noErr { writeConverted(buffer) }
+        guard let audioUnit else { return -1 }
+        let queued = checkoutBuffer(frames)
+        guard let destination = queued ?? scratchBuffer, destination.pcm.frameCapacity >= frames else { return -1 }
+        destination.pcm.frameLength = frames
+        let status = AudioUnitRender(audioUnit, flags, time, 1, frames, destination.pcm.mutableAudioBufferList)
+        recordRender(status, frames: frames)
+        guard status == noErr, let queued else { return status }
+        writerQueue.async { [self] in
+            writeConverted(queued.pcm)
+            releaseBuffer(queued)
+        }
         return status
+    }
+
+    private func checkoutBuffer(_ frames: UInt32) -> MicBuffer? {
+        guard stateLock.try() else { return nil }
+        defer { stateLock.unlock() }
+        guard let buffer = availableBuffers.popLast(), buffer.pcm.frameCapacity >= frames else { return nil }
+        return buffer
+    }
+
+    private func releaseBuffer(_ buffer: MicBuffer) {
+        stateLock.lock()
+        availableBuffers.append(buffer)
+        stateLock.unlock()
+    }
+
+    private func recordRender(_ status: OSStatus, frames: UInt32) {
+        stateLock.lock()
+        if status == noErr { receivedFrames += UInt64(frames) } else { renderError = status }
+        stateLock.unlock()
     }
 
     private func writeConverted(_ input: AVAudioPCMBuffer) {
