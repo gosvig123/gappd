@@ -102,12 +102,19 @@ export type AIConfig = {
   endpoint: string
   temperature: number
   managed: boolean
+  piProvider: string
+  piModel: string
 }
 
 export type ConfigUseManagedLocalAIInput = {
   endpoint: string
   model: string
   temperature?: number
+}
+
+export type ConfigUsePiInput = {
+  provider: string
+  model: string
 }
 
 export type ProcessingDrainInput = {

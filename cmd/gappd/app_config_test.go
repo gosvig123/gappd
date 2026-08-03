@@ -31,6 +31,20 @@ func TestManagedLocalAISetupRepairsLegacyOllamaConfig(t *testing.T) {
 	assertManagedLocalAIConfig(t, saved, home)
 }
 
+func TestApplyPiPreservesLocalSettings(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := applyPi(&cfg, "anthropic", "claude"); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AI.Provider != config.ProviderPi || cfg.AI.PiProvider != "anthropic" || cfg.AI.Model != config.DefaultLlamaCppModel {
+		t.Fatalf("AI config = %+v", cfg.AI)
+	}
+}
+
 func legacyOllamaConfig() string {
 	return `db_path = "~/.gappd/legacy.sqlite"
 

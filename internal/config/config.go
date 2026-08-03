@@ -11,11 +11,13 @@ import (
 )
 
 type AI struct {
-	Provider string  `toml:"provider"`
-	Model    string  `toml:"model"`
-	Endpoint string  `toml:"endpoint"`
-	Temp     float64 `toml:"temperature"`
-	Managed  bool    `toml:"managed"`
+	Provider   string  `toml:"provider"`
+	Model      string  `toml:"model"`
+	Endpoint   string  `toml:"endpoint"`
+	Temp       float64 `toml:"temperature"`
+	Managed    bool    `toml:"managed"`
+	PiProvider string  `toml:"pi_provider"`
+	PiModel    string  `toml:"pi_model"`
 }
 
 type Config struct {
@@ -25,6 +27,7 @@ type Config struct {
 
 const (
 	ProviderLlamaCpp = "llamacpp"
+	ProviderPi       = "pi"
 
 	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
 	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
@@ -154,7 +157,10 @@ func validate(cfg *Config) error {
 		return err
 	}
 	if !supportedProvider(cfg.AI.Provider) {
-		return fmt.Errorf("unsupported AI provider %q (supported: %s)", cfg.AI.Provider, ProviderLlamaCpp)
+		return fmt.Errorf("unsupported AI provider %q (supported: %s, %s)", cfg.AI.Provider, ProviderLlamaCpp, ProviderPi)
+	}
+	if cfg.AI.Provider == ProviderPi && (cfg.AI.PiProvider == "" || cfg.AI.PiModel == "") {
+		return fmt.Errorf("config ai.pi_provider and ai.pi_model must not be empty for Pi")
 	}
 	if cfg.AI.Model == "" {
 		return fmt.Errorf("config ai.model must not be empty")
@@ -180,6 +186,8 @@ func normalizeConfig(cfg *Config) error {
 	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
 	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
 	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
+	cfg.AI.PiProvider = strings.TrimSpace(cfg.AI.PiProvider)
+	cfg.AI.PiModel = strings.TrimSpace(cfg.AI.PiModel)
 	if cfg.DBPath == "" {
 		return fmt.Errorf("config db_path must not be empty")
 	}
@@ -199,7 +207,7 @@ func validateTemperature(temp float64) error {
 }
 
 func supportedProvider(provider string) bool {
-	return provider == ProviderLlamaCpp
+	return provider == ProviderLlamaCpp || provider == ProviderPi
 }
 
 func encode(cfg Config) ([]byte, error) {

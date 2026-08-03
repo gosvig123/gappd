@@ -20,6 +20,8 @@ type AIConfig struct {
 	Endpoint    string  `json:"endpoint"`
 	Temperature float64 `json:"temperature"`
 	Managed     bool    `json:"managed"`
+	PiProvider  string  `json:"piProvider"`
+	PiModel     string  `json:"piModel"`
 }
 
 type DevicesResponse struct {

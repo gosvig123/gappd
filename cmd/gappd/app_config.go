@@ -14,7 +14,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigUseManagedLocalAICmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigUseManagedLocalAICmd(), appConfigUsePiCmd())
 	return cmd
 }
 
@@ -65,6 +65,41 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 	return cmd
 }
 
+func appConfigUsePiCmd() *cobra.Command {
+	var provider, model string
+	cmd := &cobra.Command{
+		Use: "use-pi", Short: "Persist Pi provider settings",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadAppConfig()
+			if err != nil {
+				return err
+			}
+			if err := applyPi(&cfg, provider, model); err != nil {
+				return err
+			}
+			if err := config.Save(cfg); err != nil {
+				return fmt.Errorf("save config: %w", err)
+			}
+			return writeJSON(appConfigResponseFor(cfg))
+		},
+	}
+	cmd.Flags().StringVar(&provider, "provider", "", "Pi provider")
+	cmd.Flags().StringVar(&model, "model", "", "Pi model")
+	_ = cmd.MarkFlagRequired("provider")
+	_ = cmd.MarkFlagRequired("model")
+	return cmd
+}
+
+func applyPi(cfg *config.Config, provider, model string) error {
+	cfg.AI.PiProvider = strings.TrimSpace(provider)
+	cfg.AI.PiModel = strings.TrimSpace(model)
+	if cfg.AI.PiProvider == "" || cfg.AI.PiModel == "" {
+		return fmt.Errorf("Pi provider and model must not be empty")
+	}
+	cfg.AI.Provider = config.ProviderPi
+	return nil
+}
+
 func loadAppConfig() (config.Config, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -108,6 +143,8 @@ func appConfigResponseFor(cfg config.Config) appprotocol.ConfigResponse {
 			Endpoint:    cfg.AI.Endpoint,
 			Temperature: cfg.AI.Temp,
 			Managed:     cfg.AI.Managed,
+			PiProvider:  cfg.AI.PiProvider,
+			PiModel:     cfg.AI.PiModel,
 		},
 	}
 }

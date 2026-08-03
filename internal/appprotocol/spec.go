@@ -30,6 +30,11 @@ type ConfigUseManagedLocalAIInput struct {
 	Temperature *float64 `json:"temperature,omitempty"`
 }
 
+type ConfigUsePiInput struct {
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+}
+
 type ProcessingDrainInput struct {
 	Capability meetingprocessing.Capability `json:"capability"`
 }
@@ -69,6 +74,7 @@ var Commands = []CommandSpec{
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
+	{ID: "config.usePi", Mode: CommandModeRequest, Input: typeOf[ConfigUsePiInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-pi"), flag("provider", "provider", false), flag("model", "model", false)}},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},

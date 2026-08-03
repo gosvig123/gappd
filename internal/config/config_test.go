@@ -66,6 +66,19 @@ func TestLoadAcceptsLlamaCppProvider(t *testing.T) {
 	}
 }
 
+func TestLoadAcceptsPiAndRetainsLocalSettings(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeConfigFile(t, home, "[ai]\nprovider = \"pi\"\nmodel = \"local-model\"\nendpoint = \"http://local\"\npi_provider = \"anthropic\"\npi_model = \"claude\"\ntemperature = 0.3\n")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.AI.Provider != ProviderPi || cfg.AI.PiProvider != "anthropic" || cfg.AI.Model != "local-model" {
+		t.Fatalf("AI config = %+v", cfg.AI)
+	}
+}
+
 func TestLoadRejectsUnsupportedProvider(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
