@@ -13,6 +13,7 @@ export type ManagedRuntime = {
   status(): ManagedRuntimeSnapshot
   observe(listener: (snapshot: ManagedRuntimeSnapshot) => void): () => void
   prepare(mode: ManagedRuntimePrepareMode, model?: string): Promise<ManagedRuntimeSnapshot>
+  refresh(): Promise<ManagedRuntimeSnapshot>
   using<T>(capabilities: ManagedRuntimeCapability[], work: (scope: RuntimeScope) => Promise<T>): Promise<T>
   close(): Promise<void>
 }
@@ -26,6 +27,7 @@ export const managedRuntime: ManagedRuntime = {
   status: state.get,
   observe: state.subscribe,
   prepare,
+  refresh: refreshStatus,
   using: usingRuntime,
   close: closeRuntime,
 }

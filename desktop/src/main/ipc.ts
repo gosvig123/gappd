@@ -52,8 +52,8 @@ const IPC_HANDLERS: MainHandlers = {
   },
   aiProvider: {
     status: () => piRuntime.status(),
-    configurePi: async (_event, input: PiConfigurationInput) => notifyDrains(await piRuntime.configure(input)),
-    useLocal: async () => notifyDrains(await piRuntime.useLocal()),
+    configurePi: async (_event, input: PiConfigurationInput) => providerChanged(await piRuntime.configure(input)),
+    useLocal: async () => providerChanged(await piRuntime.useLocal()),
     clearPiCredential: (_event, provider: string) => piRuntime.clearCredential(provider),
   },
   update: {
@@ -70,7 +70,8 @@ const IPC_HANDLERS: MainHandlers = {
   },
 }
 
-function notifyDrains<T>(result: T): T {
+async function providerChanged<T>(result: T): Promise<T> {
+  await managedRuntime.refresh()
   requestDrains()
   return result
 }

@@ -24,14 +24,16 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const modelReady = runtime.bundled && await managedLanguageModelAvailable(MANAGED_LLAMACPP_MODEL)
   const speechReady = runtime.supported && await appleSpeechAssetAvailable()
   const diarizationReady = runtime.supported && await diarizationAssetsAvailable()
-  const configured = isManagedConfig(input.config)
-  const operation = probeOperation(runtime.supported, runtime.bundled, modelReady, speechReady, configured)
+  const usesPi = input.config?.provider === 'pi'
+  const summarizationReady = usesPi || modelReady
+  const configured = usesPi || isManagedConfig(input.config)
+  const operation = probeOperation(runtime.supported, runtime.bundled, summarizationReady, speechReady, configured)
   return {
-    ...baseSnapshot(operation, probeMessage(operation, runtime.bundled, modelReady, speechReady)),
+    ...baseSnapshot(operation, probeMessage(operation, runtime.bundled, summarizationReady, speechReady)),
     supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {
-      summarization: { readiness: modelReady ? 'ready' : runtime.bundled ? 'missing' : 'unavailable', message: modelReady ? undefined : runtime.bundled ? missingManagedLanguageModelMessage() : missingBundledLlamaCppMessage() },
+      summarization: { readiness: summarizationReady ? 'ready' : runtime.bundled ? 'missing' : 'unavailable', message: summarizationReady ? undefined : runtime.bundled ? missingManagedLanguageModelMessage() : missingBundledLlamaCppMessage() },
       transcription: { readiness: speechReady ? 'ready' : 'missing', message: speechReady ? undefined : missingAppleSpeechAssetMessage() },
       diarization: { readiness: diarizationReady ? 'ready' : 'missing', message: diarizationReady ? undefined : missingDiarizationAssetsMessage() },
     },

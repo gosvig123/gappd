@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AppHeader } from './components/app-header'
 import { ManagedRuntimeBanner } from './components/managed-runtime-banner'
 import { MeetingAnnouncements } from './components/meeting-announcements'
@@ -21,6 +21,7 @@ export function App() {
   const dashboard = useDashboardData(true)
   const update = useUpdateStatus()
   const recordingReady = permissions.ready
+  useEffect(() => { void window.gappd.aiProvider.status().then((status) => { if (status.selected && !status.configured) setSettingsOpen(true) }) }, [])
   return <div className="app-shell"><AppHeader appReady settingsOpen={settingsOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((value) => !value)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main"><DashboardApp dashboard={dashboard} update={update} runtime={runtime} permissions={permissions} recordingReady={recordingReady} /></main>{settingsOpen ? <SettingsSheet currentVersion={update.status?.currentVersion} onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ status: runtime.status, loading: runtime.loading, busy: runtime.busy, onRepair: () => void runtime.prepare('repair') }} developerDebugEnabled={import.meta.env.DEV} /></SettingsSheet> : null}<PageSearch /></div>
 }
 
