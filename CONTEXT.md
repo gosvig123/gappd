@@ -1,6 +1,6 @@
 # gappd Context
 
-gappd records meetings on macOS and turns local audio into transcripts and summaries through desktop-managed local inference.
+gappd records meetings on macOS and turns local audio into transcripts and summaries through desktop-managed local inference by default, with optional external Codex summarization.
 
 ## Language
 
@@ -11,6 +11,10 @@ _Avoid_: cloud AI, remote AI
 **Managed Runtime**:
 Desktop-owned llama.cpp and Apple Speech binaries, processes, and model assets used for **Local AI** summarization and transcription.
 _Avoid_: external runtime, user runtime
+
+**Installed Codex**:
+Optional user-installed and authenticated Codex CLI used only for remote meeting summarization through its configured absolute executable path.
+_Avoid_: bundled Codex, Pi provider host
 
 **Local AI Setup Operation**:
 Main-process workflow that turns missing, stale, or broken **Managed Runtime** state into ready **Local AI** state.
@@ -64,12 +68,13 @@ _Avoid_: attendee count, detected cluster count
 
 - A **Local AI Setup Operation** prepares one **Managed Runtime**.
 - A **Managed Runtime** provides **Local AI** for desktop meeting transcription and summarization.
-- Desktop workflows always use the **Managed Runtime**; command-line workflows may use user-configured local dependencies.
+- Desktop workflows use the **Managed Runtime** for transcription and use **Local AI** for summaries by default; **Installed Codex** may replace only summary inference when explicitly selected.
 - A healthy **Managed Runtime** should be shared instead of starting duplicate llama.cpp servers.
 - A **Meeting Recording Workflow** preserves captured audio even when **Local AI** is unavailable; **Meeting Processing** may run later through **Meeting Reprocessing**.
 - Captured audio remains durable after **Meeting Processing** and is deleted when its meeting is deleted, preserving source material for future **Meeting Reprocessing**.
 - A **Meeting Lifecycle** defines valid meeting capture and processing state transitions and user-facing state derived from persisted meeting rows.
-- **Meeting Processing** uses **Local AI** to turn captured audio or stored transcript into persisted transcripts and summaries.
+- **Meeting Processing** keeps transcription local, then uses the selected summary provider to turn a stored transcript into persisted title, extraction, and summary.
+- **Installed Codex** reuses the user's existing Codex login; Gappd sends transcript text through the configured CLI but never sends recorded audio.
 - **Pending Meeting Processing** derives its next work from persisted artifacts: audio without transcript needs transcription; transcript without summary needs summarization.
 - Production **Speaker Labels** and **Speaker Count** are generated automatically and shown as experimental; manual review is development-only evaluation, not a user workflow.
 - **Meeting Processing** exposes a persisted `You` / `Other` transcript before **Speaker Diarization**, then atomically refreshes remote labels before summary generation.

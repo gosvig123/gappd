@@ -168,7 +168,7 @@ function TranscriptPanel({ meeting, transcript, reading }: { meeting: MeetingDet
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
   if (meeting.diarization.state === PENDING_STATE || meeting.diarization.state === PROCESSING_STATUS) return 'Labeling speakers locally.'
-  if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary with local AI.'
+  if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary.'
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
   if (progress.hasTranscript && progress.hasSummary) return ''
   if (progress.hasTranscript) return 'Transcript available.'

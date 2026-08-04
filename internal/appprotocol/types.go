@@ -14,14 +14,20 @@ type ConfigResponse struct {
 	AI AIConfig `json:"ai"`
 }
 
+type CodexStatusResponse struct {
+	AI        AIConfig `json:"ai"`
+	Available bool     `json:"available"`
+	Error     *string  `json:"error,omitempty"`
+}
+
 type AIConfig struct {
-	Provider    string  `json:"provider"`
-	Model       string  `json:"model"`
-	Endpoint    string  `json:"endpoint"`
-	Temperature float64 `json:"temperature"`
-	Managed     bool    `json:"managed"`
-	PiProvider  string  `json:"piProvider"`
-	PiModel     string  `json:"piModel"`
+	Provider        string  `json:"provider"`
+	Model           string  `json:"model"`
+	Endpoint        string  `json:"endpoint"`
+	Temperature     float64 `json:"temperature"`
+	Managed         bool    `json:"managed"`
+	CodexExecutable string  `json:"codexExecutable"`
+	CodexModel      string  `json:"codexModel"`
 }
 
 type DevicesResponse struct {

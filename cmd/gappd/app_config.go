@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/spf13/cobra"
@@ -14,7 +15,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigUseManagedLocalAICmd(), appConfigUsePiCmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
 	return cmd
 }
 
@@ -38,9 +39,39 @@ func appConfigShowCmd() *cobra.Command {
 	return cmd
 }
 
+func appConfigCodexStatusCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use: "codex-status", Short: "Check saved Installed Codex health",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !asJSON {
+				return fmt.Errorf("app config codex-status requires --json")
+			}
+			cfg, err := loadAppConfig()
+			if err != nil {
+				return err
+			}
+			return writeJSON(codexStatusFor(cfg))
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	return cmd
+}
+
+func codexStatusFor(cfg config.Config) appprotocol.CodexStatusResponse {
+	status := appprotocol.CodexStatusResponse{AI: appAIConfigFor(cfg), Available: true}
+	if cfg.AI.Provider != config.ProviderCodexExec {
+		return status
+	}
+	if err := ai.NewCodexExec(cfg.AI.CodexExecutable, cfg.AI.CodexModel).Available(); err != nil {
+		message := err.Error()
+		status.Available, status.Error = false, &message
+	}
+	return status
+}
+
 func appConfigUseManagedLocalAICmd() *cobra.Command {
-	var endpoint string
-	var model string
+	var endpoint, model string
 	var temperature float64
 	cmd := &cobra.Command{
 		Use:   "use-managed-local-ai",
@@ -65,17 +96,18 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 	return cmd
 }
 
-func appConfigUsePiCmd() *cobra.Command {
-	var provider, model string
+func appConfigUseCodexCmd() *cobra.Command {
+	var executable, model string
 	cmd := &cobra.Command{
-		Use: "use-pi", Short: "Persist Pi provider settings",
+		Use: "use-codex", Short: "Use an installed Codex CLI for summaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadAppConfig()
 			if err != nil {
 				return err
 			}
-			if err := applyPi(&cfg, provider, model); err != nil {
-				return err
+			applyCodex(&cfg, executable, model)
+			if err := ai.NewCodexExec(cfg.AI.CodexExecutable, cfg.AI.CodexModel).Available(); err != nil {
+				return fmt.Errorf("preflight Installed Codex: %w", err)
 			}
 			if err := config.Save(cfg); err != nil {
 				return fmt.Errorf("save config: %w", err)
@@ -83,21 +115,16 @@ func appConfigUsePiCmd() *cobra.Command {
 			return writeJSON(appConfigResponseFor(cfg))
 		},
 	}
-	cmd.Flags().StringVar(&provider, "provider", "", "Pi provider")
-	cmd.Flags().StringVar(&model, "model", "", "Pi model")
-	_ = cmd.MarkFlagRequired("provider")
-	_ = cmd.MarkFlagRequired("model")
+	cmd.Flags().StringVar(&executable, "executable", "", "Absolute Codex executable path")
+	cmd.Flags().StringVar(&model, "model", "", "Optional Codex model")
+	_ = cmd.MarkFlagRequired("executable")
 	return cmd
 }
 
-func applyPi(cfg *config.Config, provider, model string) error {
-	cfg.AI.PiProvider = strings.TrimSpace(provider)
-	cfg.AI.PiModel = strings.TrimSpace(model)
-	if cfg.AI.PiProvider == "" || cfg.AI.PiModel == "" {
-		return fmt.Errorf("Pi provider and model must not be empty")
-	}
-	cfg.AI.Provider = config.ProviderPi
-	return nil
+func applyCodex(cfg *config.Config, executable, model string) {
+	cfg.AI.Provider = config.ProviderCodexExec
+	cfg.AI.CodexExecutable = strings.TrimSpace(executable)
+	cfg.AI.CodexModel = strings.TrimSpace(model)
 }
 
 func loadAppConfig() (config.Config, error) {
@@ -136,15 +163,13 @@ func applyManagedLocalAI(cfg *config.Config, endpoint, model string, temperature
 }
 
 func appConfigResponseFor(cfg config.Config) appprotocol.ConfigResponse {
-	return appprotocol.ConfigResponse{
-		AI: appprotocol.AIConfig{
-			Provider:    cfg.AI.Provider,
-			Model:       cfg.AI.Model,
-			Endpoint:    cfg.AI.Endpoint,
-			Temperature: cfg.AI.Temp,
-			Managed:     cfg.AI.Managed,
-			PiProvider:  cfg.AI.PiProvider,
-			PiModel:     cfg.AI.PiModel,
-		},
+	return appprotocol.ConfigResponse{AI: appAIConfigFor(cfg)}
+}
+
+func appAIConfigFor(cfg config.Config) appprotocol.AIConfig {
+	return appprotocol.AIConfig{
+		Provider: cfg.AI.Provider, Model: cfg.AI.Model, Endpoint: cfg.AI.Endpoint,
+		Temperature: cfg.AI.Temp, Managed: cfg.AI.Managed,
+		CodexExecutable: cfg.AI.CodexExecutable, CodexModel: cfg.AI.CodexModel,
 	}
 }

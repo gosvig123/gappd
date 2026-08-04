@@ -69,5 +69,10 @@ func processingPipeline(cfg config.Config, capability meetingprocessing.Capabili
 	if err != nil {
 		return nil, err
 	}
+	if cfg.AI.Provider == config.ProviderCodexExec {
+		if err := provider.Available(); err != nil {
+			return nil, fmt.Errorf("preflight Installed Codex before summarization: %w", err)
+		}
+	}
 	return ai.NewPipeline(provider, cfg.AI.Temp), nil
 }

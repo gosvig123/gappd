@@ -41,12 +41,12 @@ jobs:
         run: npm audit --omit=dev
         working-directory: desktop
 
-      - name: Type-check desktop
-        run: npm run typecheck
+      - name: Test desktop
+        run: npm test
         working-directory: desktop
 
-      - name: Verify bundled Pi runtime
-        run: npm run verify:pi-bundle
+      - name: Type-check desktop
+        run: npm run typecheck
         working-directory: desktop
 
       - name: Build CLI

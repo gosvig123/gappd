@@ -1,7 +1,7 @@
 import '../components/local-ai.css'
 
 import { type ReactNode, useEffect, useState } from 'react'
-import type { AIProviderStatus, PiAuthEvent, PiModelOption, StartupSettings } from '../../shared/ipc-contract'
+import type { AIProviderStatus, StartupSettings } from '../../shared/ipc-contract'
 import { Button, Card, cx, StatusPill } from '../components/ui'
 import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
@@ -15,72 +15,50 @@ type SettingsViewProps = {
   developerDebugEnabled: boolean
 }
 
+const LOCAL_PROVIDER = 'local'
+const CODEX_PROVIDER = 'codex_exec'
+const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
+type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
+
 export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
   return <section className="settings-stack settings-stack-plain"><StartupPanel /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
 function AIProviderPanel() {
   const [status, setStatus] = useState<AIProviderStatus | null>(null)
-  const [draftProvider, setDraftProvider] = useState('')
-  const [draftModel, setDraftModel] = useState('')
-  const [apiKey, setApiKey] = useState('')
-  const [authEvent, setAuthEvent] = useState<PiAuthEvent | null>(null)
-  const [authValue, setAuthValue] = useState('')
+  const [provider, setProvider] = useState<SummaryProvider>(LOCAL_PROVIDER)
+  const [executable, setExecutable] = useState('')
+  const [model, setModel] = useState('')
+  const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  useEffect(() => { void window.gappd.aiProvider.status().then(setStatus).catch((cause) => setError(errorMessage(cause))) }, [])
-  useEffect(() => {
-    const stop = window.gappd.aiProvider.onAuthEvent(setAuthEvent)
-    return () => { stop(); void window.gappd.aiProvider.cancelPiAuth() }
-  }, [])
-  const provider = draftProvider || status?.provider || status?.models[0]?.provider || ''
-  const models = status?.models.filter((item) => item.provider === provider) ?? []
-  const model = draftModel || (status?.provider === provider ? status.model : '') || models[0]?.id || ''
-  const authTypes = models.find((item) => item.id === model)?.authTypes ?? []
-  const apiKeyReady = Boolean(apiKey) || (status?.provider === provider && status.authType === 'api_key')
-  const done = () => { setApiKey(''); setAuthEvent(null); setAuthValue('') }
-  const run = (action: () => Promise<AIProviderStatus>) => runProviderAction(action, setStatus, setBusy, setError, done)
-  return <Card className="settings-section"><SectionTitle title="Meeting summaries" note="Choose where transcript text is processed." action={<StatusPill tone={status?.selected && !status.configured ? 'danger' : 'success'}>{providerStatusLabel(status)}</StatusPill>} /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="ai-provider">Pi provider</label><select id="ai-provider" className="settings-select" value={provider} onChange={(event) => selectProvider(event.target.value, status, setDraftProvider, setDraftModel)}>{providerOptions(status?.models ?? []).map((item) => <option key={item.provider} value={item.provider}>{item.providerName}</option>)}</select></div><div className="metric-card"><label className="label" htmlFor="ai-model">Model</label><select id="ai-model" className="settings-select" value={model} onChange={(event) => setDraftModel(event.target.value)}>{models.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>{authTypes.includes('api_key') ? <div className="metric-card"><label className="label" htmlFor="ai-key">API key</label><input id="ai-key" className="settings-select" type="password" autoComplete="off" value={apiKey} placeholder={status?.configured ? 'Stored securely' : 'Required'} onChange={(event) => setApiKey(event.target.value)} /></div> : null}</div><div className={cx('status-note', error ? 'danger' : undefined)}>{error || providerNote(status)}</div>{authEvent ? <PiAuthStep event={authEvent} value={authValue} setValue={setAuthValue} done={() => setAuthEvent(null)} /> : null}<div className="actions-row">{authTypes.includes('api_key') ? <Button variant="primary" disabled={busy || !provider || !model || !apiKeyReady} onClick={() => void run(() => window.gappd.aiProvider.configurePi({ provider, model, apiKey: apiKey || undefined }))}>{busy ? 'Saving…' : 'Use API key'}</Button> : null}{authTypes.includes('oauth') ? <Button variant={authTypes.includes('api_key') ? 'secondary' : 'primary'} disabled={busy || !provider || !model} onClick={() => void run(() => window.gappd.aiProvider.configurePiOAuth({ provider, model }))}>{busy ? 'Signing in…' : 'Sign in'}</Button> : null}<Button onClick={() => void run(() => window.gappd.aiProvider.useLocal())} disabled={busy || !status?.selected}>Use Local AI</Button>{status?.configured ? <Button onClick={() => void run(() => window.gappd.aiProvider.clearPiCredential(status.provider))} disabled={busy}>Forget credential</Button> : null}</div></Card>
-}
-
-function PiAuthStep({ event, value, setValue, done }: { event: PiAuthEvent; value: string; setValue: (value: string) => void; done: () => void }) {
-  const cancel = async () => { done(); setValue(''); await window.gappd.aiProvider.cancelPiAuth() }
-  if (event.type === 'notice') return <div className="metric-card"><div className="status-note">{event.message}{event.userCode ? ` Code: ${event.userCode}` : ''}</div><Button onClick={() => void cancel()}>Cancel sign-in</Button></div>
-  const prompt = event.prompt
-  const answer = async (cancelled = false) => {
-    done(); setValue('')
-    await window.gappd.aiProvider.answerPiAuth({ id: prompt.id, value: cancelled ? undefined : value, cancelled })
+  useEffect(() => { void loadProviderStatus(setStatus, setProvider, setExecutable, setModel, setError).finally(() => setLoading(false)) }, [])
+  const save = async () => {
+    setBusy(true); setError(null)
+    try {
+      const next = provider === LOCAL_PROVIDER ? await window.gappd.aiProvider.useLocal() : await window.gappd.aiProvider.configureCodex({ executable, model })
+      setStatus(next)
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
   }
-  return <div className="metric-card"><label className="label" htmlFor="pi-auth-answer">{prompt.message}</label>{prompt.type === 'select' ? <select id="pi-auth-answer" className="settings-select" value={value} onChange={(item) => setValue(item.target.value)}><option value="">Choose…</option>{prompt.options?.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select> : <input id="pi-auth-answer" className="settings-select" type={prompt.type === 'secret' ? 'password' : 'text'} value={value} placeholder={prompt.placeholder} onChange={(item) => setValue(item.target.value)} />}<div className="actions-row"><Button variant="primary" disabled={!value} onClick={() => void answer()}>Continue</Button><Button onClick={() => void answer(true)}>Cancel</Button></div></div>
+  const changeProvider = (next: typeof provider) => { setProvider(next); setStatus(null); setError(null) }
+  const healthError = status?.provider === provider && !status.available ? status.error || CODEX_UNAVAILABLE : null
+  const shownError = error || healthError
+  const note = provider === LOCAL_PROVIDER ? 'Local AI keeps transcript text and audio on this Mac.' : 'Uses existing Codex login and current Codex CLI. Update Codex if check fails. Transcript text goes through Codex; recorded audio stays on this Mac.'
+  return <Card className="settings-section"><SectionTitle title="Meeting summaries" note="Choose where transcript text is processed." action={<StatusPill tone={shownError ? 'danger' : 'success'}>{providerStatusLabel(status)}</StatusPill>} /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="ai-provider">Provider</label><select id="ai-provider" className="settings-select" value={provider} disabled={loading || busy} onChange={(event) => changeProvider(event.target.value as SummaryProvider)}><option value={LOCAL_PROVIDER}>Local AI</option><option value={CODEX_PROVIDER}>Installed Codex</option></select></div>{provider === CODEX_PROVIDER ? <><div className="metric-card"><label className="label" htmlFor="codex-executable">Codex executable</label><input id="codex-executable" className="settings-select" value={executable} disabled={loading || busy} placeholder="/absolute/path/to/codex" onChange={(event) => setExecutable(event.target.value)} /></div><div className="metric-card"><label className="label" htmlFor="codex-model">Model (optional)</label><input id="codex-model" className="settings-select" value={model} disabled={loading || busy} onChange={(event) => setModel(event.target.value)} /></div></> : null}</div><div className={cx('status-note', shownError ? 'danger' : undefined)}>{shownError || note}</div><div className="actions-row"><Button variant="primary" disabled={loading || busy || (provider === CODEX_PROVIDER && !executable.trim())} onClick={() => void save()}>{loading || busy ? 'Checking…' : 'Save summary provider'}</Button></div></Card>
 }
 
-async function runProviderAction(action: () => Promise<AIProviderStatus>, setStatus: (status: AIProviderStatus) => void, setBusy: (busy: boolean) => void, setError: (error: string | null) => void, done: () => void) {
-  setBusy(true); setError(null)
-  try { setStatus(await action()); done() }
-  catch (cause) { setError(errorMessage(cause)) }
-  finally { setBusy(false) }
-}
-
-function providerOptions(models: PiModelOption[]): PiModelOption[] {
-  return models.filter((item, index) => models.findIndex((candidate) => candidate.provider === item.provider) === index)
-}
-
-function selectProvider(provider: string, status: AIProviderStatus | null, setProvider: (value: string) => void, setModel: (value: string) => void): void {
-  setProvider(provider)
-  setModel(status?.models.find((item) => item.provider === provider)?.id ?? '')
+async function loadProviderStatus(setStatus: (value: AIProviderStatus) => void, setProvider: (value: SummaryProvider) => void, setExecutable: (value: string) => void, setModel: (value: string) => void, setError: (value: string) => void) {
+  try {
+    const next = await window.gappd.aiProvider.status()
+    setStatus(next); setProvider(next.provider); setExecutable(next.codexExecutable); setModel(next.codexModel)
+  } catch (cause) { setError(errorMessage(cause)) }
 }
 
 function providerStatusLabel(status: AIProviderStatus | null): string {
   if (!status) return 'Checking'
-  if (!status.selected) return 'Local'
-  return status.configured ? 'Pi ready' : 'Setup required'
-}
-
-function providerNote(status: AIProviderStatus | null): string {
-  if (!status) return 'Checking bundled Pi providers…'
-  if (!status.selected) return 'Local AI keeps transcript text on this Mac.'
-  if (!status.configured) return 'Pi setup required. Summaries stay pending until credential is saved.'
-  return `Transcript text is sent to ${status.provider}; recorded audio stays on this Mac.`
+  if (status.provider === CODEX_PROVIDER && !status.available) return 'Codex unavailable'
+  return status.provider === CODEX_PROVIDER ? 'Installed Codex' : 'Local AI'
 }
 
 function StartupPanel() {

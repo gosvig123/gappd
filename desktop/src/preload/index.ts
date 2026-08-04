@@ -41,7 +41,6 @@ const operationApi = buildOperationApi()
 const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
-  aiProvider: { ...operationApi.aiProvider, onAuthEvent: subscribe(IPC_EVENTS.aiProvider.auth) },
   managedRuntime: { ...operationApi.managedRuntime, observe: subscribe(IPC_EVENTS.managedRuntime.changed) },
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }

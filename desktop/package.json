@@ -13,6 +13,7 @@
     "build": "npm run build:renderer && npm run native:prepare -- build && npm run build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsup --config tsup.config.ts",
+    "test": "node --experimental-strip-types --test src/main/*.test.ts",
     "typecheck": "tsc --noEmit",
     "preflight:macos": "node ./scripts/preflight-macos.mjs",
     "native:prepare": "node ./scripts/ensure-native-artifacts.mjs",
@@ -26,8 +27,7 @@
     "dist:mac:universal": "GAPPD_MAC_BUILD=universal npm run prepare:llamacpp && GAPPD_MAC_BUILD=universal npm run build && electron-builder --config electron-builder.config.cjs --mac --universal",
     "dist:dir:mac:universal": "GAPPD_MAC_BUILD=universal npm run prepare:llamacpp && GAPPD_MAC_BUILD=universal npm run build && electron-builder --config electron-builder.config.cjs --mac dir --universal",
     "install:mac": "node ./scripts/install-mac-build.cjs",
-    "verify:mac-release": "node ./scripts/verify-mac-release.cjs",
-    "verify:pi-bundle": "npm run build:electron && node ./scripts/verify-pi-bundle.mjs"
+    "verify:mac-release": "node ./scripts/verify-mac-release.cjs"
   },
   "dependencies": {
     "@fontsource/hanken-grotesk": "^5.2.8",
@@ -39,12 +39,10 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "@earendil-works/pi-coding-agent": "^0.83.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
-    "brace-expansion": "^5.0.9",
     "concurrently": "^9.1.2",
     "electron": "^43.2.0",
     "electron-builder": "^26.0.12",

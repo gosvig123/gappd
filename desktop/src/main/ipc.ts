@@ -1,11 +1,11 @@
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type PiAuthAnswer, type PiConfigurationInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { LOCAL_AI_PROVIDER_LLAMACPP } from '../shared/managed-local-ai'
 import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
-import { answerPiAuth, cancelPiAuth, configurePiOAuth } from './pi-auth'
-import { piRuntime } from './pi-runtime'
+import { configureCodex, providerStatus, useLocalProvider } from './ai-provider'
 import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -52,13 +52,9 @@ const IPC_HANDLERS: MainHandlers = {
     prepare: (_event, input: ManagedRuntimePrepareInput) => managedRuntime.prepare(input.mode, input.model),
   },
   aiProvider: {
-    status: () => piRuntime.status(),
-    configurePi: async (_event, input: PiConfigurationInput) => providerChanged(await piRuntime.configure(input)),
-    configurePiOAuth: async (event, input: PiConfigurationInput) => providerChanged(await configurePiOAuth(event, input)),
-    answerPiAuth: (event, answer: PiAuthAnswer) => answerPiAuth(event, answer),
-    cancelPiAuth: (event) => cancelPiAuth(event),
-    useLocal: async () => providerChanged(await piRuntime.useLocal()),
-    clearPiCredential: (_event, provider: string) => piRuntime.clearCredential(provider),
+    status: () => refreshedProviderStatus(),
+    configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
+    useLocal: () => providerChanged(useLocalProvider),
   },
   update: {
     getStatus: () => getUpdateStatus(),
@@ -74,10 +70,34 @@ const IPC_HANDLERS: MainHandlers = {
   },
 }
 
-async function providerChanged<T>(result: T): Promise<T> {
-  await managedRuntime.refresh()
+async function refreshedProviderStatus() {
+  const generation = managedRuntime.providerGeneration()
+  const result = await providerStatus()
+  await managedRuntime.refresh(result.health, generation)
+  return result.status
+}
+
+async function providerChanged(action: () => ReturnType<typeof configureCodex>) {
+  const change = await managedRuntime.beginProviderChange()
+  let resumeRepair = false
+  let result: Awaited<ReturnType<typeof configureCodex>>
+  try {
+    result = await action()
+    await managedRuntime.refresh(result.health, change.gate.generation)
+    resumeRepair = isManagedLocal(result.health.ai)
+  } catch (error) {
+    resumeRepair = true
+    await managedRuntime.refresh(undefined, change.gate.generation)
+    throw error
+  } finally {
+    managedRuntime.endProviderChange(change, resumeRepair)
+  }
   requestDrains()
-  return result
+  return result.status
+}
+
+function isManagedLocal(config: { provider: string; managed: boolean }): boolean {
+  return config.provider === LOCAL_AI_PROVIDER_LLAMACPP && config.managed
 }
 
 let registered = false

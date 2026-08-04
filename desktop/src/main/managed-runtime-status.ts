@@ -7,7 +7,9 @@ import { getManagedLlamaCppRuntimeStatus, missingBundledLlamaCppMessage } from '
 import { toManagedRuntimeErrorState } from './managed-runtime-errors'
 import { diarizationAssetsAvailable, missingDiarizationAssetsMessage } from './diarization'
 
-export type RuntimeProbe = { config: AIConfig | null; error?: string }
+export type RuntimeProbe = { config: AIConfig | null; error?: string; providerError?: string }
+
+const CODEX_PROVIDER = 'codex_exec'
 
 export function initialRuntimeSnapshot(): ManagedRuntimeSnapshot {
   return baseSnapshot('checking', 'Checking Managed Runtime readiness')
@@ -24,17 +26,17 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const modelReady = runtime.bundled && await managedLanguageModelAvailable(MANAGED_LLAMACPP_MODEL)
   const speechReady = runtime.supported && await appleSpeechAssetAvailable()
   const diarizationReady = runtime.supported && await diarizationAssetsAvailable()
-  const usesPi = input.config?.provider === 'pi'
-  const summarizationReady = usesPi || modelReady
-  const runtimeReady = usesPi || runtime.bundled
-  const configured = usesPi || isManagedConfig(input.config)
+  const usesCodex = input.config?.provider === CODEX_PROVIDER
+  const summarizationReady = usesCodex ? !input.providerError : modelReady
+  const runtimeReady = usesCodex ? summarizationReady : runtime.bundled
+  const configured = usesCodex || isManagedConfig(input.config)
   const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, speechReady, configured)
   return {
-    ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, speechReady)),
+    ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, speechReady, input.providerError)),
     supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {
-      summarization: { readiness: summarizationReady ? 'ready' : runtime.bundled ? 'missing' : 'unavailable', message: summarizationReady ? undefined : runtime.bundled ? missingManagedLanguageModelMessage() : missingBundledLlamaCppMessage() },
+      summarization: summarizationStatus(usesCodex, summarizationReady, runtime.bundled, input.providerError),
       transcription: { readiness: speechReady ? 'ready' : 'missing', message: speechReady ? undefined : missingAppleSpeechAssetMessage() },
       diarization: { readiness: diarizationReady ? 'ready' : 'missing', message: diarizationReady ? undefined : missingDiarizationAssetsMessage() },
     },
@@ -64,9 +66,18 @@ function probeOperation(supported: boolean, bundled: boolean, model: boolean, sp
   return model && speech && configured ? 'ready' : 'needs_setup'
 }
 
-function probeMessage(operation: ManagedRuntimeOperation, bundled: boolean, model: boolean, speech: boolean): string {
-  if (!bundled) return missingBundledLlamaCppMessage()
-  if (!model) return missingManagedLanguageModelMessage()
+function summarizationStatus(usesCodex: boolean, ready: boolean, bundled: boolean, providerError?: string) {
+  if (ready) return { readiness: 'ready' as const }
+  if (usesCodex) return { readiness: 'unavailable' as const, message: providerError }
+  return bundled
+    ? { readiness: 'missing' as const, message: missingManagedLanguageModelMessage() }
+    : { readiness: 'unavailable' as const, message: missingBundledLlamaCppMessage() }
+}
+
+function probeMessage(operation: ManagedRuntimeOperation, runtime: boolean, summary: boolean, speech: boolean, providerError?: string): string {
+  if (providerError) return providerError
+  if (!runtime) return missingBundledLlamaCppMessage()
+  if (!summary) return missingManagedLanguageModelMessage()
   if (!speech) return missingAppleSpeechAssetMessage()
   return operation === 'ready' ? 'Managed Runtime is ready and starts when needed' : 'Managed Runtime setup is required'
 }

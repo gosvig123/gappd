@@ -102,8 +102,14 @@ export type AIConfig = {
   endpoint: string
   temperature: number
   managed: boolean
-  piProvider: string
-  piModel: string
+  codexExecutable: string
+  codexModel: string
+}
+
+export type CodexStatusResponse = {
+  ai: AIConfig
+  available: boolean
+  error?: string
 }
 
 export type ConfigUseManagedLocalAIInput = {
@@ -112,8 +118,8 @@ export type ConfigUseManagedLocalAIInput = {
   temperature?: number
 }
 
-export type ConfigUsePiInput = {
-  provider: string
+export type ConfigUseCodexInput = {
+  executable: string
   model: string
 }
 

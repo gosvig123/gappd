@@ -5,7 +5,6 @@ import { pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator 
 import { logMainProcessMemory } from './memory'
 import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
-import { piBridge } from './pi-bridge'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
@@ -103,7 +102,6 @@ async function shutdown(): Promise<void> {
   stopAutoUpdateChecks()
   await stopActiveRecordingForQuit()
   await managedRuntime.close()
-  await piBridge.close()
   logMainProcessMemory('shutdown:done')
 }
 

@@ -31,22 +31,37 @@ func TestManagedLocalAISetupRepairsLegacyOllamaConfig(t *testing.T) {
 	assertManagedLocalAIConfig(t, saved, home)
 }
 
-func TestApplyPiPreservesLocalSettings(t *testing.T) {
+func TestUseCodexCommandPreflightsAndSaves(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	executable := fakeCodexCommand(t)
+	cmd := appConfigUseCodexCmd()
+	cmd.SetArgs([]string{"--executable", executable, "--model", "gpt-5"})
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.Load()
+	if err != nil || cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.CodexModel != "gpt-5" {
+		t.Fatalf("Load() = %+v, %v", cfg.AI, err)
+	}
+}
+
+func TestApplyCodexPreservesLocalSettings(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	cfg, err := config.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := applyPi(&cfg, "anthropic", "claude"); err != nil {
-		t.Fatal(err)
-	}
-	if cfg.AI.Provider != config.ProviderPi || cfg.AI.PiProvider != "anthropic" || cfg.AI.Model != config.DefaultLlamaCppModel {
+	applyCodex(&cfg, "/opt/codex", "gpt-5")
+	if cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.CodexModel != "gpt-5" {
 		t.Fatalf("AI config = %+v", cfg.AI)
+	}
+	if cfg.AI.Model != config.DefaultLlamaCppModel || cfg.AI.Endpoint != config.DefaultLlamaCppEndpoint {
+		t.Fatalf("local settings changed: %+v", cfg.AI)
 	}
 }
 
-func legacyOllamaConfig() string {
-	return `db_path = "~/.gappd/legacy.sqlite"
+const legacyOllamaConfigText = `db_path = "~/.gappd/legacy.sqlite"
 
 [audio]
 backend = "screencapturekit"
@@ -73,6 +88,9 @@ enabled = false
 [storage]
 db_path = "~/.gappd/db.sqlite"
 `
+
+func legacyOllamaConfig() string {
+	return legacyOllamaConfigText
 }
 
 func writeAppConfigFile(t *testing.T, home, content string) {
