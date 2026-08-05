@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -52,6 +53,39 @@ func TestClaimQueuesStaleSummaryWithoutClearingIt(t *testing.T) {
 	claim, err := store.ClaimNext(context.Background(), QueueStageSummarization, time.Now(), time.Minute, nil)
 	if err != nil || claim == nil || claim.Meeting.Summary == nil || *claim.Meeting.Summary != "visible" {
 		t.Fatalf("stale summary claim = %#v, %v", claim, err)
+	}
+}
+
+func TestPendingStagesReturnsOnlyRunnableWork(t *testing.T) {
+	store := openQueueDB(t)
+	defer store.Close()
+	queueMeeting(t, store, "transcription", "2026-01-01T00:00:00Z")
+	diarization := queueMeeting(t, store, "diarization", "2026-01-02T00:00:00Z")
+	summary := queueMeeting(t, store, "summary", "2026-01-03T00:00:00Z")
+	_, _ = store.Conn.Exec(`UPDATE meetings SET transcript='ready',diarization_state=? WHERE id=?`, DiarizationStatePending, diarization.ID)
+	_, _ = store.Conn.Exec(`UPDATE meetings SET transcript='ready',diarization_state=? WHERE id=?`, DiarizationStateCompleted, summary.ID)
+	stages, err := store.PendingStages(context.Background(), time.Now(), time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []QueueStage{QueueStageTranscription, QueueStageDiarization, QueueStageSummarization}
+	if !reflect.DeepEqual(stages, want) {
+		t.Fatalf("stages = %v, want %v", stages, want)
+	}
+}
+
+func TestPendingStagesHonorsClaimExpiry(t *testing.T) {
+	store := openQueueDB(t)
+	defer store.Close()
+	now := time.Now()
+	queueMeeting(t, store, "claimed", "2026-01-01T00:00:00Z")
+	if _, err := store.ClaimNext(context.Background(), QueueStageTranscription, now, time.Minute, nil); err != nil {
+		t.Fatal(err)
+	}
+	active, _ := store.PendingStages(context.Background(), now, time.Minute)
+	expired, _ := store.PendingStages(context.Background(), now.Add(2*time.Minute), time.Minute)
+	if len(active) != 0 || !reflect.DeepEqual(expired, []QueueStage{QueueStageTranscription}) {
+		t.Fatalf("active = %v, expired = %v", active, expired)
 	}
 }
 

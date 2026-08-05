@@ -56,6 +56,10 @@ type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
 }
 
+type ProcessingPendingResponse struct {
+	Capabilities []meetingprocessing.Capability `json:"capabilities"`
+}
+
 type ProcessingDrainResponse struct {
 	Capability meetingprocessing.Capability `json:"capability"`
 	Attempted  int                          `json:"attempted"`

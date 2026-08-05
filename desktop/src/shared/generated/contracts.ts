@@ -123,6 +123,10 @@ export type ConfigUseCodexInput = {
   model: string
 }
 
+export type ProcessingPendingResponse = {
+  capabilities: ProcessingCapability[]
+}
+
 export type ProcessingDrainInput = {
   capability: ProcessingCapability
 }

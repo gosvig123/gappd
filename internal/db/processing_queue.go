@@ -86,35 +86,59 @@ func (d *DB) ClaimNext(ctx context.Context, stage QueueStage, now time.Time, ttl
 	return &ProcessingClaim{Meeting: *meeting, Token: token, Stage: stage, ExpiresAt: expires}, nil
 }
 
-func claimStatement(stage QueueStage, token string, now, expires time.Time, excluded []string) (string, []any) {
-	condition := `transcript IS NULL OR trim(transcript)=''`
-	conditionArgs := []any{}
-	switch stage {
-	case QueueStageDiarization:
-		condition = `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?)`
-		conditionArgs = append(conditionArgs, DiarizationStatePending, DiarizationStateProcessing)
-	case QueueStageSummarization:
-		condition = processingArtifactPresentSQL("transcript") + ` AND diarization_state IN (?,?,?,?) AND NOT (` +
-			ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") + `)`
-		conditionArgs = append(conditionArgs, DiarizationStateNotRequested, DiarizationStateNotApplicable, DiarizationStateCompleted, DiarizationStateDegraded)
+func (d *DB) PendingStages(ctx context.Context, now time.Time, ttl time.Duration) ([]QueueStage, error) {
+	stages := []QueueStage{QueueStageTranscription, QueueStageDiarization, QueueStageSummarization}
+	pending := make([]QueueStage, 0, len(stages))
+	for _, stage := range stages {
+		query, args := claimableMeetingQuery(stage, now, ttl, nil)
+		var exists bool
+		if err := d.Conn.QueryRowContext(ctx, `SELECT EXISTS(`+query+`)`, args...).Scan(&exists); err != nil {
+			return nil, fmt.Errorf("check pending %s processing: %w", stage, err)
+		}
+		if exists {
+			pending = append(pending, stage)
+		}
 	}
-	staleUnclaimedAt := now.Add(-3 * expires.Sub(now))
-	subquery := `SELECT id FROM meetings WHERE capture_status=? AND (` + condition + `) AND
+	return pending, nil
+}
+
+func claimStatement(stage QueueStage, token string, now, expires time.Time, excluded []string) (string, []any) {
+	subquery, queryArgs := claimableMeetingQuery(stage, now, expires.Sub(now), excluded)
+	args := []any{token, stamp(expires), ProcessingStatusProcessing, stamp(now)}
+	args = append(args, queryArgs...)
+	query := `UPDATE meetings SET processing_claim_token=?, processing_claim_expires_at=?, processing_status=?,
+		processing_status_updated_at=?, processing_failure_message=NULL WHERE id=(` + subquery + `) RETURNING ` + meetingColumns
+	return query, args
+}
+
+func claimableMeetingQuery(stage QueueStage, now time.Time, ttl time.Duration, excluded []string) (string, []any) {
+	condition, args := stageCondition(stage)
+	staleUnclaimedAt := now.Add(-3 * ttl)
+	query := `SELECT id FROM meetings WHERE capture_status=? AND (` + condition + `) AND
 		(processing_status=? OR (processing_status=? AND ((processing_claim_token IS NULL AND processing_status_updated_at<=?)
 		OR (processing_claim_token IS NOT NULL AND (processing_claim_expires_at IS NULL OR processing_claim_expires_at<=?)))))`
-	args := []any{token, stamp(expires), ProcessingStatusProcessing, stamp(now), CaptureStatusCaptured}
-	args = append(args, conditionArgs...)
+	args = append([]any{CaptureStatusCaptured}, args...)
 	args = append(args, ProcessingStatusPending, ProcessingStatusProcessing, stamp(staleUnclaimedAt), stamp(now))
 	if len(excluded) > 0 {
-		subquery += ` AND id NOT IN (` + strings.TrimSuffix(strings.Repeat("?,", len(excluded)), ",") + `)`
+		query += ` AND id NOT IN (` + strings.TrimSuffix(strings.Repeat("?,", len(excluded)), ",") + `)`
 		for _, id := range excluded {
 			args = append(args, id)
 		}
 	}
-	subquery += ` ORDER BY started_at ASC, created_at ASC LIMIT 1`
-	query := `UPDATE meetings SET processing_claim_token=?, processing_claim_expires_at=?, processing_status=?,
-		processing_status_updated_at=?, processing_failure_message=NULL WHERE id=(` + subquery + `) RETURNING ` + meetingColumns
-	return query, args
+	return query + ` ORDER BY started_at ASC, created_at ASC LIMIT 1`, args
+}
+
+func stageCondition(stage QueueStage) (string, []any) {
+	if stage == QueueStageDiarization {
+		return `transcript IS NOT NULL AND trim(transcript)<>'' AND diarization_state IN (?,?)`,
+			[]any{DiarizationStatePending, DiarizationStateProcessing}
+	}
+	if stage == QueueStageSummarization {
+		condition := processingArtifactPresentSQL("transcript") + ` AND diarization_state IN (?,?,?,?) AND NOT (` +
+			ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") + `)`
+		return condition, []any{DiarizationStateNotRequested, DiarizationStateNotApplicable, DiarizationStateCompleted, DiarizationStateDegraded}
+	}
+	return `transcript IS NULL OR trim(transcript)=''`, nil
 }
 
 const meetingColumns = `id,title,started_at,ended_at,capture_status,capture_status_updated_at,capture_failure_message,

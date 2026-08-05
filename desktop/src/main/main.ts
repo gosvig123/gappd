@@ -82,8 +82,8 @@ app.whenReady().then(async () => {
   logMainProcessMemory('ready')
 
   app.on('activate', showMainWindow)
-  powerMonitor.on('suspend', () => { void pauseDrains().catch((error) => console.error('Failed to pause drains for sleep', error)) })
-  powerMonitor.on('resume', resumeDrains)
+  powerMonitor.on('suspend', () => { void pauseDrains('sleep').catch((error) => console.error('Failed to pause drains for sleep', error)) })
+  powerMonitor.on('resume', () => resumeDrains('sleep'))
 })
 
 nativeAutoUpdater.on(BEFORE_QUIT_FOR_UPDATE_EVENT, () => { updateInstallRequested = true })

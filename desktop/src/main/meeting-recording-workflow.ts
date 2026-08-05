@@ -16,13 +16,13 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   if (selectedDevice === null) throw new Error(NO_INPUT_DEVICE_ERROR)
   const permissionError = capturePermissionError(await requestCapturePermissions())
   if (permissionError) throw new Error(permissionError)
-  await pauseDrains()
+  await pauseDrains('recording')
   try {
     await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
       language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled })
     return getRecordingState()
   } catch (error) {
-    resumeDrains()
+    resumeDrains('recording')
     throw error
   }
 }

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
@@ -14,9 +15,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const processingClaimTTL = 5 * time.Minute
+
 func appProcessingCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "processing", Short: "Durable meeting processing queue"}
-	cmd.AddCommand(appProcessingDrainCmd())
+	cmd.AddCommand(appProcessingDrainCmd(), appProcessingPendingCmd())
+	return cmd
+}
+
+func appProcessingPendingCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{Use: "pending", Short: "List runnable processing capabilities", RunE: func(cmd *cobra.Command, args []string) error {
+		if !asJSON {
+			return fmt.Errorf("app processing pending requires --json")
+		}
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		stages, err := store.PendingStages(cmdContext(), time.Now(), processingClaimTTL)
+		if err != nil {
+			return err
+		}
+		capabilities := make([]meetingprocessing.Capability, len(stages))
+		for index, stage := range stages {
+			capabilities[index] = meetingprocessing.Capability(stage)
+		}
+		return writeJSON(appprotocol.ProcessingPendingResponse{Capabilities: capabilities})
+	}}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
 
