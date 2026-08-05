@@ -13,7 +13,7 @@
     "build": "npm run build:renderer && npm run native:prepare -- build && npm run build:electron",
     "build:renderer": "vite build",
     "build:electron": "tsup --config tsup.config.ts",
-    "test": "node --experimental-strip-types --test src/main/*.test.ts",
+    "test": "node --experimental-strip-types --test src/main/*.test.ts scripts/*.test.cjs",
     "typecheck": "tsc --noEmit",
     "preflight:macos": "node ./scripts/preflight-macos.mjs",
     "native:prepare": "node ./scripts/ensure-native-artifacts.mjs",

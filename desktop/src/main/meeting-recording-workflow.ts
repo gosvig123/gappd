@@ -53,9 +53,9 @@ function capturePermissionError(permissions: Awaited<ReturnType<typeof requestCa
   const microphoneGranted = permissions.microphone === 'granted'
   const screenGranted = permissions.screen === 'granted'
   if ((!microphoneGranted && !microphoneDenied) || (!screenGranted && !screenDenied)) return 'Could not confirm microphone and screen/system audio permissions. Try again, then check System Settings if the problem continues.'
-  if (microphoneDenied && screenDenied) return 'Microphone and Screen & System Audio Recording access denied. Enable GappdCapture in System Settings to record.'
-  if (microphoneDenied) return 'Microphone access denied. Enable GappdCapture in System Settings to record.'
-  if (screenDenied) return 'Screen & System Audio Recording access required. Enable GappdCapture in System Settings to capture system audio.'
+  if (microphoneDenied && screenDenied) return 'Microphone and Screen & System Audio Recording access denied. Enable Gappd in System Settings to record.'
+  if (microphoneDenied) return 'Microphone access denied. Enable Gappd in System Settings to record.'
+  if (screenDenied) return 'Screen & System Audio Recording access required. Enable Gappd in System Settings to capture system audio.'
   return null
 }
 

@@ -6,6 +6,7 @@ import { logMainProcessMemory } from './memory'
 import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
 import { stopActiveRecordingForQuit } from './recording-process'
+import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
@@ -20,6 +21,12 @@ let updateInstallRequested = false
 function applyDevDockIcon(): void {
   if (process.platform !== 'darwin' || app.isPackaged || !app.dock) return
   app.dock.setIcon(path.join(__dirname, '../../assets/app-icon.png'))
+}
+
+function migrateScreenCapturePermission(): void {
+  if (process.platform !== 'darwin' || !app.isPackaged) return
+  try { migrateScreenCaptureIdentity(process.execPath, app.getPath('userData')) }
+  catch (error) { console.error('ScreenCapture identity migration failed', error) }
 }
 
 function createWindow(show = true): void {
@@ -64,6 +71,7 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 
 app.whenReady().then(async () => {
   applyDevDockIcon()
+  migrateScreenCapturePermission()
   const startHidden = shouldStartHidden()
   initializeStartupSettings()
   createWindow(!startHidden)

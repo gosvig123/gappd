@@ -28,6 +28,7 @@ const COMPATIBILITY_LIMITS = {
 
 async function main() {
   if (process.platform !== 'darwin') return
+  if (process.env.RELEASE_CHANNEL && process.env.GAPPD_REQUIRE_GATEKEEPER !== '1') throw new Error('Refusing to publish unsigned macOS release')
   const appPath = process.argv[2] ? path.resolve(process.argv[2]) : await defaultAppPath()
   await verifyModelManifest(path.join(appPath, 'Contents', 'Resources', 'diarization-models', 'speaker-diarization'))
   await verifyFluidAudioLicense(appPath)
