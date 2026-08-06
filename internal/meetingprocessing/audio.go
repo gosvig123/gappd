@@ -24,8 +24,6 @@ func toDBSegments(meetingID string, segs []transcribe.Segment, source db.Segment
 	return out
 }
 
-func FormatTranscript(segments []db.Segment) string { return db.FormatTranscript(segments) }
-
 func sortSegmentsChronologically(segments []db.Segment) {
 	indexed := indexedSegments(segments)
 	sort.Slice(indexed, func(i, j int) bool { return segmentLess(indexed[i], indexed[j]) })

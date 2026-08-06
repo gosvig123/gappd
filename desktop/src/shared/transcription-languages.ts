@@ -20,7 +20,3 @@ export const TRANSCRIPTION_LANGUAGES: TranscriptionLanguage[] = [
   { code: 'zh_CN', label: 'Chinese (Simplified)', summaryLanguage: 'Chinese' },
   { code: 'zh_TW', label: 'Chinese (Traditional)', summaryLanguage: 'Chinese' },
 ]
-
-export function transcriptionLanguageLabel(code: string): string {
-  return TRANSCRIPTION_LANGUAGES.find((language) => language.code === code)?.label ?? code
-}

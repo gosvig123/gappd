@@ -49,10 +49,6 @@ func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction,
 	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
-func (p *Pipeline) ExtractLong(ctx context.Context, transcript string) (*Extraction, error) {
-	return p.extractVerified(ctx, transcript, nil, "", "")
-}
-
 func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language, relevance string) (*Extraction, error) {
 	chunks := transcriptChunks(transcript)
 	if len(chunks) > maxTranscriptChunks {

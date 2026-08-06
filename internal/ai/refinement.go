@@ -5,10 +5,6 @@ import (
 	"fmt"
 )
 
-func (p *Pipeline) RefineExtraction(ctx context.Context, extraction *Extraction) (*Extraction, error) {
-	return p.refineExtraction(ctx, extraction, "", "")
-}
-
 func (p *Pipeline) refineExtraction(ctx context.Context, extraction *Extraction, relevance, language string) (*Extraction, error) {
 	data, err := EncodeExtraction(extraction)
 	if err != nil {

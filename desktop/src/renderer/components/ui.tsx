@@ -3,7 +3,6 @@ import { ChevronDownIcon } from './icons'
 
 type PanelProps = HTMLAttributes<HTMLElement> & { children: ReactNode }
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary'; ref?: Ref<HTMLButtonElement> }
-type FieldProps = { label: string; children: ReactNode; className?: string; hint?: ReactNode }
 type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; middle?: ReactNode; className?: string }
 type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string; dismissible?: boolean; dismissKey?: string; dismissLabel?: string }
 type ProgressBarProps = { value: number | null; label: string; className?: string }
@@ -67,14 +66,6 @@ export function MultiSelect({ ariaLabel, allLabel, options, selected, onChange }
   )
 }
 
-export function Field({ label, children, className, hint }: FieldProps) {
-  return <label className={cx('field', className)}><span>{label}</span>{children}{hint ? <span className="field-hint">{hint}</span> : null}</label>
-}
-
-export function MetricCard({ label, value }: { label: string; value: ReactNode }) {
-  return <div className="metric-card"><div className="label">{label}</div><div className="value">{value}</div></div>
-}
-
 export function ProgressBar({ value, label, className }: ProgressBarProps) {
   if (value === null) return <div className={cx('progress-track indeterminate', className)} aria-label={label}><div className="progress-fill indeterminate" /></div>
   return <progress className={cx('progress-track', className)} value={value} max={100} aria-label={label}>{value}%</progress>
@@ -97,18 +88,4 @@ export function ListRow({ selected, className, ...props }: ListRowProps) {
 
 export function EmptyState({ className, children }: { className?: string; children: ReactNode }) {
   return <div className={cx('empty-state', className)}>{children}</div>
-}
-
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={cx('skeleton', className)} aria-hidden="true" />
-}
-
-export function SkeletonText({ lines = 3 }: { lines?: number }) {
-  return (
-    <div>
-      {Array.from({ length: lines }, (_, i) => (
-        <Skeleton key={i} className={cx('skeleton-line', i === lines - 1 ? 'short' : 'long')} />
-      ))}
-    </div>
-  )
 }

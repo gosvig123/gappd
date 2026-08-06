@@ -56,7 +56,7 @@ func (s Service) storedTranscript(meetingID string, saved *string) (string, erro
 	if len(segments) == 0 {
 		return "", s.processingError("enhance stored", meetingID, PhaseValidation, ErrNoTranscript)
 	}
-	return FormatTranscript(segments), nil
+	return db.FormatTranscript(segments), nil
 }
 
 func (s Service) enhanceStored(ctx context.Context, meeting *db.Meeting, transcript string, req StoredRequest) error {

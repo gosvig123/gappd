@@ -21,7 +21,6 @@ export function resolveBundledLlamaCppBinary(): string {
   return resolveBinary({ packaged: ['llamacpp', BUNDLED_LLAMACPP_BINARY_NAME], dev: ['resources', 'llamacpp', BUNDLED_LLAMACPP_BINARY_NAME] })
 }
 export function managedLlamaCppSupported(): boolean { return process.platform === 'darwin' }
-export function managedLlamaCppEndpoint(): string { return runtime.endpoint }
 
 export async function getManagedLlamaCppRuntimeStatus(): Promise<ManagedLlamaCppRuntimeStatus> {
   const supported = managedLlamaCppSupported()

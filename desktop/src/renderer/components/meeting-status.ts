@@ -7,10 +7,6 @@ const permissionErrorHints = [
   'privacy & security',
 ]
 
-export function artifactLabel(ready: boolean, present: string, missing: string): string {
-  return ready ? present : missing
-}
-
 export function isPermissionErrorMessage(message: string | null | undefined): boolean {
   if (!message) return false
   const normalized = message.toLowerCase()

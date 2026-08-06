@@ -82,10 +82,6 @@ var Commands = []CommandSpec{
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
 }
 
-func RequestCommands() []CommandSpec {
-	return commandsWithMode(CommandModeRequest)
-}
-
 func StreamCommands() []CommandSpec {
 	return commandsWithMode(CommandModeStream)
 }
