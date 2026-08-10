@@ -285,7 +285,14 @@ type AppCommandDefinitions = { [K in keyof AppCommandInput]: CommandDefinition<A
 func writeCommandMap(b *strings.Builder) {
 	b.WriteString("\nexport const APP_COMMANDS = {\n")
 	for _, command := range appprotocol.Commands {
-		fmt.Fprintf(b, "  %s: { mode: %s, args: (input: %s) => %s, env: %s, terminal: %s },\n", quote(command.ID), quote(string(command.Mode)), inputTypeName(command), argsExpr(command.Input, command.Args), stringList(command.Env), eventList(command.Terminal))
+		parameter := "_input"
+		for _, arg := range command.Args {
+			if arg.Field != "" {
+				parameter = "input"
+				break
+			}
+		}
+		fmt.Fprintf(b, "  %s: { mode: %s, args: (%s: %s) => %s, env: %s, terminal: %s },\n", quote(command.ID), quote(string(command.Mode)), parameter, inputTypeName(command), argsExpr(command.Input, command.Args), stringList(command.Env), eventList(command.Terminal))
 	}
 	b.WriteString("} as const satisfies AppCommandDefinitions\n")
 }
@@ -357,11 +364,7 @@ func commandFieldType(input reflect.Type, jsonField string) reflect.Type {
 }
 
 func fieldExpr(arg appprotocol.CommandArg) string {
-	expr := "input." + arg.Field
-	if arg.Stringify {
-		return "String(" + expr + ")"
-	}
-	return expr
+	return "String(input." + arg.Field + ")"
 }
 
 func inputTypeName(command appprotocol.CommandSpec) string {

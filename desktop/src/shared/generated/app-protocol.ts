@@ -45,18 +45,18 @@ type CommandDefinition<Input> = {
 type AppCommandDefinitions = { [K in keyof AppCommandInput]: CommandDefinition<AppCommandInput[K]> }
 
 export const APP_COMMANDS = {
-  'devices.list': { mode: 'request', args: (input: EmptyInput) => ['app', 'devices', '--json'], env: [], terminal: [] },
-  'meetings.list': { mode: 'request', args: (input: EmptyInput) => ['app', 'meetings', 'list', '--json'], env: [], terminal: [] },
-  'meetings.show': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'show', input.id, '--json'], env: [], terminal: [] },
-  'meetings.retryDiarization': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'retry-diarization', input.id, '--json'], env: [], terminal: [] },
-  'meetings.delete': { mode: 'request', args: (input: MeetingDeleteInput) => ['app', 'meetings', 'delete', input.id, '--json'], env: [], terminal: [] },
-  'config.show': { mode: 'request', args: (input: EmptyInput) => ['app', 'config', 'show', '--json'], env: [], terminal: [] },
-  'config.codexStatus': { mode: 'request', args: (input: EmptyInput) => ['app', 'config', 'codex-status', '--json'], env: [], terminal: [] },
+  'devices.list': { mode: 'request', args: (_input: EmptyInput) => ['app', 'devices', '--json'], env: [], terminal: [] },
+  'meetings.list': { mode: 'request', args: (_input: EmptyInput) => ['app', 'meetings', 'list', '--json'], env: [], terminal: [] },
+  'meetings.show': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'show', String(input.id), '--json'], env: [], terminal: [] },
+  'meetings.retryDiarization': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'retry-diarization', String(input.id), '--json'], env: [], terminal: [] },
+  'meetings.delete': { mode: 'request', args: (input: MeetingDeleteInput) => ['app', 'meetings', 'delete', String(input.id), '--json'], env: [], terminal: [] },
+  'config.show': { mode: 'request', args: (_input: EmptyInput) => ['app', 'config', 'show', '--json'], env: [], terminal: [] },
+  'config.codexStatus': { mode: 'request', args: (_input: EmptyInput) => ['app', 'config', 'codex-status', '--json'], env: [], terminal: [] },
   'config.useManagedLocalAI': { mode: 'request', args: (input: ConfigUseManagedLocalAIInput) => ['app', 'config', 'use-managed-local-ai', '--endpoint', String(input.endpoint), '--model', String(input.model), ...(input.temperature === undefined ? [] : ['--temperature', String(input.temperature)])], env: [], terminal: [] },
   'config.useCodex': { mode: 'request', args: (input: ConfigUseCodexInput) => ['app', 'config', 'use-codex', '--executable', String(input.executable), '--model', String(input.model)], env: [], terminal: [] },
-  'processing.pending': { mode: 'request', args: (input: EmptyInput) => ['app', 'processing', 'pending', '--json'], env: [], terminal: [] },
+  'processing.pending': { mode: 'request', args: (_input: EmptyInput) => ['app', 'processing', 'pending', '--json'], env: [], terminal: [] },
   'processing.drain': { mode: 'request', args: (input: ProcessingDrainInput) => ['app', 'processing', 'drain', '--capability', String(input.capability), '--json'], env: ['GAPPD_DIARIZER_BIN', 'GAPPD_DIARIZATION_MODELS'], terminal: [] },
-  'record.recoverStale': { mode: 'request', args: (input: EmptyInput) => ['app', 'record', 'recover-stale', '--json'], env: [], terminal: [] },
+  'record.recoverStale': { mode: 'request', args: (_input: EmptyInput) => ['app', 'record', 'recover-stale', '--json'], env: [], terminal: [] },
   'record.start': { mode: 'stream', args: (input: RecordStartInput) => ['app', 'record', 'start', '--title', String(input.title), '--device', String(input.device), '--mode', String(input.mode), '--language', String(input.language), ...(input.speakerLabelsEnabled === undefined ? [] : ['--speaker-labels-enabled=' + String(input.speakerLabelsEnabled)])], env: ['GAPPD_CAPTURE_HELPER_PATH'], terminal: ['recording.captured', 'recording.failed'] },
 } as const satisfies AppCommandDefinitions
 

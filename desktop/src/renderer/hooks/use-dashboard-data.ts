@@ -13,20 +13,16 @@ export function useDashboardData(enabled: boolean) {
   const [state, setState] = useDashboardState()
 
   const meetingActions = useDashboardActions(setState, refs, selectedMeetingRequest, refreshRequest)
-  const recording = useDashboardRecording(enabled, meetingActions)
+  const recording = useMeetingRecordingWorkflow(enabled, {
+    refreshMeetings: meetingActions.refreshMeetings,
+    setError: meetingActions.setError,
+  })
   const actions = useDashboardViewActions(meetingActions, recording, state)
 
   useMeetingsLifecycle(enabled, meetingActions, setState)
   useDynamicRefresh(enabled, state.meetings, recording.recording, () => refs.selectedId.current, meetingActions.refreshMeetings)
 
   return useMemo(() => buildDashboardViewModel(state, recording, actions), [state, recording, actions])
-}
-
-function useDashboardRecording(enabled: boolean, actions: MeetingActions) {
-  return useMeetingRecordingWorkflow(enabled, {
-    refreshMeetings: actions.refreshMeetings,
-    setError: actions.setError,
-  })
 }
 
 function useDashboardViewActions(actions: MeetingActions, recording: RecordingWorkflow, state: DashboardState): DashboardActions {

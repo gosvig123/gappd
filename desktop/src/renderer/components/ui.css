@@ -6,11 +6,6 @@
   background: var(--surface-panel);
 }
 
-.panel-large {
-  grid-column: 1 / -1;
-  overflow: auto;
-}
-
 .panel-header {
   display: flex;
   justify-content: space-between;
@@ -70,7 +65,6 @@
 
 .meeting-title,
 .metric-card .value,
-.setup-progress-headline,
 .setup-error-banner strong {
   font-weight: var(--font-weight-semibold);
 }
@@ -137,8 +131,7 @@ label {
 }
 
 .field > span,
-label span,
-.field-hint {
+label span {
   color: var(--color-text-muted);
   font-size: var(--font-size-md);
 }
@@ -422,8 +415,7 @@ pre {
     border-radius: var(--radius-lg);
   }
 
-  .panel-header,
-  .reading-card-header {
+  .panel-header {
     display: grid;
   }
 

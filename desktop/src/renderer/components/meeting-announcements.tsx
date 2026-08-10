@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { MeetingListItem, RecordingState } from '../../shared/contracts'
-import { postStopNoticeVisible } from '../../shared/meeting-recording-workflow'
+import type { MeetingListItem } from '../../shared/contracts'
 import { Button } from './ui'
 import { CircleDotIcon, CircleCheckIcon } from './icons'
 import { meetingHasWork, meetingReady } from './meeting-progress'
@@ -16,16 +15,14 @@ type MeetingNotice = {
 
 type MeetingAnnouncementsProps = {
   meetings: MeetingListItem[]
-  recording: RecordingState
   onOpenMeeting: (id: string) => void
 }
 
 type MeetingSnapshot = { ready: boolean; working: boolean }
 
 const TOAST_MS = 7000
-export function MeetingAnnouncements({ meetings, recording, onOpenMeeting }: MeetingAnnouncementsProps) {
+export function MeetingAnnouncements({ meetings, onOpenMeeting }: MeetingAnnouncementsProps) {
   const [notice, setNotice] = useState<MeetingNotice | null>(null)
-  usePostStopNotice(recording, setNotice)
   useCompletionNotice(meetings, setNotice)
   useAutoDismiss(notice, setNotice)
   if (!notice) return null
@@ -41,16 +38,6 @@ function MeetingToast({ notice, onDismiss, onOpenMeeting }: { notice: MeetingNot
       <div className="meeting-toast-actions">{meetingId ? <Button className="compact-action" onClick={() => onOpenMeeting(meetingId)}>Open</Button> : null}<Button className="compact-action" onClick={onDismiss}>Dismiss</Button></div>
     </div>
   )
-}
-
-function usePostStopNotice(recording: RecordingState, setNotice: (notice: MeetingNotice) => void) {
-  const lastMeetingId = useRef<string | null>(null)
-  useEffect(() => {
-    if (!recording.meetingId || !postStopNoticeVisible(recording.status)) return
-    if (lastMeetingId.current === recording.meetingId) return
-    lastMeetingId.current = recording.meetingId
-    setNotice(postStopNotice(recording))
-  }, [recording.meetingId, recording.status, setNotice])
 }
 
 function useCompletionNotice(meetings: MeetingListItem[], setNotice: (notice: MeetingNotice) => void) {
@@ -71,10 +58,6 @@ function useAutoDismiss(notice: MeetingNotice | null, setNotice: (notice: Meetin
     const timer = window.setTimeout(() => setNotice(null), TOAST_MS)
     return () => window.clearTimeout(timer)
   }, [notice?.id, setNotice])
-}
-
-function postStopNotice(recording: RecordingState): MeetingNotice {
-  return { id: `saved:${recording.meetingId}`, title: 'Meeting saved', message: 'Finishing notes locally. Keep app open while transcript and summary finish.', meetingId: recording.meetingId, tone: 'working' }
 }
 
 function completionNotice(meeting: MeetingListItem): MeetingNotice {

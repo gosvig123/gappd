@@ -48,11 +48,10 @@ type RecordStartInput struct {
 }
 
 type CommandArg struct {
-	Literal   string
-	Field     string
-	Flag      string
-	Optional  bool
-	Stringify bool
+	Literal  string
+	Field    string
+	Flag     string
+	Optional bool
 }
 
 type CommandSpec struct {
@@ -117,5 +116,5 @@ func field(name string) CommandArg {
 }
 
 func flag(name, field string, optional bool) CommandArg {
-	return CommandArg{Flag: name, Field: field, Optional: optional, Stringify: true}
+	return CommandArg{Flag: name, Field: field, Optional: optional}
 }

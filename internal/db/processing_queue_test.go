@@ -8,7 +8,7 @@ import (
 )
 
 func TestClaimExclusiveExpiryAndStaleToken(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	meeting := queueMeeting(t, store, "oldest", "2026-01-01T00:00:00Z")
 	now := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -45,7 +45,7 @@ func TestClaimExclusiveExpiryAndStaleToken(t *testing.T) {
 }
 
 func TestClaimQueuesStaleSummaryWithoutClearingIt(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	meeting := queueMeeting(t, store, "stale-summary", "2026-01-01T00:00:00Z")
 	_, _ = store.Conn.Exec(`UPDATE meetings SET transcript='new',transcript_revision=2,summary='visible',
@@ -57,7 +57,7 @@ func TestClaimQueuesStaleSummaryWithoutClearingIt(t *testing.T) {
 }
 
 func TestPendingStagesReturnsOnlyRunnableWork(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	queueMeeting(t, store, "transcription", "2026-01-01T00:00:00Z")
 	diarization := queueMeeting(t, store, "diarization", "2026-01-02T00:00:00Z")
@@ -75,7 +75,7 @@ func TestPendingStagesReturnsOnlyRunnableWork(t *testing.T) {
 }
 
 func TestPendingStagesHonorsClaimExpiry(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	now := time.Now()
 	queueMeeting(t, store, "claimed", "2026-01-01T00:00:00Z")
@@ -90,7 +90,7 @@ func TestPendingStagesHonorsClaimExpiry(t *testing.T) {
 }
 
 func TestClaimRecoversStaleUnclaimedProcessing(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	meeting := queueMeeting(t, store, "abandoned", "2026-01-01T00:00:00Z")
 	_, err := store.Conn.Exec(`UPDATE meetings SET processing_status=?, processing_status_updated_at=? WHERE id=?`,
@@ -105,7 +105,7 @@ func TestClaimRecoversStaleUnclaimedProcessing(t *testing.T) {
 }
 
 func TestClaimUsesOldestEligibleMeeting(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	queueMeeting(t, store, "new", "2026-01-02T00:00:00Z")
 	queueMeeting(t, store, "old", "2026-01-01T00:00:00Z")
@@ -116,7 +116,7 @@ func TestClaimUsesOldestEligibleMeeting(t *testing.T) {
 }
 
 func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	meeting := queueMeeting(t, store, "atomic", "2026-01-01T00:00:00Z")
 	claim, _ := store.ClaimNext(context.Background(), QueueStageTranscription, time.Now(), time.Minute, nil)
@@ -143,7 +143,7 @@ func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
 }
 
 func TestProcessingArtifactsCurrentSQLMatchesModel(t *testing.T) {
-	store := openQueueDB(t)
+	store := openTestDB(t)
 	defer store.Close()
 	cases := map[string]Meeting{
 		"current":            artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 2),
@@ -174,18 +174,6 @@ func artifactMeeting(transcript, summary, extraction *string, revision, summaryR
 }
 
 func artifact(value string) *string { return &value }
-
-func openQueueDB(t *testing.T) *DB {
-	t.Helper()
-	store, err := Open(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := store.Init(); err != nil {
-		t.Fatal(err)
-	}
-	return store
-}
 
 func queueMeeting(t *testing.T, store *DB, id, started string) *Meeting {
 	t.Helper()
