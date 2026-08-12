@@ -3,6 +3,7 @@ import AppKit
 import AVFoundation
 import ScreenCaptureKit
 import CoreGraphics
+import Synchronization
 
 enum CaptureMode: String {
     case mic, system, both
@@ -134,6 +135,15 @@ func hasInputStreams(_ deviceID: AudioDeviceID) -> Bool {
         && size >= MemoryLayout<AudioStreamID>.size
 }
 
+func defaultInputDevice() -> AudioDeviceID? {
+    var deviceID: AudioDeviceID = 0
+    var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice,
+        mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID)
+    return status == noErr ? deviceID : nil
+}
+
 func listDevices() {
     var address = AudioObjectPropertyAddress(
         mSelector: kAudioHardwarePropertyDevices,
@@ -256,14 +266,34 @@ class WAVWriter {
 
 // MARK: - Mic Recorder
 
-class MicRecorder {
-    private let engine = AVAudioEngine()
+private final class MicBuffer: @unchecked Sendable {
+    let pcm: AVAudioPCMBuffer
+    init?(_ format: AVAudioFormat, capacity: AVAudioFrameCount) {
+        guard let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
+        self.pcm = pcm
+    }
+}
+
+final class MicRecorder: @unchecked Sendable {
+    private var audioUnit: AudioUnit?
     private var writer: WAVWriter?
     private let sampleRate: Double
     private let requestedDevice: Int?
     private let chunkSeconds: Double?
     private let chunkOverlapSeconds: Double
+    private var targetFormat: AVAudioFormat?
     private var converter: AVAudioConverter?
+    private let writerQueue = DispatchQueue(label: "dev.gappd.capture.microphone")
+    private var buffers: [MicBuffer] = []
+    private var scratchBuffer: MicBuffer?
+    private let readIndex = Atomic<Int>(0)
+    private let writeIndex = Atomic<Int>(0)
+    private let persistedFrames = Atomic<UInt64>(0)
+    private let droppedFrames = Atomic<UInt64>(0)
+    private let renderError = Atomic<Int32>(0)
+    private let processingFailed = Atomic<Bool>(false)
+    private let stopping = Atomic<Bool>(false)
+    private(set) var isRunning = false
 
     init(sampleRate: Double, deviceIndex: Int?, chunkSeconds: Double?, chunkOverlapSeconds: Double) {
         self.sampleRate = sampleRate
@@ -272,8 +302,8 @@ class MicRecorder {
         self.chunkOverlapSeconds = chunkOverlapSeconds
     }
 
-    private func applyDeviceSelection() {
-        guard let idx = requestedDevice else { return }
+    private func selectedDevice() -> AudioDeviceID? {
+        guard let idx = requestedDevice else { return defaultInputDevice() }
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -287,81 +317,209 @@ class MicRecorder {
 
         let inputDevices = ids.filter(hasInputStreams)
 
-        guard idx < inputDevices.count else {
+        guard idx >= 0, idx < inputDevices.count else {
             print("  warning: device index \(idx) out of range, using default")
-            return
+            return defaultInputDevice()
         }
-
-        let deviceID = inputDevices[idx]
-        var deviceIDVar = deviceID
-        var propAddr = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        let status = AudioObjectSetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &propAddr, 0, nil,
-            UInt32(MemoryLayout<AudioDeviceID>.size), &deviceIDVar
-        )
-        if status == noErr {
-            print("  mic device set to index \(idx)")
-        } else {
-            print("  warning: failed to set mic device (err \(status))")
-        }
+        print("  mic device set to index \(idx)")
+        return inputDevices[idx]
     }
 
     func start(outputPath: String) throws {
-        applyDeviceSelection()
-
-        let inputNode = engine.inputNode
-        let hwFormat = inputNode.outputFormat(forBus: 0)
-        print("  mic hw: \(UInt32(hwFormat.sampleRate))Hz \(hwFormat.channelCount)ch")
-
-        let targetFormat = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let unit = try makeAudioUnit()
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
         let chunker = AudioChunker(source: "mic", outputDir: outputPathDirectory(outputPath), sampleRate: UInt32(sampleRate), seconds: chunkSeconds, overlapSeconds: chunkOverlapSeconds)
-        writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
-        converter = AVAudioConverter(from: hwFormat, to: targetFormat)
-
-        inputNode.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
-            guard let self = self, let converter = self.converter else { return }
-            let ratio = self.sampleRate / hwFormat.sampleRate
-            let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 1
-            guard let converted = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else { return }
-            var error: NSError?
-            // convert consumes its input block synchronously; AVFAudio does not mark buffers Sendable.
-            nonisolated(unsafe) let input = buffer
-            nonisolated(unsafe) var consumed = false
-            converter.convert(to: converted, error: &error) { _, outStatus in
-                guard !consumed else { outStatus.pointee = .noDataNow; return nil }
-                consumed = true
-                outStatus.pointee = .haveData
-                return input
-            }
-            if error == nil && converted.frameLength > 0 {
-                self.writer?.write(pcmBuffer: converted)
-            }
+        do {
+            let source = try configure(unit, device: selectedDevice())
+            writer = try WAVWriter(path: outputPath, sampleRate: UInt32(sampleRate), channels: 1, chunker: chunker)
+            audioUnit = unit
+            targetFormat = format
+            converter = AVAudioConverter(from: source, to: format)
+            try prepareBuffers(unit, format: source)
+            try require(AudioUnitInitialize(unit), "initialize microphone")
+            try require(AudioOutputUnitStart(unit), "start microphone")
+            isRunning = true
+        } catch {
+            try? stop()
+            throw error
         }
-
-        try engine.start()
     }
 
-    var isRunning: Bool { engine.isRunning }
-
     func restart() throws {
-        try engine.start()
+        guard let audioUnit else { throw captureError("microphone is unavailable") }
+        try require(AudioOutputUnitStart(audioUnit), "restart microphone")
+        isRunning = true
     }
 
     func verifyRunning() throws {
-        guard engine.isRunning else {
-            throw NSError(domain: "GappdCapture", code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "microphone capture stopped during startup"])
+        let status = renderError.load(ordering: .acquiring)
+        let healthy = isRunning && persistedFrames.load(ordering: .acquiring) > 0
+            && droppedFrames.load(ordering: .acquiring) == 0 && status == 0
+            && !processingFailed.load(ordering: .acquiring)
+        guard healthy else {
+            let detail = status == 0 ? "" : " (CoreAudio \(status))"
+            throw captureError("microphone produced no audio during startup\(detail)")
         }
     }
 
-    func stop() {
-        engine.inputNode.removeTap(onBus: 0)
-        engine.stop()
-        writer?.finalize()
+    func stop() throws {
+        if let audioUnit {
+            AudioOutputUnitStop(audioUnit)
+            AudioUnitUninitialize(audioUnit)
+            AudioComponentInstanceDispose(audioUnit)
+        }
+        audioUnit = nil
+        isRunning = false
+        stopping.store(true, ordering: .releasing)
+        writerQueue.sync {
+            writer?.finalize()
+            writer = nil
+            converter = nil
+        }
+        let dropped = droppedFrames.load(ordering: .acquiring)
+        let status = renderError.load(ordering: .acquiring)
+        if status != 0 { throw captureError("microphone rendering failed (CoreAudio \(status))") }
+        if processingFailed.load(ordering: .acquiring) { throw captureError("microphone audio conversion failed") }
+        if dropped > 0 { throw captureError("microphone buffer overrun dropped \(dropped) frames") }
+    }
+
+    private func makeAudioUnit() throws -> AudioUnit {
+        var description = AudioComponentDescription(componentType: kAudioUnitType_Output,
+            componentSubType: kAudioUnitSubType_HALOutput, componentManufacturer: kAudioUnitManufacturer_Apple,
+            componentFlags: 0, componentFlagsMask: 0)
+        guard let component = AudioComponentFindNext(nil, &description) else { throw captureError("microphone component unavailable") }
+        var unit: AudioUnit?
+        try require(AudioComponentInstanceNew(component, &unit), "create microphone")
+        guard let unit else { throw captureError("microphone component unavailable") }
+        return unit
+    }
+
+    private func configure(_ unit: AudioUnit, device: AudioDeviceID?) throws -> AVAudioFormat {
+        var enabled: UInt32 = 1
+        var disabled: UInt32 = 0
+        try require(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1,
+            &enabled, UInt32(MemoryLayout.size(ofValue: enabled))), "enable microphone input")
+        try require(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0,
+            &disabled, UInt32(MemoryLayout.size(ofValue: disabled))), "disable microphone output")
+        if var device {
+            try require(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                &device, UInt32(MemoryLayout.size(ofValue: device))), "select microphone")
+        }
+        let format = try nativeFormat(unit)
+        var stream = format.streamDescription.pointee
+        try require(AudioUnitSetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1,
+            &stream, UInt32(MemoryLayout.size(ofValue: stream))), "set microphone format")
+        var callback = AURenderCallbackStruct(inputProc: Self.inputCallback,
+            inputProcRefCon: Unmanaged.passUnretained(self).toOpaque())
+        try require(AudioUnitSetProperty(unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0,
+            &callback, UInt32(MemoryLayout.size(ofValue: callback))), "install microphone callback")
+        return format
+    }
+
+    private func nativeFormat(_ unit: AudioUnit) throws -> AVAudioFormat {
+        var stream = AudioStreamBasicDescription()
+        var size = UInt32(MemoryLayout.size(ofValue: stream))
+        try require(AudioUnitGetProperty(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 1,
+            &stream, &size), "read microphone format")
+        let channels = max(1, stream.mChannelsPerFrame)
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: stream.mSampleRate, channels: channels) else {
+            throw captureError("microphone format unavailable")
+        }
+        return format
+    }
+
+    private func prepareBuffers(_ unit: AudioUnit, format: AVAudioFormat) throws {
+        var maximumFrames: UInt32 = 4096
+        var size = UInt32(MemoryLayout.size(ofValue: maximumFrames))
+        _ = AudioUnitGetProperty(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0,
+            &maximumFrames, &size)
+        let capacity = AVAudioFrameCount(maximumFrames)
+        let pool = (0..<8).compactMap { _ in MicBuffer(format, capacity: capacity) }
+        guard pool.count == 8, let scratch = MicBuffer(format, capacity: capacity) else {
+            throw captureError("microphone buffers unavailable")
+        }
+        buffers = pool
+        scratchBuffer = scratch
+        readIndex.store(0, ordering: .relaxed)
+        writeIndex.store(0, ordering: .relaxed)
+        persistedFrames.store(0, ordering: .relaxed)
+        droppedFrames.store(0, ordering: .relaxed)
+        renderError.store(0, ordering: .relaxed)
+        processingFailed.store(false, ordering: .relaxed)
+        stopping.store(false, ordering: .relaxed)
+        writerQueue.async { [self] in processBuffers() }
+    }
+
+    private static let inputCallback: AURenderCallback = { ref, flags, time, _, frames, _ in
+        Unmanaged<MicRecorder>.fromOpaque(ref).takeUnretainedValue().capture(flags, time, frames)
+    }
+
+    private func capture(_ flags: UnsafeMutablePointer<AudioUnitRenderActionFlags>,
+                         _ time: UnsafePointer<AudioTimeStamp>, _ frames: UInt32) -> OSStatus {
+        guard let audioUnit, buffers.count > 1, let scratchBuffer else { return -1 }
+        let write = writeIndex.load(ordering: .relaxed)
+        let next = (write + 1) % buffers.count
+        let full = next == readIndex.load(ordering: .acquiring)
+        let destination = full ? scratchBuffer : buffers[write]
+        guard destination.pcm.frameCapacity >= frames else { return -1 }
+        destination.pcm.frameLength = frames
+        let status = AudioUnitRender(audioUnit, flags, time, 1, frames, destination.pcm.mutableAudioBufferList)
+        if status != noErr { renderError.store(status, ordering: .releasing) }
+        if status == noErr && full { droppedFrames.wrappingAdd(UInt64(frames), ordering: .releasing) }
+        if status == noErr && !full { writeIndex.store(next, ordering: .releasing) }
+        return status
+    }
+
+    private func processBuffers() {
+        while true {
+            drainBuffers()
+            let empty = readIndex.load(ordering: .acquiring) == writeIndex.load(ordering: .acquiring)
+            if stopping.load(ordering: .acquiring) && empty { return }
+            Thread.sleep(forTimeInterval: 0.001)
+        }
+    }
+
+    private func drainBuffers() {
+        while true {
+            let read = readIndex.load(ordering: .relaxed)
+            guard read != writeIndex.load(ordering: .acquiring) else { return }
+            let persisted = writeConverted(buffers[read].pcm)
+            if persisted > 0 { persistedFrames.wrappingAdd(persisted, ordering: .releasing) }
+            readIndex.store((read + 1) % buffers.count, ordering: .releasing)
+        }
+    }
+
+    private func writeConverted(_ input: AVAudioPCMBuffer) -> UInt64 {
+        guard let converter, let targetFormat else { processingFailed.store(true, ordering: .releasing); return 0 }
+        let ratio = targetFormat.sampleRate / input.format.sampleRate
+        let capacity = AVAudioFrameCount(Double(input.frameLength) * ratio) + 1
+        guard let output = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: capacity) else {
+            processingFailed.store(true, ordering: .releasing)
+            return 0
+        }
+        var error: NSError?
+        nonisolated(unsafe) let converterInput = input
+        nonisolated(unsafe) var consumed = false
+        converter.convert(to: output, error: &error) { _, status in
+            guard !consumed else { status.pointee = .noDataNow; return nil }
+            consumed = true
+            status.pointee = .haveData
+            return converterInput
+        }
+        guard error == nil, output.frameLength > 0 else {
+            processingFailed.store(true, ordering: .releasing)
+            return 0
+        }
+        writer?.write(pcmBuffer: output)
+        return UInt64(output.frameLength)
+    }
+
+    private func require(_ status: OSStatus, _ operation: String) throws {
+        if status != noErr { throw captureError("\(operation) failed (CoreAudio \(status))") }
+    }
+
+    private func captureError(_ message: String) -> NSError {
+        NSError(domain: "GappdCapture", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
     }
 }
 
@@ -580,6 +738,14 @@ func watchStopFile(_ path: String, stopSemaphore: DispatchSemaphore) {
     }
 }
 
+@MainActor
+func stopRecorders(_ mic: MicRecorder?, _ system: SystemAudioRecorder?) async throws {
+    var firstError: Error?
+    do { try mic?.stop() } catch { firstError = error }
+    do { try await system?.stop() } catch { if firstError == nil { firstError = error } }
+    if let firstError { throw firstError }
+}
+
 // MARK: - Main
 
 if CommandLine.arguments.contains("--observe-meetings") {
@@ -624,6 +790,7 @@ Task { @MainActor in
             try await sys.start(outputPath: sysPath)
             print("● System audio recording to \(sysPath)")
         } catch {
+            try? await sys.stop()
             stderrPrint("error: could not start system audio capture: \(error)")
             exit(1)
         }
@@ -641,6 +808,7 @@ Task { @MainActor in
             try mic.verifyRunning()
             print("● Mic recording to \(micPath)")
         } catch {
+            try? await stopRecorders(mic, systemRecorder)
             stderrPrint("error: could not start microphone capture: \(error)")
             exit(1)
         }
@@ -652,16 +820,15 @@ Task { @MainActor in
         Task { @MainActor in
             emitCaptureStopAcknowledged()
             print("\n● Stopping...")
-            micRecorder?.stop()
             do {
-                try await systemRecorder?.stop()
+                try await stopRecorders(micRecorder, systemRecorder)
                 if config.chunkSeconds != nil {
                     emitAudioChunkStreamComplete(sources: captureSources(config.mode))
                 }
                 print("● Capture stopped")
                 exit(0)
             } catch {
-                stderrPrint("error: could not stop system audio capture cleanly: \(error)")
+                stderrPrint("error: could not stop audio capture cleanly: \(error)")
                 exit(1)
             }
         }

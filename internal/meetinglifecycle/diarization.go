@@ -14,10 +14,6 @@ func (w Module) StartDiarization(ctx context.Context, id, token string) (Result,
 		db.DiarizationStateProcessing, id, db.DiarizationStatePending, db.DiarizationStateProcessing, db.ProcessingStatusProcessing, token)
 }
 
-func (w Module) CompleteDiarization(ctx context.Context, id, token, resultJSON string, at time.Time) (Result, error) {
-	return w.finishDiarization(ctx, id, token, db.DiarizationStateCompleted, nil, &resultJSON, at)
-}
-
 func (w Module) DegradeDiarization(ctx context.Context, id, token string, cause error, at time.Time) (Result, error) {
 	if cause == nil {
 		return Result{}, fmt.Errorf("degrade diarization requires cause")
@@ -38,11 +34,9 @@ func (w Module) finishDiarization(ctx context.Context, id, token string, state d
 	processingStatus := `?`
 	processingArgs := []any{db.ProcessingStatusPending}
 	switch state {
-	case db.DiarizationStateCompleted, db.DiarizationStateDegraded, db.DiarizationStateNotApplicable:
-		processingStatus = `CASE WHEN transcript IS NOT NULL AND trim(transcript)<>''
-			AND summary IS NOT NULL AND trim(summary)<>''
-			AND extraction_json IS NOT NULL AND trim(extraction_json)<>''
-			AND summary_transcript_revision=transcript_revision THEN ? ELSE ? END`
+	case db.DiarizationStateDegraded, db.DiarizationStateNotApplicable:
+		processingStatus = `CASE WHEN ` + db.ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") +
+			` THEN ? ELSE ? END`
 		processingArgs = []any{db.ProcessingStatusCompleted, db.ProcessingStatusPending}
 	}
 	args := []any{state, diarizationError, resultJSON}

@@ -58,9 +58,6 @@ func TestTerminalDiarizationProcessingStatusFollowsQueueFreshness(t *testing.T) 
 		state  db.DiarizationState
 		finish func(Module, string, string, time.Time) (Result, error)
 	}{
-		{name: "completed", state: db.DiarizationStateCompleted, finish: func(module Module, id, token string, at time.Time) (Result, error) {
-			return module.CompleteDiarization(context.Background(), id, token, `{}`, at)
-		}},
 		{name: "degraded", state: db.DiarizationStateDegraded, finish: func(module Module, id, token string, at time.Time) (Result, error) {
 			return module.DegradeDiarization(context.Background(), id, token, errors.New("helper failed"), at)
 		}},

@@ -1,39 +1,48 @@
 # Desktop macOS release
 
-## What ships in the app bundle
+## Bundle contents
 
-- `build/gappd` is bundled into `Contents/Resources/bin/gappd`
-- `build/GappdCapture.app` is bundled into `Contents/Resources/GappdCapture.app`
-- Bundled runtimes stay repo-owned: `llamacpp/llama-server` and `whisper/whisper-cli`
+Electron Builder packages these resources into `Gappd.app`:
 
-## What still downloads on first run
+- Go meeting engine: `build/gappd`;
+- Swift capture app: `build/GappdCapture.app`;
+- Swift Apple Speech app: `build/GappdSpeechTranscriber.app`;
+- Swift diarizer: `build/gappd-diarizer`;
+- diarization models and licenses from `gappd-diarizer/`;
+- llama.cpp runtime from `desktop/resources/llamacpp/`.
 
-- The LFM2 meeting model is downloaded during managed Local AI setup
-- The Whisper model file is still downloaded into the app-managed models directory when needed
+Native runtimes and diarization models ship with the application. Managed setup downloads the selected llama.cpp meeting model and prepares the required Apple Speech asset.
 
-## Release workflow inputs
+## Release workflow
 
-- Manual workflow runs publish stable releases from an existing `v*` tag
-- Pushes to `beta` publish prereleases named `v<next-version>-beta.<run-number>` from the pushed commit
-- Beta builds use prerelease package versions while keeping macOS bundle/build versions numeric
-- Release assets include the first-install DMG plus the updater ZIP, blockmaps, and `*-mac.yml` metadata
-- Beta serials use the workflow-wide GitHub run number; manual stable runs consume numbers too, so gaps between beta serials are expected
-- Stable releases retain `beta-mac.yml` so beta-channel installs can move onto a promoted stable build
-- Beta pushes update the mutable `beta` release's `latest.json` so old beta apps can find the bridge release; its title and notes identify the current versioned beta, while its source archives remain tied to the compatibility tag's original commit
-- `release_tag`: existing `vMAJOR.MINOR.PATCH` tag for manual stable release runs
-- `APPLE_CERTIFICATE_P12_BASE64`: base64-encoded Developer ID Application certificate
-- `APPLE_CERTIFICATE_PASSWORD`: password for the `.p12`
-- `APPLE_SIGNING_IDENTITY`: full codesign identity name
-- `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`: notarization credentials
-- `GAPPD_ENABLE_NOTARIZATION=1`, `GAPPD_REQUIRE_GATEKEEPER=1`: release-only verification toggles used by CI
+`.github/workflows/desktop-macos-release.yml` builds universal macOS releases on `macos-26`:
+
+- pushes to `beta` create prerelease versions;
+- manual runs publish an existing stable `vMAJOR.MINOR.PATCH` tag;
+- Electron Builder emits DMG and updater ZIP targets;
+- release verification checks the packaged app and expected artifacts;
+- GitHub release publishing includes updater metadata and a generated release manifest.
+
+Signed releases require all signing and notarization secrets. When they are present, the workflow imports the Developer ID certificate, enables hardened runtime, notarizes the app, and requires Gatekeeper verification.
+
+Required secrets:
+
+- `APPLE_CERTIFICATE_P12_BASE64`
+- `APPLE_CERTIFICATE_PASSWORD`
+- `APPLE_SIGNING_IDENTITY`
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
 
 ## Local packaging
 
-- Use `npm run dev` from `desktop/` for desktop development.
-- This repo is not a pnpm workspace; install dependencies and run release packaging for `desktop` with npm.
-- From the repo root, run `npm --prefix ./desktop run dist:dir`; it still works without Apple secrets
-- Packaged app output now lands under `desktop/release/`; renderer assets stay in `desktop/dist/`
-- macOS auto-update requires signed builds and both `dmg` and `zip` targets; the ZIP is consumed by Electron's updater
-- Local builds ad-hoc sign nested bundled executables so the packaged app remains runnable for smoke checks
-- Release notarization submits and staples the `.app`; later verification validates that same `.app` instead of assuming the `.dmg` was notarized too
-- Notarization and Gatekeeper assessment stay gated behind release env vars
+From repository root:
+
+```bash
+npm run desktop:bootstrap
+npm run desktop:dist:dir
+```
+
+Output lands under `desktop/release/`; renderer assets remain under `desktop/dist/`.
+
+Local packaging does not require Apple credentials. Release-only notarization and Gatekeeper checks are enabled through `GAPPD_ENABLE_NOTARIZATION=1` and `GAPPD_REQUIRE_GATEKEEPER=1`.

@@ -125,13 +125,6 @@
   overflow: hidden;
 }
 
-.single-screen {
-  min-height: 0;
-  display: grid;
-  flex: 1;
-  overflow: hidden;
-}
-
 .settings-sheet-layer {
   position: fixed;
   inset: 4.25rem 0 0;
@@ -250,11 +243,9 @@
   }
 
   .app-main,
-  .list-panel,
   .detail-panel,
   .detail-panel > .detail-reading-stack,
-  .detail-panel > .detail-grid,
-  .single-screen {
+  .detail-panel > .detail-grid {
     overflow: visible;
   }
 }

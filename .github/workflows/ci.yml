@@ -17,11 +17,37 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
       - name: Download modules
         run: go mod download
 
+      - name: Check generated protocol
+        run: go run ./cmd/gen-protocol -check
+
       - name: Run tests
         run: go test ./...
+
+      - name: Install desktop dependencies
+        run: npm ci
+        working-directory: desktop
+
+      - name: Audit desktop production dependencies
+        run: npm audit --omit=dev
+        working-directory: desktop
+
+      - name: Test desktop
+        run: npm test
+        working-directory: desktop
+
+      - name: Type-check desktop
+        run: npm run typecheck
+        working-directory: desktop
 
       - name: Build CLI
         run: |

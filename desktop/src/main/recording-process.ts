@@ -67,6 +67,6 @@ function recordingHandlers(title: string) {
 function finishRecording(): void {
   if (!recordingChild) return
   recordingChild = null
-  resumeDrains()
+  resumeDrains('recording')
   logMainProcessMemory('recording:finished')
 }

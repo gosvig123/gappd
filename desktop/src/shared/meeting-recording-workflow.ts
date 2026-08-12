@@ -31,7 +31,6 @@ export function canStartRecordingStatus(status: RecordingStatus): boolean {
 export function canStopRecordingStatus(status: RecordingStatus): boolean { return status === RECORDING_STATUS_RECORDING }
 export function ignoresStopRequest(status: RecordingStatus): boolean { return status === RECORDING_STATUS_STOPPING }
 export function needsRecordingRefresh(status: RecordingStatus): boolean { return status === RECORDING_STATUS_RECORDING || status === RECORDING_STATUS_STOPPING }
-export function postStopNoticeVisible(_status: RecordingStatus): boolean { return false }
 export function recordingRefreshTarget(state: RecordingState): string | null | undefined {
   if (state.meetingId) return state.meetingId
   return canStartRecordingStatus(state.status) ? null : undefined

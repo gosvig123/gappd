@@ -7,13 +7,12 @@ import { Markdown } from '../components/markdown'
 import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
 import { AlignLeftIcon, CopyIcon, FileTextIcon } from '../components/icons'
-import { TranscriptText } from './transcript-view'
+import { meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText, TranscriptText, TranscriptTrackingIndicator } from './transcript-view'
 
 const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_STATE = 'pending', DEGRADED_STATE = 'degraded'
 const DIARIZATION_RETRY_WAITING_MESSAGE = 'Retry available after meeting processing finishes.'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
-type MeetingSegment = MeetingDetail['segments'][number]
 type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onRetryDiarization: (id: string) => Promise<void> }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
@@ -69,8 +68,6 @@ function MeetingFailureState({ message }: { message?: string }) {
   return <div className="detail-surface detail-alert dismissible-note"><span>{message}</span><button className="icon-dismiss" type="button" aria-label="Dismiss error" onClick={() => setDismissedMessage(message)}>×</button></div>
 }
 
-function meetingIsProcessing(meeting: MeetingDetail): boolean { return meeting.status.state === RECORDING_STATE || meeting.status.processing.state === PROCESSING_STATUS }
-
 function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; onChange: (tab: DetailTab) => void; actions?: ReactNode }) {
   return (
     <div className="detail-tabs-row">
@@ -86,7 +83,7 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
 function SelectedMeetingDetail({ selectedMeeting, transcript, onRetryDiarization }: { selectedMeeting: MeetingDetail; transcript: string; onRetryDiarization: (id: string) => Promise<void> }) {
-  const detailTranscriptText = detailTranscript(selectedMeeting, transcript)
+  const detailTranscriptText = meetingTranscript(selectedMeeting, transcript)
   const hasTranscript = Boolean(detailTranscriptText)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
   const subtitle = detailSubtitle(selectedMeeting, progress)
@@ -117,8 +114,8 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
-        {activeTab === TRANSCRIPT_TAB && recording && !hasLiveSegments(selectedMeeting) ? <TrackingIndicator /> : null}
-        {activeTab === TRANSCRIPT_TAB && (hasLiveSegments(selectedMeeting) || !recording) ? <TranscriptPanel meeting={selectedMeeting} transcript={transcript} reading={reading} /> : null}
+        {activeTab === TRANSCRIPT_TAB && recording && !meetingHasSegments(selectedMeeting) ? <TranscriptTrackingIndicator /> : null}
+        {activeTab === TRANSCRIPT_TAB && (meetingHasSegments(selectedMeeting) || !recording) ? <TranscriptPanel meeting={selectedMeeting} transcript={transcript} reading={reading} /> : null}
       </div>
     </div>
   )
@@ -165,16 +162,13 @@ function showPostMeetingProgress(meeting: MeetingDetail, progress: MeetingProgre
 
 function TranscriptPanel({ meeting, transcript, reading }: { meeting: MeetingDetail; transcript: string; reading: ReturnType<typeof useReadingOverflow> }) {
   const provisional = meeting.transcriptProvisional
-  return <><div className="meeting-section-label">{provisional ? 'Live Transcript' : 'Transcript'}</div><ReadingCard value={transcript} emptyText={transcriptEmptyText(meeting)} reading={reading}><TranscriptText value={transcript} segments={meeting.segments ?? []} /></ReadingCard></>
+  return <><div className="meeting-section-label">{provisional ? 'Live Transcript' : 'Transcript'}</div><ReadingCard value={transcript} emptyText={meetingTranscriptEmptyText(meeting)} reading={reading}><TranscriptText value={transcript} segments={meeting.segments ?? []} /></ReadingCard></>
 }
-
-function hasLiveSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
-function TrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
 
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
   if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
   if (meeting.diarization.state === PENDING_STATE || meeting.diarization.state === PROCESSING_STATUS) return 'Labeling speakers locally.'
-  if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary with local AI.'
+  if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary.'
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
   if (progress.hasTranscript && progress.hasSummary) return ''
   if (progress.hasTranscript) return 'Transcript available.'
@@ -184,26 +178,8 @@ function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput):
 
 function summaryEmptyText(progress: MeetingProgressInput): string { return progress.hasTranscript ? 'Transcript available. Summary not generated yet.' : 'Summary appears after recording is processed.' }
 
-function transcriptEmptyText(meeting: MeetingDetail): string {
-  if (meetingIsProcessing(meeting)) return 'Transcript is being created locally…'
-  return 'No transcript yet.'
-}
-
 function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
   return { status: meeting.status, hasTranscript: hasTranscript && !meeting.transcriptProvisional, hasSummary: Boolean(meeting.summary) }
-}
-
-function detailTranscript(meeting: MeetingDetail, transcript: string): string {
-  return transcript || segmentsTranscript(meeting.segments ?? [])
-}
-
-function segmentsTranscript(segments: MeetingSegment[]): string {
-  return segments.map(segmentTranscriptLine).filter(Boolean).join('\n')
-}
-
-function segmentTranscriptLine(segment: MeetingSegment): string {
-  if (!segment.text) return ''
-  return `${segment.speaker ? `[${segment.speaker}] ` : ''}${segment.text}`
 }
 
 export function MeetingDetailPanel(props: MeetingDetailPanelProps) {

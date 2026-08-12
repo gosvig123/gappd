@@ -2,9 +2,6 @@ import type { ManagedRuntimeErrorDebug, ManagedRuntimeErrorKind, ManagedRuntimeO
 import { buildErrorDebug, readErrorDebug, readOwnershipConflict } from './managed-runtime-error-debug'
 
 type ErrorLike = Record<string, unknown>
-type PullFailure = { summary: string; detail?: string; debug?: ManagedRuntimeErrorDebug; errorKind?: ManagedRuntimeErrorKind }
-type PullFailureError = Error & { detail?: string; debug?: ManagedRuntimeErrorDebug; errorKind?: ManagedRuntimeErrorKind }
-type PullStallController = { refresh: () => void; clear: () => void; errorFor: (error: unknown) => Error }
 
 export type ManagedRuntimeErrorState = {
   error: string
@@ -15,41 +12,12 @@ export type ManagedRuntimeErrorState = {
   ownershipConflict?: ManagedRuntimeSnapshot['ownershipConflict']
 }
 
-const MODEL_PULL_STALL_TIMEOUT_PRE_BYTES_MS = 90_000
-const MODEL_PULL_STALL_TIMEOUT_POST_BYTES_MS = 300_000
 const BLOB_HOST_MARKERS = ['cloudflarestorage.com']
 const DISK_SPACE_MARKERS = ['no space', 'disk full', 'enospc', 'not enough space']
 const NETWORK_MARKERS = ['network', 'connection', 'dns', 'econn', 'socket', 'fetch', 'registry', 'dial tcp', 'connection refused', 'no such host', 'network is unreachable', 'econnrefused', 'econnreset', 'enetunreach', 'ehostunreach', 'enotfound', 'eai_again']
 const OWNERSHIP_MARKERS = ['another process', 'app-owned runtime', 'ownership mismatch', '127.0.0.1:11436']
 const PERMISSION_MARKERS = ['permission denied', 'operation not permitted', 'access denied', 'eacces']
 const TIMEOUT_MARKERS = ['i/o timeout', 'timed out', 'timeout', 'pull stalled', 'stalled with no new progress', 'etimedout', 'headers timeout', 'body timeout', 'connect timeout', 'und_err_connect_timeout']
-
-export function createPullStallController(controller: AbortController, getLastMessage: () => string | undefined, hasByteProgress: () => boolean): PullStallController {
-  let stallTimer: ReturnType<typeof setTimeout> | null = null
-  let stalled = false
-  const clear = () => {
-    if (!stallTimer) return
-    clearTimeout(stallTimer)
-    stallTimer = null
-  }
-  return {
-    refresh: () => {
-      clear()
-      stallTimer = setTimeout(() => { stalled = true; controller.abort() }, pullStallTimeoutMs(hasByteProgress()))
-    },
-    clear,
-    errorFor: (error: unknown) => stalled ? new Error(stalledPullMessage(getLastMessage())) : normalizeTransportError(error),
-  }
-}
-
-export function normalizeTransportError(error: unknown): Error {
-  if (isPullFailureError(error)) return error
-  return createPullFailureError(...collectErrorDetails(error))
-}
-
-export function createPullFailureError(...details: string[]): Error {
-  return buildPullFailureError(describePullFailure(...details))
-}
 
 export function toManagedRuntimeErrorState(error: unknown, phase: ManagedRuntimeOperation, defaultMessage: string): ManagedRuntimeErrorState {
   const details = collectErrorDetails(error)
@@ -71,19 +39,6 @@ export function classifyManagedRuntimeErrorKind(message: string | undefined, pha
   return 'runtime'
 }
 
-function describePullFailure(...details: string[]): PullFailure {
-  const rawDetail = preferredDetail(details)
-  const debug = buildErrorDebug(details, rawDetail)
-  if (isPullBlobHostNetwork([debug?.host, debug?.url, ...details].filter(Boolean).join(' '))) return pullFailure('Managed llama.cpp could not reach the model download host. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_blob_host_network', debug, 'Download host')
-  if (matchesDetail(details, TIMEOUT_MARKERS)) return pullFailure('Managed llama.cpp timed out while downloading the model. Check your network connection, then retry Local AI setup.', 'pull_timeout', debug, 'Reachability target')
-  if (matchesDetail(details, NETWORK_MARKERS)) return pullFailure('Managed llama.cpp could not reach the model registry. Check your internet connection, VPN, or firewall, then retry Local AI setup.', 'pull_network', debug, 'Reachability target')
-  return { summary: rawDetail?.startsWith('Managed llama.cpp') ? rawDetail : 'Managed llama.cpp model download failed.', debug }
-}
-
-function pullFailure(summary: string, errorKind: ManagedRuntimeErrorKind, debug?: ManagedRuntimeErrorDebug, label?: string): PullFailure {
-  return { summary, detail: reachabilityDetail(debug, label || 'Reachability target'), debug, errorKind }
-}
-
 function collectErrorDetails(error: unknown, seen = new Set<unknown>()): string[] {
   if (!error || seen.has(error)) return []
   seen.add(error)
@@ -103,27 +58,9 @@ function readStringField(value: object, key: 'code' | 'detail' | 'message' | 'na
   return typeof field === 'string' ? field : undefined
 }
 
-function buildPullFailureError(failure: PullFailure): Error {
-  const error = new Error(failure.summary) as PullFailureError
-  if (failure.detail) error.detail = failure.detail
-  if (failure.debug) error.debug = failure.debug
-  if (failure.errorKind) error.errorKind = failure.errorKind
-  return error
-}
-
-function isPullFailureError(error: unknown): error is PullFailureError {
-  return error instanceof Error && ('detail' in error || 'debug' in error || 'errorKind' in error)
-}
-
 function isPullBlobHostNetwork(value: string): boolean {
   const normalized = normalizeErrorText(value)
   return matchesAny(normalized, BLOB_HOST_MARKERS) && (matchesAny(normalized, TIMEOUT_MARKERS) || matchesAny(normalized, NETWORK_MARKERS))
-}
-
-function reachabilityDetail(debug: ManagedRuntimeErrorDebug | undefined, label: string): string | undefined {
-  if (!debug?.host && !debug?.ip) return undefined
-  const target = debug.host && debug.ip ? `${debug.host} (${debug.ip})` : debug.host || debug.ip
-  return `${label}: ${target}.`
 }
 
 function readErrorMessage(error: unknown): string | undefined {
@@ -136,19 +73,6 @@ function readErrorString(error: unknown, key: 'detail' | 'message'): string | un
   return typeof value === 'string' ? value : undefined
 }
 
-function preferredDetail(details: string[]): string | undefined {
-  return details.map((detail) => detail.trim()).find(Boolean)
-}
-
-function stalledPullMessage(lastMessage?: string): string {
-  const detail = lastMessage ? ` Last status: ${lastMessage}.` : ''
-  return `Managed llama.cpp model download stalled with no new progress. Check your network connection, then retry Local AI setup.${detail}`
-}
-
-function pullStallTimeoutMs(hasByteProgress: boolean): number {
-  return hasByteProgress ? MODEL_PULL_STALL_TIMEOUT_POST_BYTES_MS : MODEL_PULL_STALL_TIMEOUT_PRE_BYTES_MS
-}
-
 function normalizeText(value: string | undefined): string | undefined {
   const normalized = value?.trim()
   return normalized || undefined
@@ -156,10 +80,6 @@ function normalizeText(value: string | undefined): string | undefined {
 
 function normalizeErrorText(message: string | undefined): string {
   return (message || '').trim().toLowerCase()
-}
-
-function matchesDetail(details: string[], markers: string[]): boolean {
-  return matchesAny(details.join(' ').toLowerCase(), markers)
 }
 
 function matchesAny(value: string, markers: string[]): boolean {

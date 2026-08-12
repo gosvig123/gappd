@@ -29,8 +29,8 @@ func TestArgsExprKeepsOptionalStringsAndNumbersSplit(t *testing.T) {
 		Limit *float64 `json:"limit,omitempty"`
 	}
 	args := []appprotocol.CommandArg{
-		{Flag: "label", Field: "label", Optional: true, Stringify: true},
-		{Flag: "limit", Field: "limit", Optional: true, Stringify: true},
+		{Flag: "label", Field: "label", Optional: true},
+		{Flag: "limit", Field: "limit", Optional: true},
 	}
 	got := argsExpr(reflect.TypeOf(input{}), args)
 	want := "[...(input.label === undefined ? [] : ['--label', String(input.label)]), ...(input.limit === undefined ? [] : ['--limit', String(input.limit)])]"

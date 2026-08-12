@@ -6,15 +6,45 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
+	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/meetingprocessing"
 	"github.com/spf13/cobra"
 )
 
+const processingClaimTTL = 5 * time.Minute
+
 func appProcessingCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "processing", Short: "Durable meeting processing queue"}
-	cmd.AddCommand(appProcessingDrainCmd())
+	cmd.AddCommand(appProcessingDrainCmd(), appProcessingPendingCmd())
+	return cmd
+}
+
+func appProcessingPendingCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{Use: "pending", Short: "List runnable processing capabilities", RunE: func(cmd *cobra.Command, args []string) error {
+		if !asJSON {
+			return fmt.Errorf("app processing pending requires --json")
+		}
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		stages, err := store.PendingStages(cmdContext(), time.Now(), processingClaimTTL)
+		if err != nil {
+			return err
+		}
+		capabilities := make([]meetingprocessing.Capability, len(stages))
+		for index, stage := range stages {
+			capabilities[index] = meetingprocessing.Capability(stage)
+		}
+		return writeJSON(appprotocol.ProcessingPendingResponse{Capabilities: capabilities})
+	}}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
 
@@ -37,11 +67,15 @@ func appProcessingDrainCmd() *cobra.Command {
 }
 
 func runProcessingDrain(capability meetingprocessing.Capability) error {
-	_, store, pipeline, err := loadDeps()
+	cfg, store, err := loadStore()
 	if err != nil {
 		return err
 	}
 	defer store.Close()
+	pipeline, err := processingPipeline(cfg, capability)
+	if err != nil {
+		return err
+	}
 	service := newMeetingProcessingService(store, pipeline, recordingOutputQuiet)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -53,4 +87,20 @@ func runProcessingDrain(capability meetingprocessing.Capability) error {
 		Capability: result.Capability, Attempted: result.Attempted, Completed: result.Completed,
 		Requeued: result.Requeued, Failed: result.Failed,
 	})
+}
+
+func processingPipeline(cfg config.Config, capability meetingprocessing.Capability) (*ai.Pipeline, error) {
+	if capability != meetingprocessing.CapabilitySummarization {
+		return nil, nil
+	}
+	provider, err := newAIProvider(cfg.AI)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.AI.Provider == config.ProviderCodexExec {
+		if err := provider.Available(); err != nil {
+			return nil, fmt.Errorf("preflight Installed Codex before summarization: %w", err)
+		}
+	}
+	return ai.NewPipeline(provider, cfg.AI.Temp), nil
 }

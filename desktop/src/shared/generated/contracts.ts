@@ -102,12 +102,29 @@ export type AIConfig = {
   endpoint: string
   temperature: number
   managed: boolean
+  codexExecutable: string
+  codexModel: string
+}
+
+export type CodexStatusResponse = {
+  ai: AIConfig
+  available: boolean
+  error?: string
 }
 
 export type ConfigUseManagedLocalAIInput = {
   endpoint: string
   model: string
   temperature?: number
+}
+
+export type ConfigUseCodexInput = {
+  executable: string
+  model: string
+}
+
+export type ProcessingPendingResponse = {
+  capabilities: ProcessingCapability[]
 }
 
 export type ProcessingDrainInput = {

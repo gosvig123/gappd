@@ -1,5 +1,5 @@
 import { requestCommand } from './app-protocol'
-import { requestDrains } from './drain-coordinator'
+import { requestPendingDrains } from './drain-coordinator'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
 
@@ -19,7 +19,7 @@ export function stopStaleRecordingRecovery(): void {
 
 async function recoverStaleRecordings(): Promise<number> {
   const result = await requestCommand('record.recoverStale', {})
-  requestDrains()
+  if (result.recovered > 0) void requestPendingDrains()
   return result.recovered
 }
 

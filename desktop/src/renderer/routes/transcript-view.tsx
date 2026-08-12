@@ -1,5 +1,6 @@
 import { type CSSProperties, useMemo, useState } from 'react'
-import type { MeetingSegment } from '../../shared/contracts'
+import type { MeetingDetail, MeetingSegment } from '../../shared/contracts'
+import { meetingHasWork } from '../components/meeting-progress'
 import { MultiSelect } from '../components/ui'
 import './transcript-view.css'
 
@@ -11,6 +12,19 @@ type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: st
 export function TranscriptText({ value, segments }: { value: string; segments: MeetingSegment[] }) {
   if (segments.length > 0) return <TranscriptSegments segments={segments} />
   return <div className="transcript-groups">{transcriptGroups(value).map((group, index) => <TranscriptGroupView key={index} group={group} />)}</div>
+}
+
+export function meetingTranscript(meeting: MeetingDetail, transcript: string): string {
+  return transcript || (meeting.segments ?? []).map(segmentTranscriptLine).filter(Boolean).join('\n')
+}
+
+export function meetingHasSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
+
+export function TranscriptTrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
+
+export function meetingTranscriptEmptyText(meeting: MeetingDetail): string {
+  if (meetingHasWork(meeting)) return 'Transcript is being created locally…'
+  return 'No transcript yet.'
 }
 
 function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
@@ -89,6 +103,11 @@ function appendTranscriptGroup(groups: TranscriptGroup[], speaker: string | null
   if (previous?.speaker === speaker) previous.lines.push(text)
   else groups.push({ speaker, lines: [text] })
   return groups
+}
+
+function segmentTranscriptLine(segment: MeetingSegment): string {
+  if (!segment.text) return ''
+  return `${segment.speaker ? `[${segment.speaker}] ` : ''}${segment.text}`
 }
 
 function segmentTurns(segments: MeetingSegment[]): SegmentTurn[] {

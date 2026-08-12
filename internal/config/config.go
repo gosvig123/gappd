@@ -1,7 +1,6 @@
 package config
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,11 +10,13 @@ import (
 )
 
 type AI struct {
-	Provider string  `toml:"provider"`
-	Model    string  `toml:"model"`
-	Endpoint string  `toml:"endpoint"`
-	Temp     float64 `toml:"temperature"`
-	Managed  bool    `toml:"managed"`
+	Provider        string  `toml:"provider"`
+	Model           string  `toml:"model"`
+	Endpoint        string  `toml:"endpoint"`
+	Temp            float64 `toml:"temperature"`
+	Managed         bool    `toml:"managed"`
+	CodexExecutable string  `toml:"codex_executable,omitempty"`
+	CodexModel      string  `toml:"codex_model,omitempty"`
 }
 
 type Config struct {
@@ -24,7 +25,9 @@ type Config struct {
 }
 
 const (
-	ProviderLlamaCpp = "llamacpp"
+	ProviderLlamaCpp  = "llamacpp"
+	ProviderCodexExec = "codex_exec"
+	legacyProviderPi  = "pi"
 
 	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
 	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
@@ -88,52 +91,6 @@ func readConfig(path string, cfg *Config, tolerateUnknown func(toml.Key) bool) e
 	return rejectUnknownConfigKeys(path, meta.Undecoded(), tolerateUnknown)
 }
 
-func rejectUnknownConfigKeys(path string, undecoded []toml.Key, tolerateUnknown func(toml.Key) bool) error {
-	keys := collectUnknownConfigKeys(undecoded, tolerateUnknown)
-	if len(keys) == 0 {
-		return nil
-	}
-	return fmt.Errorf("unknown config keys in %s: %s", path, strings.Join(keys, ", "))
-}
-
-func collectUnknownConfigKeys(undecoded []toml.Key, tolerateUnknown func(toml.Key) bool) []string {
-	keys := make([]string, 0, len(undecoded))
-	for _, key := range undecoded {
-		if !tolerateUnknown(key) {
-			keys = append(keys, key.String())
-		}
-	}
-	return keys
-}
-
-func toleratedUndecodedKey(key toml.Key) bool {
-	name := key.String()
-	return name == toleratedGoogleConfigTable || strings.HasPrefix(name, toleratedGoogleConfigTable+".")
-}
-
-func toleratedRepairUndecodedKey(key toml.Key) bool {
-	return toleratedUndecodedKey(key) || toleratedLegacyAIKey(key) || toleratedLegacyTable(key)
-}
-
-func toleratedLegacyAIKey(key toml.Key) bool {
-	switch key.String() {
-	case "ai.api_key", "ai.base_url", "ai.max_tokens":
-		return true
-	default:
-		return false
-	}
-}
-
-func toleratedLegacyTable(key toml.Key) bool {
-	name := key.String()
-	for _, table := range []string{"audio", "ci", "integrations", "storage", "transcription"} {
-		if name == table || strings.HasPrefix(name, table+".") {
-			return true
-		}
-	}
-	return false
-}
-
 func Save(cfg Config) error {
 	if err := validate(&cfg); err != nil {
 		return err
@@ -154,7 +111,10 @@ func validate(cfg *Config) error {
 		return err
 	}
 	if !supportedProvider(cfg.AI.Provider) {
-		return fmt.Errorf("unsupported AI provider %q (supported: %s)", cfg.AI.Provider, ProviderLlamaCpp)
+		return fmt.Errorf("unsupported AI provider %q (supported: %s, %s)", cfg.AI.Provider, ProviderLlamaCpp, ProviderCodexExec)
+	}
+	if cfg.AI.Provider == ProviderCodexExec && !filepath.IsAbs(cfg.AI.CodexExecutable) {
+		return fmt.Errorf("config ai.codex_executable must be an absolute path for Installed Codex")
 	}
 	if cfg.AI.Model == "" {
 		return fmt.Errorf("config ai.model must not be empty")
@@ -178,8 +138,13 @@ func validateManagedLocalAIRepair(cfg *Config) error {
 func normalizeConfig(cfg *Config) error {
 	cfg.DBPath = strings.TrimSpace(cfg.DBPath)
 	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
+	if cfg.AI.Provider == legacyProviderPi {
+		cfg.AI.Provider = ProviderLlamaCpp
+	}
 	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
 	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
+	cfg.AI.CodexExecutable = strings.TrimSpace(cfg.AI.CodexExecutable)
+	cfg.AI.CodexModel = strings.TrimSpace(cfg.AI.CodexModel)
 	if cfg.DBPath == "" {
 		return fmt.Errorf("config db_path must not be empty")
 	}
@@ -199,38 +164,7 @@ func validateTemperature(temp float64) error {
 }
 
 func supportedProvider(provider string) bool {
-	return provider == ProviderLlamaCpp
-}
-
-func encode(cfg Config) ([]byte, error) {
-	var buf bytes.Buffer
-	if err := toml.NewEncoder(&buf).Encode(cfg); err != nil {
-		return nil, fmt.Errorf("encode config: %w", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func writeConfig(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), "config-*.toml")
-	if err != nil {
-		return fmt.Errorf("create temp config: %w", err)
-	}
-	name := tmp.Name()
-	defer os.Remove(name)
-	if _, err := tmp.Write(data); err != nil {
-		tmp.Close()
-		return fmt.Errorf("write temp config: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return fmt.Errorf("close temp config: %w", err)
-	}
-	if err := os.Rename(name, path); err != nil {
-		return fmt.Errorf("replace config: %w", err)
-	}
-	return nil
+	return provider == ProviderLlamaCpp || provider == ProviderCodexExec
 }
 
 func normalizeDBPath(path string) (string, error) {
@@ -256,12 +190,4 @@ func GappdDir() (string, error) {
 		return "", fmt.Errorf("resolve home directory: %w", err)
 	}
 	return filepath.Join(home, ".gappd"), nil
-}
-
-func configPath() (string, error) {
-	dir, err := GappdDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.toml"), nil
 }

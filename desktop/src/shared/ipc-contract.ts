@@ -8,6 +8,8 @@ export type CapturePermissions = { microphone: string; screen: string; details?:
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
+export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; available: boolean; error?: string }
+export type CodexConfigurationInput = { executable: string; model: string }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -32,6 +34,11 @@ export type IpcInvokeContract = {
   managedRuntime: {
     status: OperationSpec<[], ManagedRuntimeSnapshot>
     prepare: OperationSpec<[input: ManagedRuntimePrepareInput], ManagedRuntimeSnapshot>
+  }
+  aiProvider: {
+    status: OperationSpec<[], AIProviderStatus>
+    configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
+    useLocal: OperationSpec<[], AIProviderStatus>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -65,6 +72,7 @@ export const IPC_OPERATIONS = {
   meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
+  aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -89,7 +97,6 @@ export const IPC_EVENTS = {
   update: {
     statusChanged: 'update:status-changed',
   },
-
 } as const
 
 export type GappdApi = IpcInvokeApi & {

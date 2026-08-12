@@ -1,10 +1,6 @@
 package meetingprocessing
 
-import (
-	"errors"
-
-	"github.com/gappd-dev/gappd/internal/db"
-)
+import "errors"
 
 type Capability string
 
@@ -50,5 +46,3 @@ func category(err error) ErrorCategory {
 	}
 	return ErrorTransient
 }
-
-func StageFor(meeting db.Meeting) db.QueueStage { return db.DeriveQueueStage(meeting) }

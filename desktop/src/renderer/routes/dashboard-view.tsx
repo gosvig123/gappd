@@ -1,7 +1,7 @@
 import { type MouseEvent, useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
-import { meetingProgressLabel, type MeetingProgressInput } from '../components/meeting-progress'
+import { meetingHasWork, meetingProgressLabel } from '../components/meeting-progress'
 import { ArrowLeftIcon, SearchIcon, CloseIcon, TrashIcon } from '../components/icons'
 import { EmptyState, ListRow, PageHeader, StatusPill } from '../components/ui'
 import { MeetingDetailPanel } from './meeting-detail-view'
@@ -109,13 +109,12 @@ function MeetingDateSection({ group, onSelect, onDelete }: { group: MeetingDateG
 }
 
 function MeetingRow({ meeting, onSelect, onDelete }: { meeting: MeetingListItem; onSelect: (id: string) => void; onDelete: (id: string) => Promise<void> }) {
-  const progress = listProgressInput(meeting)
   return (
     <div className="meeting-row-wrap">
       <ListRow className="meeting-row" onClick={() => onSelect(meeting.id)}>
         <div className="meeting-row-top">
           <div className="meeting-row-body"><div className="meeting-title">{meeting.title || EMPTY_TITLE}</div>{meeting.title !== dateLabel(meeting.startedAt) ? <div className="meeting-meta">{dateLabel(meeting.startedAt)}</div> : null}</div>
-          {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}
+          {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{meetingProgressLabel(meeting)}</StatusPill> : null}
         </div>
         <div className="meeting-row-summary">{artifactSummary(meeting)}</div>
       </ListRow>
@@ -124,13 +123,9 @@ function MeetingRow({ meeting, onSelect, onDelete }: { meeting: MeetingListItem;
   )
 }
 
-function meetingBusy(meeting: MeetingListItem): boolean {
-  return meeting.status.state === MEETING_RECORDING || meeting.status.processing.state === PROCESSING_PROCESSING
-}
-
 function MeetingRowDelete({ meeting, onDelete }: { meeting: MeetingListItem; onDelete: (id: string) => Promise<void> }) {
   const [deleting, setDeleting] = useState(false)
-  if (meetingBusy(meeting)) return null
+  if (meetingHasWork(meeting)) return null
   async function handleDelete(event: MouseEvent) {
     event.stopPropagation()
     if (!window.confirm(`Delete “${meeting.title || EMPTY_TITLE}”?\n\nThis removes summary, transcript, segments, and audio files.`)) return
@@ -191,8 +186,4 @@ function artifactSummary(meeting: MeetingListItem): string {
   if (meeting.hasSummary) return 'Notes available'
   if (meeting.hasTranscript) return 'Transcript available'
   return 'Artifacts pending'
-}
-
-function listProgressInput(meeting: MeetingListItem): MeetingProgressInput {
-  return { status: meeting.status, hasTranscript: meeting.hasTranscript, hasSummary: meeting.hasSummary }
 }

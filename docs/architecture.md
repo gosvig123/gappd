@@ -1,103 +1,101 @@
 # gappd Architecture
 
-## Directory Structure
+gappd is a macOS desktop application that records meeting audio, transcribes it with Apple SpeechTranscriber, labels remote speakers, and generates notes with local llama.cpp inference.
 
-```
-gappd/
-├── cmd/gappd/             # Cobra CLI and desktop app subcommands
-├── internal/
-│   ├── ai/                # llama.cpp client, prompts, extraction/synthesis pipeline
-│   ├── capture/           # macOS recording wrapper around capture-helper
-│   ├── config/            # TOML config loading and validation
-│   ├── db/                # SQLite schema, migrations, meeting/segment queries
-│   ├── recording/         # recording lifecycle: capture → transcribe → enhance
-│   └── transcribe/        # local whisper CLI wrapper
-├── desktop/               # Electron app, managed llama.cpp/Whisper runtime setup
-├── capture-helper/        # Swift ScreenCaptureKit helper app
-├── docs/                  # Architecture and release docs
-└── Makefile               # Go/capture-helper build helpers
-```
+## System map
 
-## Product Shape
-
-```
-Electron UI ──IPC──▶ Go CLI app commands ──▶ SQLite
-     │                    │                     ▲
-     │                    ├── capture-helper ───┘
-     │                    ├── whisper-local ───▶ segments
-     │                    └── llama.cpp ────────▶ summary
-     └── managed llama.cpp/Whisper setup
+```text
+Electron renderer
+    │ typed preload IPC
+    ▼
+Electron main process
+    ├── permissions, meeting detection, updates
+    ├── Managed Runtime and processing drains
+    └── `gappd app ...` machine protocol
+             │
+             ▼
+        Go meeting engine ───────────────▶ SQLite + FTS5
+             │
+             ├── GappdCapture.app ──────▶ mic/system WAV + chunk events
+             ├── GappdSpeechTranscriber.app ─▶ Apple Speech transcript
+             ├── gappd-diarizer ────────▶ meeting-local speaker windows
+             └── llama-server ──────────▶ extraction + summary
 ```
 
-The desktop app owns the **Local AI Setup Operation** and **Managed Runtime** management. It downloads and starts managed llama.cpp, downloads/builds Whisper assets, and calls machine-readable `gappd app ...` commands over IPC.
+All inference stays on the Mac. Network access is used for application updates and model downloads.
 
-The Go CLI owns capture orchestration, transcription, AI post-processing, and SQLite persistence. The CLI can also run standalone when the user provides local llama.cpp and Whisper runtime dependencies.
+## Responsibilities
 
-## Data Flow
+### Electron desktop
 
-1. User starts a recording from desktop or `gappd listen`.
-2. Go creates a `meetings` row with capture status `recording`.
-3. `capture-helper` records mic/system WAV files into the session directory.
-4. Stop signal marks capture `captured` and processing `processing`.
-5. `whisper-local` transcribes available audio streams into timestamped segments.
-6. Segments are stored in SQLite.
-7. llama.cpp runs extraction then synthesis prompts over the transcript.
-8. Summary, transcript text, and lifecycle status are saved on the meeting.
+`desktop/src/renderer` owns user interface state. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
 
-## Component Responsibilities
+`desktop/src/main` owns operating-system integration and process orchestration:
 
-### `cmd/gappd`
+- capture and speech permissions;
+- meeting presence detection and assisted stop;
+- native binary resolution and recording process control;
+- managed llama.cpp and Apple Speech setup;
+- background processing drains and sleep handling;
+- stale-recording recovery, launch-at-login, and updates.
 
-Cobra commands for humans (`listen`, `devices`, `meetings`, `show`, `enhance`, `setup`) and desktop IPC (`app ... --json`). It loads config, opens SQLite, and delegates core work to internal packages.
+### Go meeting engine
 
-### `internal/recording`
+`cmd/gappd` contains human commands and the machine-readable `gappd app ...` protocol used by Electron. Core behavior lives under `internal/`:
 
-Coordinates one recording session. It creates the session directory, starts capture, persists lifecycle status, transcribes audio streams, stores segments, runs enhancement, and emits desktop events when used by `gappd app record start`.
+- `recording`: recording workflow and capture events;
+- `capture`: Swift capture-helper process boundary;
+- `livetranscript`: provisional chunk transcription and reconciliation;
+- `meetingprocessing`: durable transcription, diarization, and summarization queue;
+- `meetinglifecycle`: valid capture and processing transitions;
+- `transcribe`: Apple SpeechTranscriber process boundary;
+- `diarize`: diarizer process boundary and speaker projection;
+- `ai`: llama.cpp-compatible extraction and synthesis;
+- `db`: SQLite schema, migrations, queries, and full-text search;
+- `appprotocol`: machine-readable desktop contracts.
 
-### `internal/capture`
+`cmd/gen-protocol` generates TypeScript status, event, and command definitions from Go-owned protocol types. `make check-protocol` detects contract drift.
 
-Wraps the macOS Swift `capture-helper` app. Capture modes are `mic`, `system`, and `both`. Output is WAV files consumed after recording stops.
+### Native helpers
 
-### `internal/transcribe`
+- `capture-helper/`: Swift ScreenCaptureKit application that captures microphone and system audio, writes durable WAV artifacts, and emits chunk events.
+- `apple-speech-transcriber/`: Swift application that prepares Apple speech assets and transcribes audio locally.
+- `gappd-diarizer/`: Swift executable using FluidAudio and bundled models to group remote speech into meeting-local speaker labels.
+- `desktop/resources/llamacpp/`: bundled llama.cpp runtime started on demand for summarization.
 
-Shells out to the configured local `whisper-local` binary. It parses Whisper output into timestamped segments and assigns speakers based on source stream.
+## Meeting flow
 
-### `internal/ai`
-
-llama.cpp-only inference. The pipeline runs two prompts: extraction to JSON, then synthesis to human-readable meeting notes.
-
-### `internal/db`
-
-SQLite storage using `modernc.org/sqlite`. Schema source of truth lives in `internal/db/schema.sql`. Tables: `meetings`, `segments`, `migrations`, plus FTS5 table/triggers for meeting search.
-
-### `desktop/`
-
-Electron renderer, preload IPC bridge, and main-process runtime management. Main process owns native process calls, managed llama.cpp, managed Whisper, the **Local AI Setup Operation**, update checks, and app command IPC.
-
-## Configuration
-
-Config lives at `~/.gappd/config.toml`; missing config falls back to defaults.
-
-```toml
-db_path = "~/.gappd/db.sqlite"
-
-[ai]
-provider = "llamacpp"
-model = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
-endpoint = "http://127.0.0.1:11436"
-temperature = 0.3
+```text
+meeting detected or manual start
+    ↓
+permission check; pause background processing
+    ↓
+capture mic/system audio to session directory
+    ↓
+show provisional Live Transcript from chunk events
+    ↓
+mark capture complete and enqueue durable Meeting Processing
+    ↓
+transcribe durable audio if needed
+    ↓
+apply optional Speaker Diarization
+    ↓
+extract structured facts and synthesize summary
+    ↓
+persist searchable meeting; resume background processing
 ```
 
-Current validation rules:
+Recording preempts diarization and summarization. Interrupted background work returns to the queue instead of competing with capture.
 
-- `ai.provider` must be `llamacpp`
-- `ai.model` and `ai.endpoint` must be non-empty
-- `ai.temperature` must be between `0` and `2`
-- `db_path` must be set and may use `~`
+## Persistence
 
-## Boundaries
+State lives under `~/.gappd/` by default:
 
-- The **Local AI Setup Operation** can manage bundled runtimes; CLI `gappd setup` only checks externally available dependencies.
-- Transcription is local Whisper only.
-- AI inference is llama.cpp only.
-- No Bubbletea TUI, cloud STT, OpenAI, or Claude integration exists in current code.
+- `config.toml`: database and managed local-inference configuration;
+- `db.sqlite`: meetings, segments, lifecycle state, claims, and FTS5 index;
+- session directories: durable microphone and system-audio artifacts;
+- managed model assets.
+
+`internal/db/schema.sql` is the current schema source of truth. Meeting rows hold capture, processing, and diarization state; segment rows hold transcript timing, source, and speaker projection.
+
+Deleting a meeting also deletes its managed audio artifacts. Captured audio otherwise remains available for recovery and explicit reprocessing.

@@ -38,7 +38,7 @@ export function meetingProgressLabel(meeting: MeetingProgressInput): string {
   return 'Processing'
 }
 
-export function meetingHasWork(meeting: MeetingProgressInput): boolean {
+export function meetingHasWork(meeting: Pick<MeetingProgressInput, 'status'>): boolean {
   return meeting.status.state === MEETING_RECORDING || meeting.status.processing.state === PROCESSING_PROCESSING
 }
 
@@ -95,7 +95,7 @@ function transcriptStep(meeting: MeetingProgressInput): ProgressStep {
 function summaryStep(meeting: MeetingProgressInput): ProgressStep {
   if (meeting.hasSummary) return { label: 'Summary ready', detail: 'Notes generated.', tone: 'done' }
   if (summaryFailed(meeting)) return { label: 'Creating summary', detail: 'Summary did not finish.', tone: 'failed' }
-  if (meeting.hasTranscript && meeting.status.processing.state === PROCESSING_PROCESSING) return { label: 'Creating summary', detail: 'Local AI is writing notes.', tone: 'active' }
+  if (meeting.hasTranscript && meeting.status.processing.state === PROCESSING_PROCESSING) return { label: 'Creating summary', detail: 'Summary provider is writing notes.', tone: 'active' }
   return { label: 'Creating summary', detail: 'Starts after transcript.', tone: 'pending' }
 }
 
@@ -108,7 +108,7 @@ function readyStep(meeting: MeetingProgressInput): ProgressStep {
 function processingLead(meeting: MeetingProgressInput): string {
   if (meetingFailed(meeting)) return 'Could not finish every step. Existing transcript or audio stays saved.'
   if (!meeting.hasTranscript) return 'Meeting saved. Transcribing audio locally.'
-  if (!meeting.hasSummary) return 'Transcript ready. Creating summary with local AI.'
+  if (!meeting.hasSummary) return 'Transcript ready. Creating summary.'
   return 'Finalizing meeting notes.'
 }
 

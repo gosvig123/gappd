@@ -38,8 +38,12 @@ func loadDeps() (config.Config, *db.DB, *ai.Pipeline, error) {
 	if err != nil {
 		return cfg, nil, nil, err
 	}
-	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
-	return cfg, store, pipeline, nil
+	provider, err := newAIProvider(cfg.AI)
+	if err != nil {
+		store.Close()
+		return cfg, nil, nil, err
+	}
+	return cfg, store, ai.NewPipeline(provider, cfg.AI.Temp), nil
 }
 
 func loadStore() (config.Config, *db.DB, error) {
@@ -88,14 +92,17 @@ func setupCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Print("Checking Local AI... ")
-			provider := ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model)
+			fmt.Print("Checking AI provider... ")
+			provider, err := newAIProvider(cfg.AI)
+			if err != nil {
+				fmt.Println("✗")
+				return err
+			}
 			if err := provider.Available(); err != nil {
 				fmt.Println("✗")
-				return fmt.Errorf("Local AI not reachable: %w", err)
+				return fmt.Errorf("AI provider unavailable: %w", err)
 			}
-			fmt.Println("✓ connected to", cfg.AI.Endpoint)
-			fmt.Println("  model:", cfg.AI.Model)
+			fmt.Println("✓", cfg.AI.Provider)
 
 			fmt.Print("Preparing Apple speech model... ")
 			if err := transcribe.PrepareSpeechAsset(cmd.Context()); err != nil {

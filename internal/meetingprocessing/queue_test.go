@@ -10,7 +10,7 @@ import (
 	"github.com/gappd-dev/gappd/internal/diarize"
 )
 
-func TestStageForArtifacts(t *testing.T) {
+func TestDeriveQueueStageArtifacts(t *testing.T) {
 	text, summary, extraction := "transcript", "summary", "{}"
 	tests := []struct {
 		name    string
@@ -26,7 +26,7 @@ func TestStageForArtifacts(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if got := StageFor(test.meeting); got != test.want {
+			if got := db.DeriveQueueStage(test.meeting); got != test.want {
 				t.Fatalf("stage = %q, want %q", got, test.want)
 			}
 		})

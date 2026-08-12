@@ -14,12 +14,20 @@ type ConfigResponse struct {
 	AI AIConfig `json:"ai"`
 }
 
+type CodexStatusResponse struct {
+	AI        AIConfig `json:"ai"`
+	Available bool     `json:"available"`
+	Error     *string  `json:"error,omitempty"`
+}
+
 type AIConfig struct {
-	Provider    string  `json:"provider"`
-	Model       string  `json:"model"`
-	Endpoint    string  `json:"endpoint"`
-	Temperature float64 `json:"temperature"`
-	Managed     bool    `json:"managed"`
+	Provider        string  `json:"provider"`
+	Model           string  `json:"model"`
+	Endpoint        string  `json:"endpoint"`
+	Temperature     float64 `json:"temperature"`
+	Managed         bool    `json:"managed"`
+	CodexExecutable string  `json:"codexExecutable"`
+	CodexModel      string  `json:"codexModel"`
 }
 
 type DevicesResponse struct {
@@ -46,6 +54,10 @@ type MeetingDeleteResponse struct {
 
 type RecoverStaleRecordingsResponse struct {
 	Recovered int `json:"recovered"`
+}
+
+type ProcessingPendingResponse struct {
+	Capabilities []meetingprocessing.Capability `json:"capabilities"`
 }
 
 type ProcessingDrainResponse struct {

@@ -75,7 +75,11 @@ func drainListenCapabilities(store *db.DB) error {
 	if err != nil {
 		return err
 	}
-	pipeline := ai.NewPipeline(ai.NewOpenAICompat(cfg.AI.Endpoint, cfg.AI.Model), cfg.AI.Temp)
+	provider, err := newAIProvider(cfg.AI)
+	if err != nil {
+		return err
+	}
+	pipeline := ai.NewPipeline(provider, cfg.AI.Temp)
 	service := newMeetingProcessingService(store, pipeline, recordingOutputConsole)
 	return drainListenPipeline(func(capability meetingprocessing.Capability) (meetingprocessing.DrainResult, error) {
 		return service.Drain(cmdContext(), capability)

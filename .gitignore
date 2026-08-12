@@ -56,3 +56,5 @@ desktop/release/
 desktop/src/**/*.js
 !desktop/build/
 !desktop/build/*.plist
+.pi
+.pi-workers

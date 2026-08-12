@@ -215,7 +215,7 @@ func (s Service) transcribeClaim(ctx context.Context, lifecycle meetinglifecycle
 	if err != nil {
 		return err
 	}
-	result, err := lifecycle.SaveClaimTranscript(ctx, claim.Meeting.ID, claim.Token, FormatTranscript(segments), segments, s.now())
+	result, err := lifecycle.SaveClaimTranscript(ctx, claim.Meeting.ID, claim.Token, db.FormatTranscript(segments), segments, s.now())
 	if err != nil {
 		return err
 	}

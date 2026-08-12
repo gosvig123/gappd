@@ -30,6 +30,11 @@ type ConfigUseManagedLocalAIInput struct {
 	Temperature *float64 `json:"temperature,omitempty"`
 }
 
+type ConfigUseCodexInput struct {
+	Executable string `json:"executable"`
+	Model      string `json:"model"`
+}
+
 type ProcessingDrainInput struct {
 	Capability meetingprocessing.Capability `json:"capability"`
 }
@@ -43,11 +48,10 @@ type RecordStartInput struct {
 }
 
 type CommandArg struct {
-	Literal   string
-	Field     string
-	Flag      string
-	Optional  bool
-	Stringify bool
+	Literal  string
+	Field    string
+	Flag     string
+	Optional bool
 }
 
 type CommandSpec struct {
@@ -68,14 +72,13 @@ var Commands = []CommandSpec{
 	{ID: "meetings.retryDiarization", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("retry-diarization"), field("id"), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
+	{ID: "config.codexStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[CodexStatusResponse](), Args: literalArgs("app", "config", "codex-status", "--json")},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
+	{ID: "config.useCodex", Mode: CommandModeRequest, Input: typeOf[ConfigUseCodexInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-codex"), flag("executable", "executable", false), flag("model", "model", false)}},
+	{ID: "processing.pending", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ProcessingPendingResponse](), Args: literalArgs("app", "processing", "pending", "--json")},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
-}
-
-func RequestCommands() []CommandSpec {
-	return commandsWithMode(CommandModeRequest)
 }
 
 func StreamCommands() []CommandSpec {
@@ -113,5 +116,5 @@ func field(name string) CommandArg {
 }
 
 func flag(name, field string, optional bool) CommandArg {
-	return CommandArg{Flag: name, Field: field, Optional: optional, Stringify: true}
+	return CommandArg{Flag: name, Field: field, Optional: optional}
 }

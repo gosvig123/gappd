@@ -1,7 +1,7 @@
 import '../components/local-ai.css'
 
 import { type ReactNode, useEffect, useState } from 'react'
-import type { StartupSettings } from '../../shared/ipc-contract'
+import type { AIProviderStatus, StartupSettings } from '../../shared/ipc-contract'
 import { Button, Card, cx, StatusPill } from '../components/ui'
 import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
@@ -15,8 +15,50 @@ type SettingsViewProps = {
   developerDebugEnabled: boolean
 }
 
+const LOCAL_PROVIDER = 'local'
+const CODEX_PROVIDER = 'codex_exec'
+const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
+type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
+
 export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><StartupPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+  return <section className="settings-stack settings-stack-plain"><StartupPanel /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+}
+
+function AIProviderPanel() {
+  const [status, setStatus] = useState<AIProviderStatus | null>(null)
+  const [provider, setProvider] = useState<SummaryProvider>(LOCAL_PROVIDER)
+  const [executable, setExecutable] = useState('')
+  const [model, setModel] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => { void loadProviderStatus(setStatus, setProvider, setExecutable, setModel, setError).finally(() => setLoading(false)) }, [])
+  const save = async () => {
+    setBusy(true); setError(null)
+    try {
+      const next = provider === LOCAL_PROVIDER ? await window.gappd.aiProvider.useLocal() : await window.gappd.aiProvider.configureCodex({ executable, model })
+      setStatus(next)
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { setBusy(false) }
+  }
+  const changeProvider = (next: typeof provider) => { setProvider(next); setStatus(null); setError(null) }
+  const healthError = status?.provider === provider && !status.available ? status.error || CODEX_UNAVAILABLE : null
+  const shownError = error || healthError
+  const note = provider === LOCAL_PROVIDER ? 'Local AI keeps transcript text and audio on this Mac.' : 'Uses existing Codex login and current Codex CLI. Update Codex if check fails. Transcript text goes through Codex; recorded audio stays on this Mac.'
+  return <Card className="settings-section"><SectionTitle title="Meeting summaries" note="Choose where transcript text is processed." action={<StatusPill tone={shownError ? 'danger' : 'success'}>{providerStatusLabel(status)}</StatusPill>} /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="ai-provider">Provider</label><select id="ai-provider" className="settings-select" value={provider} disabled={loading || busy} onChange={(event) => changeProvider(event.target.value as SummaryProvider)}><option value={LOCAL_PROVIDER}>Local AI</option><option value={CODEX_PROVIDER}>Installed Codex</option></select></div>{provider === CODEX_PROVIDER ? <><div className="metric-card"><label className="label" htmlFor="codex-executable">Codex executable</label><input id="codex-executable" className="settings-select" value={executable} disabled={loading || busy} placeholder="/absolute/path/to/codex" onChange={(event) => setExecutable(event.target.value)} /></div><div className="metric-card"><label className="label" htmlFor="codex-model">Model (optional)</label><input id="codex-model" className="settings-select" value={model} disabled={loading || busy} onChange={(event) => setModel(event.target.value)} /></div></> : null}</div><div className={cx('status-note', shownError ? 'danger' : undefined)}>{shownError || note}</div><div className="actions-row"><Button variant="primary" disabled={loading || busy || (provider === CODEX_PROVIDER && !executable.trim())} onClick={() => void save()}>{loading || busy ? 'Checking…' : 'Save summary provider'}</Button></div></Card>
+}
+
+async function loadProviderStatus(setStatus: (value: AIProviderStatus) => void, setProvider: (value: SummaryProvider) => void, setExecutable: (value: string) => void, setModel: (value: string) => void, setError: (value: string) => void) {
+  try {
+    const next = await window.gappd.aiProvider.status()
+    setStatus(next); setProvider(next.provider); setExecutable(next.codexExecutable); setModel(next.codexModel)
+  } catch (cause) { setError(errorMessage(cause)) }
+}
+
+function providerStatusLabel(status: AIProviderStatus | null): string {
+  if (!status) return 'Checking'
+  if (status.provider === CODEX_PROVIDER && !status.available) return 'Codex unavailable'
+  return status.provider === CODEX_PROVIDER ? 'Installed Codex' : 'Local AI'
 }
 
 function StartupPanel() {
