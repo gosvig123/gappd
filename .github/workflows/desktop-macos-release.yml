@@ -10,6 +10,9 @@ on:
   push:
     branches:
       - beta
+    paths-ignore:
+      - 'site/**'
+      - '.github/workflows/pages.yml'
 
 permissions:
   contents: write
