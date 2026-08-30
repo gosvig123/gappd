@@ -1,5 +1,9 @@
+import type { ClerkAccountStatus } from './account-contract'
+import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
+export type { ClerkAccountStatus } from './account-contract'
+export type { CalendarConnection, CalendarEventSummary, CalendarSnapshot } from './calendar-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -52,6 +56,17 @@ export type IpcInvokeContract = {
     setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
+  clerkAuth: {
+    status: OperationSpec<[], ClerkAccountStatus>
+    connect: OperationSpec<[], ClerkAccountStatus>
+    disconnect: OperationSpec<[], ClerkAccountStatus>
+  }
+  calendar: {
+    snapshot: OperationSpec<[], CalendarSnapshot>
+    connectGoogle: OperationSpec<[], CalendarSnapshot>
+    sync: OperationSpec<[connectionId: string], CalendarSnapshot>
+    disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
+  }
 }
 
 export type IpcOperationGroup = Extract<keyof IpcInvokeContract, string>
@@ -84,6 +99,13 @@ export const IPC_OPERATIONS = {
     getSettings: 'startup:getSettings',
     setOpenAtLogin: 'startup:setOpenAtLogin',
     setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled',
+  },
+  clerkAuth: { status: 'clerkAuth:status', connect: 'clerkAuth:connect', disconnect: 'clerkAuth:disconnect' },
+  calendar: {
+    snapshot: 'calendar:snapshot',
+    connectGoogle: 'calendar:connectGoogle',
+    sync: 'calendar:sync',
+    disconnect: 'calendar:disconnect',
   },
 } as const satisfies IpcOperationChannels
 

@@ -13,8 +13,19 @@ import { useSetupPermissions } from './hooks/use-setup-permissions'
 import { useUpdateStatus } from './hooks/use-update-status'
 import { DashboardView } from './routes/dashboard-view'
 import { SettingsView } from './routes/settings-view'
+import { GoogleCalendarPrototype } from './prototypes/google-calendar/google-calendar-prototype'
+
+const CALENDAR_PROTOTYPE_PARAM = 'calendarPrototype'
 
 export function App() {
+  return calendarPrototypeEnabled() ? <GoogleCalendarPrototype /> : <MainApp />
+}
+
+function calendarPrototypeEnabled(): boolean {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).has(CALENDAR_PROTOTYPE_PARAM)
+}
+
+function MainApp() {
   const runtime = useManagedRuntime()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const permissions = useSetupPermissions(true)

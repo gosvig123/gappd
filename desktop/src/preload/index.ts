@@ -18,6 +18,8 @@ function buildOperationApi(): IpcInvokeApi {
     aiProvider: invokeGroup('aiProvider'),
     update: invokeGroup('update'),
     startup: invokeGroup('startup'),
+    clerkAuth: invokeGroup('clerkAuth'),
+    calendar: invokeGroup('calendar'),
   }
 }
 
