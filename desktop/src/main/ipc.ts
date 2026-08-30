@@ -12,8 +12,6 @@ import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
-import { clerkAccountStatus, connectClerkAccount, disconnectClerkAccount } from './clerk-auth'
-import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
 
 const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
 const LEGACY_PRIVACY_SECURITY_PANE = 'com.apple.preference.security'
@@ -69,17 +67,6 @@ const IPC_HANDLERS: MainHandlers = {
     getSettings: () => getStartupSettings(),
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
-  },
-  clerkAuth: {
-    status: () => clerkAccountStatus(),
-    connect: () => connectClerkAccount(),
-    disconnect: () => disconnectClerkAccount(),
-  },
-  calendar: {
-    snapshot: () => googleCalendarSnapshot(),
-    connectGoogle: () => connectGoogleCalendar(),
-    sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
-    disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
 }
 

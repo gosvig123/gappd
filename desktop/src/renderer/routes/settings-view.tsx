@@ -1,5 +1,4 @@
 import '../components/local-ai.css'
-import '../components/oauth-settings.css'
 
 import { type ReactNode, useEffect, useState } from 'react'
 import type { AIProviderStatus, StartupSettings } from '../../shared/ipc-contract'
@@ -8,8 +7,6 @@ import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { runtimeErrorView, runtimeOperationLabel, runtimeStatusTone, type ManagedRuntimeSnapshot } from '../components/managed-runtime-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
-import { ClerkAccountPanel } from '../components/clerk-account-panel'
-import { GoogleCalendarPanel } from '../components/google-calendar-panel'
 
 type SettingsViewProps = {
   language: string
@@ -24,7 +21,7 @@ const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
 export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><StartupPanel /><ClerkAccountPanel /><GoogleCalendarPanel /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+  return <section className="settings-stack settings-stack-plain"><StartupPanel /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
 function AIProviderPanel() {
