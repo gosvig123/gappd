@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { authorizeOAuth, buildAuthorizationUrl, createPkce, parseTokenResponse, type OAuthConfig } from './oauth.ts'
+import { authorizeOAuth, buildAuthorizationUrl, createPkce, parseTokenResponse, refreshOAuthToken, type OAuthConfig, type OAuthTokenRequest } from './oauth.ts'
 
 const CONFIG: OAuthConfig = {
   clientId: 'public-client',
@@ -52,6 +52,32 @@ test('loopback authorization validates state and exchanges code without a secret
   assert.equal(tokens.expiresAt, 61_000)
   assert.match(tokenBody, /code_verifier=/)
   assert.doesNotMatch(tokenBody, /client_secret=/)
+})
+
+test('loopback authorization can exchange through a token requester', async () => {
+  const captured: { value: OAuthTokenRequest | null } = { value: null }
+  const tokens = await authorizeOAuth(CONFIG, {
+    openExternal: completeBrowserAuthorization,
+    tokenRequester: async (value) => {
+      captured.value = value
+      return { accessToken: 'relay-access', refreshToken: 'relay-refresh', expiresAt: 61_000, tokenType: 'Bearer' }
+    },
+  })
+  const request = captured.value
+  assert.ok(request)
+  assert.equal(tokens.accessToken, 'relay-access')
+  assert.equal(request.grantType, 'authorization_code')
+  assert.match(request.grantType === 'authorization_code' ? request.codeVerifier : '', /^[A-Za-z0-9_-]{43}$/)
+})
+
+test('refresh can use a token requester and preserve the refresh token', async () => {
+  let request: OAuthTokenRequest | null = null
+  const tokens = await refreshOAuthToken(CONFIG, { accessToken: 'old', refreshToken: 'refresh', expiresAt: 0, tokenType: 'Bearer' }, fetch, Date.now, async (value) => {
+    request = value
+    return { accessToken: 'new', expiresAt: 60_000, tokenType: 'Bearer' }
+  })
+  assert.deepEqual(request, { grantType: 'refresh_token', refreshToken: 'refresh' })
+  assert.equal(tokens.refreshToken, 'refresh')
 })
 
 test('loopback authorization rejects mismatched state', async () => {

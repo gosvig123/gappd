@@ -12,6 +12,12 @@ export type OAuthTokenSet = {
   scope?: string
 }
 
+export type OAuthTokenRequest =
+  | { grantType: 'authorization_code'; code: string; redirectUri: string; codeVerifier: string }
+  | { grantType: 'refresh_token'; refreshToken: string }
+
+export type OAuthTokenRequester = (request: OAuthTokenRequest) => Promise<OAuthTokenSet>
+
 export type OAuthConfig = {
   clientId: string
   authorizeUrl: string
@@ -26,6 +32,7 @@ export type OAuthDependencies = {
   fetcher?: typeof fetch
   now?: () => number
   timeoutMs?: number
+  tokenRequester?: OAuthTokenRequester
 }
 
 type Loopback = { redirectUri: string; code: Promise<string>; close: () => void }
@@ -52,14 +59,18 @@ export async function authorizeOAuth(config: OAuthConfig, dependencies: OAuthDep
   try {
     await dependencies.openExternal(buildAuthorizationUrl(config, loopback.redirectUri, pkce.challenge, pkce.state))
     const code = await loopback.code
+    const request: OAuthTokenRequest = { grantType: 'authorization_code', code, redirectUri: loopback.redirectUri, codeVerifier: pkce.verifier }
+    if (dependencies.tokenRequester) return dependencies.tokenRequester(request)
     return exchangeCode(config, code, loopback.redirectUri, pkce.verifier, dependencies.fetcher, dependencies.now)
   } finally { loopback.close() }
 }
 
-export async function refreshOAuthToken(config: OAuthConfig, tokens: OAuthTokenSet, fetcher: typeof fetch = fetch, now: () => number = Date.now): Promise<OAuthTokenSet> {
+export async function refreshOAuthToken(config: OAuthConfig, tokens: OAuthTokenSet, fetcher: typeof fetch = fetch, now: () => number = Date.now, tokenRequester?: OAuthTokenRequester): Promise<OAuthTokenSet> {
   if (!tokens.refreshToken) throw new Error('Reconnect this account to continue.')
-  const body = new URLSearchParams({ grant_type: 'refresh_token', client_id: config.clientId, refresh_token: tokens.refreshToken })
-  const refreshed = await requestTokens(config.tokenUrl, body, fetcher, now)
+  const request: OAuthTokenRequest = { grantType: 'refresh_token', refreshToken: tokens.refreshToken }
+  const refreshed = tokenRequester
+    ? await tokenRequester(request)
+    : await requestTokens(config.tokenUrl, new URLSearchParams({ grant_type: 'refresh_token', client_id: config.clientId, refresh_token: tokens.refreshToken }), fetcher, now)
   return { ...refreshed, refreshToken: refreshed.refreshToken || tokens.refreshToken }
 }
 
