@@ -15,4 +15,5 @@ test('maps all-day events and ignores cancelled events', () => {
   assert.equal(event?.allDay, true)
   assert.equal(event?.title, 'Untitled event')
   assert.equal(mapGoogleEvent({ id: 'event-2', status: 'cancelled' }, 'connection-2', 'user@example.com'), null)
+  assert.equal(mapGoogleEvent({ id: 'event-3', start: { dateTime: 'invalid' }, end: { dateTime: 'invalid' } }, 'connection-2', 'user@example.com'), null)
 })

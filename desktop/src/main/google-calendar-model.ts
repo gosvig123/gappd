@@ -18,7 +18,8 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
   if (!item.id || item.status === CANCELLED_STATUS) return null
   const start = item.start?.dateTime || item.start?.date
   const end = item.end?.dateTime || item.end?.date
-  if (!start || !end) return null
+  const allDay = Boolean(item.start?.date && !item.start?.dateTime)
+  if (!start || !end || !validRange(start, end, allDay)) return null
   return {
     connectionId,
     accountEmail,
@@ -28,8 +29,15 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
     title: item.summary?.trim() || UNTITLED_EVENT,
     start,
     end,
-    allDay: Boolean(item.start?.date && !item.start?.dateTime),
+    allDay,
     status: item.status || CONFIRMED_STATUS,
     location: item.location?.trim() || undefined,
   }
+}
+
+function validRange(start: string, end: string, allDay: boolean): boolean {
+  if (allDay) return /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end) && end > start
+  const startTime = new Date(start).getTime()
+  const endTime = new Date(end).getTime()
+  return Number.isFinite(startTime) && Number.isFinite(endTime) && endTime > startTime
 }
