@@ -198,7 +198,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          GAPPD_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GAPPD_GOOGLE_OAUTH_CLIENT_ID }}
 
       - name: Write beta update metadata
         run: |
