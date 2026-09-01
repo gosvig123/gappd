@@ -33,7 +33,7 @@ test('enrolls once and signs token requests', async () => {
   assertDpopProof(requests[1], true)
 })
 
-test('retries a Google DPoP nonce challenge once with a new proof', async () => {
+test('retries a Google DPoP code challenge once with its nonce', async () => {
   const proofs: string[] = []
   const store = memoryStore(createFixtureInstallation())
   const client = new OAuthRelayClient({ baseUrl: BASE_URL, store, now: () => NOW,
@@ -44,8 +44,10 @@ test('retries a Google DPoP nonce challenge once with a new proof', async () => 
     } })
   assert.equal((await client.requestTokens(authorizationGrant())).accessToken, 'access')
   assert.equal(proofs.length, 2)
+  assert.equal('nonce' in dpopPayload(proofs[0]), false)
+  assert.equal(dpopPayload(proofs[0]).jti, digest('code'))
   assert.equal(dpopPayload(proofs[1]).nonce, 'challenge-nonce')
-  assert.notEqual(dpopPayload(proofs[0]).jti, dpopPayload(proofs[1]).jti)
+  assert.equal(dpopPayload(proofs[0]).jti, dpopPayload(proofs[1]).jti)
 })
 
 test('returns only a safe relay error', async () => {

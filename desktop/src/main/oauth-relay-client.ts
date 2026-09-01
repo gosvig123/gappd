@@ -45,7 +45,8 @@ export class OAuthRelayClient {
   }
 
   private async sendTokenRequest(request: OAuthTokenRequest, installation: RelayInstallation, retried: boolean): Promise<OAuthTokenSet> {
-    const dpop = createDpopProof(installation, installation.dpopNonce, this.now())
+    const nonce = request.grantType === 'refresh_token' || retried ? installation.dpopNonce : undefined
+    const dpop = createDpopProof(installation, request, nonce, this.now())
     const body = JSON.stringify(request)
     const response = await this.fetch(TOKEN_PATH, { method: 'POST', headers: signedHeaders(installation, body, dpop, this.now()), body })
     const nextNonce = validDpopNonce(response.headers.get('dpop-nonce'))
@@ -122,15 +123,19 @@ function keyThumbprint(jwk: CryptoJsonWebKey): string {
   return digest(canonical)
 }
 
-function createDpopProof(installation: RelayInstallation, nonce: string | undefined, now: number): string {
+function createDpopProof(installation: RelayInstallation, request: OAuthTokenRequest, nonce: string | undefined, now: number): string {
   const jwk = installation.publicKey
   const header = encodeJson({ typ: 'dpop+jwt', alg: 'ES256', jwk: { kty: jwk.kty, crv: jwk.crv, x: jwk.x, y: jwk.y } })
   const payload: Record<string, unknown> = {
-    htm: 'POST', htu: GOOGLE_TOKEN_URL, iat: Math.floor(now / 1000), jti: randomBytes(24).toString('base64url'),
+    htm: 'POST', htu: GOOGLE_TOKEN_URL, iat: Math.floor(now / 1000), jti: proofId(request),
   }
   if (nonce) payload.nonce = nonce
   const message = `${header}.${encodeJson(payload)}`
   return `${message}.${signature(installation, message)}`
+}
+
+function proofId(request: OAuthTokenRequest): string {
+  return request.grantType === 'authorization_code' ? digest(request.code) : randomBytes(24).toString('base64url')
 }
 
 function encodeJson(value: unknown): string {
