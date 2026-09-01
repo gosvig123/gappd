@@ -6,6 +6,7 @@ import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
 import { configureCodex, providerStatus, useLocalProvider } from './ai-provider'
+import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
 import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -55,6 +56,12 @@ const IPC_HANDLERS: MainHandlers = {
     status: () => refreshedProviderStatus(),
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),
+  },
+  googleCalendar: {
+    snapshot: () => googleCalendarSnapshot(),
+    connect: () => connectGoogleCalendar(),
+    sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
+    disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
   update: {
     getStatus: () => getUpdateStatus(),

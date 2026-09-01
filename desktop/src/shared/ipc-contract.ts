@@ -1,3 +1,4 @@
+import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
@@ -40,6 +41,12 @@ export type IpcInvokeContract = {
     configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
     useLocal: OperationSpec<[], AIProviderStatus>
   }
+  googleCalendar: {
+    snapshot: OperationSpec<[], CalendarSnapshot>
+    connect: OperationSpec<[], CalendarSnapshot>
+    sync: OperationSpec<[connectionId: string], CalendarSnapshot>
+    disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
+  }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
     checkNow: OperationSpec<[], UpdateStatus>
@@ -73,6 +80,10 @@ export const IPC_OPERATIONS = {
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  googleCalendar: {
+    snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect',
+    sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
+  },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
