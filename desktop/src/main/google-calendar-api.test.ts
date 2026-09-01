@@ -27,9 +27,7 @@ test('refreshes through the relay and fetches owned primary events from local mi
   assert.equal(result.events.length, 1)
   assert.equal(result.events[0].sourceId, 'connection-1:primary:event-1')
   const eventsUrl = new URL(eventsUrlValue)
-  const expectedStart = new Date(NOW)
-  expectedStart.setHours(0, 0, 0, 0)
-  assert.equal(eventsUrl.searchParams.get('timeMin'), expectedStart.toISOString())
+  assert.equal(eventsUrl.searchParams.get('timeMin'), localMidnight(NOW))
   assert.match(eventsUrl.searchParams.get('fields') || '', /items/)
 })
 
@@ -46,6 +44,12 @@ test('revocation failure does not block local disconnect', async () => {
   })
   await assert.doesNotReject(api.revoke(expiredTokens()))
 })
+
+function localMidnight(now: number): string {
+  const value = new Date(now)
+  value.setHours(0, 0, 0, 0)
+  return value.toISOString()
+}
 
 function expiredTokens() {
   return { accessToken: 'old-access', refreshToken: 'refresh', expiresAt: 0, tokenType: 'Bearer' }

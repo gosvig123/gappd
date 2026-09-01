@@ -22,14 +22,7 @@ export function useGoogleCalendar(): GoogleCalendarController {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    let active = true
-    window.gappd.googleCalendar.snapshot()
-      .then((value) => { if (active) setSnapshot(value) })
-      .catch((cause) => { if (active) setError(errorMessage(cause)) })
-      .finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [])
+  useEffect(() => loadSnapshot(setSnapshot, setError, setLoading), [])
 
   const run = useCallback(async (operation: string, action: () => Promise<CalendarSnapshot>) => {
     setBusy(operation); setError(null)
@@ -43,6 +36,15 @@ export function useGoogleCalendar(): GoogleCalendarController {
   const disconnect = useCallback((id: string) => run(`disconnect:${id}`, () => window.gappd.googleCalendar.disconnect(id)), [run])
   const syncAll = useCallback(() => run(SYNC_ALL_OPERATION, () => refreshAll(snapshot, setSnapshot)), [run, snapshot])
   return { snapshot, loading, busy, error, connect, sync, syncAll, disconnect, clearError: () => setError(null) }
+}
+
+function loadSnapshot(setSnapshot: (value: CalendarSnapshot) => void, setError: (value: string) => void, setLoading: (value: boolean) => void) {
+  let active = true
+  window.gappd.googleCalendar.snapshot()
+    .then((value) => { if (active) setSnapshot(value) })
+    .catch((cause) => { if (active) setError(errorMessage(cause)) })
+    .finally(() => { if (active) setLoading(false) })
+  return () => { active = false }
 }
 
 async function refreshAll(snapshot: CalendarSnapshot | null, onProgress: (value: CalendarSnapshot) => void): Promise<CalendarSnapshot> {
