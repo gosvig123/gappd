@@ -25,6 +25,8 @@ Native runtimes and diarization models ship with the application. Managed setup 
 
 Workflow releases require all signing and notarization secrets. The workflow fails before building if any are absent, then imports the Developer ID certificate, enables hardened runtime, notarizes the app, and requires Gatekeeper verification.
 
+The signing setup exports `CSC_KEYCHAIN` so Electron Builder uses the verified keychain. Do not also set `CSC_LINK`: that asks the builder to import the certificate again into a separate keychain.
+
 Calendar-enabled releases also require the public `GAPPD_GOOGLE_OAUTH_CLIENT_ID` repository variable. It must belong to the Gappd Production Google Cloud project; the Google client secret must never enter GitHub or the desktop bundle.
 
 Required secrets:

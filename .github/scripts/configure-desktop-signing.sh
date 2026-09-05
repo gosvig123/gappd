@@ -28,7 +28,4 @@ if ! security find-identity -v -p codesigning "$keychain_path" | grep -F "$APPLE
   exit 1
 fi
 
-{
-  echo "CSC_LINK=$cert_path"
-  echo "CSC_KEYCHAIN=$keychain_path"
-} >> "$GITHUB_ENV"
+echo "CSC_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
