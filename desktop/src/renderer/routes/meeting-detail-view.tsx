@@ -3,6 +3,7 @@ import type { MeetingDetail } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import './meeting-detail.css'
 import './meeting-reading.css'
+import { SpeakerLabels } from './speaker-labels'
 import { Markdown } from '../components/markdown'
 import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
 import { Button, EmptyState, Panel, StatusPill } from '../components/ui'
@@ -13,7 +14,7 @@ const PROCESSING_STATUS = 'processing', RECORDING_STATE = 'recording', PENDING_S
 const DIARIZATION_RETRY_WAITING_MESSAGE = 'Retry available after meeting processing finishes.'
 const SUMMARY_TAB = 'summary', TRANSCRIPT_TAB = 'transcript'
 type DetailTab = typeof SUMMARY_TAB | typeof TRANSCRIPT_TAB
-type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onRetryDiarization: (id: string) => Promise<void> }
+type MeetingDetailPanelProps = { selectedMeetingId: string | null; selectedMeeting: MeetingDetail | null; selectedMeetingLoading: boolean; selectedMeetingError: string | null; transcript: string; onUpdated: (meeting: MeetingDetail) => void; onRetryDiarization: (id: string) => Promise<void> }
 
 function canCopyArtifact(): boolean { return typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.writeText) }
 
@@ -82,7 +83,7 @@ function DetailTabs({ activeTab, onChange, actions }: { activeTab: DetailTab; on
 
 function tabClassName(activeTab: DetailTab, tab: DetailTab): string { return activeTab === tab ? 'detail-tab active' : 'detail-tab' }
 
-function SelectedMeetingDetail({ selectedMeeting, transcript, onRetryDiarization }: { selectedMeeting: MeetingDetail; transcript: string; onRetryDiarization: (id: string) => Promise<void> }) {
+function SelectedMeetingDetail({ selectedMeeting, transcript, onUpdated, onRetryDiarization }: { selectedMeeting: MeetingDetail; transcript: string; onUpdated: (meeting: MeetingDetail) => void; onRetryDiarization: (id: string) => Promise<void> }) {
   const detailTranscriptText = meetingTranscript(selectedMeeting, transcript)
   const hasTranscript = Boolean(detailTranscriptText)
   const progress = detailProgressInput(selectedMeeting, hasTranscript)
@@ -95,12 +96,12 @@ function SelectedMeetingDetail({ selectedMeeting, transcript, onRetryDiarization
         <div className="meeting-detail-title"><h1>{selectedMeeting.title}</h1>{subtitle ? <p>{subtitle}</p> : null}</div>
         <div className="meeting-detail-actions">{meetingStatusPillVisible(selectedMeeting.status.state) ? <StatusPill tone={meetingStatusTone(selectedMeeting.status.state)}>{meetingProgressLabel(progress)}</StatusPill> : null}</div>
       </div>
-      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} onRetryDiarization={onRetryDiarization} />
+      <DetailBody activeTab={activeTab} onTabChange={setActiveTab} selectedMeeting={selectedMeeting} transcript={detailTranscriptText} hasTranscript={hasTranscript} onUpdated={onUpdated} onRetryDiarization={onRetryDiarization} />
     </Panel>
   )
 }
 
-function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript, onRetryDiarization }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean; onRetryDiarization: (id: string) => Promise<void> }) {
+function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTranscript, onUpdated, onRetryDiarization }: { activeTab: DetailTab; onTabChange: (tab: DetailTab) => void; selectedMeeting: MeetingDetail; transcript: string; hasTranscript: boolean; onUpdated: (meeting: MeetingDetail) => void; onRetryDiarization: (id: string) => Promise<void> }) {
   const recording = selectedMeeting.status.state === RECORDING_STATE
   const copyValue = tabCopyValue(activeTab, selectedMeeting, transcript)
   const reading = useReadingOverflow(copyValue, `${selectedMeeting.id}:${activeTab}`)
@@ -111,6 +112,8 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <MeetingFailureState message={selectedMeeting.status.processing.failureMessage} />
       <DiarizationNotice meeting={selectedMeeting} onRetry={onRetryDiarization} />
       <DiarizationTrustCue meeting={selectedMeeting} />
+      <SpeakerLabels key={selectedMeeting.id} meeting={selectedMeeting} onUpdated={onUpdated} />
+      {selectedMeeting.summaryUpdating ? <div className="summary-updating" role="status">Updating names in summary and action items…</div> : null}
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
@@ -187,7 +190,7 @@ export function MeetingDetailPanel(props: MeetingDetailPanelProps) {
   if (selectedMeetingLoading) return <DetailShell><EmptyState>Loading meeting…</EmptyState></DetailShell>
   if (selectedMeetingError) return <DetailShell><SelectedMeetingError message={selectedMeetingError} /></DetailShell>
   if (!selectedMeetingId || !selectedMeeting) return <DetailShell><EmptyState>Select a meeting to view details.</EmptyState></DetailShell>
-  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onRetryDiarization={props.onRetryDiarization} />
+  return <SelectedMeetingDetail selectedMeeting={selectedMeeting} transcript={transcript} onUpdated={props.onUpdated} onRetryDiarization={props.onRetryDiarization} />
 }
 
 function SelectedMeetingError({ message }: { message: string }) {

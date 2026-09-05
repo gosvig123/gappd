@@ -44,6 +44,7 @@ type DashboardViewProps = {
   onSelectMeeting: (id: string) => void
   onClearSelection: () => void
   onRetryDiarization: (id: string) => Promise<void>
+  onMeetingUpdated: (meeting: MeetingDetail) => void
   onDeleteMeeting: (id: string) => Promise<void>
 }
 
@@ -96,7 +97,7 @@ function MeetingDetailScreen(props: { selectedMeetingId: string | null; selected
         <button className="back-link" aria-label="Back to all meetings" onClick={props.onBack}><ArrowLeftIcon aria-hidden="true" /> <span>All meetings</span></button>
         <RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />
       </div>
-      <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onRetryDiarization={props.onRetryDiarization} />
+      <MeetingDetailPanel onUpdated={props.record.onMeetingUpdated} selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onRetryDiarization={props.onRetryDiarization} />
     </div>
   )
 }

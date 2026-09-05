@@ -9,6 +9,7 @@ node_modules/
 *.dylib
 /docs/*
 !/docs/desktop-macos-release.md
+!/docs/speaker-labeling.md
 # Go
 vendor/
 

@@ -4,16 +4,16 @@ import { RefreshIcon } from './icons'
 import { Button } from './ui'
 import './google-calendar.css'
 
-export function GoogleCalendarAgenda({ calendar, onOpenSettings }: { calendar: GoogleCalendarController; onOpenSettings: () => void }) {
+export function GoogleCalendarAgenda({ calendar, onOpenSettings, onRecord, canRecord }: { onRecord: (sourceId: string) => void; canRecord: boolean; calendar: GoogleCalendarController; onOpenSettings: () => void }) {
   if (calendar.loading || !calendar.snapshot?.configured) return null
   const connections = calendar.snapshot.connections
   const events = calendar.snapshot.events.filter((event) => eventIsToday(event))
   if (!connections.length) return <section className="calendar-agenda calendar-agenda-empty"><div><strong>Today’s calendar</strong><span>Connect Google Calendar to see today’s events beside your meetings.</span></div><Button onClick={onOpenSettings}>Open Settings</Button></section>
-  return <section className="calendar-agenda" aria-label="Today’s Google Calendar events"><div className="calendar-agenda-head"><div><strong>Today’s calendar</strong><span>{eventCountLabel(events.length, connections.length)}</span></div><Button className="compact-action" disabled={Boolean(calendar.busy)} onClick={() => void calendar.syncAll()}><RefreshIcon aria-hidden="true" />{calendar.busy === 'sync-all' ? 'Refreshing…' : 'Refresh'}</Button></div>{calendar.error ? <div className="calendar-agenda-error" role="alert">{calendar.error}</div> : null}{events.length ? <div className="calendar-event-list">{events.map((event) => <CalendarEvent key={event.sourceId} event={event} />)}</div> : <div className="calendar-agenda-none">No Calendar events today.</div>}</section>
+  return <section className="calendar-agenda" aria-label="Today’s Google Calendar events"><div className="calendar-agenda-head"><div><strong>Today’s calendar</strong><span>{eventCountLabel(events.length, connections.length)}</span></div><Button className="compact-action" disabled={Boolean(calendar.busy)} onClick={() => void calendar.syncAll()}><RefreshIcon aria-hidden="true" />{calendar.busy === 'sync-all' ? 'Refreshing…' : 'Refresh'}</Button></div>{calendar.error ? <div className="calendar-agenda-error" role="alert">{calendar.error}</div> : null}{events.length ? <div className="calendar-event-list">{events.map((event) => <CalendarEvent key={event.sourceId} event={event} onRecord={onRecord} canRecord={canRecord} />)}</div> : <div className="calendar-agenda-none">No Calendar events today.</div>}</section>
 }
 
-function CalendarEvent({ event }: { event: CalendarEventSummary }) {
-  return <div className="calendar-event"><div className="calendar-event-time">{eventTime(event)}</div><div className="calendar-event-copy"><strong>{event.title}</strong><span>{[event.accountEmail, event.location].filter(Boolean).join(' · ')}</span></div></div>
+function CalendarEvent({ event, onRecord, canRecord }: { event: CalendarEventSummary; onRecord: (sourceId: string) => void; canRecord: boolean }) {
+  return <div className="calendar-event"><div className="calendar-event-time">{eventTime(event)}</div><div className="calendar-event-copy"><strong>{event.title}</strong><span>{[event.accountEmail, event.location].filter(Boolean).join(' · ')}</span></div><Button className="compact-action" disabled={!canRecord} onClick={() => onRecord(event.sourceId)}>Record</Button></div>
 }
 
 function eventIsToday(event: CalendarEventSummary, now = new Date()): boolean {

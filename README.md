@@ -14,6 +14,7 @@ help, bug reports, and roadmap discussion.
 - Produces live transcripts with Apple SpeechTranscriber.
 - Generates local meeting summaries through managed llama.cpp.
 - Stores searchable meeting history in SQLite.
+- Labels speakers with saved people and calendar suggestions, with short audio previews.
 - Recovers interrupted recordings and helps stop recording when a meeting ends.
 - Supports multiple transcription languages and optional launch at login.
 - Downloads and manages required local models from the desktop app.
@@ -89,6 +90,7 @@ More detail:
 
 - [Architecture](docs/architecture.md)
 - [macOS releases](docs/desktop-macos-release.md)
+- [Speaker labeling](docs/speaker-labeling.md)
 
 ## License
 

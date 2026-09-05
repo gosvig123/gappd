@@ -78,3 +78,16 @@ CREATE TRIGGER IF NOT EXISTS meetings_au AFTER UPDATE ON meetings BEGIN
     INSERT INTO meetings_fts(rowid, title, transcript, summary)
     VALUES (new.rowid, new.title, new.transcript, new.summary);
 END;
+
+CREATE TABLE IF NOT EXISTS people (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_people_email ON people(email) WHERE email <> '';
+CREATE TABLE IF NOT EXISTS meeting_speakers (
+    meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key TEXT NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id),
+    PRIMARY KEY (meeting_id, speaker_key)
+);

@@ -1,12 +1,13 @@
 import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
+import type { AssignSpeakerInput, LinkCalendarInput, ParticipantContext, SavedPerson, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
 export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; available: boolean; error?: string }
@@ -26,6 +27,11 @@ export type IpcInvokeContract = {
     show: OperationSpec<[id: string], MeetingDetail>
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
+    people: OperationSpec<[], SavedPerson[]>
+    assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
+    speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
+    participantContext: OperationSpec<[id: string], ParticipantContext>
+    linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
   }
   recording: {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
@@ -76,7 +82,11 @@ export const IPC_OPERATIONS = {
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
-  meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
+  meetings: {
+    list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
+    people: 'meetings:people', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
+    participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
+  },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },

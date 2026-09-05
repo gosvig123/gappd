@@ -66,6 +66,9 @@ type CommandSpec struct {
 }
 
 var Commands = []CommandSpec{
+	{ID: "meetings.people", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[PeopleResponse](), Args: literalArgs("app", "meetings", "people", "--json")},
+	{ID: "meetings.assignSpeaker", Mode: CommandModeRequest, Input: typeOf[AssignSpeakerInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("assign-speaker"), field("id"), flag("speaker-key", "speakerKey", false), flag("person-id", "personId", true), flag("name", "name", true), flag("email", "email", true), lit("--json")}},
+	{ID: "meetings.speakerClip", Mode: CommandModeRequest, Input: typeOf[SpeakerClipInput](), Output: typeOf[SpeakerClipResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("speaker-clip"), field("id"), flag("speaker-key", "speakerKey", false), flag("index", "index", true), lit("--json")}},
 	{ID: "devices.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[DevicesResponse](), Args: literalArgs("app", "devices", "--json")},
 	{ID: "meetings.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingsResponse](), Args: literalArgs("app", "meetings", "list", "--json")},
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},

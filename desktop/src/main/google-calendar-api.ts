@@ -10,7 +10,7 @@ const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
 const GOOGLE_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events.owned.readonly']
-const EVENT_FIELDS = 'nextPageToken,items(id,status,summary,location,start,end)'
+const EVENT_FIELDS = 'nextPageToken,items(id,status,summary,location,start,end,attendees(email,displayName,responseStatus,self,resource),organizer(email,displayName))'
 const SYNC_DAYS = 30
 const REQUEST_TIMEOUT_MS = 10_000
 

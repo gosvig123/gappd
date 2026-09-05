@@ -6,6 +6,9 @@ export type CalendarConnection = {
   error?: string
 }
 
+export type CalendarParticipant = { email: string; name?: string }
+export type CalendarAttendee = CalendarParticipant & { responseStatus?: string; self?: boolean }
+
 export type CalendarEventSummary = {
   connectionId: string
   accountEmail: string
@@ -18,6 +21,8 @@ export type CalendarEventSummary = {
   allDay: boolean
   status: string
   location?: string
+  attendees?: CalendarAttendee[]
+  organizer?: CalendarParticipant
 }
 
 export type CalendarSnapshot = {

@@ -13,12 +13,12 @@ const LIVE_TRANSCRIPT_CHUNK_SECONDS = '300'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }, onStarted?: (meetingId: string) => void): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const snapshot = managedRuntime.status()
   const liveTranscript = snapshot.capabilities.transcription.readiness === 'ready'
   logMainProcessMemory('recording:start')
-  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title), {
+  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title, onStarted), {
     GAPPD_CAPTURE_CHUNK_SECONDS: liveTranscript ? LIVE_TRANSCRIPT_CHUNK_SECONDS : '',
     GAPPD_CAPTURE_CHUNK_OVERLAP_SECONDS: liveTranscript ? LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS : '',
   })
@@ -49,10 +49,11 @@ function childExited(child: RecordingChild): boolean {
   return child.exitCode !== null || child.signalCode !== null
 }
 
-function recordingHandlers(title: string) {
+function recordingHandlers(title: string, onStarted?: (meetingId: string) => void) {
   return {
     onEvent(event: RecordingEvent) {
       setRecordingState(recordingEventOutcome(event).state)
+      if (event.type === 'recording.started') onStarted?.(event.meetingId)
       if (event.type === 'recording.captured') requestDrains()
       if (event.type === 'recording.captured' || event.type === 'recording.failed') finishRecording()
     },
