@@ -72,7 +72,12 @@ CREATE TRIGGER IF NOT EXISTS meetings_ad AFTER DELETE ON meetings BEGIN
     VALUES ('delete', old.rowid, old.title, old.transcript, old.summary);
 END;
 
-CREATE TRIGGER IF NOT EXISTS meetings_au AFTER UPDATE ON meetings BEGIN
+CREATE TRIGGER IF NOT EXISTS meetings_au AFTER UPDATE ON meetings
+WHEN old.rowid IS NOT new.rowid
+    OR old.title IS NOT new.title
+    OR old.transcript IS NOT new.transcript
+    OR old.summary IS NOT new.summary
+BEGIN
     INSERT INTO meetings_fts(meetings_fts, rowid, title, transcript, summary)
     VALUES ('delete', old.rowid, old.title, old.transcript, old.summary);
     INSERT INTO meetings_fts(rowid, title, transcript, summary)
