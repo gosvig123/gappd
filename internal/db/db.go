@@ -102,8 +102,18 @@ func (d *DB) initializeSchema(ctx context.Context, conn *sql.Conn) (err error) {
 }
 
 func installSchema(ctx context.Context, conn *sql.Conn) error {
+	var searchExists bool
+	if err := conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='meetings_fts')`).Scan(&searchExists); err != nil {
+		return fmt.Errorf("inspect meetings fts: %w", err)
+	}
 	if _, err := conn.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("init schema: %w", err)
+	}
+	if err := migrateMeetingsSearchTrigger(ctx, conn); err != nil {
+		return err
+	}
+	if searchExists {
+		return nil
 	}
 	if _, err := conn.ExecContext(ctx, `INSERT INTO meetings_fts(meetings_fts) VALUES ('rebuild')`); err != nil {
 		return fmt.Errorf("rebuild meetings fts: %w", err)

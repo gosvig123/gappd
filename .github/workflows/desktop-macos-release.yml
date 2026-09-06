@@ -23,6 +23,7 @@ jobs:
     runs-on: macos-26
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      GAPPD_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GAPPD_GOOGLE_OAUTH_CLIENT_ID }}
 
     steps:
       - name: Check out repository
@@ -40,58 +41,7 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
 
       - name: Resolve release metadata
-        run: |
-          set -euo pipefail
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            if [[ ! "$INPUT_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Stable release tag must match vMAJOR.MINOR.PATCH, got: $INPUT_RELEASE_TAG" >&2
-              echo "Use an existing v* tag such as v0.1.0." >&2
-              exit 1
-            fi
-            release_tag="$INPUT_RELEASE_TAG"
-            release_version="${release_tag#v}"
-            release_core="$release_version"
-            release_channel="stable"
-            release_prerelease="0"
-          else
-            latest_stable="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1 || true)"
-            package_version="$(node -p "require('./desktop/package.json').version")"
-            release_core="$(node - "$latest_stable" "$package_version" <<'NODE'
-          const [stableTag, packageVersion] = process.argv.slice(2)
-          const stable = parse(stableTag || 'v0.0.0')
-          const packageCore = parse(packageVersion)
-          const base = compare(packageCore, stable) > 0 ? packageCore : [stable[0], stable[1], stable[2] + 1]
-          console.log(base.join('.'))
-          function parse(value) {
-            const match = String(value).match(/^v?(\d+)\.(\d+)\.(\d+)/)
-            if (!match) throw new Error(`Invalid version: ${value}`)
-            return match.slice(1).map(Number)
-          }
-          function compare(left, right) {
-            for (let index = 0; index < left.length; index += 1) {
-              if (left[index] !== right[index]) return left[index] - right[index]
-            }
-            return 0
-          }
-          NODE
-          )"
-            release_version="$release_core-beta.$GITHUB_RUN_NUMBER"
-            release_tag="v$release_version"
-            release_channel="beta"
-            release_prerelease="1"
-          fi
-
-          {
-            echo "GAPPD_BUILD_VERSION=$release_core"
-            echo "GAPPD_BUNDLE_SHORT_VERSION=$release_core"
-            echo "GAPPD_UPDATE_CHANNEL=$release_channel"
-            echo "RELEASE_CHANNEL=$release_channel"
-            echo "RELEASE_CORE=$release_core"
-            echo "RELEASE_PRERELEASE=$release_prerelease"
-            echo "RELEASE_TAG=$release_tag"
-            echo "RELEASE_VERSION=$release_version"
-          } >> "$GITHUB_ENV"
-          printf 'Release: %s (%s)\n' "$release_tag" "$release_channel"
+        run: .github/scripts/resolve-desktop-release-metadata.sh
         env:
           INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
 
@@ -100,20 +50,8 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Resolve signing mode
-        run: |
-          missing=0
-          for name in APPLE_CERTIFICATE_P12_BASE64 APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            if [ -z "${!name:-}" ]; then missing=1; fi
-          done
-
-          if [ "$missing" -eq 0 ]; then
-            echo "GAPPD_SIGNED_RELEASE=1" >> "$GITHUB_ENV"
-            echo "Signing mode: Apple signed and notarized"
-          else
-            echo "GAPPD_SIGNED_RELEASE=0" >> "$GITHUB_ENV"
-            echo "Signing mode: unsigned development DMG because Apple release secrets are not configured"
-          fi
+      - name: Validate release configuration
+        run: .github/scripts/validate-desktop-release-config.sh
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -143,45 +81,10 @@ jobs:
         run: npm ci
         working-directory: desktop
 
-      - name: Write signing certificate
-        if: env.GAPPD_SIGNED_RELEASE == '1'
-        run: |
-          CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
-          python3 - <<'PY'
-          import base64
-          import os
-          from pathlib import Path
-
-          cert = os.environ['APPLE_CERTIFICATE_P12_BASE64']
-          Path(os.environ['RUNNER_TEMP'], 'gappd-macos-signing.p12').write_bytes(base64.b64decode(cert))
-          PY
-          echo "CSC_LINK=$CERT_PATH" >> "$GITHUB_ENV"
+      - name: Configure signing identity
+        run: .github/scripts/configure-desktop-signing.sh
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-
-      - name: Preflight signing identity
-        if: env.GAPPD_SIGNED_RELEASE == '1'
-        run: |
-          CERT_PATH="$RUNNER_TEMP/gappd-macos-signing.p12"
-          KEYCHAIN_PATH="$RUNNER_TEMP/gappd-macos-signing.keychain-db"
-          KEYCHAIN_PASSWORD="$(uuidgen)"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
-          security default-keychain -d user -s "$KEYCHAIN_PATH"
-
-          if ! security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null; then
-            echo "Expected signing identity not found in imported certificate: $APPLE_SIGNING_IDENTITY" >&2
-            security find-identity -v -p codesigning "$KEYCHAIN_PATH" >&2 || true
-            exit 1
-          fi
-
-          echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-        env:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
@@ -196,7 +99,6 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           CSC_NAME: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
       - name: Write beta update metadata
@@ -235,56 +137,7 @@ jobs:
         run: node desktop/scripts/write-release-manifest.mjs
 
       - name: Publish release
-        run: |
-          set -euo pipefail
-          if [ "$GAPPD_SIGNED_RELEASE" = "1" ]; then
-            release_kind="signed and notarized"
-          else
-            release_kind="unsigned development"
-          fi
-          notes="Gappd macOS $RELEASE_CHANNEL $release_kind build for $RELEASE_TAG."
-          if [ "$RELEASE_CHANNEL" = "beta" ]; then
-            printf -v notes '%s\n\nSource commit: %s' "$notes" "$GITHUB_SHA"
-          fi
-
-          edit_flags=(--title "Gappd $RELEASE_TAG" --notes "$notes")
-          create_flags=(--title "Gappd $RELEASE_TAG" --notes "$notes")
-          if [ "$RELEASE_PRERELEASE" = "1" ]; then
-            edit_flags+=(--prerelease)
-            create_flags+=(--prerelease --latest=false --target "$GITHUB_SHA")
-          else
-            edit_flags+=(--latest)
-            create_flags+=(--verify-tag --latest)
-          fi
-
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${edit_flags[@]}"
-          else
-            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${create_flags[@]}"
-          fi
-
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | while read -r asset; do
-            case "$asset" in
-              *.dmg|*.zip|*.blockmap|*-mac.yml|latest.json) gh release delete-asset "$RELEASE_TAG" "$asset" --repo "$GITHUB_REPOSITORY" --yes ;;
-            esac
-          done
-          shopt -s nullglob
-          release_assets=(desktop/release/*.dmg desktop/release/*.zip desktop/release/*.blockmap desktop/release/*-mac.yml desktop/release/latest.json)
-          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${release_assets[@]}" --clobber
-
-          if [ "$RELEASE_CHANNEL" = "beta" ]; then
-            beta_title="Gappd beta pointer - $RELEASE_TAG"
-            printf -v beta_notes 'Compatibility update-manifest pointer for older Gappd beta builds.\n\nCurrent beta: [%s](https://github.com/%s/releases/tag/%s)\n\nDownload app builds and current source archives from the versioned release above. Source archives on this `beta` tag reflect its original commit.' "$RELEASE_TAG" "$GITHUB_REPOSITORY" "$RELEASE_TAG"
-            if gh release view beta --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              gh release edit beta --repo "$GITHUB_REPOSITORY" --title "$beta_title" --notes "$beta_notes" --prerelease
-              if gh release view beta --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -Fx latest.json >/dev/null; then
-                gh release delete-asset beta latest.json --repo "$GITHUB_REPOSITORY" --yes
-              fi
-            else
-              gh release create beta --repo "$GITHUB_REPOSITORY" --title "$beta_title" --notes "$beta_notes" --prerelease --latest=false --target "$GITHUB_SHA"
-            fi
-            gh release upload beta --repo "$GITHUB_REPOSITORY" desktop/release/latest.json --clobber
-          fi
+        run: .github/scripts/publish-desktop-release.sh
         env:
           GH_TOKEN: ${{ github.token }}
 

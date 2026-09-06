@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/config"
@@ -28,7 +27,7 @@ func rootCmd() *cobra.Command {
 	}
 	root.AddCommand(
 		listenCmd(), devicesCmd(), meetingsCmd(), showCmd(),
-		setupCmd(), enhanceCmd(), appCmd(),
+		setupCmd(), enhanceCmd(), appCmd(), mcpCmd(),
 	)
 	return root
 }
@@ -59,14 +58,18 @@ func loadStore() (config.Config, *db.DB, error) {
 }
 
 func openDB(cfg config.Config) (*db.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(cfg.DBPath), 0o755); err != nil {
-		return nil, fmt.Errorf("create db dir: %w", err)
+	if err := prepareStoreDirectory(cfg.DBPath); err != nil {
+		return nil, err
 	}
 	store, err := db.Open(cfg.DBPath)
 	if err != nil {
 		return nil, err
 	}
 	if err := store.Init(); err != nil {
+		store.Close()
+		return nil, err
+	}
+	if err := secureManagedStore(cfg.DBPath); err != nil {
 		store.Close()
 		return nil, err
 	}

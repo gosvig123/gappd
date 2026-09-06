@@ -5,26 +5,21 @@ import { useDynamicRefresh } from './use-dynamic-refresh'
 import { useGuardedEffect } from './use-guarded-effect'
 import { useMeetingRecordingWorkflow } from './use-meeting-recording-workflow'
 import { useRequestGate } from './request-gate'
-
 export function useDashboardData(enabled: boolean) {
   const selectedMeetingRequest = useRequestGate()
   const refreshRequest = useRequestGate()
   const refs = useMeetingRefs()
   const [state, setState] = useDashboardState()
-
   const meetingActions = useDashboardActions(setState, refs, selectedMeetingRequest, refreshRequest)
   const recording = useMeetingRecordingWorkflow(enabled, {
     refreshMeetings: meetingActions.refreshMeetings,
     setError: meetingActions.setError,
   })
   const actions = useDashboardViewActions(meetingActions, recording, state)
-
   useMeetingsLifecycle(enabled, meetingActions, setState)
   useDynamicRefresh(enabled, state.meetings, recording.recording, () => refs.selectedId.current, meetingActions.refreshMeetings)
-
   return useMemo(() => buildDashboardViewModel(state, recording, actions), [state, recording, actions])
 }
-
 function useDashboardViewActions(actions: MeetingActions, recording: RecordingWorkflow, state: DashboardState): DashboardActions {
   return useMemo(() => ({
     ...actions,
@@ -35,7 +30,6 @@ function useDashboardViewActions(actions: MeetingActions, recording: RecordingWo
     openPermissionsSettings: () => recording.actions.openPermissionsSettings(state.error ?? recording.recording.error ?? null),
   }), [actions, recording.actions, recording.recording.error, state.error])
 }
-
 function useMeetingRefs() {
   return { selectedId: useRef<string | null>(null), selected: useRef<MeetingDetail | null>(null) }
 }
@@ -53,6 +47,7 @@ function useDashboardState() {
 
 function useDashboardActions(setState: SetDashboardState, refs: MeetingRefs, selectedRequest: RequestGate, refreshRequest: RequestGate) {
   return {
+    updateMeeting: (meeting: MeetingDetail) => { if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }; void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState)) },
     refreshMeetings: (id?: string | null) => refreshMeetings(id, refs, setState, selectedRequest, refreshRequest),
     loadMeeting: (id: string) => loadMeeting(id, refs, setState, selectedRequest),
     clearSelectedMeeting: () => clearSelectedMeeting(refs, setState),
@@ -122,7 +117,7 @@ function failMeetingDelete(err: unknown, setState: SetDashboardState) {
 
 type MeetingActions = ReturnType<typeof useDashboardActions>
 type DashboardActions = MeetingActions & {
-  start(): void
+  start(eventSourceId?: string): void
   stop(): void
   setDevice(device: number): void
   setLanguage(language: string): void

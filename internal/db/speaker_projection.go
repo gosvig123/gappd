@@ -74,6 +74,9 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 	if err != nil {
 		return nil, false, err
 	}
+	if err := reconcileSpeakerIdentities(tx, input.MeetingID, segments, assignments); err != nil {
+		return nil, false, err
+	}
 	changed, exact, err := updateProjectedSegments(ctx, tx, segments, assignments)
 	if err != nil {
 		return nil, false, err
@@ -146,6 +149,9 @@ func updateProjectedSegments(ctx context.Context, tx *sql.Tx, segments []Segment
 			return false, false, nil
 		}
 		matched++
+		if segments[i].PersonID != nil {
+			continue
+		}
 		speaker := string(assignment.Speaker)
 		if segments[i].Speaker == speaker && equalFloat(segments[i].SpeakerConfidence, assignment.Confidence) &&
 			segments[i].SpeakerAssignmentReason != nil && *segments[i].SpeakerAssignmentReason == assignment.Reason {

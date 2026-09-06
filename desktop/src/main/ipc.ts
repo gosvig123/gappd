@@ -6,7 +6,9 @@ import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
 import { configureCodex, providerStatus, useLocalProvider } from './ai-provider'
-import { deleteMeeting, getDevices, listMeetings, retryDiarization, showMeeting } from './meetings'
+import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
+import { assignSpeaker, deleteMeeting, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
+import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
@@ -41,6 +43,11 @@ const IPC_HANDLERS: MainHandlers = {
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
     delete: (_event, id: string) => deleteMeeting(id),
+    people: () => listPeople(),
+    assignSpeaker: (_event, input) => assignSpeaker(input),
+    speakerClip: (_event, input) => speakerClip(input),
+    participantContext: (_event, id) => participantContext(id),
+    linkCalendar: (_event, input) => linkCalendar(input),
   },
   recording: {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
@@ -55,6 +62,12 @@ const IPC_HANDLERS: MainHandlers = {
     status: () => refreshedProviderStatus(),
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),
+  },
+  googleCalendar: {
+    snapshot: () => googleCalendarSnapshot(),
+    connect: () => connectGoogleCalendar(),
+    sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
+    disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
   update: {
     getStatus: () => getUpdateStatus(),

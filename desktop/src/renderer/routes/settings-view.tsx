@@ -7,11 +7,14 @@ import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { runtimeErrorView, runtimeOperationLabel, runtimeStatusTone, type ManagedRuntimeSnapshot } from '../components/managed-runtime-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
+import { GoogleCalendarPanel } from '../components/google-calendar-panel'
+import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 
 type SettingsViewProps = {
   language: string
   onLanguageChange: (language: string) => void
   localAI: { status: ManagedRuntimeSnapshot | null; loading: boolean; busy: boolean; onRepair: () => void }
+  calendar: GoogleCalendarController
   developerDebugEnabled: boolean
 }
 
@@ -20,8 +23,8 @@ const CODEX_PROVIDER = 'codex_exec'
 const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
-export function SettingsView({ language, onLanguageChange, localAI, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><StartupPanel /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+export function SettingsView({ language, onLanguageChange, localAI, calendar, developerDebugEnabled }: SettingsViewProps) {
+  return <section className="settings-stack settings-stack-plain"><StartupPanel /><GoogleCalendarPanel calendar={calendar} /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
 function AIProviderPanel() {

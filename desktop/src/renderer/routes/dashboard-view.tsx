@@ -1,4 +1,4 @@
-import { type MouseEvent, useMemo, useState } from 'react'
+import { type MouseEvent, type ReactNode, useMemo, useState } from 'react'
 import type { Device, MeetingDetail, MeetingListItem, RecordingStatus } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import { meetingHasWork, meetingProgressLabel } from '../components/meeting-progress'
@@ -37,12 +37,14 @@ type DashboardViewProps = {
   recordingStatus: RecordingStatus
   canStart: boolean
   canStop: boolean
+  calendar?: ReactNode
   onDeviceChange: (value: number) => void
   onStart: () => void
   onStop: () => void
   onSelectMeeting: (id: string) => void
   onClearSelection: () => void
   onRetryDiarization: (id: string) => Promise<void>
+  onMeetingUpdated: (meeting: MeetingDetail) => void
   onDeleteMeeting: (id: string) => Promise<void>
 }
 
@@ -64,14 +66,14 @@ export function DashboardView(props: DashboardViewProps) {
         {open ? (
           <MeetingDetailScreen selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onBack={props.onClearSelection} onRetryDiarization={props.onRetryDiarization} record={props} />
         ) : (
-          <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} onDeleteMeeting={props.onDeleteMeeting} record={props} />
+          <MeetingListScreen allMeetingsCount={props.meetings.length} meetings={meetings} query={query} calendar={props.calendar} onQueryChange={setQuery} onSelectMeeting={props.onSelectMeeting} onDeleteMeeting={props.onDeleteMeeting} record={props} />
         )}
       </div>
     </div>
   )
 }
 
-function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void; onDeleteMeeting: (id: string) => Promise<void>; record: DashboardViewProps }) {
+function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingListItem[]; query: string; calendar?: ReactNode; onQueryChange: (value: string) => void; onSelectMeeting: (id: string) => void; onDeleteMeeting: (id: string) => Promise<void>; record: DashboardViewProps }) {
   const visibleText = props.query ? `${props.meetings.length} of ${props.allMeetingsCount} meetings` : meetingCountLabel(props.allMeetingsCount)
   const groups = groupMeetingsByDate(props.meetings)
   return (
@@ -79,6 +81,7 @@ function MeetingListScreen(props: { allMeetingsCount: number; meetings: MeetingL
       <div className="meeting-list-sticky">
         <PageHeader className="compact meetings-header" title="Meetings" description={visibleText} middle={<div className="meeting-search-wrapper"><SearchIcon aria-hidden="true" /><input className="meeting-search" value={props.query} onChange={(event) => props.onQueryChange(event.target.value)} placeholder="Search meetings" aria-label="Search meetings" />{props.query ? <button className="meeting-search-clear" type="button" onClick={() => props.onQueryChange('')} aria-label="Clear search"><CloseIcon aria-hidden="true" /></button> : null}</div>} action={<RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />} />
       </div>
+      {props.calendar}
       <div className="meeting-list">
         {groups.map((group) => <MeetingDateSection key={group.key} group={group} onSelect={props.onSelectMeeting} onDelete={props.onDeleteMeeting} />)}
         {props.meetings.length === 0 ? <EmptyState className="meetings-empty">{props.allMeetingsCount === 0 ? 'No meetings yet. Start recording to capture one.' : 'No matching meetings.'}</EmptyState> : null}
@@ -94,7 +97,7 @@ function MeetingDetailScreen(props: { selectedMeetingId: string | null; selected
         <button className="back-link" aria-label="Back to all meetings" onClick={props.onBack}><ArrowLeftIcon aria-hidden="true" /> <span>All meetings</span></button>
         <RecordControls device={props.record.device} devices={props.record.devices} recordingStatus={props.record.recordingStatus} canStart={props.record.canStart} canStop={props.record.canStop} onDeviceChange={props.record.onDeviceChange} onStart={props.record.onStart} onStop={props.record.onStop} />
       </div>
-      <MeetingDetailPanel selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onRetryDiarization={props.onRetryDiarization} />
+      <MeetingDetailPanel onUpdated={props.record.onMeetingUpdated} selectedMeetingId={props.selectedMeetingId} selectedMeeting={props.selectedMeeting} selectedMeetingLoading={props.selectedMeetingLoading} selectedMeetingError={props.selectedMeetingError} transcript={props.transcript} onRetryDiarization={props.onRetryDiarization} />
     </div>
   )
 }

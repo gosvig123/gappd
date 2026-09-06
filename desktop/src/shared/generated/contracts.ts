@@ -5,6 +5,96 @@ import type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapabilit
 
 export type EmptyInput = Record<string, never>
 
+export type PeopleResponse = {
+  people: Person[]
+}
+
+export type Person = {
+  id: string
+  name: string
+  email?: string
+}
+
+export type AssignSpeakerInput = {
+  id: string
+  speakerKey: string
+  personId?: string
+  name?: string
+  email?: string
+}
+
+export type MeetingResponse = {
+  meeting: MeetingDetail
+}
+
+export type MeetingDetail = {
+  id: string
+  title: string
+  startedAt: string
+  endedAt?: string
+  status: MeetingStatus
+  transcriptText?: string
+  transcriptProvisional: boolean
+  summary?: string
+  speakers: MeetingSpeaker[]
+  summaryUpdating: boolean
+  segments: MeetingSegment[]
+  diarization: DiarizationInfo
+}
+
+export type MeetingStatus = {
+  state: MeetingState
+  updatedAt: string
+  capture: CaptureStatusInfo
+  processing: ProcessingStatusInfo
+}
+
+export type CaptureStatusInfo = {
+  state: CaptureStatus
+  updatedAt: string
+  failureMessage?: string
+}
+
+export type ProcessingStatusInfo = {
+  state: ProcessingStatus
+  updatedAt: string
+  failureMessage?: string
+}
+
+export type MeetingSpeaker = {
+  key: string
+  name: string
+  personId?: string
+}
+
+export type MeetingSegment = {
+  id: string
+  startSec: number
+  endSec: number
+  speaker: string
+  speakerKey: string
+  text: string
+}
+
+export type DiarizationInfo = {
+  state: DiarizationState
+  error?: string
+  speakerCount?: number
+}
+
+export type SpeakerClipInput = {
+  id: string
+  speakerKey: string
+  index?: number
+}
+
+export type SpeakerClipResponse = {
+  text: string
+  startSec: number
+  audioBase64: string
+  mimeType: string
+}
+
 export type DevicesResponse = {
   devices: Device[]
 }
@@ -29,58 +119,8 @@ export type MeetingListItem = {
   searchText?: string
 }
 
-export type MeetingStatus = {
-  state: MeetingState
-  updatedAt: string
-  capture: CaptureStatusInfo
-  processing: ProcessingStatusInfo
-}
-
-export type CaptureStatusInfo = {
-  state: CaptureStatus
-  updatedAt: string
-  failureMessage?: string
-}
-
-export type ProcessingStatusInfo = {
-  state: ProcessingStatus
-  updatedAt: string
-  failureMessage?: string
-}
-
 export type MeetingShowInput = {
   id: string
-}
-
-export type MeetingResponse = {
-  meeting: MeetingDetail
-}
-
-export type MeetingDetail = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  transcriptText?: string
-  transcriptProvisional: boolean
-  summary?: string
-  segments: MeetingSegment[]
-  diarization: DiarizationInfo
-}
-
-export type MeetingSegment = {
-  id: string
-  startSec: number
-  endSec: number
-  speaker: string
-  text: string
-}
-
-export type DiarizationInfo = {
-  state: DiarizationState
-  error?: string
-  speakerCount?: number
 }
 
 export type MeetingDeleteInput = {

@@ -54,11 +54,8 @@ func appDevicesCmd() *cobra.Command {
 }
 
 func appMeetingsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "meetings",
-		Short: "Machine-readable meeting access",
-	}
-	cmd.AddCommand(appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
+	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
+	cmd.AddCommand(appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
@@ -128,54 +125,29 @@ func recoverStaleRecordings(store *db.DB) (int, error) {
 }
 
 func appMeetingsListCmd() *cobra.Command {
-	var asJSON bool
-	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List saved meetings as JSON",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if !asJSON {
-				return fmt.Errorf("app meetings list requires --json")
-			}
-			_, store, err := loadStore()
-			if err != nil {
-				return err
-			}
-			defer store.Close()
-			entries, err := store.ListMeetingEntries(50)
-			if err != nil {
-				return err
-			}
-			return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(entries)})
-		},
-	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
-	return cmd
+	return meetingJSONCommand("list", nil, func(_ []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		entries, err := store.ListMeetingEntries(50)
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(entries)})
+	})
 }
 
 func appMeetingsShowCmd() *cobra.Command {
-	var asJSON bool
-	cmd := &cobra.Command{
-		Use:   "show [meeting-id]",
-		Short: "Show a meeting with transcript and summary as JSON",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if !asJSON {
-				return fmt.Errorf("app meetings show requires --json")
-			}
-			_, store, err := loadStore()
-			if err != nil {
-				return err
-			}
-			defer store.Close()
-			detail, err := appMeetingDetailFor(store, args[0])
-			if err != nil {
-				return err
-			}
-			return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
-		},
-	}
-	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
-	return cmd
+	return meetingJSONCommand("show [meeting-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		return writeAppMeeting(store, args[0])
+	})
 }
 
 func appMeetingsRetryDiarizationCmd() *cobra.Command {
@@ -203,11 +175,7 @@ func appMeetingsRetryDiarizationCmd() *cobra.Command {
 			}
 			return errors.New(speakerLabelingRetryUnavailableMessage)
 		}
-		detail, err := appMeetingDetailFor(store, args[0])
-		if err != nil {
-			return err
-		}
-		return writeJSON(appprotocol.MeetingResponse{Meeting: detail})
+		return writeAppMeeting(store, args[0])
 	}}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd

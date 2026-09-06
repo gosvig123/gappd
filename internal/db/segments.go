@@ -33,6 +33,8 @@ type Segment struct {
 	End                     float64
 	Text                    string
 	Speaker                 string
+	SpeakerKey              string
+	PersonID                *string
 	SpeakerSource           *SegmentSource
 	SpeakerConfidence       *float64
 	SpeakerAssignmentReason *SpeakerAssignmentReason
@@ -46,10 +48,12 @@ const insertSegmentSQL = `INSERT INTO segments
 	 speaker_group_start_sec, speaker_group_end_sec)
 	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-const selectSegmentsSQL = `SELECT id, meeting_id, start_sec, end_sec,
-	text, speaker, speaker_source, speaker_confidence, speaker_assignment_reason,
-	speaker_group_start_sec, speaker_group_end_sec, created_at
-	FROM segments WHERE meeting_id = ? ORDER BY start_sec ASC`
+const selectSegmentsSQL = `SELECT s.id, s.meeting_id, s.start_sec, s.end_sec,
+    s.text, COALESCE(p.name, s.speaker), s.speaker_source, s.speaker_confidence,
+    s.speaker_assignment_reason, s.speaker_group_start_sec, s.speaker_group_end_sec,
+    s.created_at, s.speaker, ms.person_id
+    FROM segments s LEFT JOIN meeting_speakers ms ON ms.meeting_id=s.meeting_id AND ms.speaker_key=s.speaker
+    LEFT JOIN people p ON p.id=ms.person_id WHERE s.meeting_id=? ORDER BY s.start_sec ASC`
 
 const deleteSegmentsSQL = `DELETE FROM segments WHERE meeting_id = ?`
 
@@ -66,7 +70,7 @@ func (d *DB) InsertSegment(s *Segment) error {
 		return err
 	}
 	defer tx.Rollback()
-	if _, err := tx.Exec(insertSegmentSQL, s.ID, s.MeetingID, s.Start, s.End, s.Text, s.Speaker,
+	if _, err := tx.Exec(insertSegmentSQL, s.ID, s.MeetingID, s.Start, s.End, s.Text, s.RawSpeaker(),
 		s.SpeakerSource, s.SpeakerConfidence, s.SpeakerAssignmentReason, s.SpeakerGroupStart, s.SpeakerGroupEnd); err != nil {
 		return err
 	}
@@ -89,6 +93,9 @@ func (d *DB) ReplaceSegments(meetingID string, segments []Segment) error {
 }
 
 func replaceSegmentsTx(tx *sql.Tx, meetingID string, segments []Segment) error {
+	if _, err := tx.Exec(`DELETE FROM meeting_speakers WHERE meeting_id=?`, meetingID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(deleteSegmentsSQL, meetingID); err != nil {
 		return err
 	}
@@ -125,7 +132,7 @@ func insertSegmentRow(stmt *sql.Stmt, segment *Segment) error {
 		}
 		segment.ID = id
 	}
-	_, err := stmt.Exec(segment.ID, segment.MeetingID, segment.Start, segment.End, segment.Text, segment.Speaker,
+	_, err := stmt.Exec(segment.ID, segment.MeetingID, segment.Start, segment.End, segment.Text, segment.RawSpeaker(),
 		segment.SpeakerSource, segment.SpeakerConfidence, segment.SpeakerAssignmentReason, segment.SpeakerGroupStart, segment.SpeakerGroupEnd)
 	if err != nil {
 		return fmt.Errorf("insert segment %s: %w", segment.ID, err)
@@ -156,10 +163,21 @@ func scanSegments(rows *sql.Rows) ([]Segment, error) {
 		var s Segment
 		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Start, &s.End, &s.Text, &s.Speaker,
 			&s.SpeakerSource, &s.SpeakerConfidence, &s.SpeakerAssignmentReason,
-			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt); err != nil {
+			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt, &s.SpeakerKey, &s.PersonID); err != nil {
 			return nil, fmt.Errorf("scan segment: %w", err)
+		}
+		if s.PersonID == nil {
+			s.SpeakerKey = ""
 		}
 		out = append(out, s)
 	}
 	return out, rows.Err()
+}
+
+// RawSpeaker returns the stable recording-local key, independent of a person label.
+func (segment Segment) RawSpeaker() string {
+	if segment.SpeakerKey != "" {
+		return segment.SpeakerKey
+	}
+	return segment.Speaker
 }
