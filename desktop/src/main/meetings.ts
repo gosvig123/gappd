@@ -1,3 +1,4 @@
+import { liveActionsGenerating, liveActionsRevision } from './live-actions'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { AssignSpeakerInput, SpeakerClipInput } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
@@ -15,8 +16,13 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 }
 
 export async function showMeeting(id: string): Promise<MeetingDetail> {
-  const result = await requestCommand('meetings.show', { id })
-  return result.meeting
+  // A command can read the old draft while local generation finishes. Read again then.
+  let revision: number, result
+  do {
+    revision = liveActionsRevision()
+    result = await requestCommand('meetings.show', { id })
+  } while (revision !== liveActionsRevision())
+  return { ...result.meeting, liveActionsGenerating: liveActionsGenerating(id) }
 }
 
 export async function retryDiarization(id: string): Promise<MeetingDetail> {

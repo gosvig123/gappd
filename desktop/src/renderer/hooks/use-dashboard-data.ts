@@ -1,3 +1,4 @@
+import { readMeeting } from './live-actions-generation'
 import { useMemo, useRef, useState } from 'react'
 import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
 import { isPermissionErrorMessage } from '../components/meeting-status'
@@ -49,8 +50,8 @@ function useDashboardActions(setState: SetDashboardState, refs: MeetingRefs, sel
   return {
     updateMeeting: (meeting: MeetingDetail) => { if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }; void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState)) },
     refreshMeetings: (id?: string | null) => refreshMeetings(id, refs, setState, selectedRequest, refreshRequest),
-    loadMeeting: (id: string) => loadMeeting(id, refs, setState, selectedRequest),
-    clearSelectedMeeting: () => clearSelectedMeeting(refs, setState),
+    loadMeeting: (id: string) => { refreshRequest.cancel(); return loadMeeting(id, refs, setState, selectedRequest) },
+    clearSelectedMeeting: () => { refreshRequest.cancel(); selectedRequest.cancel(); clearSelectedMeeting(refs, setState) },
     retryDiarization: (id: string) => retryDiarization(id, refs, setState, selectedRequest, refreshRequest),
     deleteMeeting: (id: string) => deleteMeeting(id, refs, setState, selectedRequest, refreshRequest),
     setError: (error: string | null) => setState((current) => ({ ...current, error })),
@@ -69,7 +70,7 @@ async function loadMeeting(id: string, refs: MeetingRefs, setState: SetDashboard
   const requestId = selectedRequest.next()
   startMeetingLoad(id, setState, refs)
   try {
-    const meeting = await window.gappd.meetings.show(id)
+    const meeting = await readMeeting(id)
     if (isCurrentMeeting(requestId, id, refs, selectedRequest)) applySelectedMeeting(meeting, setState, refs)
   } catch (err) {
     if (isCurrentMeeting(requestId, id, refs, selectedRequest)) failSelectedMeeting(err, setState, refs)

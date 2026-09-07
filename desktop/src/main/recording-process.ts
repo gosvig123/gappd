@@ -9,7 +9,7 @@ import { getRecordingState, setRecordingState } from './state'
 
 type RecordingChild = ReturnType<typeof spawn>
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
-const LIVE_TRANSCRIPT_CHUNK_SECONDS = '300'
+const LIVE_TRANSCRIPT_CHUNK_SECONDS = '120'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
@@ -33,6 +33,7 @@ export function stopRecording(): void {
 export async function stopActiveRecordingForQuit(): Promise<void> {
   const child = recordingChild
   if (!child) return
+  setRecordingState({ ...getRecordingState(), status: RECORDING_STATUS_STOPPING })
   child.kill('SIGINT')
   await waitForRecordingExit(child)
 }

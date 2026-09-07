@@ -2,6 +2,7 @@
 // Source of truth: internal/db, internal/meetinglifecycle, internal/recording, internal/appprotocol.
 
 import type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'
+import type { LiveActionDraft } from './live-actions'
 
 export type EmptyInput = Record<string, never>
 
@@ -26,8 +27,8 @@ export type AssignSpeakerInput = {
 export type MeetingResponse = {
   meeting: MeetingDetail
 }
-
 export type MeetingDetail = {
+  liveActionDraft?: LiveActionDraft
   id: string
   title: string
   startedAt: string
@@ -41,7 +42,6 @@ export type MeetingDetail = {
   segments: MeetingSegment[]
   diarization: DiarizationInfo
 }
-
 export type MeetingStatus = {
   state: MeetingState
   updatedAt: string

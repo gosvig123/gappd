@@ -18,6 +18,7 @@ type MeetingListItem struct {
 }
 
 type MeetingDetail struct {
+	LiveActionDraft       *LiveActionDraft `json:"liveActionDraft,omitempty"`
 	ID                    string           `json:"id"`
 	Title                 string           `json:"title"`
 	StartedAt             string           `json:"startedAt"`

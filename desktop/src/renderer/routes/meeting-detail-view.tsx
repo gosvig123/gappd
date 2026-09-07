@@ -3,6 +3,7 @@ import type { MeetingDetail } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import './meeting-detail.css'
 import './meeting-reading.css'
+import { LiveActionsPanel } from './live-actions-panel'
 import { SpeakerLabels } from './speaker-labels'
 import { Markdown } from '../components/markdown'
 import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
@@ -114,6 +115,7 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <DiarizationTrustCue meeting={selectedMeeting} />
       <SpeakerLabels key={selectedMeeting.id} meeting={selectedMeeting} onUpdated={onUpdated} />
       {selectedMeeting.summaryUpdating ? <div className="summary-updating" role="status">Updating names in summary and action items…</div> : null}
+      {recording ? <LiveActionsPanel key={selectedMeeting.id} meeting={selectedMeeting} onUpdated={onUpdated} /> : null}
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}
@@ -158,7 +160,6 @@ function tabCopyValue(activeTab: DetailTab, meeting: MeetingDetail, transcript: 
 }
 
 function tabCopyLabel(activeTab: DetailTab): string { return activeTab === SUMMARY_TAB ? 'Copy summary' : 'Copy transcript' }
-
 function showPostMeetingProgress(meeting: MeetingDetail, progress: MeetingProgressInput): boolean {
   return meeting.status.state !== RECORDING_STATE && (meetingHasWork(progress) || meetingFailed(progress))
 }
@@ -169,7 +170,7 @@ function TranscriptPanel({ meeting, transcript, reading }: { meeting: MeetingDet
 }
 
 function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput): string {
-  if (meeting.status.state === RECORDING_STATE) return 'Recording audio · transcript after stop.'
+  if (meeting.status.state === RECORDING_STATE) return 'Recording audio · Live Transcript updates as chunks arrive.'
   if (meeting.diarization.state === PENDING_STATE || meeting.diarization.state === PROCESSING_STATUS) return 'Labeling speakers locally.'
   if (meetingHasWork(progress) && progress.hasTranscript) return 'Creating summary.'
   if (meetingHasWork(progress)) return 'Transcribing audio locally.'
@@ -180,7 +181,6 @@ function detailSubtitle(meeting: MeetingDetail, progress: MeetingProgressInput):
 }
 
 function summaryEmptyText(progress: MeetingProgressInput): string { return progress.hasTranscript ? 'Transcript available. Summary not generated yet.' : 'Summary appears after recording is processed.' }
-
 function detailProgressInput(meeting: MeetingDetail, hasTranscript: boolean): MeetingProgressInput {
   return { status: meeting.status, hasTranscript: hasTranscript && !meeting.transcriptProvisional, hasSummary: Boolean(meeting.summary) }
 }

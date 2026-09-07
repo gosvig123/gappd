@@ -109,6 +109,9 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 	if _, err := conn.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("init schema: %w", err)
 	}
+	if _, err := conn.ExecContext(ctx, liveActionsSchema); err != nil {
+		return fmt.Errorf("init draft action items: %w", err)
+	}
 	if err := migrateMeetingsSearchTrigger(ctx, conn); err != nil {
 		return err
 	}

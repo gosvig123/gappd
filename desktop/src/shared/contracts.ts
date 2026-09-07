@@ -1,7 +1,9 @@
+import type { MeetingDetail as StoredMeetingDetail } from './generated/contracts'
+export type MeetingDetail = StoredMeetingDetail & { liveActionsGenerating?: boolean }
 
 export * from './generated/protocol'
 export { RECORDING_STATUSES } from './meeting-recording-workflow'
-export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
+export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'
 export type { RecordingState, RecordingStatus } from './meeting-recording-workflow'
 export type { ManagedRuntimeSnapshot, ManagedRuntimeOperation, ManagedRuntimeErrorDebug, ManagedRuntimeErrorKind, ManagedRuntimePullStage, OwnershipConflict } from './managed-runtime'
 
