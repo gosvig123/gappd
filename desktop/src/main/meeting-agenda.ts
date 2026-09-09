@@ -16,7 +16,7 @@ export async function generateMeetingAgenda(sourceId: string): Promise<MeetingAg
   const reconciliation = { ...agendaReconciliationStatus(history), historyWarning: agendaHistoryWarning(history, snapshot) }
   const sources = matchAgendaHistory(event, history, selfEmails)
   if (!sources.length) return { items: [], sources: [], ...reconciliation }
-  const result = await usingSummaryRuntime(() => requestCommand('meetings.agenda', { title: event.title, meetingIds: sources.map(source => source.id).join(',') }))
+  const result = await usingSummaryRuntime(() => requestCommand('meetings.agenda', { title: event.title, meetingIds: sources.map(source => source.id).join(',') }, {}, AbortSignal.timeout(20 * 60 * 1000 + 5000)))
   return { items: result.items, sources, ...reconciliation }
 }
 

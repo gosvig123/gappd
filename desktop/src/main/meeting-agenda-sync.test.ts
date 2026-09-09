@@ -32,7 +32,7 @@ function fixture(service: Record<string, unknown> = {}) {
     './participant-calendar': { savedMeetingCalendarContexts: async () => contexts },
     './app-protocol': { requestCommand: async (id: string) => id === 'meetings.agendaHistory' ? { meetings } : { items: [] } },
     './summary-runtime': { usingSummaryRuntime: async (work: () => Promise<unknown>) => work() },
-  }).generateMeetingAgenda
+  }, { AbortSignal }).generateMeetingAgenda
   return { ...f, generate, state: f }
 }
 

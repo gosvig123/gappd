@@ -34,6 +34,7 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain, but that account no longer supplies inferred overlap context.
 - The renderer receives Calendar snapshots and account operations, never Google tokens or relay private keys.
 - An **Agenda draft** uses **Meeting** history, not email messages; generating it does not change Calendar or share the draft.
+- An **Agenda draft** checks later **Meetings** for resolutions and superseded commitments. Topics ask users to confirm status; missing resolution evidence does not prove that work remains open. Long histories use bounded section extraction before chronological synthesis, and processing limits fail without returning a partial draft.
 - A past **Meeting** can supply **Calendar invitee** email context through a confirmed Calendar link or a unique, meaningful timed overlap; inferred overlap does not confirm attendance or identify a **Meeting speaker**, and ambiguous overlaps remain unresolved until the user chooses a Calendar event.
 - A confirmed Calendar link takes precedence over inferred overlap, and explicitly unlinking a **Meeting** disables automatic Calendar matching for its **Agenda draft** context.
 

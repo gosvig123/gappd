@@ -1,3 +1,4 @@
+import { agendaErrorMessage } from '../../shared/agenda-error'
 import { useState } from 'react'
 import { INFERRED_CALENDAR_PROVENANCE } from '../../shared/meeting-agenda'
 import type { MeetingAgendaDraft } from '../../shared/meeting-agenda'
@@ -15,7 +16,7 @@ export function MeetingAgendaDraftPanel({ sourceId, onOpenMeeting, onOpenSetting
   async function generate() {
     setBusy(true); setError('')
     try { setDraft(await window.gappd.googleCalendar.generateAgenda(sourceId)) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    catch (cause) { setError(agendaErrorMessage(cause)) }
     finally { setBusy(false) }
   }
   return <MeetingAgendaDraftView draft={draft} busy={busy} error={error} onGenerate={() => void generate()} onChange={setDraft} onOpenMeeting={onOpenMeeting} onOpenSettings={onOpenSettings} />
@@ -27,7 +28,7 @@ export function MeetingAgendaDraftView({ draft, busy, error, onGenerate, onChang
     if (retry && !window.confirm('Replace this agenda draft?\n\nGenerating again replaces all local topic edits. Cancel to keep this draft.')) return
     onGenerate()
   }
-  return <div className="meeting-agenda-draft"><Button className="compact-action" disabled={busy || Boolean(draft?.items.length && !retry)} onClick={generate}>{busy ? 'Generating agenda…' : retry ? 'Generate again…' : 'Generate agenda'}</Button>{busy ? <p role="status">Checking and syncing Calendar history when needed, then preparing from local Meetings…</p> : null}{error ? <div role="alert"><p>{error}</p><Button onClick={onOpenSettings}>Open Settings</Button></div> : null}{draft?.ambiguousMeetings?.length ? <AmbiguousCalendarMeetings meetings={draft.ambiguousMeetings} onOpenMeeting={onOpenMeeting} /> : null}{draft ? <DraftContent draft={draft} busy={busy} onChange={onChange} onOpenMeeting={onOpenMeeting} /> : null}</div>
+  return <div className="meeting-agenda-draft"><Button className="compact-action" disabled={busy || Boolean(draft?.items.length && !retry)} onClick={generate}>{busy ? 'Generating agenda…' : retry ? 'Generate again…' : 'Generate agenda'}</Button>{busy ? <p role="status">Checking and syncing Calendar history when needed, then preparing from local Meetings. Long histories use up to 97 sequential model requests and can take up to 20 minutes. Provider usage charges may apply…</p> : null}{error ? <div role="alert"><p>{error}</p><Button onClick={onOpenSettings}>Open Settings</Button></div> : null}{draft?.ambiguousMeetings?.length ? <AmbiguousCalendarMeetings meetings={draft.ambiguousMeetings} onOpenMeeting={onOpenMeeting} /> : null}{draft ? <DraftContent draft={draft} busy={busy} onChange={onChange} onOpenMeeting={onOpenMeeting} /> : null}</div>
 }
 
 function DraftContent({ draft, busy, onChange, onOpenMeeting }: { draft: MeetingAgendaDraft; busy: boolean; onChange: (draft: MeetingAgendaDraft) => void; onOpenMeeting: (id: string) => void }) {

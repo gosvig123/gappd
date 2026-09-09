@@ -28,18 +28,22 @@ const agendaSystem = `Create a meeting preparation draft from the supplied histo
 const agendaSchema = `{"type":"object","properties":{"items":{"type":"array","maxItems":8,"items":{"type":"object","properties":{"topic":{"type":"string"},"sourceId":{"type":"string"},"quote":{"type":"string"}},"required":["topic","sourceId","quote"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}`
 
 func GenerateAgenda(ctx context.Context, provider Provider, title string, sources []AgendaSource) (AgendaDraft, error) {
-	input, err := json.Marshal(struct {
-		Title   string         `json:"upcomingTitle"`
-		Sources []AgendaSource `json:"sources"`
-	}{title, sources})
+	prepared, err := prepareAgendaSources(sources)
 	if err != nil {
 		return AgendaDraft{}, err
 	}
-	raw, err := provider.CompleteJSON(ctx, CompletionRequest{System: agendaSystem, User: string(input), JSONSchema: json.RawMessage(agendaSchema), MaxTokens: 2400, Temperature: 0.1})
+	input, err := agendaInput(title, prepared)
 	if err != nil {
 		return AgendaDraft{}, err
 	}
-	return validateAgenda(raw, sources)
+	if len(input)+len(agendaSystem)+len(agendaSchema) > agendaRequestBytes {
+		return generateAgendaHistory(ctx, provider, title, prepared)
+	}
+	raw, err := agendaComplete(ctx, provider, agendaSystem, agendaSchema, input)
+	if err != nil {
+		return AgendaDraft{}, err
+	}
+	return validateAgenda(raw, prepared)
 }
 
 func validateAgenda(raw json.RawMessage, sources []AgendaSource) (AgendaDraft, error) {

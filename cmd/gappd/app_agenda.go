@@ -13,12 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const maxAgendaSourceBytes = 192000
+const maxAgendaSourceBytes = ai.MaxAgendaHistoryBytes
 const maxAgendaSources = 12
 
 func appAgendaCmd() *cobra.Command {
 	var input appprotocol.AgendaInput
 	cmd := meetingJSONCommand("agenda", nil, func(_ []string) error { return runAgenda(input) })
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
 	cmd.Flags().StringVar(&input.Title, "title", "", "Upcoming event title")
 	cmd.Flags().StringVar(&input.MeetingIDs, "meeting-ids", "", "Matched local Meeting IDs")
 	return cmd
@@ -42,7 +44,7 @@ func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource)
 	if err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	defer cancel()
 	draft, err := ai.GenerateAgenda(ctx, provider, title, sources)
 	if err != nil {
@@ -65,7 +67,7 @@ func agendaSources(store *db.DB, ids []string) ([]ai.AgendaSource, error) {
 		text := source.Text
 		total += len(text)
 		if total > maxAgendaSourceBytes {
-			return nil, fmt.Errorf("agenda: matched transcripts exceed the model input limit; no draft was generated")
+			return nil, fmt.Errorf("agenda: matched transcripts exceed the 576000-byte processing input limit; prepare this agenda manually from matched Meetings; no draft was generated")
 		}
 		sources = append(sources, source)
 	}

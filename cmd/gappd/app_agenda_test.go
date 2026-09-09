@@ -1,6 +1,9 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"github.com/gappd-dev/gappd/internal/ai"
 	"strings"
 	"testing"
 
@@ -49,4 +52,44 @@ func TestAgendaSourcesRejectMissingEmptyAndOversizedInput(t *testing.T) {
 	if _, err := agendaSources(store, []string{id}); err == nil || !strings.Contains(err.Error(), "input limit") {
 		t.Fatalf("expected honest size error: %v", err)
 	}
+}
+
+func TestAgendaSourcesAcceptLargeHistory(t *testing.T) {
+	text := strings.Repeat("会議 followup discussion. ", 9000)
+	store, id := agendaTestStore(t, text)
+	sources, err := agendaSources(store, []string{id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sources[0].Text != text {
+		t.Fatal("transcript changed")
+	}
+	provider := &agendaIntegrationProvider{}
+	if _, err := ai.GenerateAgenda(context.Background(), provider, "Next", sources); err != nil {
+		t.Fatal(err)
+	}
+	if provider.calls < 3 || provider.calls > 97 {
+		t.Fatalf("calls=%d", provider.calls)
+	}
+}
+
+func TestAgendaCommandSuppressesCobraDiagnostics(t *testing.T) {
+	cmd := appAgendaCmd()
+	if !cmd.SilenceUsage || !cmd.SilenceErrors {
+		t.Fatal("agenda leaks Cobra usage or duplicate errors")
+	}
+}
+
+type agendaIntegrationProvider struct{ calls int }
+
+func (p *agendaIntegrationProvider) Available() error { return nil }
+func (p *agendaIntegrationProvider) Complete(context.Context, ai.CompletionRequest) (string, error) {
+	return "", nil
+}
+func (p *agendaIntegrationProvider) CompleteJSON(_ context.Context, req ai.CompletionRequest) (json.RawMessage, error) {
+	p.calls++
+	if strings.Contains(req.System, "Extract") {
+		return json.RawMessage(`{"complete":true,"items":[]}`), nil
+	}
+	return json.RawMessage(`{"items":[]}`), nil
 }

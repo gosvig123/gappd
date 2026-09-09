@@ -31,7 +31,7 @@ function loadAgenda(f: ReturnType<typeof fixture>) {
     './google-calendar-service': { googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
     './participant-calendar': { savedMeetingCalendarContexts: async () => ({}) },
     './summary-runtime': f.runtime,
-  }).generateMeetingAgenda
+  }, { AbortSignal }).generateMeetingAgenda
 }
 
 test('agenda holds Local AI lease until generation completes', async () => {
