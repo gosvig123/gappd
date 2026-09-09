@@ -95,3 +95,15 @@ test('incomplete draft regeneration confirms replacement and cancellation preser
     assert.match(render({ draft, busy: true }), /<textarea readOnly=""/)
   } finally { global.window = previousWindow }
 })
+
+
+test('Calendar sync busy copy and distinct residual warnings retain editable topics', () => {
+  assert.match(render({ busy: true }), /syncing Calendar history when needed/)
+  for (const historyWarning of ['Calendar sync cannot repair this valid recorded time range.', 'account@example.com: Reconnect required']) {
+    const draft = { historyIncomplete: true, historyWarning, sources: [source], items: [{ topic: 'Keep my topic', sourceId: source.id, quote: 'Evidence' }] }
+    assert.match(render({ draft }), new RegExp(historyWarning))
+    assert.match(render({ draft }), /Keep my topic/)
+    assert.match(render({ draft: { ...draft, sources: [], items: [] } }), new RegExp(historyWarning))
+    assert.match(render({ draft: { ...draft, items: [] } }), new RegExp(historyWarning))
+  }
+})

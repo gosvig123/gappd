@@ -28,7 +28,7 @@ function loadAgenda(f: ReturnType<typeof fixture>) {
     '../shared/calendar-reconciliation': calendarReconciliation,
     '../shared/meeting-agenda': { calendarEventIsUpcoming: () => true, inviteeEmails: () => ['partner@example.com'], matchAgendaHistory: () => [{ id: 'previous' }] },
     './app-protocol': { requestCommand: f.requestCommand },
-    './google-calendar-service': { googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
+    './google-calendar-service': { googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
     './participant-calendar': { savedMeetingCalendarContexts: async () => ({}) },
     './summary-runtime': f.runtime,
   }).generateMeetingAgenda

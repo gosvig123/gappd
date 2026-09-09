@@ -43,6 +43,10 @@ export class GoogleCalendarServiceCore {
     this.now = now
   }
 
+  pendingSyncIds(): string[] {
+    return [...this.syncing.keys()]
+  }
+
   async snapshot(): Promise<CalendarSnapshot> {
     await this.queue
     return this.toSnapshot(await this.readDocument())

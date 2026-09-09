@@ -42,9 +42,32 @@ export function reconcileAgendaHistory(meetings: AgendaHistory[], contexts: Reco
   })
 }
 
+export function meetingHasValidRecordedInterval(meeting: MeetingInterval): boolean {
+  const start = Date.parse(meeting.startedAt), end = Date.parse(meeting.endedAt ?? '')
+  return Number.isFinite(start) && Number.isFinite(end) && end > start && end <= Date.now()
+}
+
+export function agendaCalendarSyncIds(meetings: AgendaHistory[], contexts: Record<string, ParticipantContext>, snapshot: CalendarSnapshot): string[] {
+  const eligible = meetings.filter(meeting => !contexts[meeting.id]?.event && !contexts[meeting.id]?.inferenceDisabled && meetingHasValidRecordedInterval(meeting))
+  return snapshot.connections.filter(connection => eligible.some(meeting => !meetingHasCalendarCoverage(meeting, { ...snapshot, connections: [connection] }))).map(connection => connection.id)
+}
+
+export function agendaHistoryWarning(history: AgendaHistory[], snapshot: CalendarSnapshot): string | undefined {
+  const unavailable = history.filter(meeting => meeting.calendarReconciliationUnavailable)
+  if (!unavailable.length) return undefined
+  const warnings: string[] = []
+  if (unavailable.some(meeting => !meetingHasValidRecordedInterval(meeting))) warnings.push('Some Meetings lack a valid recorded time range. Calendar sync cannot repair this. Open each Meeting and choose its Calendar event.')
+  if (unavailable.some(meetingHasValidRecordedInterval)) {
+    const errors = snapshot.connections.filter(connection => connection.error).map(connection => `${connection.email}: ${connection.error}`)
+    warnings.push(snapshot.connections.length ? 'Calendar history coverage is still incomplete. Open Calendar settings, resolve account or history errors, then generate again. You can also link a Meeting to its Calendar event.' : 'Connect Calendar in Settings or link a Meeting to its Calendar event, then generate again.')
+    warnings.push(...errors)
+  }
+  return warnings.join(' ')
+}
+
 export function meetingHasCalendarCoverage(meeting: MeetingInterval, snapshot: CalendarSnapshot): boolean {
   const start = Date.parse(meeting.startedAt), end = Date.parse(meeting.endedAt ?? '')
-  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !snapshot.connections.length) return false
+  if (!meetingHasValidRecordedInterval(meeting) || !snapshot.connections.length) return false
   return snapshot.connections.every(connection => {
     if (connection.error || !connection.historyRanges) return false
     let coveredUntil = start

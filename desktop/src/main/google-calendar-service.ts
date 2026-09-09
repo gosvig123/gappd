@@ -11,6 +11,10 @@ import { serviceConfig } from './service-config'
 const CALENDAR_STORE_FILE = 'google-calendar.enc'
 let instance: GoogleCalendarServiceCore | null = null
 
+export function googleCalendarPendingSyncIds(): string[] {
+  return calendarService().pendingSyncIds()
+}
+
 export function googleCalendarSnapshot(): Promise<CalendarSnapshot> {
   return calendarService().snapshot()
 }
