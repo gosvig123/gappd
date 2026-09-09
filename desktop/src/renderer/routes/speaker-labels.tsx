@@ -18,7 +18,7 @@ export function SpeakerLabels({ meeting, onUpdated }: Props) {
 
 function CalendarSource({ context, onLink }: { context: ParticipantContext; onLink: (id: string) => Promise<void> }) {
   if (!context.event && !context.candidates.length) return <p className="speaker-label-hint">No matching calendar event. Choose a saved person or add someone below.</p>
-  return <div className="speaker-calendar-source"><label>Calendar event<select aria-label="Calendar event for participant suggestions" value={context.event?.sourceId ?? ''} onChange={event => void onLink(event.target.value)}><option value="">No calendar event</option>{calendarChoices(context).map(event => <option key={event.sourceId} value={event.sourceId}>{event.title} · {new Date(event.start).toLocaleString()}</option>)}</select></label><span className="speaker-label-hint">Invitees are suggestions; confirm who actually spoke.</span></div>
+  return <div className="speaker-calendar-source"><label>Calendar event<select aria-label="Calendar event for participant suggestions" value={context.event?.sourceId ?? ''} onChange={event => void onLink(event.target.value)}><option value="">{context.inferenceDisabled ? 'No Calendar event · automatic agenda matching off' : 'No confirmed Calendar event'}</option>{calendarChoices(context).map(event => <option key={event.sourceId} value={event.sourceId}>{event.title} · {new Date(event.start).toLocaleString()}</option>)}</select></label><span className="speaker-label-hint">Invitees are suggestions; confirm who actually spoke.</span>{!context.event && !context.inferenceDisabled ? <button type="button" onClick={() => void onLink('')}>Disable automatic Calendar matching for agendas</button> : null}</div>
 }
 
 function calendarChoices(context: ParticipantContext) {

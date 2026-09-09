@@ -16,7 +16,7 @@ func appAgendaHistoryCmd() *cobra.Command {
 		}
 		meetings := make([]appprotocol.AgendaHistoryMeeting, 0, len(history))
 		for _, meeting := range history {
-			meetings = append(meetings, appprotocol.AgendaHistoryMeeting{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, Emails: meeting.Emails})
+			meetings = append(meetings, appprotocol.AgendaHistoryMeeting{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Emails: meeting.Emails})
 		}
 		return writeJSON(appprotocol.AgendaHistoryResponse{Meetings: meetings})
 	})

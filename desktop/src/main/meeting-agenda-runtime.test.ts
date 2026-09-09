@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import * as calendarReconciliation from '../shared/calendar-reconciliation.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { deferred, loadSourceModule } from './source-module-test-helper.ts'
 
 function fixture(provider: string) {
@@ -23,6 +25,7 @@ function fixture(provider: string) {
 
 function loadAgenda(f: ReturnType<typeof fixture>) {
   return loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
+    '../shared/calendar-reconciliation': calendarReconciliation,
     '../shared/meeting-agenda': { calendarEventIsUpcoming: () => true, inviteeEmails: () => ['partner@example.com'], matchAgendaHistory: () => [{ id: 'previous' }] },
     './app-protocol': { requestCommand: f.requestCommand },
     './google-calendar-service': { googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },

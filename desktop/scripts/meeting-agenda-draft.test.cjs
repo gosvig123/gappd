@@ -61,3 +61,37 @@ test('editing keeps source evidence and source button opens the exact Meeting ID
   tree.filter(node => node.type === 'button').at(-1).props.onClick()
   assert.equal(opened, source.id)
 })
+
+test('ambiguous Calendar history gives manual linking guidance and exact Meeting navigation', () => {
+  const draft = { items: [], sources: [], ambiguousMeetings: [source] }
+  const html = render({ draft })
+  assert.match(html, /Multiple Calendar events overlap/)
+  assert.match(html, /Automatic matching remains unconfirmed/)
+  assert.match(html, /People in this meeting/)
+  assert.doesNotMatch(html, /No previous Meetings matched/)
+  let opened
+  const tree = elements(Component({ ...base, draft, onOpenMeeting: id => { opened = id } }))
+  tree.filter(node => node.type === 'button').at(-1).props.onClick()
+  assert.equal(opened, source.id)
+})
+
+test('incomplete draft regeneration confirms replacement and cancellation preserves edits', () => {
+  const draft = { historyIncomplete: true, sources: [source], items: [{ topic: 'My local edit', sourceId: source.id, quote: 'Original quote' }] }
+  let generated = 0, approved = false, prompt
+  const previousWindow = global.window
+  global.window = { confirm: message => { prompt = message; return approved } }
+  try {
+    const button = elements(Component({ ...base, draft, onGenerate: () => generated++ })).find(node => node.type === 'button')
+    assert.equal(button.props.disabled, false)
+    assert.match(render({ draft }), /Generate again/)
+    button.props.onClick()
+    assert.equal(generated, 0)
+    assert.equal(draft.items[0].topic, 'My local edit')
+    assert.match(prompt, /replaces all local topic edits/)
+    approved = true; button.props.onClick()
+    assert.equal(generated, 1)
+    const busyButton = elements(Component({ ...base, draft, busy: true })).find(node => node.type === 'button')
+    assert.equal(busyButton.props.disabled, true)
+    assert.match(render({ draft, busy: true }), /<textarea readOnly=""/)
+  } finally { global.window = previousWindow }
+})

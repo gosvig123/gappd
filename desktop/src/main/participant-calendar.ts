@@ -25,7 +25,7 @@ function mergeContext(saved: ParticipantContext | undefined, current: Participan
   const candidates = new Map((saved?.candidates ?? []).map((event) => [event.sourceId, event]))
   for (const event of current.candidates) candidates.set(event.sourceId, event)
   const event = saved?.event && (candidates.get(saved.event.sourceId) ?? saved.event)
-  return { event, candidates: [...candidates.values()] }
+  return { event, inferenceDisabled: saved?.inferenceDisabled, candidates: [...candidates.values()] }
 }
 
 export async function linkCalendar(input: LinkCalendarInput): Promise<ParticipantContext> {
@@ -34,7 +34,7 @@ export async function linkCalendar(input: LinkCalendarInput): Promise<Participan
   if (input.eventSourceId && !event) throw new Error('Link calendar event: event unavailable. Refresh the meeting and choose a suggested event.')
   return serialize(async () => {
     await requestCommand('meetings.show', { id: input.id })
-    const updated = { ...context, event }
+    const updated = { ...context, event, inferenceDisabled: !input.eventSourceId }
     await saveContext(await readLinks(), input.id, updated)
     return updated
   })

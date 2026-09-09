@@ -13,6 +13,7 @@ export type AgendaHistoryMeeting = {
   id: string
   title: string
   startedAt: string
+  endedAt: string
   emails: string[]
 }
 

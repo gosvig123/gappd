@@ -61,3 +61,22 @@ func TestAgendaHistoryExcludesSelfSpeakerIdentity(t *testing.T) {
 		t.Fatalf("self-only evidence: %+v %v", history, err)
 	}
 }
+
+func TestAgendaHistoryIncludesRecordedIntervalWithoutPerson(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	meeting := lifecycleRoundTripMeeting()
+	if err := store.CreateMeeting(meeting); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Conn.Exec(`UPDATE meetings SET ended_at='2025-01-01T13:00:00Z' WHERE id=?`, meeting.ID); err != nil {
+		t.Fatal(err)
+	}
+	history, err := store.AgendaHistory()
+	if err != nil || len(history) != 1 {
+		t.Fatalf("history=%+v error=%v", history, err)
+	}
+	if history[0].EndedAt != "2025-01-01T13:00:00Z" || len(history[0].Emails) != 0 {
+		t.Fatalf("interval or identities=%+v", history[0])
+	}
+}

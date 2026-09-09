@@ -31,9 +31,11 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
-- Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** remain.
+- Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain, but that account no longer supplies inferred overlap context.
 - The renderer receives Calendar snapshots and account operations, never Google tokens or relay private keys.
 - An **Agenda draft** uses **Meeting** history, not email messages; generating it does not change Calendar or share the draft.
+- A past **Meeting** can supply **Calendar invitee** email context through a confirmed Calendar link or a unique, meaningful timed overlap; inferred overlap does not confirm attendance or identify a **Meeting speaker**, and ambiguous overlaps remain unresolved until the user chooses a Calendar event.
+- A confirmed Calendar link takes precedence over inferred overlap, and explicitly unlinking a **Meeting** disables automatic Calendar matching for its **Agenda draft** context.
 
 ## Example dialogue
 

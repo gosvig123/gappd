@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import type { CalendarConnection, CalendarEventSummary, CalendarSnapshot } from '../shared/calendar-contract'
+import type { CalendarConnection, CalendarEventSummary, CalendarSnapshot, CalendarHistoryRange } from '../shared/calendar-contract'
 import type { OAuthTokenSet } from './oauth'
 
 const READY_STATUS = 'ready'
@@ -11,6 +11,8 @@ export type StoredCalendarConnection = {
   subject: string
   email: string
   tokens: OAuthTokenSet
+  historyRanges?: CalendarHistoryRange[]
+  historicalEvents?: CalendarEventSummary[]
   events: CalendarEventSummary[]
   lastSyncedAt?: string
   error?: string
@@ -23,7 +25,7 @@ export type CalendarStore = {
 export type CalendarApi = {
   configured(): boolean
   authorize(): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
-  sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[] }>
+  sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarHistoryRange[]; historyError?: string }>
   revoke(tokens: OAuthTokenSet): Promise<void>
 }
 
@@ -92,7 +94,9 @@ export class GoogleCalendarServiceCore {
       const result = await this.api.sync(connection.id, connection.email, connection.tokens)
       Object.assign(connection, {
         tokens: result.tokens, events: result.events,
-        lastSyncedAt: this.now().toISOString(), error: undefined,
+        historicalEvents: result.historicalEvents ?? connection.historicalEvents,
+        historyRanges: result.historyRanges ?? connection.historyRanges,
+        lastSyncedAt: this.now().toISOString(), error: result.historyError,
       })
       await this.store.write(document)
     } catch (error) {
@@ -104,7 +108,7 @@ export class GoogleCalendarServiceCore {
 
   private toSnapshot(document: CalendarDocument): CalendarSnapshot {
     const connections = document.connections.map((connection) => this.toConnection(connection))
-    const events = document.connections.flatMap((connection) => connection.events)
+    const events = document.connections.flatMap((connection) => [...new Map([...(connection.historicalEvents ?? []), ...connection.events].map(event => [event.sourceId, event])).values()])
       .sort((left, right) => left.start.localeCompare(right.start))
     return { configured: this.api.configured(), connections, events }
   }
@@ -113,7 +117,7 @@ export class GoogleCalendarServiceCore {
     const status = this.syncing.has(connection.id) ? SYNCING_STATUS : connection.error ? ERROR_STATUS : READY_STATUS
     return {
       id: connection.id, email: connection.email, status,
-      lastSyncedAt: connection.lastSyncedAt, error: connection.error,
+      historyRanges: connection.historyRanges, lastSyncedAt: connection.lastSyncedAt, error: connection.error,
     }
   }
 

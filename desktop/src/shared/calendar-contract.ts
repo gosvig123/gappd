@@ -1,7 +1,10 @@
+export type CalendarHistoryRange = { start: number; end: number }
+
 export type CalendarConnection = {
   id: string
   email: string
   status: 'ready' | 'syncing' | 'error'
+  historyRanges?: CalendarHistoryRange[]
   lastSyncedAt?: string
   error?: string
 }

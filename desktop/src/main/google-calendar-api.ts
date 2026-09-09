@@ -1,3 +1,4 @@
+import type { CalendarRange } from './calendar-history-ranges'
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { mapGoogleEvent, type GoogleEventItem } from './google-calendar-model.ts'
@@ -12,15 +13,18 @@ const GOOGLE_REVOKE_URL = 'https://oauth2.googleapis.com/revoke'
 const GOOGLE_SCOPES = ['openid', 'email', 'https://www.googleapis.com/auth/calendar.events.owned.readonly']
 const EVENT_FIELDS = 'nextPageToken,items(id,recurringEventId,status,summary,location,start,end,attendees(email,displayName,responseStatus,self,resource),organizer(email,displayName))'
 const SYNC_DAYS = 30
+const MAX_PAGES_PER_RANGE = 20
+const MAX_HISTORY_PAGES = 200
 const REQUEST_TIMEOUT_MS = 10_000
 
 export type GoogleAuthorizedAccount = { subject: string; email: string; tokens: OAuthTokenSet }
-export type GoogleSyncResult = { tokens: OAuthTokenSet; events: CalendarEventSummary[] }
+export type GoogleSyncResult = { tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarRange[]; historyError?: string }
 export type GoogleCalendarApiOptions = {
   clientId: string
   tokenRequester?: OAuthTokenRequester
   openExternal(url: string): Promise<unknown>
   fetcher?: typeof fetch
+  historyRanges?: () => Promise<CalendarRange[]>
   now?: () => number
 }
 
@@ -29,9 +33,11 @@ export class GoogleCalendarApi {
   private readonly tokenRequester?: OAuthTokenRequester
   private readonly openExternal: (url: string) => Promise<unknown>
   private readonly fetcher: typeof fetch
+  private readonly historyRanges: () => Promise<CalendarRange[]>
   private readonly now: () => number
 
   constructor(options: GoogleCalendarApiOptions) {
+    this.historyRanges = options.historyRanges ?? (async () => [])
     this.clientId = options.clientId
     this.tokenRequester = options.tokenRequester
     this.openExternal = options.openExternal
@@ -55,7 +61,9 @@ export class GoogleCalendarApi {
     const currentTokens = needsTokenRefresh(tokens, this.now())
       ? await refreshOAuthToken(this.oauthConfig(), tokens, this.fetcher, this.now, this.requiredTokenRequester())
       : tokens
-    return { tokens: currentTokens, events: await this.fetchEvents(connectionId, email, currentTokens) }
+    const events = await this.fetchEvents(connectionId, email, currentTokens)
+    const history = await this.fetchHistory(connectionId, email, currentTokens)
+    return { tokens: currentTokens, events, ...history }
   }
 
   async revoke(tokens: OAuthTokenSet): Promise<void> {
@@ -89,11 +97,13 @@ export class GoogleCalendarApi {
     return { subject: requiredString(value.sub, 'Google account ID'), email: requiredString(value.email, 'Google account email') }
   }
 
-  private async fetchEvents(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<CalendarEventSummary[]> {
+  private async fetchEvents(connectionId: string, email: string, tokens: OAuthTokenSet, range?: CalendarRange, budget = { remaining: MAX_PAGES_PER_RANGE }): Promise<CalendarEventSummary[]> {
     const events: CalendarEventSummary[] = []
     let pageToken: string | undefined
+    let pages = 0
     do {
-      const page = await this.fetchEventPage(tokens, pageToken)
+      if (++pages > MAX_PAGES_PER_RANGE || --budget.remaining < 0) throw new Error('Calendar pagination limit exceeded; synchronization is incomplete.')
+      const page = await this.fetchEventPage(tokens, pageToken, range)
       for (const item of page.items || []) {
         const event = mapGoogleEvent(item, connectionId, email)
         if (event) events.push(event)
@@ -103,8 +113,22 @@ export class GoogleCalendarApi {
     return events.sort((left, right) => left.start.localeCompare(right.start))
   }
 
-  private async fetchEventPage(tokens: OAuthTokenSet, pageToken?: string): Promise<GoogleEventPage> {
-    const response = await this.fetcher(upcomingEventsUrl(this.now(), pageToken), { headers: bearerHeaders(tokens) })
+  private async fetchHistory(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<Pick<GoogleSyncResult, 'historicalEvents' | 'historyRanges' | 'historyError'>> {
+    try {
+      const events = new Map<string, CalendarEventSummary>()
+      const budget = { remaining: MAX_HISTORY_PAGES }
+      const historyRanges = await this.historyRanges()
+      for (const range of historyRanges) {
+        for (const event of await this.fetchEvents(connectionId, email, tokens, range, budget)) events.set(event.sourceId, event)
+      }
+      return { historicalEvents: [...events.values()], historyRanges }
+    } catch (error) {
+      return { historyError: `Calendar history incomplete: ${error instanceof Error ? error.message : 'request failed'}`.slice(0, 240) }
+    }
+  }
+
+  private async fetchEventPage(tokens: OAuthTokenSet, pageToken?: string, range?: CalendarRange): Promise<GoogleEventPage> {
+    const response = await this.fetcher(upcomingEventsUrl(this.now(), pageToken, range), { headers: bearerHeaders(tokens), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     if (!response.ok) throw new Error(`Google Calendar synchronization failed (${response.status}).`)
     return response.json() as Promise<GoogleEventPage>
   }
@@ -112,12 +136,12 @@ export class GoogleCalendarApi {
 
 type GoogleEventPage = { items?: GoogleEventItem[]; nextPageToken?: string }
 
-function upcomingEventsUrl(now: number, pageToken?: string): string {
+function upcomingEventsUrl(now: number, pageToken?: string, range?: CalendarRange): string {
   const url = new URL(GOOGLE_EVENTS_URL)
   const start = new Date(now)
   start.setHours(0, 0, 0, 0)
   const end = new Date(start.getTime() + SYNC_DAYS * 24 * 60 * 60 * 1000)
-  const params = { timeMin: start.toISOString(), timeMax: end.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500', fields: EVENT_FIELDS }
+  const params = { timeMin: range ? new Date(range.start).toISOString() : start.toISOString(), timeMax: range ? new Date(range.end).toISOString() : end.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '2500', fields: EVENT_FIELDS }
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value)
   if (pageToken) url.searchParams.set('pageToken', pageToken)
   return url.toString()

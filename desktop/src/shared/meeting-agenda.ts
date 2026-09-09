@@ -1,9 +1,14 @@
 import type { CalendarEventSummary } from './calendar-contract'
 import type { AgendaItem } from './generated/contracts'
 
-export type AgendaSource = { id: string; title: string; startedAt: string }
-export type MeetingAgendaDraft = { items: AgendaItem[]; sources: AgendaSource[] }
-export type AgendaHistory = AgendaSource & { emails: string[]; event?: CalendarEventSummary }
+export const INFERRED_CALENDAR_PROVENANCE = 'inferred'
+export const CONFIRMED_CALENDAR_PROVENANCE = 'confirmed'
+export type CalendarProvenance = typeof INFERRED_CALENDAR_PROVENANCE | typeof CONFIRMED_CALENDAR_PROVENANCE
+
+export type AgendaSource = { id: string; title: string; startedAt: string; calendarProvenance?: CalendarProvenance; calendarTitle?: string }
+export type MeetingAgendaDraft = { items: AgendaItem[]; historyIncomplete?: boolean; ambiguousMeetings?: AgendaSource[]; sources: AgendaSource[] }
+export type AgendaHistory = AgendaSource & { endedAt?: string; calendarReconciliationUnavailable?: boolean; calendarAmbiguous?: boolean; emails: string[]; event?: CalendarEventSummary }
+const DECLINED_STATUS = 'declined'
 const MAX_SOURCES = 12
 const RECENT_SOURCES = 6
 
@@ -13,7 +18,7 @@ export function normalizeInviteeEmail(email: string): string {
 
 export function inviteeEmails(event: CalendarEventSummary, selfEmails: string[]): string[] {
   const self = new Set([...selfEmails, event.accountEmail, ...(event.attendees ?? []).filter(person => person.self).map(person => person.email)].map(normalizeInviteeEmail))
-  return [...new Set((event.attendees ?? []).filter(person => !person.self).map(person => normalizeInviteeEmail(person.email)).filter(email => email && !self.has(email)))]
+  return [...new Set((event.attendees ?? []).filter(person => !person.self && person.responseStatus !== DECLINED_STATUS).map(person => normalizeInviteeEmail(person.email)).filter(email => email && !self.has(email)))]
 }
 
 export function matchAgendaHistory(event: CalendarEventSummary, history: AgendaHistory[], selfEmails: string[], now = Date.now()): AgendaSource[] {
@@ -24,7 +29,7 @@ export function matchAgendaHistory(event: CalendarEventSummary, history: AgendaH
   const ranked = matches.sort((a, b) => Number(b.series) - Number(a.series) || b.overlap - a.overlap || b.time - a.time)
   const selected = new Map(recent.map(match => [match.source.id, match.source]))
   for (const match of ranked) { if (selected.size >= MAX_SOURCES) break; selected.set(match.source.id, match.source) }
-  return [...selected.values()].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt)).map(({ id, title, startedAt }) => ({ id, title, startedAt }))
+  return [...selected.values()].sort((a, b) => Date.parse(a.startedAt) - Date.parse(b.startedAt)).map(({ id, title, startedAt, calendarProvenance, calendarTitle }) => ({ id, title, startedAt, ...(calendarProvenance ? { calendarProvenance, calendarTitle } : {}) }))
 }
 
 function rankSource(event: CalendarEventSummary, source: AgendaHistory, invitees: Set<string>, cutoff: number) {

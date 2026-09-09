@@ -25,6 +25,7 @@ type AgendaHistoryMeeting struct {
 	ID        string   `json:"id"`
 	Title     string   `json:"title"`
 	StartedAt string   `json:"startedAt"`
+	EndedAt   string   `json:"endedAt"`
 	Emails    []string `json:"emails"`
 }
 

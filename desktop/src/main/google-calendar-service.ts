@@ -1,3 +1,5 @@
+import { requestCommand } from './app-protocol'
+import { historicalCalendarRanges } from './calendar-history-ranges'
 import { shell } from 'electron'
 import type { CalendarSnapshot } from '../shared/calendar-contract'
 import { createSecureStore } from './electron-secure-store'
@@ -31,6 +33,7 @@ function calendarService(): GoogleCalendarServiceCore {
   const relay = config.googleClientId ? createOAuthRelay(config.googleRelayUrl) : null
   const api = new GoogleCalendarApi({
     clientId: config.googleClientId,
+    historyRanges: async () => historicalCalendarRanges((await requestCommand('meetings.agendaHistory', {})).meetings),
     tokenRequester: relay ? (request) => relay.requestTokens(request) : undefined,
     openExternal: (url) => shell.openExternal(url),
   })
