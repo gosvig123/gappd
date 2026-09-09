@@ -66,6 +66,8 @@ type CommandSpec struct {
 }
 
 var Commands = []CommandSpec{
+	{ID: "meetings.agendaHistory", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AgendaHistoryResponse](), Args: literalArgs("app", "meetings", "agenda-history", "--json")},
+	{ID: "meetings.agenda", Mode: CommandModeRequest, Input: typeOf[AgendaInput](), Output: typeOf[AgendaResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("agenda"), flag("title", "title", false), flag("meeting-ids", "meetingIds", false), lit("--json")}},
 	{ID: "meetings.people", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[PeopleResponse](), Args: literalArgs("app", "meetings", "people", "--json")},
 	{ID: "meetings.assignSpeaker", Mode: CommandModeRequest, Input: typeOf[AssignSpeakerInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("assign-speaker"), field("id"), flag("speaker-key", "speakerKey", false), flag("person-id", "personId", true), flag("name", "name", true), flag("email", "email", true), lit("--json")}},
 	{ID: "meetings.speakerClip", Mode: CommandModeRequest, Input: typeOf[SpeakerClipInput](), Output: typeOf[SpeakerClipResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("speaker-clip"), field("id"), flag("speaker-key", "speakerKey", false), flag("index", "index", true), lit("--json")}},

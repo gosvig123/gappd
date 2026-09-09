@@ -1,3 +1,4 @@
+import type { MeetingAgendaDraft } from './meeting-agenda'
 import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
@@ -48,6 +49,7 @@ export type IpcInvokeContract = {
     useLocal: OperationSpec<[], AIProviderStatus>
   }
   googleCalendar: {
+    generateAgenda: OperationSpec<[sourceId: string], MeetingAgendaDraft>
     snapshot: OperationSpec<[], CalendarSnapshot>
     connect: OperationSpec<[], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
@@ -91,6 +93,7 @@ export const IPC_OPERATIONS = {
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
   googleCalendar: {
+    generateAgenda: 'googleCalendar:generateAgenda',
     snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect',
     sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
   },

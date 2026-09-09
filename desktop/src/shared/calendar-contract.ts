@@ -13,6 +13,7 @@ export type CalendarEventSummary = {
   connectionId: string
   accountEmail: string
   calendarId: 'primary'
+  recurringEventId?: string
   eventId: string
   sourceId: string
   title: string

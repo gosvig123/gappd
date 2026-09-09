@@ -9,6 +9,7 @@ type GoogleParticipant = { email?: string; displayName?: string }
 type GoogleAttendee = GoogleParticipant & { responseStatus?: string; self?: boolean; resource?: boolean }
 
 export type GoogleEventItem = {
+  recurringEventId?: string
   id?: string
   status?: string
   summary?: string
@@ -29,6 +30,7 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
     connectionId, accountEmail,
     calendarId: PRIMARY_CALENDAR_ID,
     eventId: item.id,
+    recurringEventId: item.recurringEventId,
     sourceId: `${connectionId}:${PRIMARY_CALENDAR_ID}:${item.id}`,
     title: item.summary?.trim() || UNTITLED_EVENT,
     start, end, allDay,

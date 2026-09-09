@@ -130,3 +130,9 @@
     flex: 1;
   }
 }
+
+.meeting-agenda-draft { padding: 0 12px 12px; font-size: 13px; }
+.meeting-agenda-draft textarea { display: block; width: 100%; min-height: 64px; margin: 6px 0; color: inherit; background: transparent; font: inherit; }
+.meeting-agenda-draft blockquote { margin: 8px 0; opacity: .75; }
+
+.calendar-event-list { max-height: 60vh; overflow-y: auto; }

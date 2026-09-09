@@ -1,3 +1,4 @@
+import { generateMeetingAgenda } from './meeting-agenda'
 import os from 'node:os'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
@@ -64,6 +65,7 @@ const IPC_HANDLERS: MainHandlers = {
     useLocal: () => providerChanged(useLocalProvider),
   },
   googleCalendar: {
+    generateAgenda: (_event, sourceId) => generateMeetingAgenda(sourceId),
     snapshot: () => googleCalendarSnapshot(),
     connect: () => connectGoogleCalendar(),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),

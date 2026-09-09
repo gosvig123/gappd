@@ -24,7 +24,7 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const recordingReady = permissions.ready
-  const agenda = <GoogleCalendarAgenda canRecord={recordingReady && dashboard.canStart} onRecord={sourceId => void dashboard.actions.start(sourceId)} calendar={calendar} onOpenSettings={() => setSettingsOpen(true)} />
+  const agenda = <GoogleCalendarAgenda onOpenMeeting={id => void dashboard.actions.loadMeeting(id)} canRecord={recordingReady && dashboard.canStart} onRecord={sourceId => void dashboard.actions.start(sourceId)} calendar={calendar} onOpenSettings={() => setSettingsOpen(true)} />
   return <div className="app-shell"><AppHeader appReady settingsOpen={settingsOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((value) => !value)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main"><DashboardApp dashboard={dashboard} update={update} runtime={runtime} permissions={permissions} recordingReady={recordingReady} calendar={agenda} /></main>{settingsOpen ? <SettingsSheet currentVersion={update.status?.currentVersion} onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ status: runtime.status, loading: runtime.loading, busy: runtime.busy, onRepair: () => void runtime.prepare('repair') }} calendar={calendar} developerDebugEnabled={import.meta.env.DEV} /></SettingsSheet> : null}<PageSearch /></div>
 }
 

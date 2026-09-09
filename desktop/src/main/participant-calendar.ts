@@ -91,3 +91,7 @@ function serialize<T>(action: () => Promise<T>): Promise<T> {
   queue = operation.catch(() => undefined)
   return operation
 }
+
+export function savedMeetingCalendarContexts(): Promise<Record<string, ParticipantContext>> {
+  return serialize(async () => (await readLinks()).meetings)
+}

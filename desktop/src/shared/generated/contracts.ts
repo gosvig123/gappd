@@ -5,6 +5,32 @@ import type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapabilit
 
 export type EmptyInput = Record<string, never>
 
+export type AgendaHistoryResponse = {
+  meetings: AgendaHistoryMeeting[]
+}
+
+export type AgendaHistoryMeeting = {
+  id: string
+  title: string
+  startedAt: string
+  emails: string[]
+}
+
+export type AgendaInput = {
+  title: string
+  meetingIds: string
+}
+
+export type AgendaResponse = {
+  items: AgendaItem[]
+}
+
+export type AgendaItem = {
+  topic: string
+  sourceId: string
+  quote: string
+}
+
 export type PeopleResponse = {
   people: Person[]
 }

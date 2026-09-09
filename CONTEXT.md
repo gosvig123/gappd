@@ -16,6 +16,9 @@ A voice identified within one meeting, optionally linked to a saved person.
 **Calendar invitee**:
 A person listed on a calendar event whose attendance and voice identity still need confirmation.
 
+**Agenda draft**:
+Editable preparation for an upcoming calendar event, grounded in previous Meetings matched by Calendar invitee email addresses.
+
 **Google Calendar connection**:
 Read-only authorization for one Google account's primary calendar, with independent synchronization, errors, reconnect, and disconnect behavior.
 
@@ -30,6 +33,7 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** remain.
 - The renderer receives Calendar snapshots and account operations, never Google tokens or relay private keys.
+- An **Agenda draft** uses **Meeting** history, not email messages; generating it does not change Calendar or share the draft.
 
 ## Example dialogue
 
