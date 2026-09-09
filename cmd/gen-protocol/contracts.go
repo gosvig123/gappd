@@ -21,11 +21,8 @@ func renderContracts() string {
 	var b strings.Builder
 	b.WriteString(protocolHeader)
 	b.WriteString("\nimport type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
-	b.WriteString("import type { LiveActionDraft } from './live-actions'\n")
 	for _, typ := range collector.order {
-		if !isLiveActionType(typ) {
-			writeType(&b, typ)
-		}
+		writeType(&b, typ)
 	}
 	return b.String()
 }

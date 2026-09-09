@@ -12,7 +12,7 @@ help, bug reports, and roadmap discussion.
 - Detects supported meetings and prompts you to record.
 - Captures microphone and system audio with macOS ScreenCaptureKit.
 - Produces live transcripts with Apple SpeechTranscriber.
-- Generates local meeting summaries through managed llama.cpp.
+- Generates local meeting summaries and action items after recording ends through managed llama.cpp.
 - Stores searchable meeting history in SQLite.
 - Labels speakers with saved people and calendar suggestions, with short audio previews.
 - Recovers interrupted recordings and helps stop recording when a meeting ends.

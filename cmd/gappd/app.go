@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appGenerateLiveActionsCmd(), appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
@@ -186,7 +186,7 @@ func appMeetingDetailFor(store *db.DB, id string) (appprotocol.MeetingDetail, er
 	if err != nil {
 		return appprotocol.MeetingDetail{}, err
 	}
-	return withLiveActionDraft(store, appprotocol.BuildAppMeetingDetail(*meeting, segments))
+	return appprotocol.BuildAppMeetingDetail(*meeting, segments), nil
 }
 
 func loadMeetingDetail(store *db.DB, id string) (*db.Meeting, []db.Segment, error) {

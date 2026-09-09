@@ -3,7 +3,6 @@ import type { MeetingDetail } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import './meeting-detail.css'
 import './meeting-reading.css'
-import { LiveActionsPanel } from './live-actions-panel'
 import { SpeakerLabels } from './speaker-labels'
 import { Markdown } from '../components/markdown'
 import { meetingFailed, meetingHasWork, meetingProgressLabel, PostMeetingProgressCard, type MeetingProgressInput } from '../components/meeting-progress'
@@ -115,7 +114,6 @@ function DetailBody({ activeTab, onTabChange, selectedMeeting, transcript, hasTr
       <DiarizationTrustCue meeting={selectedMeeting} />
       <SpeakerLabels key={selectedMeeting.id} meeting={selectedMeeting} onUpdated={onUpdated} />
       {selectedMeeting.summaryUpdating ? <div className="summary-updating" role="status">Updating names in summary and action items…</div> : null}
-      {recording ? <LiveActionsPanel key={selectedMeeting.id} meeting={selectedMeeting} onUpdated={onUpdated} /> : null}
       <DetailTabs activeTab={activeTab} onChange={onTabChange} actions={actions} />
       <div className="detail-tab-body" key={activeTab}>
         {activeTab === SUMMARY_TAB ? <SummaryPanel selectedMeeting={selectedMeeting} hasTranscript={hasTranscript} reading={reading} /> : null}

@@ -5,7 +5,7 @@ import { usingSummaryRuntime } from './summary-runtime'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
 const DRAIN_RETRY_INTERVAL_MS = 60_000
-export type DrainPauseReason = 'recording' | 'sleep' | 'live-actions'
+export type DrainPauseReason = 'recording' | 'sleep'
 type Flight = { capability: ManagedRuntimeCapability; controller: AbortController; done?: Promise<void> }
 const pending = new Set<ManagedRuntimeCapability>()
 const pauseCounts = new Map<DrainPauseReason, number>()

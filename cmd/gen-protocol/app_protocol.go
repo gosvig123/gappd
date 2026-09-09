@@ -21,16 +21,14 @@ func renderAppProtocol() string {
 
 func appProtocolImports() string {
 	types := appProtocolTypeNames()
-	return fmt.Sprintf("\nimport type { %s } from './contracts'\nimport type { LiveActionsResponse } from './live-actions'\nimport type { RecordingProtocolEventType } from './protocol'\n", strings.Join(types, ", "))
+	return fmt.Sprintf("\nimport type { %s } from './contracts'\nimport type { RecordingProtocolEventType } from './protocol'\n", strings.Join(types, ", "))
 }
 
 func appProtocolTypeNames() []string {
 	seen := map[string]bool{}
 	for _, command := range appprotocol.Commands {
 		addTypeName(seen, inputTypeName(command))
-		if command.Output == nil || !isLiveActionType(command.Output) {
-			addTypeName(seen, outputTypeName(command))
-		}
+		addTypeName(seen, outputTypeName(command))
 		addTypeName(seen, eventTypeName(command))
 	}
 	return sortedKeys(seen)

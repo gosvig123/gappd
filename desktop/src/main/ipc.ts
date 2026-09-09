@@ -1,5 +1,4 @@
 import os from 'node:os'
-import { generateLiveActions } from './live-actions'
 import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { LOCAL_AI_PROVIDER_LLAMACPP } from '../shared/managed-local-ai'
@@ -42,7 +41,6 @@ const IPC_HANDLERS: MainHandlers = {
   meetings: {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
-    generateLiveActions: (_event, id: string) => generateLiveActions(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
     delete: (_event, id: string) => deleteMeeting(id),
     people: () => listPeople(),

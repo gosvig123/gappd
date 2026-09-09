@@ -1,4 +1,3 @@
-import type { LiveActionsResponse } from './generated/live-actions'
 import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
@@ -26,7 +25,6 @@ export type IpcInvokeContract = {
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
     show: OperationSpec<[id: string], MeetingDetail>
-    generateLiveActions: OperationSpec<[id: string], LiveActionsResponse>
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
     people: OperationSpec<[], SavedPerson[]>
@@ -85,7 +83,6 @@ export const IPC_OPERATIONS = {
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
   meetings: {
-    generateLiveActions: 'meetings:generateLiveActions',
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
     people: 'meetings:people', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',

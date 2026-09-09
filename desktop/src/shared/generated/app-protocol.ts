@@ -2,7 +2,6 @@
 // Source of truth: internal/db, internal/meetinglifecycle, internal/recording, internal/appprotocol.
 
 import type { AssignSpeakerInput, CodexStatusResponse, ConfigResponse, ConfigUseCodexInput, ConfigUseManagedLocalAIInput, DevicesResponse, EmptyInput, MeetingDeleteInput, MeetingDeleteResponse, MeetingResponse, MeetingShowInput, MeetingsResponse, PeopleResponse, ProcessingDrainInput, ProcessingDrainResponse, ProcessingPendingResponse, RecordStartInput, RecordingEvent, RecoverStaleRecordingsResponse, SpeakerClipInput, SpeakerClipResponse } from './contracts'
-import type { LiveActionsResponse } from './live-actions'
 import type { RecordingProtocolEventType } from './protocol'
 
 export type AppCommandInput = {
@@ -12,7 +11,6 @@ export type AppCommandInput = {
   'devices.list': EmptyInput
   'meetings.list': EmptyInput
   'meetings.show': MeetingShowInput
-  'meetings.generateLiveActions': MeetingShowInput
   'meetings.retryDiarization': MeetingShowInput
   'meetings.delete': MeetingDeleteInput
   'config.show': EmptyInput
@@ -32,7 +30,6 @@ export type AppCommandOutput = {
   'devices.list': DevicesResponse
   'meetings.list': MeetingsResponse
   'meetings.show': MeetingResponse
-  'meetings.generateLiveActions': LiveActionsResponse
   'meetings.retryDiarization': MeetingResponse
   'meetings.delete': MeetingDeleteResponse
   'config.show': ConfigResponse
@@ -60,7 +57,6 @@ export const APP_COMMANDS = {
   'devices.list': { mode: 'request', args: (_input: EmptyInput) => ['app', 'devices', '--json'], env: [], terminal: [] },
   'meetings.list': { mode: 'request', args: (_input: EmptyInput) => ['app', 'meetings', 'list', '--json'], env: [], terminal: [] },
   'meetings.show': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'show', String(input.id), '--json'], env: [], terminal: [] },
-  'meetings.generateLiveActions': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'generate-live-actions', String(input.id), '--json'], env: [], terminal: [] },
   'meetings.retryDiarization': { mode: 'request', args: (input: MeetingShowInput) => ['app', 'meetings', 'retry-diarization', String(input.id), '--json'], env: [], terminal: [] },
   'meetings.delete': { mode: 'request', args: (input: MeetingDeleteInput) => ['app', 'meetings', 'delete', String(input.id), '--json'], env: [], terminal: [] },
   'config.show': { mode: 'request', args: (_input: EmptyInput) => ['app', 'config', 'show', '--json'], env: [], terminal: [] },

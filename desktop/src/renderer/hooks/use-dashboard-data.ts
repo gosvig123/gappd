@@ -1,4 +1,3 @@
-import { readMeeting } from './live-actions-generation'
 import { useMemo, useRef, useState } from 'react'
 import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
 import { isPermissionErrorMessage } from '../components/meeting-status'
@@ -70,7 +69,7 @@ async function loadMeeting(id: string, refs: MeetingRefs, setState: SetDashboard
   const requestId = selectedRequest.next()
   startMeetingLoad(id, setState, refs)
   try {
-    const meeting = await readMeeting(id)
+    const meeting = await window.gappd.meetings.show(id)
     if (isCurrentMeeting(requestId, id, refs, selectedRequest)) applySelectedMeeting(meeting, setState, refs)
   } catch (err) {
     if (isCurrentMeeting(requestId, id, refs, selectedRequest)) failSelectedMeeting(err, setState, refs)

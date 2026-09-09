@@ -28,7 +28,7 @@ func main() {
 	lifecycleOut := flag.String("lifecycle-out", "desktop/src/shared/generated/lifecycle.ts", "lifecycle helper output path")
 	flag.Parse()
 
-	files := map[string]string{*protocolOut: renderProtocol(), *contractsOut: renderContracts(), *appOut: renderAppProtocol(), *lifecycleOut: renderLifecycle(), liveActionContractsPath(*contractsOut): renderLiveActionContracts()}
+	files := map[string]string{*protocolOut: renderProtocol(), *contractsOut: renderContracts(), *appOut: renderAppProtocol(), *lifecycleOut: renderLifecycle()}
 	if *check {
 		checkFiles(files)
 		return
