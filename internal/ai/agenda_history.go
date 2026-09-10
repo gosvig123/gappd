@@ -19,7 +19,7 @@ const agendaExtractSystem = `Extract source-grounded candidate followups AND all
 var agendaExtractSchema = strings.Replace(strings.Replace(agendaSchema, `"properties":{"items"`, `"properties":{"complete":{"type":"boolean"},"items"`, 1), `"required":["items"]`, `"required":["items","complete"]`, 1)
 
 func agendaLimit() error {
-	return fmt.Errorf("agenda: history exceeds bounded processing capacity (576000 transcript bytes, 96 sections, 24000 model-input content bytes per request); prepare this agenda manually from matched Meetings; no draft was generated")
+	return &AgendaCapacityError{Reason: "history exceeds 576000 transcript bytes, 96 initial sections, or 24000 model-input content bytes"}
 }
 
 func prepareAgendaSources(sources []AgendaSource) ([]AgendaSource, error) {
@@ -56,6 +56,9 @@ func agendaComplete(ctx context.Context, provider Provider, system, schema strin
 	}
 	if len(input)+len(system)+len(schema) > agendaRequestBytes {
 		return nil, agendaLimit()
+	}
+	if err := spendAgendaCall(ctx); err != nil {
+		return nil, err
 	}
 	raw, err := provider.CompleteJSON(ctx, CompletionRequest{System: system, User: string(input), JSONSchema: json.RawMessage(schema), MaxTokens: 2400, Temperature: 0.1})
 	if err != nil {
@@ -105,6 +108,7 @@ func generateAgendaHistory(ctx context.Context, provider Provider, title string,
 	if len(title) > 1000 {
 		return AgendaDraft{}, agendaLimit()
 	}
+	ctx = context.WithValue(ctx, agendaBudgetKey{}, &agendaCallBudget{})
 	sections, err := agendaSections(sources)
 	if err != nil {
 		return AgendaDraft{}, err
@@ -132,14 +136,14 @@ func synthesizeAgendaHistory(ctx context.Context, provider Provider, title strin
 func collectAgendaEvidence(ctx context.Context, provider Provider, title string, sections []AgendaSource) ([]agendaSectionEvidence, error) {
 	evidence := []agendaSectionEvidence{}
 	for _, section := range sections {
-		items, err := extractAgendaSection(ctx, provider, title, section)
+		items, err := adaptiveAgendaSection(ctx, provider, title, section)
 		if err != nil {
 			return nil, err
 		}
-		evidence = append(evidence, agendaSectionEvidence{section.ID, section.StartedAt, items})
+		evidence = appendAgendaEvidence(evidence, section, items)
 		input, _ := agendaInput(title, evidence)
 		if len(input)+len(agendaSystem)+len(agendaSchema) > agendaRequestBytes {
-			return nil, agendaLimit()
+			return nil, &AgendaCapacityError{Reason: "complete evidence ledger exceeds 24000 model-input content bytes after exact deduplication; all later resolutions must fit"}
 		}
 	}
 	return evidence, nil
@@ -152,16 +156,22 @@ func extractAgendaSection(ctx context.Context, provider Provider, title string, 
 		return nil, err
 	}
 	var status struct {
-		Complete bool `json:"complete"`
+		Complete *bool `json:"complete"`
 	}
 	if err = json.Unmarshal(raw, &status); err != nil {
 		return nil, fmt.Errorf("agenda: invalid extraction: %w", err)
 	}
-	if !status.Complete {
-		return nil, fmt.Errorf("agenda: section evidence exceeds extraction capacity (8 items); prepare this agenda manually from matched Meetings; no draft was generated")
+	if status.Complete == nil {
+		return nil, fmt.Errorf("agenda: extraction missing complete status")
 	}
 	draft, err := validateAgenda(raw, []AgendaSource{section})
-	return draft.Items, err
+	if err != nil {
+		return nil, err
+	}
+	if !*status.Complete {
+		return nil, errAgendaIncomplete
+	}
+	return draft.Items, nil
 }
 
 func validateAgendaLedger(draft AgendaDraft, evidence []agendaSectionEvidence) (AgendaDraft, error) {

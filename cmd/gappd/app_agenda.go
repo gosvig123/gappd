@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -48,6 +49,10 @@ func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource)
 	defer cancel()
 	draft, err := ai.GenerateAgenda(ctx, provider, title, sources)
 	if err != nil {
+		var capacity *ai.AgendaCapacityError
+		if errors.As(err, &capacity) {
+			return fmt.Errorf("generate agenda: %w", err)
+		}
 		return fmt.Errorf("generate agenda: %w; check your AI model in Settings or retry", err)
 	}
 	return writeJSON(appprotocol.BuildAgenda(draft))
