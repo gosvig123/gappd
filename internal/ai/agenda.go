@@ -28,6 +28,7 @@ const agendaSystem = `Create a meeting preparation draft from the supplied histo
 const agendaSchema = `{"type":"object","properties":{"items":{"type":"array","maxItems":8,"items":{"type":"object","properties":{"topic":{"type":"string"},"sourceId":{"type":"string"},"quote":{"type":"string"}},"required":["topic","sourceId","quote"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false}`
 
 func GenerateAgenda(ctx context.Context, provider Provider, title string, sources []AgendaSource) (AgendaDraft, error) {
+	ctx = context.WithValue(ctx, agendaBudgetKey{}, &agendaCallBudget{})
 	prepared, err := prepareAgendaSources(sources)
 	if err != nil {
 		return AgendaDraft{}, err

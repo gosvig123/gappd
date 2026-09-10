@@ -24,12 +24,18 @@ export type AgendaInput = {
 
 export type AgendaResponse = {
   items: AgendaItem[]
+  generation: AgendaGeneration
 }
 
 export type AgendaItem = {
   topic: string
   sourceId: string
   quote: string
+}
+
+export type AgendaGeneration = {
+  model?: string
+  reasoningEffort?: string
 }
 
 export type PeopleResponse = {
@@ -169,12 +175,31 @@ export type AIConfig = {
   managed: boolean
   codexExecutable: string
   codexModel: string
+  codexReasoningEffort: string
 }
 
 export type CodexStatusResponse = {
   ai: AIConfig
   available: boolean
   error?: string
+}
+
+export type ConfigCodexModelsInput = {
+  executable: string
+}
+
+export type CodexModelsResponse = {
+  models: CodexModelInfo[]
+  defaultModel: string
+  defaultReasoningEffort: string
+}
+
+export type CodexModelInfo = {
+  id: string
+  displayName: string
+  defaultReasoningEffort: string
+  reasoningEfforts: string[]
+  isDefault: boolean
 }
 
 export type ConfigUseManagedLocalAIInput = {
@@ -186,6 +211,7 @@ export type ConfigUseManagedLocalAIInput = {
 export type ConfigUseCodexInput = {
   executable: string
   model: string
+  reasoningEffort: string
 }
 
 export type ProcessingPendingResponse = {

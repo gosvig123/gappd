@@ -44,10 +44,24 @@ func TestAgendaRollingRejectsFabricatedAndJoinedQuotes(t *testing.T) {
 	for _, quote := range []string{"First statement here. Last statement here.", "Invented unsupported evidence."} {
 		index, occurrence := -1, 0
 		raw, _ := json.Marshal(map[string]any{"items": []agendaSelection{{AgendaItem{"Confirm status?", "x", quote}, &index, &occurrence}}})
-		p := &fakeProvider{contents: []string{string(raw)}}
+		p := &fakeProvider{contents: []string{string(raw), string(raw)}}
 		if _, err := rollAgendaSection(context.Background(), p, "Next", section, nil); err == nil {
 			t.Fatal("accepted unsupported quote")
 		}
+	}
+}
+
+func TestAgendaRollingCorrectsOneAbsentNewQuote(t *testing.T) {
+	section := agendaSection{AgendaSource: AgendaSource{ID: "x", Text: "Exact supported statement."}}
+	bad := `{"items":[{"topic":"Confirm status?","sourceId":"x","quote":"Absent fabricated statement.","retainedIndex":-1,"quoteOccurrence":0}]}`
+	good := `{"items":[{"topic":"Confirm status?","sourceId":"x","quote":"Exact supported statement.","retainedIndex":-1,"quoteOccurrence":0}]}`
+	p := &fakeProvider{contents: []string{bad, good}}
+	items, err := rollAgendaSection(context.Background(), p, "Next", section, nil)
+	if err != nil || len(items) != 1 || len(p.requests) != 2 {
+		t.Fatalf("items=%d calls=%d err=%v", len(items), len(p.requests), err)
+	}
+	if !strings.Contains(p.requests[1].System, "case-sensitively") {
+		t.Fatal("missing strict correction")
 	}
 }
 

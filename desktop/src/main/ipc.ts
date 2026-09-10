@@ -6,7 +6,8 @@ import { LOCAL_AI_PROVIDER_LLAMACPP } from '../shared/managed-local-ai'
 import { requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime'
-import { configureCodex, providerStatus, useLocalProvider } from './ai-provider'
+import { configureCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
+import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda-drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
 import { assignSpeaker, deleteMeeting, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
@@ -61,11 +62,18 @@ const IPC_HANDLERS: MainHandlers = {
   },
   aiProvider: {
     status: () => refreshedProviderStatus(),
+    models: (_event, executable?: string) => providerModels(executable),
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),
   },
+  agenda: {
+    load: (_event, draftKey: string) => loadSavedAgenda(draftKey),
+    list: () => listSavedAgendas(),
+    save: (_event, input) => saveAgendaTopics(input),
+    remove: (_event, draftKey: string) => removeSavedAgenda(draftKey),
+  },
   googleCalendar: {
-    generateAgenda: (_event, sourceId) => generateMeetingAgenda(sourceId),
+    generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
     connect: () => connectGoogleCalendar(),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),

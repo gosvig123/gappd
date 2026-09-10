@@ -1,23 +1,30 @@
 import { reconcileAgendaHistory, agendaReconciliationStatus, agendaCalendarSyncIds, agendaHistoryWarning } from '../shared/calendar-reconciliation'
-import type { CalendarSnapshot } from '../shared/calendar-contract'
+import type { CalendarEventSummary, CalendarSnapshot } from '../shared/calendar-contract'
+import type { GeneratedAgenda } from '../shared/agenda-draft'
 import type { AgendaHistory, MeetingAgendaDraft } from '../shared/meeting-agenda'
 import { calendarEventIsUpcoming, inviteeEmails, matchAgendaHistory } from '../shared/meeting-agenda'
+import { persistGeneratedAgenda } from './agenda-drafts'
 import { requestCommand } from './app-protocol'
 import { googleCalendarSnapshot, googleCalendarPendingSyncIds, syncGoogleCalendar } from './google-calendar-service'
 import { savedMeetingCalendarContexts } from './participant-calendar'
 import { usingSummaryRuntime } from './summary-runtime'
 
-export async function generateMeetingAgenda(sourceId: string): Promise<MeetingAgendaDraft> {
-  const { snapshot, history } = await prepareAgendaHistory(sourceId)
-  const event = snapshot.events.find(event => event.sourceId === sourceId)
+export async function generateMeetingAgenda(input: { sourceId: string; expectedRevision: number }): Promise<GeneratedAgenda> {
+  const { snapshot, history } = await prepareAgendaHistory(input.sourceId)
+  const event = snapshot.events.find(event => event.sourceId === input.sourceId)
   if (!event || !calendarEventIsUpcoming(event)) throw new Error('This Calendar event is no longer upcoming. Refresh Calendar.')
   const selfEmails = snapshot.connections.map(connection => connection.email)
-  if (!inviteeEmails(event, selfEmails).length) return { items: [], sources: [] }
+  const result = await generateAgendaDraft(event, history, snapshot, selfEmails)
+  return persistGeneratedAgenda({ event, draft: result.draft, generation: result.generation, expectedRevision: input.expectedRevision })
+}
+
+async function generateAgendaDraft(event: CalendarEventSummary, history: AgendaHistory[], snapshot: CalendarSnapshot, selfEmails: string[]): Promise<{ draft: MeetingAgendaDraft; generation?: { model?: string; reasoningEffort?: string } }> {
   const reconciliation = { ...agendaReconciliationStatus(history), historyWarning: agendaHistoryWarning(history, snapshot) }
+  if (!inviteeEmails(event, selfEmails).length) return { draft: { items: [], sources: [] } }
   const sources = matchAgendaHistory(event, history, selfEmails)
-  if (!sources.length) return { items: [], sources: [], ...reconciliation }
+  if (!sources.length) return { draft: { items: [], sources: [], ...reconciliation } }
   const result = await usingSummaryRuntime(() => requestCommand('meetings.agenda', { title: event.title, meetingIds: sources.map(source => source.id).join(',') }, {}, AbortSignal.timeout(20 * 60 * 1000 + 5000)))
-  return { items: result.items, sources, ...reconciliation }
+  return { draft: { items: result.items, sources, ...reconciliation }, generation: result.generation }
 }
 
 async function prepareAgendaHistory(sourceId: string): Promise<{ snapshot: CalendarSnapshot; history: AgendaHistory[] }> {

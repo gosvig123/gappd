@@ -107,3 +107,20 @@ test('Calendar sync busy copy and distinct residual warnings retain editable top
     assert.match(render({ draft: { ...draft, items: [] } }), new RegExp(historyWarning))
   }
 })
+
+test('saved agenda states, unavailable regeneration and removed sources stay visible', () => {
+  const draft = { sources: [source], items: [{ topic: 'Keep my topic', sourceId: source.id, quote: 'Evidence' }], model: 'gpt-5.6-terra', reasoningEffort: 'medium', generatedAt: '2026-09-10T09:00:00.000Z' }
+  const saved = render({ draft, saveState: 'clean' })
+  assert.match(saved, /Saved locally/)
+  assert.match(saved, /gpt-5.6-terra · medium reasoning/)
+  assert.match(render({ draft, saveState: 'saving' }), /Saving…/)
+  assert.match(render({ draft, saveState: 'failed' , onRetrySave: noop }), /Not saved yet/)
+  assert.match(render({ draft, saveState: 'failed', onRetrySave: noop }), /Retry save/)
+  assert.match(render({ draft, saveState: 'conflict', onReloadSaved: noop }), /Reload saved version/)
+  const blocked = elements(Component({ ...base, draft, canGenerate: false })).find(node => node.type === 'button')
+  assert.equal(blocked.props.disabled, true)
+  assert.match(render({ draft, canGenerate: false }), /Regeneration is off for this event/)
+  assert.match(render({ draft: { ...draft, sources: [{ ...source, id: 'deleted-meeting' }], items: [{ topic: 'Keep my topic', sourceId: 'deleted-meeting', quote: 'Evidence' }] }, knownMeetingIds: new Set() }), /Source Meeting removed: Planning source/)
+  assert.match(render({ draft, onDeleteSaved: noop }), /Delete saved agenda/)
+  assert.doesNotMatch(render({ draft }), /Delete saved agenda/)
+})

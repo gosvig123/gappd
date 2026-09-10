@@ -1,3 +1,4 @@
+import { agendaDraftKey } from '../../shared/agenda-draft'
 import { calendarEventIsUpcoming } from '../../shared/meeting-agenda'
 import { MeetingAgendaDraftPanel } from './meeting-agenda-draft'
 import type { CalendarEventSummary } from '../../shared/calendar-contract'
@@ -6,12 +7,12 @@ import { RefreshIcon } from './icons'
 import { Button } from './ui'
 import './google-calendar.css'
 
-export function GoogleCalendarAgenda({ calendar, onOpenSettings, onRecord, canRecord, onOpenMeeting }: { onOpenMeeting: (id: string) => void; onRecord: (sourceId: string) => void; canRecord: boolean; calendar: GoogleCalendarController; onOpenSettings: () => void }) {
+export function GoogleCalendarAgenda({ calendar, onOpenSettings, onRecord, canRecord, onOpenMeeting, knownMeetingIds }: { onOpenMeeting: (id: string) => void; onRecord: (sourceId: string) => void; canRecord: boolean; calendar: GoogleCalendarController; onOpenSettings: () => void; knownMeetingIds?: ReadonlySet<string> }) {
   if (calendar.loading || !calendar.snapshot?.configured) return null
   const connections = calendar.snapshot.connections
   const events = calendar.snapshot.events.filter((event) => calendarEventIsUpcoming(event))
   if (!connections.length) return <section className="calendar-agenda calendar-agenda-empty"><div><strong>Upcoming calendar</strong><span>Connect Google Calendar to see upcoming events beside your meetings.</span></div><Button onClick={onOpenSettings}>Open Settings</Button></section>
-  return <section className="calendar-agenda" aria-label="Upcoming Google Calendar events"><div className="calendar-agenda-head"><div><strong>Upcoming calendar</strong><span>{eventCountLabel(events.length, connections.length)}</span></div><Button className="compact-action" disabled={Boolean(calendar.busy)} onClick={() => void calendar.syncAll()}><RefreshIcon aria-hidden="true" />{calendar.busy === 'sync-all' ? 'Refreshing…' : 'Refresh'}</Button></div>{calendar.error ? <div className="calendar-agenda-error" role="alert">{calendar.error}</div> : null}{events.length ? <div className="calendar-event-list">{events.map((event) => <div key={event.sourceId}><CalendarEvent event={event} onRecord={onRecord} canRecord={canRecord} />{calendarEventIsUpcoming(event) ? <MeetingAgendaDraftPanel sourceId={event.sourceId} onOpenMeeting={onOpenMeeting} onOpenSettings={onOpenSettings} /> : null}</div>)}</div> : <div className="calendar-agenda-none">No upcoming Calendar events.</div>}</section>
+  return <section className="calendar-agenda" aria-label="Upcoming Google Calendar events"><div className="calendar-agenda-head"><div><strong>Upcoming calendar</strong><span>{eventCountLabel(events.length, connections.length)}</span></div><Button className="compact-action" disabled={Boolean(calendar.busy)} onClick={() => void calendar.syncAll()}><RefreshIcon aria-hidden="true" />{calendar.busy === 'sync-all' ? 'Refreshing…' : 'Refresh'}</Button></div>{calendar.error ? <div className="calendar-agenda-error" role="alert">{calendar.error}</div> : null}{events.length ? <div className="calendar-event-list">{events.map((event) => <div key={event.sourceId}><CalendarEvent event={event} onRecord={onRecord} canRecord={canRecord} />{calendarEventIsUpcoming(event) ? <MeetingAgendaDraftPanel draftKey={agendaDraftKey(event)} sourceId={event.sourceId} canGenerate knownMeetingIds={knownMeetingIds} onOpenMeeting={onOpenMeeting} onOpenSettings={onOpenSettings} /> : null}</div>)}</div> : <div className="calendar-agenda-none">No upcoming Calendar events.</div>}</section>
 }
 
 function CalendarEvent({ event, onRecord, canRecord }: { event: CalendarEventSummary; onRecord: (sourceId: string) => void; canRecord: boolean }) {

@@ -52,7 +52,6 @@ func generateAgendaHistory(ctx context.Context, provider Provider, title string,
 	if err != nil {
 		return AgendaDraft{}, err
 	}
-	ctx = context.WithValue(ctx, agendaBudgetKey{}, &agendaCallBudget{})
 	items, err := selectAgendaPartitions(ctx, provider, title, sources, sections)
 	if err != nil {
 		return AgendaDraft{}, err
@@ -65,7 +64,11 @@ func rollAgendaSection(ctx context.Context, provider Provider, title string, sec
 	if err != nil {
 		return nil, err
 	}
-	return validateRollingAgenda(raw, section, items)
+	result, err := validateRollingAgenda(raw, section, items)
+	if err != nil {
+		return correctAgendaSection(ctx, provider, title, section, items, err)
+	}
+	return result, nil
 }
 
 func agendaChunkCut(text string, limit int) int {

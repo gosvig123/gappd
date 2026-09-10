@@ -55,7 +55,12 @@ func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource)
 		}
 		return fmt.Errorf("generate agenda: %w; check your AI model in Settings or retry", err)
 	}
-	return writeJSON(appprotocol.BuildAgenda(draft))
+	return writeJSON(appprotocol.BuildAgenda(draft, agendaGenerationFor(provider, settings)))
+}
+
+func agendaGenerationFor(provider ai.Provider, settings config.AI) appprotocol.AgendaGeneration {
+	generation := providerGenerationFor(provider, settings)
+	return appprotocol.AgendaGeneration{Model: generation.Model, ReasoningEffort: generation.Effort}
 }
 
 func agendaSources(store *db.DB, ids []string) ([]ai.AgendaSource, error) {

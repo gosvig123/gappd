@@ -1,10 +1,11 @@
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { AppHeader } from './components/app-header'
 import { GoogleCalendarAgenda } from './components/google-calendar-agenda'
 import { ManagedRuntimeBanner } from './components/managed-runtime-banner'
 import { MeetingAnnouncements } from './components/meeting-announcements'
 import { PageSearch } from './components/page-search'
 import { PermissionBanner } from './components/permission-banner'
+import { SavedAgendas } from './components/saved-agendas'
 import { SettingsSheet } from './components/settings-sheet'
 import { UpdateBanner } from './components/update-banner'
 import { Banner, Button } from './components/ui'
@@ -24,7 +25,8 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const recordingReady = permissions.ready
-  const agenda = <GoogleCalendarAgenda onOpenMeeting={id => void dashboard.actions.loadMeeting(id)} canRecord={recordingReady && dashboard.canStart} onRecord={sourceId => void dashboard.actions.start(sourceId)} calendar={calendar} onOpenSettings={() => setSettingsOpen(true)} />
+  const knownMeetingIds = useMemo(() => new Set(dashboard.meetings.map((meeting) => meeting.id)), [dashboard.meetings])
+  const agenda = <><GoogleCalendarAgenda onOpenMeeting={id => void dashboard.actions.loadMeeting(id)} canRecord={recordingReady && dashboard.canStart} onRecord={sourceId => void dashboard.actions.start(sourceId)} calendar={calendar} knownMeetingIds={knownMeetingIds} onOpenSettings={() => setSettingsOpen(true)} /><SavedAgendas calendar={calendar} knownMeetingIds={knownMeetingIds} onOpenMeeting={id => void dashboard.actions.loadMeeting(id)} onOpenSettings={() => setSettingsOpen(true)} /></>
   return <div className="app-shell"><AppHeader appReady settingsOpen={settingsOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((value) => !value)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main"><DashboardApp dashboard={dashboard} update={update} runtime={runtime} permissions={permissions} recordingReady={recordingReady} calendar={agenda} /></main>{settingsOpen ? <SettingsSheet currentVersion={update.status?.currentVersion} onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ status: runtime.status, loading: runtime.loading, busy: runtime.busy, onRepair: () => void runtime.prepare('repair') }} calendar={calendar} developerDebugEnabled={import.meta.env.DEV} /></SettingsSheet> : null}<PageSearch /></div>
 }
 

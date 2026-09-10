@@ -11,6 +11,7 @@ import { GoogleCalendarServiceCore } from './google-calendar-service-core.ts'
 import type { CalendarDocument } from './google-calendar-service-core'
 import type { CalendarSnapshot, CalendarEventSummary } from '../shared/calendar-contract'
 import type { ParticipantContext } from '../shared/participant-contract'
+import type { GeneratedAgenda } from '../shared/agenda-draft'
 
 const meeting = { id: 'past', title: 'Past', startedAt: '2026-01-01T10:00:00Z', endedAt: '2026-01-01T11:00:00Z', emails: [] as string[] }
 const range = { start: Date.parse(meeting.startedAt), end: Date.parse(meeting.endedAt) }
@@ -26,14 +27,17 @@ function fixture(service: Record<string, unknown> = {}) {
     snapshot.connections.find(connection => connection.id === id)!.historyRanges = [range]
     snapshot.events.push(past)
   } }
-  const generate = loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
+  const persistCalls: Array<{ event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }> = []
+  const module = loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
     '../shared/calendar-reconciliation': reconciliation, '../shared/meeting-agenda': agenda,
     './google-calendar-service': { googleCalendarPendingSyncIds: () => f.pending, googleCalendarSnapshot: async () => snapshot, syncGoogleCalendar: async (id: string) => { calls.push(id); await f.sync(id) }, ...service },
     './participant-calendar': { savedMeetingCalendarContexts: async () => contexts },
-    './app-protocol': { requestCommand: async (id: string) => id === 'meetings.agendaHistory' ? { meetings } : { items: [] } },
+    './app-protocol': { requestCommand: async (id: string) => id === 'meetings.agendaHistory' ? { meetings } : { items: [], generation: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' } } },
     './summary-runtime': { usingSummaryRuntime: async (work: () => Promise<unknown>) => work() },
-  }, { AbortSignal }).generateMeetingAgenda
-  return { ...f, generate, state: f }
+    './agenda-drafts': { persistGeneratedAgenda: async (input: { event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }) => { persistCalls.push(input); return { draft: input.draft, saved: true, revision: 1, generatedAt: '2026-01-01T00:00:00.000Z', model: input.generation?.model ?? '', reasoningEffort: input.generation?.reasoningEffort ?? '' } as GeneratedAgenda } },
+  }, { AbortSignal })
+  const generate = async (sourceId: string) => (await module.generateMeetingAgenda({ sourceId, expectedRevision: 0 })).draft
+  return { ...f, generate, persistCalls, state: f }
 }
 
 test('legacy missing history warns before sync and generation recovers automatically', async () => {
@@ -158,4 +162,20 @@ test('successful sync with residual missing coverage is attempted only once', as
   assert.deepEqual(f.calls, ['account'])
   assert.equal(draft.historyIncomplete, true)
   assert.match(draft.historyWarning, /coverage is still incomplete/)
+})
+
+test('generated agendas persist with the trusted event identity and generation snapshot', async () => {
+  const f = fixture()
+  await f.generate('next')
+  assert.equal(f.persistCalls.length, 1)
+  assert.equal(f.persistCalls[0].event.sourceId, 'next')
+  assert.equal(f.persistCalls[0].generation?.model, 'gpt-5.6-terra')
+  assert.equal(f.persistCalls[0].generation?.reasoningEffort, 'medium')
+  assert.deepEqual((f.persistCalls[0].draft as { sources: Array<{ id: string }> }).sources.map(source => source.id), ['past'])
+})
+
+test('failed generation never reaches persistence', async () => {
+  const f = fixture()
+  await assert.rejects(f.generate('event-that-left-the-window'), /no longer upcoming/)
+  assert.equal(f.persistCalls.length, 0)
 })

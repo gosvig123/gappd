@@ -8,17 +8,24 @@ type AgendaInput struct {
 }
 
 type AgendaResponse struct {
-	Items []AgendaItem `json:"items"`
+	Items      []AgendaItem     `json:"items"`
+	Generation AgendaGeneration `json:"generation"`
+}
+
+// AgendaGeneration records the provider snapshot that produced a draft.
+type AgendaGeneration struct {
+	Model           string `json:"model,omitempty"`
+	ReasoningEffort string `json:"reasoningEffort,omitempty"`
 }
 
 type AgendaItem ai.AgendaItem
 
-func BuildAgenda(draft ai.AgendaDraft) AgendaResponse {
+func BuildAgenda(draft ai.AgendaDraft, generation AgendaGeneration) AgendaResponse {
 	items := make([]AgendaItem, 0, len(draft.Items))
 	for _, item := range draft.Items {
 		items = append(items, AgendaItem(item))
 	}
-	return AgendaResponse{Items: items}
+	return AgendaResponse{Items: items, Generation: generation}
 }
 
 type AgendaHistoryMeeting struct {

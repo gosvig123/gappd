@@ -1,4 +1,5 @@
 import type { MeetingAgendaDraft } from './meeting-agenda'
+import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
@@ -11,8 +12,11 @@ export type CapturePermissions = { microphone: string; screen: string; details?:
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
-export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; available: boolean; error?: string }
-export type CodexConfigurationInput = { executable: string; model: string }
+export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; codexReasoningEffort: string; available: boolean; error?: string }
+export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
+export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
+export type CodexModelCatalog = { models: CodexModelOption[]; defaultModel: string; defaultReasoningEffort: string }
+export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -45,11 +49,18 @@ export type IpcInvokeContract = {
   }
   aiProvider: {
     status: OperationSpec<[], AIProviderStatus>
+    models: OperationSpec<[executable?: string], CodexModelCatalog>
     configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
     useLocal: OperationSpec<[], AIProviderStatus>
   }
+  agenda: {
+    load: OperationSpec<[draftKey: string], SavedAgendaDraft | null>
+    list: OperationSpec<[], SavedAgendaDraft[]>
+    save: OperationSpec<[input: AgendaDraftSaveInput], AgendaDraftWriteResult>
+    remove: OperationSpec<[draftKey: string], AgendaDraftRemoveResult>
+  }
   googleCalendar: {
-    generateAgenda: OperationSpec<[sourceId: string], MeetingAgendaDraft>
+    generateAgenda: OperationSpec<[input: GenerateAgendaInput], GeneratedAgenda>
     snapshot: OperationSpec<[], CalendarSnapshot>
     connect: OperationSpec<[], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
@@ -91,7 +102,8 @@ export const IPC_OPERATIONS = {
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
-  aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  aiProvider: { status: 'aiProvider:status', models: 'aiProvider:models', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  agenda: { load: 'agenda:load', list: 'agenda:list', save: 'agenda:save', remove: 'agenda:remove' },
   googleCalendar: {
     generateAgenda: 'googleCalendar:generateAgenda',
     snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect',
