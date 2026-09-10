@@ -9,7 +9,7 @@ import (
 )
 
 func agendaCorrectionProvider() *fakeProvider {
-	return &fakeProvider{contents: []string{agendaCorrectionResponse(agendaCorrectionSelection("we will send the proposal.", -1, 0)), agendaCorrectionResponse(agendaCorrectionSelection("We will send the proposal.", -1, 0))}}
+	return &fakeProvider{contents: []string{agendaCorrectionResponse(agendaCorrectionSelection("we will send the proposal.", -1, 0)), agendaExcerptResponse()}}
 }
 
 func TestAgendaCorrectionSharesGlobalCallBudget(t *testing.T) {
@@ -39,14 +39,20 @@ func agendaCorrectionSizedSection(t *testing.T, target int, correction bool) age
 	system := agendaRollingSystem
 	if correction {
 		bad := agendaCorrectionSelection("we will send the proposal.", -1, 0)
-		input, _ = json.Marshal(agendaCorrectionInput{agendaRollingInput{"Next", []agendaSection{section}, nil}, []agendaRejectedSelection{{0, agendaAbsentNewQuote, bad}}})
+		source, _ := agendaCorrectionEvidence(section, nil)
+		input, _ = json.Marshal(agendaCorrectionInput{"Next", []agendaExcerptSection{source}, nil, []agendaRejectedSelection{{0, agendaAbsentNewQuote, bad}}})
 		system = agendaCorrectionSystem
 	}
-	padding := target - len(input) - len(system) - len(agendaRollingSchema)
+	schema := agendaRollingSchema
+	if correction {
+		schema = agendaCorrectionSchema
+	}
+	padding := target - len(input) - len(system) - len(schema)
 	if padding < 0 {
 		t.Fatal("invalid fixture bound")
 	}
-	section.Text += strings.Repeat("x", padding)
+	// Metadata padding does not add excerpts or change their serialized overhead.
+	section.Title += strings.Repeat("x", padding)
 	return section
 }
 

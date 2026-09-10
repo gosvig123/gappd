@@ -37,12 +37,12 @@ func TestAgendaCorrectionCapturedPatternClasses(t *testing.T) {
 	for name, quotes := range cases {
 		t.Run(name, func(t *testing.T) {
 			section, _ := agendaCorrectionFixture()
-			p := &fakeProvider{contents: []string{agendaCorrectionResponse(agendaCorrectionSelection(quotes[0], -1, 0)), agendaCorrectionResponse(agendaCorrectionSelection(quotes[1], -1, 0))}}
+			p := &fakeProvider{contents: []string{agendaCorrectionResponse(agendaCorrectionSelection(quotes[0], -1, 0)), agendaExcerptResponse()}}
 			items, err := rollAgendaSection(context.Background(), p, "Next", section, nil)
-			if err != nil || len(items) != 1 || items[0].Quote != quotes[1] || len(p.requests) != 2 {
+			if err != nil || len(items) != 1 || !strings.Contains(items[0].Quote, quotes[1]) || len(p.requests) != 2 {
 				t.Fatalf("items=%v calls=%d err=%v", items, len(p.requests), err)
 			}
-			if items[0].QuoteStart != section.TextStart+strings.Index(section.Text, quotes[1]) {
+			if items[0].QuoteStart != section.TextStart+strings.Index(section.Text, items[0].Quote) {
 				t.Fatal("lost exact provenance")
 			}
 		})
@@ -55,7 +55,7 @@ func TestAgendaCorrectionAggregatesIndicesAndPreservesOriginalInput(t *testing.T
 	retained.SourceID = prior[0].SourceID
 	good := agendaCorrectionSelection("We will send the proposal.", -1, 0)
 	bad := []agendaSelection{good, agendaCorrectionSelection("we will send the proposal.", -1, 0), retained, agendaCorrectionSelection("Absent statement from this Meeting.", -1, 0)}
-	p := &fakeProvider{contents: []string{agendaCorrectionResponse(bad...), agendaCorrectionResponse(good, retained)}}
+	p := &fakeProvider{contents: []string{agendaCorrectionResponse(bad...), `{"items":[{"topic":"Confirm status?","evidenceIndex":1},{"topic":"Confirm status?","evidenceIndex":0}]}`}}
 	items, err := rollAgendaSection(context.Background(), p, "Next", section, prior)
 	if err != nil || len(items) != 2 || len(p.requests) != 2 {
 		t.Fatalf("items=%d calls=%d err=%v", len(items), len(p.requests), err)
@@ -65,7 +65,8 @@ func TestAgendaCorrectionAggregatesIndicesAndPreservesOriginalInput(t *testing.T
 		t.Fatal(err)
 	}
 	want := []agendaRejectedSelection{{1, agendaAbsentNewQuote, bad[1]}, {3, agendaAbsentNewQuote, bad[3]}}
-	if !reflect.DeepEqual(input.Rejected, want) || !reflect.DeepEqual(input.agendaRollingInput, agendaRollingInput{"Next", []agendaSection{section}, prior}) {
+	source, _ := agendaCorrectionEvidence(section, prior)
+	if !reflect.DeepEqual(input.Rejected, want) || input.Title != "Next" || !reflect.DeepEqual(input.Sources, []agendaExcerptSection{source}) || !reflect.DeepEqual(input.Candidates, prior) {
 		t.Fatal("correction omitted failed indices or changed original source/state")
 	}
 	if items[1].QuoteStart != prior[0].QuoteStart || items[1].Quote != prior[0].Quote {
@@ -88,7 +89,7 @@ func TestAgendaCorrectionExplicitOmission(t *testing.T) {
 	bad := agendaCorrectionSelection("Absent statement from this Meeting.", -1, 0)
 	good := agendaCorrectionSelection("We will send the proposal.", -1, 0)
 	for _, corrected := range [][]agendaSelection{nil, {good}} {
-		p := &fakeProvider{contents: []string{agendaCorrectionResponse(bad, good), agendaCorrectionResponse(corrected...)}}
+		p := &fakeProvider{contents: []string{agendaCorrectionResponse(bad, good), agendaExcerptResponseForCount(len(corrected))}}
 		items, err := rollAgendaSection(context.Background(), p, "Next", section, nil)
 		if err != nil || items == nil || len(items) != len(corrected) || len(p.requests) != 2 {
 			t.Fatalf("items=%v calls=%d err=%v", items, len(p.requests), err)

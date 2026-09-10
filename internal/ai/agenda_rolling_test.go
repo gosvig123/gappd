@@ -54,7 +54,7 @@ func TestAgendaRollingRejectsFabricatedAndJoinedQuotes(t *testing.T) {
 func TestAgendaRollingCorrectsOneAbsentNewQuote(t *testing.T) {
 	section := agendaSection{AgendaSource: AgendaSource{ID: "x", Text: "Exact supported statement."}}
 	bad := `{"items":[{"topic":"Confirm status?","sourceId":"x","quote":"Absent fabricated statement.","retainedIndex":-1,"quoteOccurrence":0}]}`
-	good := `{"items":[{"topic":"Confirm status?","sourceId":"x","quote":"Exact supported statement.","retainedIndex":-1,"quoteOccurrence":0}]}`
+	good := `{"items":[{"topic":"Confirm status?","evidenceIndex":0}]}`
 	p := &fakeProvider{contents: []string{bad, good}}
 	items, err := rollAgendaSection(context.Background(), p, "Next", section, nil)
 	if err != nil || len(items) != 1 || len(p.requests) != 2 {
