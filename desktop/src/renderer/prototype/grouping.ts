@@ -23,24 +23,35 @@ function bucketOf(meeting: MeetingListItem, now: Date): MeetingGroup['key'] {
   return 'earlier'
 }
 
-export type SearchHit = { meeting: MeetingListItem; reason: string }
+export type SearchHit = { meeting: MeetingListItem; field: string; excerpt: string }
 
-/** Meeting search: title, People, summary, and transcript text. */
-export function searchMeetings(meetings: MeetingListItem[], details: Map<string, { summary?: string; transcriptText?: string; speakers: Array<{ name: string }> }>, query: string): SearchHit[] {
+type DetailLike = { summary?: string; transcriptText?: string; speakers: Array<{ name: string }> }
+
+/** Meeting search: title, People, notes, and transcript text. */
+export function searchMeetings(meetings: MeetingListItem[], details: Map<string, DetailLike>, query: string): SearchHit[] {
   const term = query.trim().toLowerCase()
   if (!term) return []
-  return meetings
-    .map((meeting) => ({ meeting, reason: matchReason(meeting, details.get(meeting.id), term) }))
-    .filter((hit): hit is SearchHit => Boolean(hit.reason))
+  return meetings.flatMap((meeting) => matchHit(meeting, details.get(meeting.id), term) ?? [])
 }
 
-function matchReason(meeting: MeetingListItem, detail: { summary?: string; transcriptText?: string; speakers: Array<{ name: string }> } | undefined, term: string): string | null {
-  if (meeting.title.toLowerCase().includes(term)) return 'Title'
+function matchHit(meeting: MeetingListItem, detail: DetailLike | undefined, term: string): SearchHit | null {
+  if (meeting.title.toLowerCase().includes(term)) return { meeting, field: 'Title', excerpt: '' }
   const person = detail?.speakers.find((speaker) => speaker.name.toLowerCase().includes(term))
-  if (person) return `Speaker · ${person.name}`
-  if (detail?.summary?.toLowerCase().includes(term)) return `Notes · ${excerpt(detail.summary, term)}`
-  if (detail?.transcriptText?.toLowerCase().includes(term)) return `Transcript · ${excerpt(detail.transcriptText, term)}`
+  if (person) return { meeting, field: 'Speaker', excerpt: person.name }
+  if (detail?.summary && plainText(detail.summary).toLowerCase().includes(term)) return { meeting, field: 'Notes', excerpt: excerpt(plainText(detail.summary), term, 62) }
+  if (detail?.transcriptText && plainText(detail.transcriptText).toLowerCase().includes(term)) return { meeting, field: 'Transcript', excerpt: excerpt(plainText(detail.transcriptText), term, 62) }
   return null
+}
+
+/** One display line for a search hit, used where a row would otherwise show its artifact state. */
+export function searchHitLine(hit: SearchHit): string {
+  const field = hit.field.toLowerCase()
+  return hit.excerpt ? `Matched ${field} · ${hit.excerpt}` : `Matched ${field}`
+}
+
+/** Notes and transcripts are stored as prose and Markdown, so strip markers before showing an excerpt. */
+export function plainText(source: string): string {
+  return source.replace(/[*_`#>]/g, '').replace(/^\s*[-•]\s*/gm, '').replace(/\s+/g, ' ').trim()
 }
 
 export function excerpt(source: string, term: string, radius = 64): string {

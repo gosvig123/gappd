@@ -1,0 +1,125 @@
+/* Variant C — Today Deck: the persistent record dock, the toast stack, and the settings modal. */
+
+/* ------------------------------------------------------------- record dock */
+
+.vc-dock {
+  position: fixed;
+  inset-block-end: 1.25rem;
+  inset-inline-start: 1.25rem;
+  z-index: 85;
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-4);
+  max-inline-size: min(23rem, calc(50vw - 2rem));
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-sheet);
+}
+
+.vc-dock.is-recording { border-color: var(--color-danger-border); }
+.vc-dock-device { display: flex; align-items: center; gap: var(--space-3); padding-inline: var(--space-4) var(--space-3); min-inline-size: 0; }
+.vc-dock-device svg { inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-text-muted); flex: 0 0 auto; }
+
+.vc-dock-device select {
+  max-inline-size: 6.5rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-size-small);
+  text-overflow: ellipsis;
+  appearance: none;
+}
+
+.vc-dock-device select:focus { outline: none; box-shadow: none; }
+
+.vc-dock-state { display: grid; align-content: center; gap: 1px; min-inline-size: 0; padding-inline-end: var(--space-3); }
+.vc-dock-state strong { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.vc-dock-state span { color: var(--color-text-muted); font-size: var(--font-size-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.vc-dock-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+}
+
+.vc-dock-button svg { inline-size: 0.85rem; block-size: 0.85rem; }
+.vc-dock-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
+.vc-dock-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.vc-dock-button.is-recording { background: var(--color-danger); }
+
+/* ----------------------------------------------------------------- toasts */
+
+.vc-toasts {
+  position: fixed;
+  inset-block-end: 5.5rem;
+  inset-inline-end: 1.25rem;
+  z-index: 86;
+  display: grid;
+  gap: var(--space-4);
+  inline-size: min(26rem, calc(50vw - 2rem));
+}
+
+.vc-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-raised);
+}
+
+.vc-toast > svg { inline-size: 0.95rem; block-size: 0.95rem; color: var(--color-text-muted); margin-block-start: 2px; }
+.vc-toast.attention { border-color: var(--color-warning-border); background: var(--color-warning-bg); }
+.vc-toast.info { border-color: var(--color-accent-border); background: var(--color-accent-tint); }
+.vc-toast-copy { min-inline-size: 0; }
+.vc-toast-copy strong { display: block; font-size: var(--font-size-small); line-height: var(--leading-base); }
+.vc-toast-copy p { margin: 0.1rem 0 0; color: var(--color-text-soft); font-size: var(--font-size-small); line-height: var(--leading-body); }
+.vc-toast-action { margin-block-start: var(--space-3); }
+
+/* ------------------------------------------------------------------ modal */
+
+.vc-modal-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 88;
+  display: grid;
+  place-items: center;
+  padding: var(--space-9);
+  background: var(--color-overlay-scrim);
+  backdrop-filter: blur(4px);
+}
+
+.vc-modal {
+  inline-size: min(100%, 34rem);
+  max-block-size: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-elevated);
+  box-shadow: inset 0 1px 0 var(--highlight-subtle), var(--shadow-sheet);
+  animation: vc-modal-in var(--transition-smooth);
+}
+
+@keyframes vc-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+
+.vc-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-7) var(--space-8); border-block-end: 1px solid var(--color-border); }
+.vc-modal-head h2 { margin: 0; font-size: var(--font-size-title); letter-spacing: var(--tracking-tight); }
+.vc-modal-body { min-block-size: 0; padding: var(--space-8); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-modal { animation: none; }
+}

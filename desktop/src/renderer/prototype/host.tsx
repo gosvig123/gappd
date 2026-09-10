@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { SavedAgendaDraft } from '../../shared/agenda-draft'
+import type { MeetingDetail } from '../../shared/contracts'
+import type { SavedPerson } from '../../shared/participant-contract'
 import { useDashboardData } from '../hooks/use-dashboard-data'
 import { useGoogleCalendar } from '../hooks/use-google-calendar'
 import { useManagedRuntime } from '../hooks/use-managed-runtime'
@@ -9,7 +12,7 @@ import { PrototypeSwitcher } from './switcher'
 import { readParam, writeParams } from './url-params'
 import { useMeetingDetails } from './use-meeting-details'
 import { useSavedDrafts, useSavedPeople } from './use-prototype-data'
-import { VARIANTS } from './variants'
+import { VARIANTS, type Variant } from './variants'
 
 /**
  * PROTOTYPE. Throwaway code for judging an overhauled Gappd UI.
@@ -34,8 +37,30 @@ export function PrototypeApp() {
   const selectVariant = useCallback((key: string) => { setVariantKey(key); writeParams({ variant: key }) }, [])
   const toggleTheme = useCallback(() => setTheme((value) => { const next = value === 'dark' ? 'light' : 'dark'; writeParams({ theme: next }); return next }), [])
   const actions = usePrototypeActions(dashboard, permissions, calendar, update, reloadDrafts, setDismissals, setTheme, runtime)
-  const view: PrototypeView = {
-    meetings: dashboard.meetings, meetingDetails, people,
+  const view = buildView({ dashboard, runtime, permissions, calendar, update, meetingDetails, people, drafts, theme, dismissals, actions })
+  const current = VARIANTS.find((variant) => variant.key === variantKey) ?? VARIANTS[0]
+  useNormalizedVariant(current, variantKey, setVariantKey)
+  if (!current) return null
+  return (
+    <>
+      <current.Component view={view} />
+      <PrototypeSwitcher variants={VARIANTS} current={current} theme={theme} onSelect={selectVariant} onToggleTheme={toggleTheme} />
+    </>
+  )
+}
+
+type ViewInputs = {
+  dashboard: ReturnType<typeof useDashboardData>; runtime: ReturnType<typeof useManagedRuntime>
+  permissions: ReturnType<typeof useSetupPermissions>; calendar: ReturnType<typeof useGoogleCalendar>
+  update: ReturnType<typeof useUpdateStatus>; meetingDetails: Map<string, MeetingDetail>
+  people: SavedPerson[]; drafts: SavedAgendaDraft[]; theme: ThemeName
+  dismissals: ReadonlySet<string>; actions: PrototypeActions
+}
+
+function buildView(input: ViewInputs): PrototypeView {
+  const { dashboard, runtime, permissions, calendar, update } = input
+  return {
+    meetings: dashboard.meetings, meetingDetails: input.meetingDetails, people: input.people,
     selectedMeetingId: dashboard.selectedMeetingId, selectedMeeting: dashboard.selectedMeeting,
     selectedMeetingLoading: dashboard.selectedMeetingLoading, selectedMeetingError: dashboard.selectedMeetingError,
     transcript: dashboard.transcript,
@@ -45,16 +70,9 @@ export function PrototypeApp() {
     runtime: runtime.status, runtimeBusy: runtime.busy, runtimeLoading: runtime.loading,
     update: update.status, calendar: calendar.snapshot, calendarController: calendar,
     calendarBusy: calendar.busy, calendarError: calendar.error,
-    drafts, language: dashboard.language, theme, alertDismissals: dismissals, actions,
+    drafts: input.drafts, language: dashboard.language, theme: input.theme,
+    alertDismissals: input.dismissals, actions: input.actions,
   }
-  const current = VARIANTS.find((variant) => variant.key === variantKey) ?? VARIANTS[0]
-  if (!current) return null
-  return (
-    <>
-      <current.Component view={view} />
-      <PrototypeSwitcher variants={VARIANTS} current={current} theme={theme} onSelect={selectVariant} onToggleTheme={toggleTheme} />
-    </>
-  )
 }
 
 function usePrototypeActions(
@@ -93,4 +111,13 @@ function usePrototypeActions(
 
 function useThemeAttribute(theme: ThemeName): void {
   useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
+}
+
+/** An unknown ?variant= key falls back to the first variant and repairs the URL. */
+function useNormalizedVariant(current: Variant | undefined, variantKey: string, setKey: (key: string) => void): void {
+  useEffect(() => {
+    if (!current || current.key === variantKey) return
+    setKey(current.key)
+    writeParams({ variant: current.key })
+  }, [current, variantKey, setKey])
 }

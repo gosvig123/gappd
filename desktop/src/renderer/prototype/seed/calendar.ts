@@ -7,17 +7,28 @@ const WORK_ACCOUNT = 'krisitan@northwind.example'
 const PERSONAL_ACCOUNT = 'krisitan.personal@example.com'
 const NOW = new Date()
 
-type EventSpec = { eventId: string; title: string; dayOffset: number; hour: number; minutes: number; account: string; location?: string; attendees: string[] }
+type EventSpec = { eventId: string; title: string; start: Date; minutes: number; account: string; location?: string; attendees: string[] }
 
-const EVENT_SPECS: EventSpec[] = [
-  { eventId: 'e-board', title: 'Quarterly board meeting', dayOffset: 3, hour: 11, minutes: 90, account: WORK_ACCOUNT, location: 'Zoom', attendees: ['Priya Raman', 'Marco Silva', 'Dana Whitfield'] },
-  { eventId: 'e-northwind', title: 'Northwind renewal', dayOffset: 1, hour: 9, minutes: 45, account: WORK_ACCOUNT, attendees: ['Ana Petrova'] },
-  { eventId: 'e-hiring', title: 'Hiring debrief — staff engineer', dayOffset: 1, hour: 14, minutes: 30, account: WORK_ACCOUNT, attendees: ['Priya Raman'] },
-  { eventId: 'e-design', title: 'Design system review', dayOffset: 0, hour: NOW.getHours() + 1, minutes: 60, account: WORK_ACCOUNT, location: 'Studio', attendees: ['Dana Whitfield'] },
-  { eventId: 'e-beacon', title: 'Customer call: Beacon Health', dayOffset: 0, hour: NOW.getHours() + 3, minutes: 45, account: PERSONAL_ACCOUNT, attendees: ['Ana Petrova'] },
-  { eventId: 'e-planning', title: 'Quarterly planning kickoff', dayOffset: -1, hour: 14, minutes: 96, account: WORK_ACCOUNT, attendees: ['Priya Raman', 'Marco Silva'] },
-  { eventId: 'e-interview', title: 'Customer interview — Beacon Health', dayOffset: -2, hour: 10, minutes: 41, account: PERSONAL_ACCOUNT, attendees: ['Ana Petrova'] },
-]
+/** Today's events follow the real clock, but never spill past midnight. */
+function buildSpecs(): EventSpec[] {
+  const now = new Date()
+  return [
+    { eventId: 'e-design', title: 'Design system review', start: minutesLater(now, -25), minutes: 60, account: WORK_ACCOUNT, location: 'Studio', attendees: ['Dana Whitfield'] },
+    { eventId: 'e-beacon', title: 'Customer call: Beacon Health', start: sameDaySlot(now, 70, 45, at(1, 9, 30)), minutes: 45, account: PERSONAL_ACCOUNT, attendees: ['Ana Petrova'] },
+    { eventId: 'e-northwind', title: 'Northwind renewal', start: at(1, 11, 30), minutes: 45, account: WORK_ACCOUNT, attendees: ['Ana Petrova'] },
+    { eventId: 'e-hiring', title: 'Hiring debrief — staff engineer', start: at(1, 14), minutes: 30, account: WORK_ACCOUNT, attendees: ['Priya Raman'] },
+    { eventId: 'e-board', title: 'Quarterly board meeting', start: at(3, 11), minutes: 90, account: WORK_ACCOUNT, location: 'Zoom', attendees: ['Priya Raman', 'Marco Silva', 'Dana Whitfield'] },
+    { eventId: 'e-planning', title: 'Quarterly planning kickoff', start: at(-1, 14), minutes: 96, account: WORK_ACCOUNT, attendees: ['Priya Raman', 'Marco Silva'] },
+    { eventId: 'e-interview', title: 'Customer interview — Beacon Health', start: at(-2, 10), minutes: 41, account: PERSONAL_ACCOUNT, attendees: ['Ana Petrova'] },
+  ]
+}
+
+/** Keeps a today event and its whole duration inside today; otherwise uses the fallback slot. */
+function sameDaySlot(now: Date, addMinutes: number, durationMinutes: number, fallback: Date): Date {
+  const start = minutesLater(now, addMinutes)
+  const sameDay = start.getDate() === now.getDate() && minutesLater(start, durationMinutes).getDate() === now.getDate()
+  return sameDay ? start : fallback
+}
 
 export function seedCalendar(): CalendarSnapshot {
   return {
@@ -26,12 +37,12 @@ export function seedCalendar(): CalendarSnapshot {
       { id: 'conn-work', email: WORK_ACCOUNT, status: 'ready', lastSyncedAt: minutesLater(NOW, -12).toISOString() },
       { id: 'conn-personal', email: PERSONAL_ACCOUNT, status: 'error', error: 'Google sign-in expired. Reconnect to resume refresh. Last succeeded 4 days ago.' },
     ],
-    events: EVENT_SPECS.map(toEvent),
+    events: buildSpecs().map(toEvent),
   }
 }
 
 function toEvent(spec: EventSpec): CalendarEventSummary {
-  const start = at(spec.dayOffset, spec.hour)
+  const start = spec.start
   return {
     connectionId: spec.account === WORK_ACCOUNT ? 'conn-work' : 'conn-personal',
     accountEmail: spec.account,

@@ -3,7 +3,7 @@ import { meetingStatusPillVisible, meetingStatusTone } from '../../../shared/mee
 import { Button, EmptyState, StatusPill } from '../../components/ui'
 import { meetingHasWork } from '../../components/meeting-progress'
 import { artifactLine, eventIsNow, eventTimeRange, statusLabel, upcomingEvents, type PrototypeView } from '../contract'
-import { excerpt, groupByDate, meetingDurationLabel, meetingTimeLabel, searchMeetings, type SearchHit } from '../grouping'
+import { groupByDate, meetingDurationLabel, meetingTimeLabel, searchMeetings, type SearchHit } from '../grouping'
 import type { ConfirmController } from '../proto-dialog'
 
 type IndexProps = { view: PrototypeView; query: string; onQueryChange: (value: string) => void; onOpenSettings: () => void; confirm: ConfirmController }
@@ -70,8 +70,8 @@ function SearchResults({ hits, term, view }: { hits: SearchHit[]; term: string; 
         <li key={hit.meeting.id}>
           <button type="button" className="va-hit" onClick={() => view.actions.openMeeting(hit.meeting.id)}>
             <span className="va-hit-title">{hit.meeting.title || 'Untitled meeting'}</span>
-            <span className="va-hit-meta">{meetingTimeLabel(hit.meeting)} · {hit.reason.split(' · ')[0]}</span>
-            <span className="va-hit-reason">{excerpt(hit.reason, term, 72)}</span>
+            <span className="va-hit-meta">{meetingTimeLabel(hit.meeting)} · matched {hit.field.toLowerCase()}</span>
+            {hit.excerpt ? <span className="va-hit-reason">{hit.excerpt}</span> : null}
           </button>
         </li>
       ))}
