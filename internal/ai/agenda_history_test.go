@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"unicode/utf8"
 )
 
 type agendaHistoryProvider struct {
+	mu       sync.Mutex
 	requests []CompletionRequest
 	fail     error
 }
@@ -19,15 +22,15 @@ func (p *agendaHistoryProvider) Complete(context.Context, CompletionRequest) (st
 	return "", errors.New("unexpected")
 }
 func (p *agendaHistoryProvider) CompleteJSON(ctx context.Context, req CompletionRequest) (json.RawMessage, error) {
-	p.requests = append(p.requests, req)
+	p.record(req)
 	if p.fail != nil {
 		return nil, p.fail
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if strings.Contains(req.System, "Extract") {
-		return json.RawMessage(`{"complete":true,"items":[]}`), nil
+	if strings.Contains(req.System, "Reconcile") {
+		return json.RawMessage(`{"updates":[]}`), nil
 	}
 	return json.RawMessage(`{"items":[]}`), nil
 }
@@ -46,27 +49,42 @@ func TestAgendaLargeHistoryBoundedCoverage(t *testing.T) {
 
 func assertAgendaCoverage(t *testing.T, requests []CompletionRequest, text string) {
 	t.Helper()
-	var covered string
-	for _, req := range requests[:len(requests)-1] {
-		if len(req.User)+len(req.System)+len(req.JSONSchema) > agendaRequestBytes || !utf8.ValidString(req.User) {
-			t.Fatal("invalid request budget/UTF-8")
-		}
-		var input struct {
-			Sources []AgendaSource `json:"sources"`
-		}
-		if err := json.Unmarshal([]byte(req.User), &input); err != nil {
-			t.Fatal(err)
-		}
-		for _, s := range input.Sources {
-			if s.ID == "large" {
-				covered = appendAgendaCoverage(t, covered, s.Text)
+	for _, system := range []string{agendaRollingSystem, agendaReviewSystem} {
+		sections := []agendaSection{}
+		for _, req := range requests {
+			if len(req.User)+len(req.System)+len(req.JSONSchema) > agendaRequestBytes || !utf8.ValidString(req.User) {
+				t.Fatal("invalid request bounds")
+			}
+			if req.System != system {
+				continue
+			}
+			var input agendaRollingInput
+			if err := json.Unmarshal([]byte(req.User), &input); err != nil {
+				t.Fatal(err)
+			}
+			for _, section := range input.Sources {
+				if section.ID == "large" {
+					sections = append(sections, section)
+				}
 			}
 		}
-	}
-	if !strings.Contains(covered, text) {
-		t.Fatal("skipped sections")
+		sort.Slice(sections, func(i, j int) bool { return sections[i].TextStart < sections[j].TextStart })
+		var covered string
+		for _, section := range sections {
+			covered = appendAgendaCoverage(t, covered, section.Text)
+		}
+		if covered != text {
+			t.Fatal("skipped source sections")
+		}
 	}
 }
+
+func (p *agendaHistoryProvider) record(req CompletionRequest) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.requests = append(p.requests, req)
+}
+
 func TestAgendaHistoryProviderFailureAndCancellation(t *testing.T) {
 	for _, canceled := range []bool{false, true} {
 		ctx, cancel := context.WithCancel(context.Background())
@@ -77,7 +95,7 @@ func TestAgendaHistoryProviderFailureAndCancellation(t *testing.T) {
 		}
 		_, err := GenerateAgenda(ctx, p, "Next", []AgendaSource{{ID: "x", Text: strings.Repeat("history ", 30000)}})
 		cancel()
-		if err == nil || len(p.requests) > 1 {
+		if err == nil || len(p.requests) > agendaConcurrency {
 			t.Fatalf("err=%v calls=%d", err, len(p.requests))
 		}
 	}

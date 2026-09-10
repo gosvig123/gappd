@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/gappd-dev/gappd/internal/ai"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/gappd-dev/gappd/internal/db"
@@ -68,7 +69,7 @@ func TestAgendaSourcesAcceptLargeHistory(t *testing.T) {
 	if _, err := ai.GenerateAgenda(context.Background(), provider, "Next", sources); err != nil {
 		t.Fatal(err)
 	}
-	if provider.calls < 3 || provider.calls > 97 {
+	if provider.calls < 3 || provider.calls > 96 {
 		t.Fatalf("calls=%d", provider.calls)
 	}
 }
@@ -80,16 +81,21 @@ func TestAgendaCommandSuppressesCobraDiagnostics(t *testing.T) {
 	}
 }
 
-type agendaIntegrationProvider struct{ calls int }
+type agendaIntegrationProvider struct {
+	calls int
+	mu    sync.Mutex
+}
 
 func (p *agendaIntegrationProvider) Available() error { return nil }
 func (p *agendaIntegrationProvider) Complete(context.Context, ai.CompletionRequest) (string, error) {
 	return "", nil
 }
 func (p *agendaIntegrationProvider) CompleteJSON(_ context.Context, req ai.CompletionRequest) (json.RawMessage, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.calls++
-	if strings.Contains(req.System, "Extract") {
-		return json.RawMessage(`{"complete":true,"items":[]}`), nil
+	if strings.Contains(req.System, "Reconcile") {
+		return json.RawMessage(`{"updates":[]}`), nil
 	}
 	return json.RawMessage(`{"items":[]}`), nil
 }
