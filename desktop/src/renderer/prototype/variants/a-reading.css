@@ -1,0 +1,214 @@
+/* Variant A — Reading Room: the single column, index rows, and reading view. */
+
+.va-column {
+  inline-size: min(100%, 48rem);
+  margin-inline: auto;
+  padding: 0.5rem clamp(1rem, 4vw, 2.5rem) 2rem;
+  display: grid;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.va-index-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.va-index-head h1 { margin-block-start: 0.15rem; }
+.va-index-sub { margin: 0.35rem 0 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+/* ------------------------------------------------------------------ up next */
+
+.va-upnext {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.7rem 0.85rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-soft);
+}
+
+.va-upnext.is-empty { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem; }
+.va-upnext.is-empty strong { display: block; font-size: var(--font-size-small); }
+.va-upnext.is-empty span { color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+.va-upnext-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding-block-end: 0.35rem; }
+.va-upnext-head .proto-eyebrow { display: inline-flex; align-items: center; gap: 0.35rem; }
+.va-upnext-head svg { inline-size: 0.8rem; block-size: 0.8rem; }
+.va-upnext-sync { display: inline-flex; align-items: center; gap: 0.3rem; border: 0; background: transparent; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.va-upnext-sync:hover:not(:disabled) { color: var(--color-accent); }
+.va-upnext-sync svg { inline-size: 0.8rem; block-size: 0.8rem; }
+
+.va-event { display: grid; grid-template-columns: 11rem minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; padding: 0.4rem 0; border-block-start: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+.va-event.is-now { border-inline-start: 2px solid var(--color-danger); padding-inline-start: 0.6rem; margin-inline-start: -0.6rem; }
+.va-event-time { color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
+.va-event-copy { min-inline-size: 0; }
+.va-event-copy strong { display: block; font-size: var(--font-size-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-event-copy span { color: var(--color-text-muted); font-size: var(--font-size-small); }
+
+/* ------------------------------------------------------------ search results */
+
+.va-hits { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
+
+.va-hit {
+  inline-size: 100%;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+  text-align: start;
+}
+
+.va-hit:hover { border-color: var(--color-accent-border); background: var(--surface-hover); }
+.va-hit-title { font-size: var(--font-size-body); font-weight: var(--font-weight-semibold); }
+.va-hit-meta { color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.va-hit-reason { color: var(--color-text-soft); font-size: var(--font-size-small); }
+
+/* ------------------------------------------------------------- index groups */
+
+.va-groups { display: grid; gap: 1.1rem; }
+
+.va-group ul { margin: 0; padding: 0; list-style: none; }
+
+.va-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 0.2rem;
+  padding-block-end: 0.35rem;
+  border-block-end: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.va-group-head span { font-variant-numeric: tabular-nums; }
+
+.va-row-wrap { position: relative; display: flex; }
+
+.va-row {
+  flex: 1;
+  min-inline-size: 0;
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 2.4rem 0.7rem 0.35rem;
+  border: 0;
+  border-block-end: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+  background: transparent;
+  text-align: start;
+  color: inherit;
+  transition: background var(--transition-quick);
+}
+
+.va-row:hover { background: var(--surface-hover); }
+.va-row:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+.va-row-time { color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
+.va-row-body { min-inline-size: 0; display: grid; gap: 0.1rem; }
+.va-row-title { font-size: var(--font-size-body); font-weight: var(--font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.va-row-line { color: var(--color-text-muted); font-size: var(--font-size-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.va-row-delete {
+  position: absolute;
+  inset-inline-end: 0.35rem;
+  inset-block-start: 50%;
+  translate: 0 -50%;
+  display: grid;
+  place-items: center;
+  inline-size: 1.9rem;
+  block-size: 1.9rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-quick), color var(--transition-quick), background var(--transition-quick);
+}
+
+.va-row-wrap:hover .va-row-delete,
+.va-row-delete:focus-visible { opacity: 1; }
+.va-row-delete:hover { color: var(--color-danger); background: var(--color-danger-bg); border-color: var(--color-danger-border); }
+.va-row-delete svg { inline-size: 0.85rem; block-size: 0.85rem; }
+
+.va-footnote { display: flex; align-items: center; gap: 0.35rem; margin: 0; color: var(--color-text-muted); font-size: var(--font-size-caption); }
+.va-footnote svg { inline-size: 0.75rem; block-size: 0.75rem; }
+
+/* ------------------------------------------------------------- reading view */
+
+.va-reading { gap: 1rem; }
+
+.va-back {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.6rem 0.3rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+}
+
+.va-back:hover { color: var(--color-accent); background: var(--surface-hover); }
+.va-back svg { inline-size: 0.9rem; block-size: 0.9rem; }
+
+.va-detail-head { display: grid; gap: 0.25rem; padding-block-end: 0.35rem; border-block-end: 1px solid var(--color-border); }
+.va-detail-head h1 { margin-block-start: 0.1rem; }
+
+.va-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin: 0.2rem 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.va-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-bg);
+  color: var(--color-text-soft);
+  font-size: var(--font-size-small);
+}
+
+.va-tabbar { display: flex; align-items: end; justify-content: space-between; gap: 0.6rem; border-block-end: 1px solid var(--color-border); }
+.va-tabs { display: flex; gap: 0.15rem; }
+
+.va-tab {
+  margin-block-end: -1px;
+  padding: 0.5rem 0.9rem 0.6rem;
+  border: 1px solid transparent;
+  border-block-end-color: var(--color-border);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+}
+
+.va-tab:hover { color: var(--color-text); background: var(--surface-hover); }
+.va-tab.is-active { color: var(--color-text); border-color: var(--color-border); border-block-end-color: var(--color-card); background: var(--color-card); }
+
+.va-panel {
+  padding: 1.1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-block-start: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  background: var(--reading-paper);
+}
+
+.va-panel:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.va-measure { max-inline-size: 40rem; font-family: var(--font-reading); font-size: var(--font-size-lg); line-height: var(--line-height-reading); }
+.va-measure :is(h1, h2, h3) { font-family: var(--font-ui); letter-spacing: var(--tracking-tight); }
+.va-detail-foot { display: flex; justify-content: flex-end; padding-block-start: 0.35rem; }
