@@ -90,13 +90,17 @@
   z-index: 88;
   display: grid;
   place-items: center;
-  padding: var(--space-9);
+  /* Bottom space clears the prototype switcher, which is not part of the design. */
+  padding: var(--space-9) var(--space-9) 5rem;
   background: var(--color-overlay-scrim);
   backdrop-filter: blur(4px);
 }
 
 .vc-modal {
-  inline-size: min(100%, 34rem);
+  /* One fluid rule instead of step breakpoints: a comfortable panel on a laptop,
+     a wide multi-column panel on a large display, and it never exceeds the
+     space the layer gives it. The field grid inside reacts to this width. */
+  inline-size: min(100%, clamp(32rem, 46vw, 52rem));
   max-block-size: 100%;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -113,6 +117,14 @@
 .vc-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-7) var(--space-8); border-block-end: 1px solid var(--color-border); }
 .vc-modal-head h2 { margin: 0; font-size: var(--font-size-title); letter-spacing: var(--tracking-tight); }
 .vc-modal-body { min-block-size: 0; padding: var(--space-8); }
+
+/* Narrow screens keep the fluid width but reclaim the margins. */
+@media (max-width: 45rem) {
+  .vc-modal-layer { padding: var(--space-4) var(--space-4) 5rem; }
+  .vc-modal { border-radius: var(--radius-lg); }
+  .vc-modal-head { padding: var(--space-5) var(--space-6); }
+  .vc-modal-body { padding: var(--space-6); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .vc-modal { animation: none; }
