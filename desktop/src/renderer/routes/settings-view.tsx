@@ -11,11 +11,15 @@ import { GoogleCalendarPanel } from '../components/google-calendar-panel'
 import { CodexModelFields, CodexModelStatus } from '../components/codex-model-fields'
 import { codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../shared/codex-models'
 import { useCodexCatalog } from '../hooks/use-codex-catalog'
+import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
+import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 
 type SettingsViewProps = {
   language: string
   onLanguageChange: (language: string) => void
+  theme: ThemeName
+  onThemeChange: (theme: ThemeName) => void
   localAI: { status: ManagedRuntimeSnapshot | null; loading: boolean; busy: boolean; onRepair: () => void }
   calendar: GoogleCalendarController
   developerDebugEnabled: boolean
@@ -26,8 +30,27 @@ const CODEX_PROVIDER = 'codex_exec'
 const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
-export function SettingsView({ language, onLanguageChange, localAI, calendar, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><StartupPanel /><GoogleCalendarPanel calendar={calendar} /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, developerDebugEnabled }: SettingsViewProps) {
+  return <section className="settings-stack settings-stack-plain"><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><GoogleCalendarPanel calendar={calendar} /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+}
+
+function AppearancePanel({ theme, onThemeChange }: { theme: ThemeName; onThemeChange: (theme: ThemeName) => void }) {
+  return (
+    <Card className="settings-section">
+      <SectionTitle title="Appearance" note="Applies to Gappd on this Mac and is remembered between launches." />
+      <div className="ui-segmented" role="group" aria-label="Theme">
+        {THEME_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={theme === option.value}
+            className={theme === option.value ? 'ui-segmented-option is-active' : 'ui-segmented-option'}
+            onClick={() => onThemeChange(option.value)}
+          >{option.label}</button>
+        ))}
+      </div>
+    </Card>
+  )
 }
 
 function AIProviderPanel() {

@@ -1,0 +1,47 @@
+/* Variant C — Agenda: the preview-line chip, the Agenda tab body, and the
+   inline Agenda editor on an upcoming event. */
+
+.app-agenda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 1px var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-soft);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+button.app-agenda-chip { cursor: pointer; }
+button.app-agenda-chip:hover { border-color: var(--color-accent-border-strong); background: var(--surface-hover); color: var(--color-text); }
+.app-agenda-chip.is-ready { border-color: var(--color-accent-border); background: var(--color-accent-tint); color: var(--color-accent); }
+
+/* The chip shares the line with the artifact summary on a preview line. */
+.app-table-sub { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.app-recent-meta { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+/* Keeping the chip out of the trailing action group stops the Record button wrapping. */
+.app-timeline-sub { display: flex; align-items: center; gap: var(--space-3); min-inline-size: 0; }
+
+/* An upcoming event can open its Agenda editor under its own row. */
+.app-event { flex-wrap: wrap; }
+.app-event-actions { display: flex; align-items: center; gap: var(--space-3); flex: 0 0 auto; }
+.app-event-editor { flex-basis: 100%; }
+
+/* Agenda tab body. Draft editing itself is the production editor. */
+.app-agenda-pane { display: grid; gap: var(--space-6); }
+
+.app-agenda-source {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-soft);
+}
+
+.app-agenda-source strong { font-size: var(--font-size-body); }
+.app-agenda-source span { color: var(--color-text-muted); font-size: var(--font-size-small); }

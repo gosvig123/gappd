@@ -101,4 +101,60 @@
   --transition-spring: 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
   --stagger-base: 0ms;
   --stagger-step: 50ms;
+
+  /* Reading and display scale. The old scale topped out at the body size, so a
+     page title could not outrank its own copy. */
+  --font-size-caption: 11px;
+  --font-size-title: 17px;
+  --font-size-display: 22px;
+  --font-size-hero: 30px;
+  --font-size-xl: var(--font-size-title);
+  --tracking-tight: -0.015em;
+  --tracking-display: -0.025em;
+  --tracking-caps: 0.07em;
+  --leading-display: 1.2;
+  --leading-reading: 1.55;
+
+  --ui-column: 46rem;
+  --ui-wide: 78rem;
+}
+
+/*
+ * Light theme. Every colour is a token override, so no component needs to know
+ * which theme is active. The base colours flip, and the derived mixes recompute.
+ */
+[data-theme='light'] {
+  color-scheme: light;
+  --color-brand: #4a5364;
+  --color-accent: #2f6fb5;
+  --color-secure: #2f855a;
+  --color-surface: #e9ecf1;
+  --color-border: #d2d7df;
+  --color-text: #1b1f27;
+  --color-card: #ffffff;
+  --color-bg: #f5f6f9;
+  --color-surface-raised: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --surface-panel: #ffffff;
+  --surface-control: #ffffff;
+  --surface-hover: color-mix(in srgb, #1b1f27 6%, #ffffff);
+  --color-surface-sunken: color-mix(in srgb, var(--color-card) 92%, #9aa3b2);
+  --color-overlay-scrim: color-mix(in srgb, #1b1f27 38%, transparent);
+  --highlight-subtle: color-mix(in srgb, #1b1f27 5%, transparent);
+  --highlight-strong: color-mix(in srgb, #1b1f27 9%, transparent);
+  --color-danger: #b42331;
+  --color-warning: #8f5d0d;
+  --color-danger-bg: color-mix(in srgb, var(--color-danger) 10%, var(--color-card));
+  --color-warning-bg: color-mix(in srgb, var(--color-warning) 12%, var(--color-card));
+  --color-success-bg: color-mix(in srgb, var(--color-secure) 12%, var(--color-card));
+  --color-accent-contrast: #ffffff;
+  --reading-paper: color-mix(in srgb, var(--color-card) 94%, #f4ead6);
+  --reading-paper-border: color-mix(in srgb, var(--color-border) 78%, #c9bda6);
+  --shadow-soft: 0 1px 2px rgb(27 31 39 / 6%), 0 8px 24px -16px rgb(27 31 39 / 20%);
+  --shadow-raised: 0 1px 2px rgb(27 31 39 / 8%), 0 16px 40px -20px rgb(27 31 39 / 24%);
+  --shadow-sheet: 0 1.5rem 4rem rgb(27 31 39 / 22%);
+  --shadow-accent: 0 1px 2px rgb(27 31 39 / 10%), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --gradient-accent: linear-gradient(180deg, #4b8ed6, #3a76bd);
+  --gradient-accent-hover: linear-gradient(180deg, #5697dd, #4380c7);
+  --shell-glow: linear-gradient(180deg, rgb(255 255 255 / 60%), transparent 24%);
 }
