@@ -78,11 +78,46 @@ jobs:
         working-directory: desktop
 
       - name: Install desktop dependencies
-        run: npm ci
+        run: |
+          started="$(date +%s)"
+          npm ci
+          echo "GAPPD_RELEASE_DEPS_SECONDS=$(( $(date +%s) - started ))" >> "$GITHUB_ENV"
         working-directory: desktop
 
+      - name: Plan llama.cpp runtime cache
+        id: llamacpp-cache
+        env:
+          GAPPD_MAC_BUILD: universal
+        run: |
+          echo "GAPPD_RELEASE_CACHE_START=$(date +%s)" >> "$GITHUB_ENV"
+          node desktop/scripts/prepare-llamacpp-bundle.mjs --print-cache-plan >> "$GITHUB_OUTPUT"
+
+      - name: Restore llama.cpp runtime cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.llamacpp-cache.outputs.path }}
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.llamacpp-cache.outputs.key }}
+
+      - name: Plan diarizer build cache
+        id: diarizer-cache
+        env:
+          GAPPD_DIARIZER_SOURCES_SHA: ${{ hashFiles('gappd-diarizer/Package.swift', 'gappd-diarizer/Sources/**') }}
+        run: bash .github/scripts/prepare-diarizer-cache.sh
+
+      - name: Restore diarizer build cache
+        uses: actions/cache@v4
+        with:
+          # These are the scratch paths gappd-diarizer/build.sh uses for the universal profile.
+          path: |
+            gappd-diarizer/.build/arm64
+            gappd-diarizer/.build/x86_64
+          key: ${{ steps.diarizer-cache.outputs.cache-key }}
+          restore-keys: ${{ steps.diarizer-cache.outputs.restore-key }}
+
       - name: Configure signing identity
-        run: .github/scripts/configure-desktop-signing.sh
+        run: |
+          echo "GAPPD_RELEASE_CACHE_SECONDS=$(( $(date +%s) - ${GAPPD_RELEASE_CACHE_START:-$(date +%s)} ))" >> "$GITHUB_ENV"
+          .github/scripts/configure-desktop-signing.sh
         env:
           APPLE_CERTIFICATE_P12_BASE64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -92,7 +127,9 @@ jobs:
         run: |
           export GAPPD_ENABLE_NOTARIZATION="$GAPPD_SIGNED_RELEASE"
           export GAPPD_REQUIRE_GATEKEEPER="$GAPPD_SIGNED_RELEASE"
+          started="$(date +%s)"
           npm run dist:mac:universal -- --publish=never
+          echo "GAPPD_RELEASE_BUILD_SECONDS=$(( $(date +%s) - started ))" >> "$GITHUB_ENV"
         working-directory: desktop
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -136,20 +173,24 @@ jobs:
       - name: Write release manifest
         run: node desktop/scripts/write-release-manifest.mjs
 
+      - name: Report release phase timings and sizes
+        run: bash .github/scripts/report-desktop-release.sh
+
       - name: Publish release
         run: .github/scripts/publish-desktop-release.sh
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Upload release artifacts
+      # Installers are published to the release; omit the unpacked app and duplicate downloads.
+      # Keep only short-lived metadata and diagnostics in Actions.
+      - name: Upload release metadata and diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: gappd-desktop-macos
+          name: gappd-desktop-macos-metadata
+          retention-days: 7
           if-no-files-found: error
           path: |
-            desktop/release/*.dmg
-            desktop/release/*.zip
             desktop/release/*.blockmap
             desktop/release/*-mac.yml
             desktop/release/latest.json
-            desktop/release/mac*/**
+            desktop/release/builder-debug.yml
