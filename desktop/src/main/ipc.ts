@@ -9,6 +9,7 @@ import { managedRuntime } from './managed-runtime'
 import { configureCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda-drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
+import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, deleteMeeting, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
@@ -75,6 +76,7 @@ const IPC_HANDLERS: MainHandlers = {
   googleCalendar: {
     generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
+    contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
     connect: () => connectGoogleCalendar(),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),

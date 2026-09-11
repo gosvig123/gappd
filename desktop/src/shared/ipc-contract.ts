@@ -1,6 +1,6 @@
 import type { MeetingAgendaDraft } from './meeting-agenda'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
-import type { CalendarSnapshot } from './calendar-contract'
+import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AssignSpeakerInput, LinkCalendarInput, ParticipantContext, SavedPerson, SpeakerClip, SpeakerClipInput } from './participant-contract'
@@ -62,6 +62,7 @@ export type IpcInvokeContract = {
   googleCalendar: {
     generateAgenda: OperationSpec<[input: GenerateAgendaInput], GeneratedAgenda>
     snapshot: OperationSpec<[], CalendarSnapshot>
+    contacts: OperationSpec<[], CalendarParticipant[]>
     connect: OperationSpec<[], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
@@ -106,7 +107,7 @@ export const IPC_OPERATIONS = {
   agenda: { load: 'agenda:load', list: 'agenda:list', save: 'agenda:save', remove: 'agenda:remove' },
   googleCalendar: {
     generateAgenda: 'googleCalendar:generateAgenda',
-    snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect',
+    snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect', contacts: 'googleCalendar:contacts',
     sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
   },
   update: {
