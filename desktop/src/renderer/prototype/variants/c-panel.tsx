@@ -8,14 +8,18 @@ import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../../component
 import { SpeakerLabels } from '../../routes/speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from '../../routes/transcript-view'
 import { artifactLine, statusLabel, type PrototypeView } from '../contract'
+import { agendaStateForMeeting, agendaTabLabel } from '../agenda-status'
+import { AgendaPane } from './c-agenda'
+import type { MeetingTab } from './c-open-meeting'
 import { meetingDurationLabel, meetingTimeLabel } from '../grouping'
 import type { ConfirmController } from '../proto-dialog'
 
-const TABS = [
+const TABS: ReadonlyArray<{ id: MeetingTab; label: string }> = [
   { id: 'summary', label: 'Summary' },
+  { id: 'agenda', label: 'Agenda' },
   { id: 'transcript', label: 'Transcript' },
-] as const
-type TabId = (typeof TABS)[number]['id']
+]
+type TabId = MeetingTab
 
 /**
  * The Meeting layover. It is a modal for assistive technology, but visually a
@@ -26,35 +30,36 @@ type TabId = (typeof TABS)[number]['id']
  * and its section switcher stay reachable through a long transcript. One close
  * control, not two.
  */
-export function DeckPanel({ view, confirm }: { view: PrototypeView; confirm: ConfirmController }) {
-  const [tab, setTab] = useState<TabId>('summary')
+export function DeckPanel({ view, confirm, initialTab, onOpenSettings }: { view: PrototypeView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
+  const [tab, setTab] = useState<TabId>(initialTab ?? 'summary')
   const [copied, setCopied] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
-  const copyValue = tab === 'summary' ? meeting?.summary ?? '' : transcript
+  const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
+  const copyValue = copySourceFor(tab, meeting, transcript)
   useRestoreFocus()
   useEscapeToClose(view.actions.closeMeeting)
-  useEffect(() => { setTab('summary'); setCopied(false); closeRef.current?.focus() }, [view.selectedMeetingId])
+  useEffect(() => { setTab(initialTab ?? 'summary'); setCopied(false); closeRef.current?.focus() }, [view.selectedMeetingId, initialTab])
   const copy = () => { void navigator.clipboard?.writeText(copyValue).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600) }) }
-  const copyLabel = tab === 'summary' ? 'Copy notes' : 'Copy transcript'
+  const copyLabel = copyLabelFor(tab)
   return (
     <div className="vc-panel-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) view.actions.closeMeeting() }}>
       <article className="vc-panel" role="dialog" aria-modal="true" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
         {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
-        {meeting ? <TabBar tab={tab} onChange={setTab} /> : null}
+        {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
         <div className="vc-panel-body proto-scroll">
           {meeting
-            ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} />
+            ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} />
             : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : 'This Meeting is no longer available.'}</EmptyState>}
         </div>
-        {meeting && copyValue ? (
+        {meeting ? (
           <footer className="vc-panel-foot">
             <Button
               className="compact-action"
               onClick={() => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, and audio for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: () => { void view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })}
             >Delete Meeting</Button>
-            <Button className="compact-action" onClick={copy}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabel}</Button>
+            {copyLabel ? <Button className="compact-action" onClick={copy}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabel}</Button> : null}
           </footer>
         ) : null}
       </article>
@@ -88,18 +93,34 @@ function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HT
 }
 
 /** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
-function PanelContent({ view, meeting, transcript, tab }: { view: PrototypeView; meeting: MeetingDetail; transcript: string; tab: TabId }) {
+function PanelContent({ view, meeting, transcript, tab, onOpenSettings }: { view: PrototypeView; meeting: MeetingDetail; transcript: string; tab: TabId; onOpenSettings: () => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
+  const meetingLevel = tab !== 'agenda'
   return (
     <>
-      {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
-      {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
-      <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} />
+      {meetingLevel && meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
+      {meetingLevel && meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
+      {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} /> : null}
       <section className="vc-panel-pane" role="tabpanel" id={`vc-pane-${tab}`} aria-labelledby={`vc-tab-${tab}`} tabIndex={0}>
-        {tab === 'summary' ? <SummaryPane view={view} /> : <TranscriptPane view={view} text={transcript} />}
+        {tab === 'summary' ? <SummaryPane view={view} /> : null}
+        {tab === 'agenda' ? <AgendaPane view={view} meetingId={meeting.id} onOpenSettings={onOpenSettings} /> : null}
+        {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} /> : null}
       </section>
     </>
   )
+}
+
+function copySourceFor(tab: TabId, meeting: MeetingDetail | null, transcript: string): string {
+  if (!meeting) return ''
+  if (tab === 'summary') return meeting.summary ?? ''
+  if (tab === 'transcript') return transcript
+  return ''
+}
+
+function copyLabelFor(tab: TabId): string {
+  if (tab === 'summary') return 'Copy notes'
+  if (tab === 'transcript') return 'Copy transcript'
+  return ''
 }
 
 function SummaryPane({ view }: { view: PrototypeView }) {
@@ -131,7 +152,7 @@ function DiarizationNotice({ view }: { view: PrototypeView }) {
   )
 }
 
-function TabBar({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void }) {
+function TabBar({ tab, onChange, labels = {} }: { tab: TabId; onChange: (tab: TabId) => void; labels?: Partial<Record<TabId, string>> }) {
   const listRef = useRef<HTMLDivElement>(null)
   const move = (delta: number) => {
     const index = TABS.findIndex((item) => item.id === tab)
@@ -156,7 +177,7 @@ function TabBar({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void 
           tabIndex={tab === item.id ? 0 : -1}
           className={cx('vc-tab', tab === item.id && 'is-active')}
           onClick={() => onChange(item.id)}
-        >{item.label}</button>
+        >{labels[item.id] ?? item.label}</button>
       ))}
     </div>
   )

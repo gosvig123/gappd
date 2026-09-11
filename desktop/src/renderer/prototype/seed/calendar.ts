@@ -18,6 +18,7 @@ function buildSpecs(): EventSpec[] {
     { eventId: 'e-northwind', title: 'Northwind renewal', start: at(1, 11, 30), minutes: 45, account: WORK_ACCOUNT, attendees: ['Ana Petrova'] },
     { eventId: 'e-hiring', title: 'Hiring debrief — staff engineer', start: at(1, 14), minutes: 30, account: WORK_ACCOUNT, attendees: ['Priya Raman'] },
     { eventId: 'e-board', title: 'Quarterly board meeting', start: at(3, 11), minutes: 90, account: WORK_ACCOUNT, location: 'Zoom', attendees: ['Priya Raman', 'Marco Silva', 'Dana Whitfield'] },
+    { eventId: 'e-sync', title: 'Weekly product sync', start: at(0, 9, 30), minutes: 47, account: WORK_ACCOUNT, attendees: ['Priya Raman', 'Marco Silva', 'Dana Whitfield', 'Krisitan Ahmadi'] },
     { eventId: 'e-planning', title: 'Quarterly planning kickoff', start: at(-1, 14), minutes: 96, account: WORK_ACCOUNT, attendees: ['Priya Raman', 'Marco Silva'] },
     { eventId: 'e-interview', title: 'Customer interview — Beacon Health', start: at(-2, 10), minutes: 41, account: PERSONAL_ACCOUNT, attendees: ['Ana Petrova'] },
   ]
@@ -71,10 +72,23 @@ const PLANNING_TOPICS = [
   ['Define what searchable means for transcripts', 'm-06'],
 ] as const
 
+/** Prepared before the sync happened, so the saved draft outlives the event. */
+const SYNC_TOPICS = [
+  ['Confirm the layout direction chosen in the planning session', 'm-05'],
+  ['Close out the search requirement from the customer interview', 'm-06'],
+  ['Review the single-alert decision from the retrospective', 'm-07'],
+  ['Check who owns the undo model for deleted Meetings', 'm-05'],
+] as const
+
 export function seedAgendaDrafts(events: CalendarEventSummary[]): SavedAgendaDraft[] {
   const board = events.find((event) => event.eventId === 'e-board')
   const planning = events.find((event) => event.eventId === 'e-planning')
-  return [board && draftOf(board, BOARD_TOPICS, 'gpt-5.1-codex', 'medium'), planning && draftOf(planning, PLANNING_TOPICS, 'local-ai', 'medium')].filter(Boolean) as SavedAgendaDraft[]
+  const sync = events.find((event) => event.eventId === 'e-sync')
+  return [
+    board && draftOf(board, BOARD_TOPICS, 'gpt-5.1-codex', 'medium'),
+    planning && draftOf(planning, PLANNING_TOPICS, 'local-ai', 'medium'),
+    sync && draftOf(sync, SYNC_TOPICS, 'gpt-5.1-codex', 'high'),
+  ].filter(Boolean) as SavedAgendaDraft[]
 }
 
 function draftOf(event: CalendarEventSummary, topics: ReadonlyArray<readonly [string, string]>, model: string, effort: string): SavedAgendaDraft {

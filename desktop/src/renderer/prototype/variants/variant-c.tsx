@@ -8,6 +8,7 @@ import type { VariantProps } from '../variants'
 import { DeckCalendar } from './c-calendar'
 import { DeckMeetings } from './c-meetings'
 import { DeckPanel } from './c-panel'
+import { OpenMeetingScope, type MeetingTab, type OpenMeeting } from './c-open-meeting'
 import { DeckPeople } from './c-people'
 import { DeckSettings } from './c-settings'
 import { DeckToday } from './c-today'
@@ -41,12 +42,14 @@ function VariantC({ view }: VariantProps) {
   const [section, setSection] = useState<SectionKey>('today')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [wantsSearch, setWantsSearch] = useState(false)
+  const [pendingTab, setPendingTab] = useState<MeetingTab | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
   const alerts = buildAlerts(view)
   const blocking = alerts.filter((alert) => alert.kind === 'blocking')
   const transient = alerts.filter((alert) => alert.kind !== 'blocking')
   const focusMeetingsSearch = useCallback(() => { setSection('meetings'); setWantsSearch(true) }, [])
+  const openMeeting = useCallback<OpenMeeting>((id, tab) => { setPendingTab(tab ?? null); view.actions.openMeeting(id) }, [view.actions])
   useSearchShortcut(focusMeetingsSearch)
   usePendingSearchFocus(wantsSearch, section, searchRef, () => setWantsSearch(false))
   return (
@@ -56,14 +59,16 @@ function VariantC({ view }: VariantProps) {
         <RecordBar view={view} />
         <BlockingBanner alerts={blocking} />
         <div className="vc-scroll proto-scroll">
-          {section === 'today' ? <DeckToday view={view} onOpenMeetings={() => setSection('meetings')} onOpenCalendar={() => setSection('calendar')} /> : null}
-          {section === 'meetings' ? <DeckMeetings view={view} searchRef={searchRef} confirm={confirm} /> : null}
-          {section === 'calendar' ? <DeckCalendar view={view} confirm={confirm} onOpenSettings={() => setSettingsOpen(true)} /> : null}
-          {section === 'people' ? <DeckPeople view={view} /> : null}
+          <OpenMeetingScope open={openMeeting}>
+            {section === 'today' ? <DeckToday view={view} onOpenMeetings={() => setSection('meetings')} onOpenCalendar={() => setSection('calendar')} /> : null}
+            {section === 'meetings' ? <DeckMeetings view={view} searchRef={searchRef} confirm={confirm} /> : null}
+            {section === 'calendar' ? <DeckCalendar view={view} confirm={confirm} onOpenSettings={() => setSettingsOpen(true)} /> : null}
+            {section === 'people' ? <DeckPeople view={view} /> : null}
+          </OpenMeetingScope>
         </div>
       </main>
       <DeckToasts alerts={transient} onDismiss={view.actions.dismissAlert} />
-      {view.selectedMeetingId ? <DeckPanel view={view} confirm={confirm} /> : null}
+      {view.selectedMeetingId ? <DeckPanel view={view} confirm={confirm} initialTab={pendingTab} onOpenSettings={() => setSettingsOpen(true)} /> : null}
       {settingsOpen ? <DeckSettings view={view} onClose={() => setSettingsOpen(false)} /> : null}
       {confirm.dialog}
     </div>

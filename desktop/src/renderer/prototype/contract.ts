@@ -23,6 +23,7 @@ export type AlertItem = {
 export type PrototypeView = {
   meetings: MeetingListItem[]
   meetingDetails: Map<string, MeetingDetail>
+  meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]
   selectedMeetingId: string | null
   selectedMeeting: MeetingDetail | null

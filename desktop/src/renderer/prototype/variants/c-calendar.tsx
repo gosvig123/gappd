@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Trash2 } from 'lucide-react'
-import { agendaDraftCanGenerate, agendaDraftEvent, type SavedAgendaDraft } from '../../../shared/agenda-draft'
+import { agendaDraftCanGenerate, agendaDraftEvent, agendaDraftKey, type SavedAgendaDraft } from '../../../shared/agenda-draft'
 import type { CalendarConnection, CalendarEventSummary } from '../../../shared/calendar-contract'
 import { MeetingAgendaDraftPanel } from '../../components/meeting-agenda-draft'
 import { Button, EmptyState, StatusPill, cx } from '../../components/ui'
 import { eventIsNow, eventTimeRange, upcomingEvents, type PrototypeView } from '../contract'
 import type { ConfirmController } from '../proto-dialog'
+import { EventAgendaChip } from './c-agenda'
 import '../../components/google-calendar.css'
 
 type DeckCalendarProps = { view: PrototypeView; confirm: ConfirmController; onOpenSettings: () => void }
@@ -23,7 +24,7 @@ export function DeckCalendar({ view, confirm, onOpenSettings }: DeckCalendarProp
     <div className="vc-stack">
       <CalendarHead view={view} />
       <AccountsBlock connections={connections} view={view} confirm={confirm} onOpenSettings={onOpenSettings} />
-      <UpcomingBlock view={view} />
+      <UpcomingBlock view={view} knownMeetingIds={knownMeetingIds} onOpenSettings={onOpenSettings} />
       <DraftsBlock view={view} knownMeetingIds={knownMeetingIds} onOpenSettings={onOpenSettings} />
     </div>
   )
@@ -60,7 +61,9 @@ function AccountsBlock({ connections, view, confirm, onOpenSettings }: { connect
   )
 }
 
-function UpcomingBlock({ view }: { view: PrototypeView }) {
+/** Upcoming events are where an Agenda is prepared, so each one can open its editor here. */
+function UpcomingBlock({ view, knownMeetingIds, onOpenSettings }: { view: PrototypeView; knownMeetingIds: ReadonlySet<string>; onOpenSettings: () => void }) {
+  const [openSourceId, setOpenSourceId] = useState<string | null>(null)
   const events = upcomingEvents(view.calendar, 5)
   return (
     <section className="vc-block" aria-label="Upcoming events">
@@ -68,15 +71,30 @@ function UpcomingBlock({ view }: { view: PrototypeView }) {
       {events.length ? (
         <ul className="vc-events">
           {events.map((event) => (
-            <li key={event.sourceId} className={cx('vc-event', eventIsNow(event) && 'is-now')}>
-              <div className="vc-event-when">{eventIsNow(event) ? 'Now' : eventTimeRange(event)}</div>
-              <div className="vc-event-copy"><strong>{event.title}</strong><span>{[event.accountEmail, event.location, inviteeLabel(event)].filter(Boolean).join(' · ')}</span></div>
-              <Button className="compact-action" disabled={!view.canStart} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
-            </li>
+            <UpcomingRow key={event.sourceId} event={event} view={view} open={openSourceId === event.sourceId} knownMeetingIds={knownMeetingIds} onOpenSettings={onOpenSettings} onToggle={() => setOpenSourceId((current) => (current === event.sourceId ? null : event.sourceId))} />
           ))}
         </ul>
       ) : <p className="vc-block-note">No upcoming Calendar events.</p>}
     </section>
+  )
+}
+
+function UpcomingRow({ event, view, open, knownMeetingIds, onOpenSettings, onToggle }: { event: CalendarEventSummary; view: PrototypeView; open: boolean; knownMeetingIds: ReadonlySet<string>; onOpenSettings: () => void; onToggle: () => void }) {
+  return (
+    <li className={cx('vc-event', eventIsNow(event) && 'is-now')}>
+      <div className="vc-event-when">{eventIsNow(event) ? 'Now' : eventTimeRange(event)}</div>
+      <div className="vc-event-copy"><strong>{event.title}</strong><span>{[event.accountEmail, event.location, inviteeLabel(event)].filter(Boolean).join(' · ')}</span></div>
+      <div className="vc-event-actions">
+        <EventAgendaChip view={view} event={event} />
+        <Button className="compact-action" aria-expanded={open} onClick={onToggle}>{open ? 'Hide agenda' : 'Agenda'}</Button>
+        <Button className="compact-action" disabled={!view.canStart} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
+      </div>
+      {open ? (
+        <div className="vc-draft-editor vc-event-editor">
+          <MeetingAgendaDraftPanel draftKey={agendaDraftKey(event)} sourceId={event.sourceId} canGenerate knownMeetingIds={knownMeetingIds} onOpenMeeting={view.actions.openMeeting} onOpenSettings={onOpenSettings} />
+        </div>
+      ) : null}
+    </li>
   )
 }
 

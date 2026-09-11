@@ -2,6 +2,7 @@ import type { MeetingDetail, MeetingListItem } from '../../../shared/contracts'
 import type { GappdApi } from '../../../shared/ipc-contract'
 import type { ParticipantContext } from '../../../shared/participant-contract'
 import { calendarEventIsUpcoming } from '../../../shared/meeting-agenda'
+import { SEED_MEETING_EVENT_LINKS } from '../seed/misc'
 import { emitRecording, type Store } from './store'
 import { toneClip } from './wav'
 
@@ -15,7 +16,7 @@ export function systemApi(store: Store): GappdApi['system'] {
 }
 
 export function meetingsApi(store: Store): GappdApi['meetings'] {
-  const links = new Map<string, string>()
+  const links = seedLinks(store)
   return {
     list: async () => store.meetings.map(toListItem).sort((left, right) => right.startedAt.localeCompare(left.startedAt)),
     show: async (id) => requireMeeting(store, id),
@@ -98,6 +99,16 @@ function context(store: Store, links: Map<string, string>, id: string): Particip
   const event = linked ? store.calendar.events.find((item) => item.sourceId === linked) : undefined
   const candidates = store.calendar.events.filter((item) => calendarEventIsUpcoming(item) || item.sourceId === linked)
   return { event, candidates, inferenceDisabled: false }
+}
+
+/** Resolves the seeded Meeting to event ids against the seeded events. */
+function seedLinks(store: Store): Map<string, string> {
+  const links = new Map<string, string>()
+  for (const [meetingId, eventId] of Object.entries(SEED_MEETING_EVENT_LINKS)) {
+    const event = store.calendar.events.find((item) => item.eventId === eventId)
+    if (event) links.set(meetingId, event.sourceId)
+  }
+  return links
 }
 
 function toListItem(detail: MeetingDetail): MeetingListItem {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { SavedAgendaDraft } from '../../shared/agenda-draft'
+import type { CalendarEventSummary } from '../../shared/calendar-contract'
 import type { MeetingDetail } from '../../shared/contracts'
 import type { SavedPerson } from '../../shared/participant-contract'
 import { useDashboardData } from '../hooks/use-dashboard-data'
@@ -11,6 +12,7 @@ import type { PrototypeActions, PrototypeView, ThemeName } from './contract'
 import { PrototypeSwitcher } from './switcher'
 import { readParam, writeParams } from './url-params'
 import { useMeetingDetails } from './use-meeting-details'
+import { useMeetingEvents } from './use-meeting-events'
 import { useSavedDrafts, useSavedPeople } from './use-prototype-data'
 import { VARIANTS, type Variant } from './variants'
 
@@ -28,6 +30,7 @@ export function PrototypeApp() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const meetingDetails = useMeetingDetails(dashboard.meetings)
+  const meetingEvents = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [drafts, reloadDrafts] = useSavedDrafts()
   const people = useSavedPeople()
   const [theme, setTheme] = useState<ThemeName>(() => (readParam('theme') === 'light' ? 'light' : 'dark'))
@@ -37,7 +40,7 @@ export function PrototypeApp() {
   const selectVariant = useCallback((key: string) => { setVariantKey(key); writeParams({ variant: key }) }, [])
   const toggleTheme = useCallback(() => setTheme((value) => { const next = value === 'dark' ? 'light' : 'dark'; writeParams({ theme: next }); return next }), [])
   const actions = usePrototypeActions(dashboard, permissions, calendar, update, reloadDrafts, setDismissals, setTheme, runtime)
-  const view = buildView({ dashboard, runtime, permissions, calendar, update, meetingDetails, people, drafts, theme, dismissals, actions })
+  const view = buildView({ dashboard, runtime, permissions, calendar, update, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
   const current = VARIANTS.find((variant) => variant.key === variantKey) ?? VARIANTS[0]
   useNormalizedVariant(current, variantKey, setVariantKey)
   if (!current) return null
@@ -53,6 +56,7 @@ type ViewInputs = {
   dashboard: ReturnType<typeof useDashboardData>; runtime: ReturnType<typeof useManagedRuntime>
   permissions: ReturnType<typeof useSetupPermissions>; calendar: ReturnType<typeof useGoogleCalendar>
   update: ReturnType<typeof useUpdateStatus>; meetingDetails: Map<string, MeetingDetail>
+  meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]; drafts: SavedAgendaDraft[]; theme: ThemeName
   dismissals: ReadonlySet<string>; actions: PrototypeActions
 }
@@ -61,6 +65,7 @@ function buildView(input: ViewInputs): PrototypeView {
   const { dashboard, runtime, permissions, calendar, update } = input
   return {
     meetings: dashboard.meetings, meetingDetails: input.meetingDetails, people: input.people,
+    meetingEvents: input.meetingEvents,
     selectedMeetingId: dashboard.selectedMeetingId, selectedMeeting: dashboard.selectedMeeting,
     selectedMeetingLoading: dashboard.selectedMeetingLoading, selectedMeetingError: dashboard.selectedMeetingError,
     transcript: dashboard.transcript,

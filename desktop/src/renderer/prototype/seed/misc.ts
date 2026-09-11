@@ -41,6 +41,17 @@ export function seedRecording(): RecordingState {
 
 export const SEED_STARTUP = { openAtLogin: true, supported: true, requiresApproval: false, speakerLabelsEnabled: true }
 
+/**
+ * Seeded Meeting to Calendar event links, by event id. Two of these have a saved
+ * Agenda draft and one does not, so every Agenda state is reachable in the UI.
+ * The remaining Meetings stay unlinked on purpose.
+ */
+export const SEED_MEETING_EVENT_LINKS: Record<string, string> = {
+  'm-01': 'e-sync',
+  'm-05': 'e-planning',
+  'm-06': 'e-interview',
+}
+
 export function seedStaleRecoveryNotice(): string | null {
   return null
 }

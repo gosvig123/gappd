@@ -6,6 +6,8 @@ import { meetingHasWork, meetingProgressLabel } from '../../components/meeting-p
 import { Button, ProgressBar, StatusPill, cx } from '../../components/ui'
 import { artifactLine, eventIsNow, eventTimeRange, upcomingEvents, type PrototypeView } from '../contract'
 import { meetingDurationLabel, meetingTimeLabel } from '../grouping'
+import { EventAgendaChip, MeetingAgendaChip } from './c-agenda'
+import { useOpenMeeting } from './c-open-meeting'
 
 type TodayProps = { view: PrototypeView; onOpenMeetings: () => void; onOpenCalendar: () => void }
 
@@ -58,7 +60,10 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
       </div>
       <div className="vc-timeline-copy">
         <strong>{event.title}</strong>
-        <span>{[event.accountEmail, event.location].filter(Boolean).join(' · ')}</span>
+        <div className="vc-timeline-sub">
+          <span>{[event.accountEmail, event.location].filter(Boolean).join(' · ')}</span>
+          <EventAgendaChip view={view} event={event} />
+        </div>
       </div>
       {now || next ? <span className="vc-chip">{now ? 'Now' : 'Next'}</span> : null}
       <Button className="compact-action" disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
@@ -108,11 +113,15 @@ function LiveCard({ meeting, view }: { meeting: MeetingListItem; view: Prototype
 }
 
 function RecentRow({ meeting, view }: { meeting: MeetingListItem; view: PrototypeView }) {
+  const open = useOpenMeeting(view.actions.openMeeting)
   return (
     <li className="vc-recent-row">
       <span className="vc-recent-time">{meetingTimeLabel(meeting)}</span>
-      <button type="button" className="vc-recent-title" onClick={() => view.actions.openMeeting(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
-      <span className="vc-recent-meta">{meetingDurationLabel(meeting)} · {artifactLine(meeting)}</span>
+      <button type="button" className="vc-recent-title" onClick={() => open(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
+      <span className="vc-recent-meta">
+        <span>{meetingDurationLabel(meeting)} · {artifactLine(meeting)}</span>
+        <MeetingAgendaChip view={view} meetingId={meeting.id} onOpen={() => open(meeting.id, 'agenda')} />
+      </span>
     </li>
   )
 }

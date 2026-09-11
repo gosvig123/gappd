@@ -7,6 +7,8 @@ import { EmptyState, StatusPill, cx } from '../../components/ui'
 import { artifactLine, statusLabel, type PrototypeView } from '../contract'
 import { meetingDurationLabel, meetingTimeLabel, searchHitLine, searchMeetings } from '../grouping'
 import type { ConfirmController } from '../proto-dialog'
+import { MeetingAgendaChip } from './c-agenda'
+import { useOpenMeeting } from './c-open-meeting'
 
 type SortKey = 'time' | 'title'
 type Sort = { key: SortKey; direction: 'ascending' | 'descending' }
@@ -74,13 +76,17 @@ function SortHeader({ label, column, sort, onSort }: { label: string; column: So
 
 function MeetingRow({ meeting, view, reason, confirm }: { meeting: MeetingListItem; view: PrototypeView; reason?: string; confirm: ConfirmController }) {
   const detail = view.meetingDetails.get(meeting.id)
-  const open = view.selectedMeetingId === meeting.id
+  const open = useOpenMeeting(view.actions.openMeeting)
+  const isOpen = view.selectedMeetingId === meeting.id
   return (
-    <tr className={cx('vc-row', open && 'is-open')} aria-current={open ? 'true' : undefined}>
+    <tr className={cx('vc-row', isOpen && 'is-open')} aria-current={isOpen ? 'true' : undefined}>
       <td className="vc-cell-time">{meetingTimeLabel(meeting)}</td>
       <th scope="row" className="vc-cell-title">
-        <button type="button" className="vc-table-open" onClick={() => view.actions.openMeeting(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
-        <span className="vc-table-match">{reason ?? artifactLine(meeting)}</span>
+        <button type="button" className="vc-table-open" onClick={() => open(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
+        <span className="vc-table-sub">
+          <span className="vc-table-match">{reason ?? artifactLine(meeting)}</span>
+          <MeetingAgendaChip view={view} meetingId={meeting.id} onOpen={() => open(meeting.id, 'agenda')} />
+        </span>
       </th>
       <td className="vc-cell-num">{meetingDurationLabel(meeting)}</td>
       <td className="vc-cell-num">{detail ? speakerCountLabel(detail.speakers.length) : '—'}</td>
