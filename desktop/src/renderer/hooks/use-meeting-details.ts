@@ -3,7 +3,7 @@ import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
 
 const cache = new Map<string, MeetingDetail>()
 
-/** Loads every Meeting detail once per revision so prototype search and tables can use real content. */
+/** Loads every Meeting detail once per revision so search and tables can use real content. */
 export function useMeetingDetails(meetings: MeetingListItem[]): Map<string, MeetingDetail> {
   const [details, setDetails] = useState<Map<string, MeetingDetail>>(new Map())
   const signature = meetings.map(keyOf).join('|')

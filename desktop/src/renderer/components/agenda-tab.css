@@ -1,5 +1,4 @@
-/* Variant C — Agenda: the preview-line chip, the Agenda tab body, and the
-   inline Agenda editor on an upcoming event. */
+/* The Agenda preview chip, the Agenda tab body, and the inline Agenda editor. */
 
 .app-agenda-chip {
   display: inline-flex;

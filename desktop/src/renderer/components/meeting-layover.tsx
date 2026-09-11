@@ -5,6 +5,7 @@ import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meetin
 import { Markdown } from '../components/markdown'
 import { meetingHasWork, meetingProgressLabel } from '../components/meeting-progress'
 import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../components/ui'
+import { useFocusTrap } from '../hooks/use-focus-trap'
 import { SpeakerLabels } from '../routes/speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from '../routes/transcript-view'
 import { artifactLine, statusLabel, type AppView } from '../lib/app-view'
@@ -22,18 +23,17 @@ const TABS: ReadonlyArray<{ id: MeetingTab; label: string }> = [
 type TabId = MeetingTab
 
 /**
- * The Meeting layover. It is a modal for assistive technology, but visually a
- * card that floats over the table rather than a page that replaces it: the row
- * underneath keeps aria-current, and the table keeps its scroll position.
- *
- * Title and tabs are fixed rows and only the pane scrolls, so the Meeting name
- * and its section switcher stay reachable through a long transcript. One close
- * control, not two.
+ * The Meeting layover: a modal for assistive technology, a floating card
+ * visually. The row underneath keeps aria-current and the table keeps its
+ * scroll position. Title and tabs stay fixed rows, so the Meeting name and its
+ * section switcher remain reachable through a long transcript.
  */
 export function MeetingLayover({ view, confirm, initialTab, onOpenSettings }: { view: AppView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
   const [tab, setTab] = useState<TabId>(initialTab ?? 'summary')
   const [copied, setCopied] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLElement>(null)
+  useFocusTrap(panelRef)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
   const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
@@ -45,7 +45,7 @@ export function MeetingLayover({ view, confirm, initialTab, onOpenSettings }: { 
   const copyLabel = copyLabelFor(tab)
   return (
     <div className="app-panel-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) view.actions.closeMeeting() }}>
-      <article className="app-panel" role="dialog" aria-modal="true" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
+      <article ref={panelRef} className="app-panel" role="dialog" aria-modal="true" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
         {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
         {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
         <div className="app-panel-body ui-scroll">

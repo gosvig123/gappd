@@ -1,4 +1,4 @@
-/* Variant C — Today Deck: section heads, Today timeline, history table, calendar, People. */
+/* Section heads, the Today timeline, the history table, Calendar, and People. */
 
 .app-stack { display: grid; gap: var(--space-8); max-inline-size: 62rem; }
 
@@ -156,7 +156,7 @@
 .app-cell-actions { inline-size: 2.5rem; text-align: end; }
 .app-table-open { padding: 0; border: 0; background: transparent; color: var(--color-text); font-size: var(--font-size-body); font-weight: var(--font-weight-medium); text-align: start; }
 .app-table-open:hover { color: var(--color-accent); }
-.app-table-match { display: block; margin-block-start: 2px; max-inline-size: 34rem; color: var(--color-text-muted); font-size: var(--font-size-caption); line-height: var(--leading-body); }
+.app-table-match { display: block; margin-block-start: 2px; max-inline-size: 34rem; color: var(--color-text-muted); font-size: var(--font-size-caption); line-height: var(--line-height-body); }
 
 /* ------------------------------------------------------------- calendar, people */
 

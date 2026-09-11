@@ -29,7 +29,7 @@
 }
 
 .ui-dialog h2 { margin: 0; font-size: var(--font-size-title); letter-spacing: var(--tracking-tight); }
-.ui-dialog p { margin: 0; color: var(--color-text-soft); line-height: var(--leading-body); }
+.ui-dialog p { margin: 0; color: var(--color-text-soft); line-height: var(--line-height-body); }
 .ui-dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
 .ui-dialog-danger { background: var(--color-danger); border-color: transparent; color: #fff; }
 

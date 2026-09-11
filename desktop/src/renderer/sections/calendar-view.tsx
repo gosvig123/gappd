@@ -4,7 +4,7 @@ import { agendaDraftCanGenerate, agendaDraftEvent, agendaDraftKey, savedAgendaDr
 import type { CalendarConnection, CalendarEventSummary } from '../../shared/calendar-contract'
 import { MeetingAgendaDraftPanel } from '../components/meeting-agenda-draft'
 import { Button, EmptyState, StatusPill, cx } from '../components/ui'
-import { eventIsNow, eventTimeRange, upcomingEvents, type AppView } from '../lib/app-view'
+import { eventIsNow, eventTimeRange, upcomingEventCount, upcomingEvents, type AppView } from '../lib/app-view'
 import type { ConfirmController } from '../components/confirm'
 import { EventAgendaChip } from '../components/agenda-tab'
 import '../components/google-calendar.css'
@@ -32,7 +32,7 @@ export function CalendarView({ view, confirm, onOpenSettings }: CalendarViewProp
 
 function CalendarHead({ view }: { view: AppView }) {
   const connections = view.calendar?.connections.length ?? 0
-  const events = upcomingEvents(view.calendar, 5).length
+  const events = upcomingEventCount(view.calendar)
   return (
     <header className="app-section-head">
       <p className="ui-eyebrow">Read-only calendar access</p>

@@ -1,5 +1,6 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from './ui'
+import { useFocusTrap } from '../hooks/use-focus-trap'
 import './confirm.css'
 
 export type ConfirmRequest = {
@@ -26,7 +27,9 @@ export function useConfirm(): ConfirmController {
 function ConfirmDialog({ request, onClose }: { request: ConfirmRequest; onClose: () => void }) {
   const [busy, setBusy] = useState(false)
   const confirmRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEscape(onClose)
+  useFocusTrap(dialogRef)
   useEffect(() => { confirmRef.current?.focus() }, [])
   const run = async () => {
     setBusy(true)
@@ -39,7 +42,7 @@ function ConfirmDialog({ request, onClose }: { request: ConfirmRequest; onClose:
   }
   return (
     <div className="ui-dialog-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="ui-dialog" role="dialog" aria-modal="true" aria-label={request.title}>
+      <div ref={dialogRef} className="ui-dialog" role="dialog" aria-modal="true" aria-label={request.title}>
         <h2>{request.title}</h2>
         <p>{request.body}</p>
         <div className="ui-dialog-actions">

@@ -1,4 +1,4 @@
-/* Variant C — Today Deck: shell, sidebar, alert split, record dock, toasts, modal. */
+/* The app shell: sidebar, main toolbar, scroll region, alert banner, modal layers. */
 
 .app-shell {
   display: grid;
@@ -65,8 +65,7 @@
   overflow: hidden;
 }
 
-/* Bottom padding clears the prototype switcher. */
-.app-scroll { min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) 5rem; }
+.app-scroll { min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
 
 .app-blocking {
   display: flex;

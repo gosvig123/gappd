@@ -82,6 +82,15 @@ export function upcomingEvents(calendar: CalendarSnapshot | null, limit = 6, now
     .slice(0, limit)
 }
 
+/**
+ * Upcoming events without a display limit. The Calendar section head and the
+ * sidebar badge both count what the section covers, so they must agree.
+ */
+export function upcomingEventCount(calendar: CalendarSnapshot | null, now = new Date()): number {
+  if (!calendar) return 0
+  return calendar.events.filter((event) => new Date(event.end).getTime() >= now.getTime()).length
+}
+
 export function eventTimeRange(event: CalendarEventSummary): string {
   const start = new Date(event.start)
   const end = new Date(event.end)

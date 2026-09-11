@@ -1,15 +1,18 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { SettingsView } from '../routes/settings-view'
 import type { AppView } from '../lib/app-view'
 import type { ThemeName } from '../hooks/use-theme'
+import { useFocusTrap } from '../hooks/use-focus-trap'
 import './settings-dialog.css'
 
 export function SettingsDialog({ view, onClose }: { view: AppView; onClose: () => void }) {
+  const modalRef = useRef<HTMLDivElement>(null)
   useEscape(onClose)
+  useFocusTrap(modalRef)
   return (
     <div className="app-modal-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="app-modal" role="dialog" aria-modal="true" aria-label="Settings">
+      <div ref={modalRef} className="app-modal" role="dialog" aria-modal="true" aria-label="Settings">
         <header className="app-modal-head">
           <h2>Settings</h2>
           <button type="button" className="app-icon-action" aria-label="Close settings" onClick={onClose}><X aria-hidden="true" /></button>

@@ -1,6 +1,6 @@
 import { CalendarDays, List, Settings as SettingsIcon, Sun, Users } from 'lucide-react'
 import type { CalendarSnapshot } from '../../shared/calendar-contract'
-import type { AppView } from '../lib/app-view'
+import { upcomingEventCount, type AppView } from '../lib/app-view'
 
 const SECTIONS = [
   { key: 'today', label: 'Today', Icon: Sun },
@@ -35,7 +35,7 @@ export function sectionCounts(view: AppView): Record<SectionKey, number> {
   return {
     today: todayEventCount(view.calendar),
     meetings: view.meetings.length,
-    calendar: view.calendar?.connections.length ?? 0,
+    calendar: upcomingEventCount(view.calendar),
     people: view.people.length,
   }
 }

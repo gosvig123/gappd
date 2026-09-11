@@ -1,5 +1,5 @@
 /*
- * Variant C — Today Deck: the Meeting layover.
+ * The Meeting layover.
  *
  * The card floats over the section instead of replacing it. The scrim is light
  * on purpose, so the table underneath stays legible and the layover reads as a
@@ -14,8 +14,7 @@
   justify-items: end;
   /* align-items start, so the card hugs its content instead of always filling. */
   align-items: start;
-  /* Bottom space clears the prototype switcher, which is not part of the design. */
-  padding: var(--space-4) var(--space-4) 3.6rem;
+  padding: var(--space-4);
   background: color-mix(in srgb, var(--color-overlay-scrim) 62%, transparent);
   backdrop-filter: blur(2px);
 }
