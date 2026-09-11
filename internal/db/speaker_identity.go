@@ -73,5 +73,15 @@ func applySpeakerIdentity(tx *sql.Tx, meetingID, key string, person Person) erro
 	if err := saveSpeakerIdentity(tx, meetingID, key, person); err != nil {
 		return err
 	}
+	origin := "manual"
+	if person == (Person{}) {
+		origin = "cleared"
+	}
+	if err := setIdentityOrigin(tx, meetingID, key, origin); err != nil {
+		return err
+	}
+	if err := enrollAssignedSpeaker(tx, meetingID, key); err != nil {
+		return err
+	}
 	return refreshSpeakerTranscript(tx, meetingID)
 }

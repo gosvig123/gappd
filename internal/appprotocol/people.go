@@ -41,10 +41,18 @@ type SpeakerClipResponse struct {
 	MimeType    string  `json:"mimeType"`
 }
 
+type RecognizeSpeakersInput struct {
+	ID       string `json:"id"`
+	Revision int    `json:"revision"`
+	Emails   string `json:"emails"`
+	Calendar bool   `json:"calendar"`
+}
+
 type MeetingSpeaker struct {
-	Key      string  `json:"key"`
-	Name     string  `json:"name"`
-	PersonID *string `json:"personId,omitempty"`
+	IdentityOrigin string  `json:"identityOrigin,omitempty"`
+	Key            string  `json:"key"`
+	Name           string  `json:"name"`
+	PersonID       *string `json:"personId,omitempty"`
 }
 
 func buildSpeakerViews(segments []db.Segment) []MeetingSpeaker {
@@ -56,7 +64,24 @@ func buildSpeakerViews(segments []db.Segment) []MeetingSpeaker {
 			continue
 		}
 		seen[key] = true
-		speakers = append(speakers, MeetingSpeaker{Key: key, Name: segment.Speaker, PersonID: segment.PersonID})
+		speakers = append(speakers, MeetingSpeaker{Key: key, Name: segment.Speaker, PersonID: segment.PersonID, IdentityOrigin: segment.IdentityOrigin})
 	}
 	return speakers
+}
+
+type VoiceTargetsInput struct {
+	After string `json:"after"`
+}
+type VoiceTargetsResponse struct {
+	Targets []VoiceTarget `json:"targets"`
+}
+
+type VoiceTarget db.VoiceTarget
+
+func BuildVoiceTargets(targets []db.VoiceTarget) []VoiceTarget {
+	out := make([]VoiceTarget, len(targets))
+	for i, target := range targets {
+		out[i] = VoiceTarget(target)
+	}
+	return out
 }

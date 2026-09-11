@@ -14,10 +14,26 @@ previous summary remains visible while participants, action items, and summary
 are regenerated from the named transcript. If processing fails, the assignment
 remains saved and the normal processing recovery flow can retry.
 
-Saved people remain available across calls. This release requires selecting
-the person in each call; automatic recognition from voice profiles is not yet
-implemented. Email addresses reuse existing people; names alone do not merge
-people. Clearing a label unlinks that speaker without deleting the saved person.
+Saved people remain available across calls. An explicit person label can enroll
+clean, sufficient remote speech for local speaker auto-fill. Automatic labels
+never train voice profiles. **You** and **Other** do not enroll in this version.
+Email addresses reuse existing people; names alone do not merge people.
+
+After speaker processing, the desktop can fill names before summarization.
+A confirmed Calendar snapshot restricts candidates to exact invitee emails;
+Calendar is never voice evidence. Without a confirmed snapshot, candidates must
+come from a current manually labeled remote person and previous manually
+confirmed coattendance. Global history and automatic labels cannot seed a group.
+Unknown or ambiguous voices stay unnamed. Score and margin thresholds are
+conservative rules, not measured accuracy guarantees.
+
+**Auto-filled · check label** marks automatic names. Use the person menu to
+correct or clear a label. Clearing a remote label stops automatic filling for
+that Meeting, including retries, until that cleared label is explicitly assigned
+again. It keeps the saved Person. Correction, clear, speaker reprocessing,
+transcript replacement, and Meeting deletion retract affected voice samples.
+Voice vectors and model/source provenance stay in the local backend database;
+the renderer receives names and label provenance only.
 
 Labeling becomes available after recording and speaker processing finish.
 The generic **Other** bucket can contain multiple voices and cannot be assigned
@@ -58,3 +74,12 @@ Person records and meeting assignments live in the local SQLite database.
 Linked calendar snapshots live in the encrypted desktop store, survive Calendar
 disconnection, and are removed when their meeting is deleted. Old meetings
 without snapshots can only suggest events still present in the Calendar cache.
+
+Desktop processing uses `voice-targets --after MEETING_ID --json` to page through
+eligible Meetings (use an empty `--after` for the first page). It calls
+`recognize-speakers MEETING_ID --revision REVISION --emails INVITEE_EMAILS
+--calendar=true --json` with the confirmed snapshot constraint. With no confirmed
+snapshot it passes `--calendar=false` and an empty email list. The backend rejects
+stale revisions and active processing claims. Neither history reads nor Meeting
+detail reads run recognition. Speaker views expose `identityOrigin` as `manual`
+or `automatic` when a Person is assigned.

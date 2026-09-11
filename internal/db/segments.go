@@ -35,6 +35,7 @@ type Segment struct {
 	Speaker                 string
 	SpeakerKey              string
 	PersonID                *string
+	IdentityOrigin          string
 	SpeakerSource           *SegmentSource
 	SpeakerConfidence       *float64
 	SpeakerAssignmentReason *SpeakerAssignmentReason
@@ -51,8 +52,9 @@ const insertSegmentSQL = `INSERT INTO segments
 const selectSegmentsSQL = `SELECT s.id, s.meeting_id, s.start_sec, s.end_sec,
     s.text, COALESCE(p.name, s.speaker), s.speaker_source, s.speaker_confidence,
     s.speaker_assignment_reason, s.speaker_group_start_sec, s.speaker_group_end_sec,
-    s.created_at, s.speaker, ms.person_id
+    s.created_at, s.speaker, ms.person_id, COALESCE(st.origin,'manual')
     FROM segments s LEFT JOIN meeting_speakers ms ON ms.meeting_id=s.meeting_id AND ms.speaker_key=s.speaker
+    LEFT JOIN speaker_identity_state st ON st.meeting_id=s.meeting_id AND st.speaker_key=s.speaker
     LEFT JOIN people p ON p.id=ms.person_id WHERE s.meeting_id=? ORDER BY s.start_sec ASC`
 
 const deleteSegmentsSQL = `DELETE FROM segments WHERE meeting_id = ?`
@@ -163,11 +165,12 @@ func scanSegments(rows *sql.Rows) ([]Segment, error) {
 		var s Segment
 		if err := rows.Scan(&s.ID, &s.MeetingID, &s.Start, &s.End, &s.Text, &s.Speaker,
 			&s.SpeakerSource, &s.SpeakerConfidence, &s.SpeakerAssignmentReason,
-			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt, &s.SpeakerKey, &s.PersonID); err != nil {
+			&s.SpeakerGroupStart, &s.SpeakerGroupEnd, &s.CreatedAt, &s.SpeakerKey, &s.PersonID, &s.IdentityOrigin); err != nil {
 			return nil, fmt.Errorf("scan segment: %w", err)
 		}
 		if s.PersonID == nil {
 			s.SpeakerKey = ""
+			s.IdentityOrigin = ""
 		}
 		out = append(out, s)
 	}

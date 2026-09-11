@@ -2,6 +2,7 @@ import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { LinkCalendarInput, ParticipantContext } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
 import { createSecureStore } from './electron-secure-store'
+import { requestDrains } from './drain-coordinator'
 import { googleCalendarSnapshot } from './google-calendar-service'
 
 const STORE_FILE = 'meeting-calendar.enc'
@@ -24,7 +25,7 @@ export async function participantContext(id: string): Promise<ParticipantContext
 function mergeContext(saved: ParticipantContext | undefined, current: ParticipantContext): ParticipantContext {
   const candidates = new Map((saved?.candidates ?? []).map((event) => [event.sourceId, event]))
   for (const event of current.candidates) candidates.set(event.sourceId, event)
-  const event = saved?.event && (candidates.get(saved.event.sourceId) ?? saved.event)
+  const event = saved?.event
   return { event, inferenceDisabled: saved?.inferenceDisabled, candidates: [...candidates.values()] }
 }
 
@@ -36,6 +37,7 @@ export async function linkCalendar(input: LinkCalendarInput): Promise<Participan
     await requestCommand('meetings.show', { id: input.id })
     const updated = { ...context, event, inferenceDisabled: !input.eventSourceId }
     await saveContext(await readLinks(), input.id, updated)
+    requestDrains()
     return updated
   })
 }
@@ -94,4 +96,9 @@ function serialize<T>(action: () => Promise<T>): Promise<T> {
 
 export function savedMeetingCalendarContexts(): Promise<Record<string, ParticipantContext>> {
   return serialize(async () => (await readLinks()).meetings)
+}
+
+// Hold the Calendar lock until the backend consumes the bounded constraint.
+export function withSavedCalendarContexts<T>(action: (contexts: Record<string, ParticipantContext>) => Promise<T>): Promise<T> {
+  return serialize(async () => action((await readLinks()).meetings))
 }

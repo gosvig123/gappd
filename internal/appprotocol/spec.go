@@ -103,6 +103,8 @@ var Commands = []CommandSpec{
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
+	{ID: "meetings.voiceTargets", Mode: CommandModeRequest, Input: typeOf[VoiceTargetsInput](), Output: typeOf[VoiceTargetsResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("voice-targets"), flag("after", "after", false), lit("--json")}},
+	{ID: "meetings.recognizeSpeakers", Mode: CommandModeRequest, Input: typeOf[RecognizeSpeakersInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("recognize-speakers"), field("id"), flag("revision", "revision", false), flag("emails", "emails", false), flag("calendar", "calendar", false), lit("--json")}},
 }
 
 func StreamCommands() []CommandSpec {

@@ -12,10 +12,14 @@ func reconcileSpeakerIdentities(tx *sql.Tx, meetingID string, segments []Segment
 	if err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`DELETE FROM speaker_identity_state WHERE meeting_id=? AND origin<>'cleared' AND speaker_key<>'You'`, meetingID); err != nil {
+		return err
+	}
 	for i := range segments {
 		if segments[i].SpeakerSource != nil && *segments[i].SpeakerSource == SegmentSourceSystem {
 			segments[i].Speaker, segments[i].PersonID = segments[i].RawSpeaker(), nil
 			segments[i].SpeakerKey = ""
+			segments[i].IdentityOrigin = ""
 		}
 	}
 	return nil

@@ -1,6 +1,7 @@
 import type { ManagedRuntimeCapability, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
 import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime'
+import { recognizePendingSpeakers } from './speaker-recognition'
 import { usingSummaryRuntime } from './summary-runtime'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
@@ -82,6 +83,7 @@ export async function requestPendingDrains(): Promise<void> {
   if (stopped || pendingCheckRunning) return
   pendingCheckRunning = true
   try {
+    await recognizePendingSpeakers(AbortSignal.timeout(60_000))
     const result = await requestCommand('processing.pending', {})
     const snapshot = managedRuntime.status()
     for (const capability of result.capabilities) {
@@ -117,7 +119,8 @@ async function runDrain(current: Flight): Promise<void> {
   }
 }
 
-function drainCapability(current: Flight) {
+async function drainCapability(current: Flight) {
+  if (current.capability === 'summarization') await recognizePendingSpeakers(current.controller.signal)
   const drain = (env: NodeJS.ProcessEnv) => requestCommand('processing.drain', { capability: current.capability }, env, current.controller.signal)
   if (current.capability === 'summarization') return usingSummaryRuntime(drain)
   const capabilities = current.capability === 'diarization' ? [] : [current.capability]

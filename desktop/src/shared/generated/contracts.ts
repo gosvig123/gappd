@@ -93,6 +93,7 @@ export type ProcessingStatusInfo = {
 }
 
 export type MeetingSpeaker = {
+  identityOrigin?: string
   key: string
   name: string
   personId?: string
@@ -248,4 +249,24 @@ export type RecordingEvent = {
   title: string
   status: MeetingStatus
   error?: string
+}
+
+export type VoiceTargetsInput = {
+  after: string
+}
+
+export type VoiceTargetsResponse = {
+  targets: VoiceTarget[]
+}
+
+export type VoiceTarget = {
+  id: string
+  revision: number
+}
+
+export type RecognizeSpeakersInput = {
+  id: string
+  revision: number
+  emails: string
+  calendar: boolean
 }

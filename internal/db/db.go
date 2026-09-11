@@ -102,6 +102,9 @@ func (d *DB) initializeSchema(ctx context.Context, conn *sql.Conn) (err error) {
 }
 
 func installSchema(ctx context.Context, conn *sql.Conn) error {
+	if err := migrateVoiceEvidence(ctx, conn); err != nil {
+		return err
+	}
 	var searchExists bool
 	if err := conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='meetings_fts')`).Scan(&searchExists); err != nil {
 		return fmt.Errorf("inspect meetings fts: %w", err)
