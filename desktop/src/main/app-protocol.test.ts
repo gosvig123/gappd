@@ -29,7 +29,7 @@ function writePerByte(stream: PassThrough, value: string): void {
   for (const byte of Buffer.from(value, 'utf8')) stream.write(Buffer.from([byte]))
 }
 
-test('a command response waits for stdout that follows exit', async () => {
+test('a command response waits for stdout that follows exit', { timeout: 2000 }, async () => {
   const child = new FakeChild()
   const pending = protocol(child).requestCommand('test.request', {})
   child.stdout.write('{"ok":')
@@ -39,7 +39,7 @@ test('a command response waits for stdout that follows exit', async () => {
   assert.equal((await pending).ok, true)
 })
 
-test('per-byte pipes keep split accented and emoji characters in both paths', async () => {
+test('per-byte pipes keep split accented and emoji characters in both paths', { timeout: 2000 }, async () => {
   const title = 'café 🎉'
   const request = new FakeChild()
   const pending = protocol(request).requestCommand('test.request', {})
@@ -60,7 +60,7 @@ test('per-byte pipes keep split accented and emoji characters in both paths', as
   assert.equal((events[0] as { title: string }).title, title)
 })
 
-test('a failed command reports stderr and an aborted command rejects with its error', async () => {
+test('a failed command reports stderr and an aborted command rejects with its error', { timeout: 2000 }, async () => {
   const failed = new FakeChild()
   const failing = protocol(failed).requestCommand('test.request', {})
   failed.stderr.write('transcription helper failed')
