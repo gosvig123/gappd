@@ -61,18 +61,18 @@
 .vc-main {
   min-inline-size: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
-/* Bottom padding clears the fixed record dock and the prototype switcher. */
-.vc-scroll { min-block-size: 0; overflow: auto; padding: var(--space-8) var(--space-9) 7.5rem; }
+/* Bottom padding clears the prototype switcher. */
+.vc-scroll { min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) 5rem; }
 
 .vc-blocking {
   display: flex;
   align-items: start;
   gap: var(--space-5);
-  margin: var(--space-6) var(--space-9) 0;
+  margin: var(--space-5) var(--space-9) 0;
   padding: var(--space-5) var(--space-6);
   border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-lg);

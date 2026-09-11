@@ -3,29 +3,38 @@ import { Bell, Mic, Square, X } from 'lucide-react'
 import { Button, cx } from '../../components/ui'
 import type { AlertItem, PrototypeView } from '../contract'
 
-/** The record dock follows the user across every section, so recording is never buried in a page. */
-export function DeckDock({ view }: { view: PrototypeView }) {
+/**
+ * Recording is app chrome, so it sits in the main toolbar rather than floating
+ * over the content. The pill keeps its shape: device on the left, action on the
+ * right, and no second status block in between — the action label carries the
+ * live elapsed time instead.
+ */
+export function RecordBar({ view }: { view: PrototypeView }) {
   const live = view.recording.status === 'recording'
   const stopping = view.recording.status === 'stopping'
   const elapsed = useElapsed(live ? startedAtOf(view) : null)
-  const label = stopping ? 'Stopping…' : live ? 'Stop' : 'Record'
   const disabled = stopping || (live ? !view.canStop : !view.canStart)
+  const title = view.canStart || live ? undefined : 'Connect an audio input to record'
   return (
-    <div className={cx('vc-dock', live && 'is-recording')} role="region" aria-label="Recording controls">
-      <label className="vc-dock-device" title="Audio input">
-        <Mic aria-hidden="true" />
-        <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
-          {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
-        </select>
-      </label>
-      <div className="vc-dock-state">
-        <strong>{stopping ? 'Finishing up' : live ? `Recording · ${elapsed}` : 'Ready to record'}</strong>
-        <span>{live ? view.recording.title || 'New meeting' : 'Audio stays on this Mac'}</span>
+    <div className="vc-toolbar">
+      <div className={cx('vc-record', live && 'is-recording')}>
+        <label className="vc-record-device" title="Audio input">
+          <Mic aria-hidden="true" />
+          <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
+            {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
+          </select>
+        </label>
+        <button
+          type="button"
+          className={cx('vc-record-button', live && 'is-recording')}
+          disabled={disabled}
+          title={title}
+          onClick={() => (live || stopping ? view.actions.stop() : view.actions.start())}
+        >
+          {live || stopping ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+          {stopping ? 'Stopping…' : live ? `Stop · ${elapsed}` : 'Record'}
+        </button>
       </div>
-      <button type="button" className={cx('vc-dock-button', live && 'is-recording')} disabled={disabled} title={view.canStart || live ? undefined : 'Connect an audio input to record'} onClick={() => (live || stopping ? view.actions.stop() : view.actions.start())}>
-        {live || stopping ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
-        {label}
-      </button>
     </div>
   )
 }

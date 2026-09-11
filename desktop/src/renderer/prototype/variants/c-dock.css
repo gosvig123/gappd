@@ -1,29 +1,26 @@
-/* Variant C — Today Deck: the persistent record dock, the toast stack, and the settings modal. */
+/* Variant C — Today Deck: the record toolbar, the toast stack, and the settings modal. */
 
-/* ------------------------------------------------------------- record dock */
+/* ---------------------------------------------------------- record toolbar */
 
-.vc-dock {
-  position: fixed;
-  inset-block-end: 1.25rem;
-  inset-inline-start: 1.25rem;
-  z-index: 85;
+.vc-toolbar { display: flex; align-items: center; justify-content: flex-end; padding: var(--space-6) var(--space-9) 0; }
+
+.vc-record {
   display: flex;
   align-items: stretch;
-  gap: var(--space-4);
-  max-inline-size: min(23rem, calc(50vw - 2rem));
-  padding: var(--space-3);
-  border: 1px solid var(--color-border-strong);
+  min-block-size: 2.25rem;
+  overflow: hidden;
+  border: 1px solid var(--color-accent-border-strong);
   border-radius: var(--radius-pill);
   background: var(--color-surface-elevated);
-  box-shadow: var(--shadow-sheet);
+  box-shadow: inset 0 1px 0 var(--highlight-subtle);
 }
 
-.vc-dock.is-recording { border-color: var(--color-danger-border); }
-.vc-dock-device { display: flex; align-items: center; gap: var(--space-3); padding-inline: var(--space-4) var(--space-3); min-inline-size: 0; }
-.vc-dock-device svg { inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-text-muted); flex: 0 0 auto; }
+.vc-record.is-recording { border-color: var(--color-danger-border); }
+.vc-record-device { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-5); min-inline-size: 0; }
+.vc-record-device svg { inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-text-muted); flex: 0 0 auto; }
 
-.vc-dock-device select {
-  max-inline-size: 6.5rem;
+.vc-record-device select {
+  max-inline-size: 11rem;
   padding: 0;
   border: 0;
   background: transparent;
@@ -32,29 +29,26 @@
   appearance: none;
 }
 
-.vc-dock-device select:focus { outline: none; box-shadow: none; }
+.vc-record-device select:focus { outline: none; box-shadow: none; }
+.vc-record-device:has(select:disabled) { opacity: 0.6; }
 
-.vc-dock-state { display: grid; align-content: center; gap: 1px; min-inline-size: 0; padding-inline-end: var(--space-3); }
-.vc-dock-state strong { font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
-.vc-dock-state span { color: var(--color-text-muted); font-size: var(--font-size-caption); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.vc-dock-button {
+.vc-record-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-6);
   border: 0;
-  border-radius: var(--radius-pill);
   background: var(--gradient-accent);
   color: var(--color-accent-contrast);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
-.vc-dock-button svg { inline-size: 0.85rem; block-size: 0.85rem; }
-.vc-dock-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
-.vc-dock-button:disabled { opacity: 0.55; cursor: not-allowed; }
-.vc-dock-button.is-recording { background: var(--color-danger); }
+.vc-record-button svg { inline-size: 0.85rem; block-size: 0.85rem; }
+.vc-record-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
+.vc-record-button:disabled { opacity: 0.55; cursor: not-allowed; }
+.vc-record-button.is-recording { background: var(--color-danger); }
 
 /* ----------------------------------------------------------------- toasts */
 

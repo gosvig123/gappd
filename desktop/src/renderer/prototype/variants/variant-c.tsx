@@ -6,12 +6,12 @@ import { buildAlerts, type AlertItem, type PrototypeView } from '../contract'
 import { useConfirm } from '../proto-dialog'
 import type { VariantProps } from '../variants'
 import { DeckCalendar } from './c-calendar'
-import { DeckDock, DeckToasts } from './c-dock'
 import { DeckMeetings } from './c-meetings'
 import { DeckPanel } from './c-panel'
 import { DeckPeople } from './c-people'
 import { DeckSettings } from './c-settings'
 import { DeckToday } from './c-today'
+import { DeckToasts, RecordBar } from './c-dock'
 import './variant-c.css'
 import './c-sections.css'
 import './c-panel.css'
@@ -24,7 +24,7 @@ import './c-dock.css'
  * the landing surface: the day's calendar drives recording, and Meeting history
  * lives in a sortable table rather than a card grid. Alerts split by severity —
  * only blocking problems get a banner, everything else is a corner toast — and
- * the record dock follows you across every section.
+ * recording lives in the main toolbar so it is always in the same place.
  */
 export default { key: 'c', name: 'Today Deck', tagline: 'Agenda-first sidebar with a history table', Component: VariantC }
 
@@ -53,6 +53,7 @@ function VariantC({ view }: VariantProps) {
     <div className="vc-shell">
       <Sidebar section={section} counts={sectionCounts(view)} onSelect={setSection} onOpenSettings={() => setSettingsOpen(true)} />
       <main className="vc-main">
+        <RecordBar view={view} />
         <BlockingBanner alerts={blocking} />
         <div className="vc-scroll proto-scroll">
           {section === 'today' ? <DeckToday view={view} onOpenMeetings={() => setSection('meetings')} onOpenCalendar={() => setSection('calendar')} /> : null}
@@ -61,9 +62,8 @@ function VariantC({ view }: VariantProps) {
           {section === 'people' ? <DeckPeople view={view} /> : null}
         </div>
       </main>
-      <DeckDock view={view} />
       <DeckToasts alerts={transient} onDismiss={view.actions.dismissAlert} />
-      {view.selectedMeetingId ? <DeckPanel view={view} /> : null}
+      {view.selectedMeetingId ? <DeckPanel view={view} confirm={confirm} /> : null}
       {settingsOpen ? <DeckSettings view={view} onClose={() => setSettingsOpen(false)} /> : null}
       {confirm.dialog}
     </div>

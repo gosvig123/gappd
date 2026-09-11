@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Copy, X } from 'lucide-react'
+import { Copy, X } from 'lucide-react'
 import type { MeetingDetail } from '../../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../../shared/meeting-recording-workflow'
 import { Markdown } from '../../components/markdown'
@@ -9,6 +9,7 @@ import { SpeakerLabels } from '../../routes/speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from '../../routes/transcript-view'
 import { artifactLine, statusLabel, type PrototypeView } from '../contract'
 import { meetingDurationLabel, meetingTimeLabel } from '../grouping'
+import type { ConfirmController } from '../proto-dialog'
 
 const TABS = [
   { id: 'summary', label: 'Summary' },
@@ -17,55 +18,87 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 /**
- * A Meeting opens as a deck card layered over the current section, so the table
- * underneath keeps its scroll position and can still mark the open row with
- * aria-current. Variant A replaces its column instead; variant B uses a pane.
+ * The Meeting layover. It is a modal for assistive technology, but visually a
+ * card that floats over the table rather than a page that replaces it: the row
+ * underneath keeps aria-current, and the table keeps its scroll position.
+ *
+ * Title and tabs are fixed rows and only the pane scrolls, so the Meeting name
+ * and its section switcher stay reachable through a long transcript. One close
+ * control, not two.
  */
-export function DeckPanel({ view }: { view: PrototypeView }) {
+export function DeckPanel({ view, confirm }: { view: PrototypeView; confirm: ConfirmController }) {
   const [tab, setTab] = useState<TabId>('summary')
+  const [copied, setCopied] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
-  useRestoreFocus()
-  useEffect(() => { setTab('summary'); closeRef.current?.focus() }, [view.selectedMeetingId])
-  useEscapeToClose(view.actions.closeMeeting)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
+  const copyValue = tab === 'summary' ? meeting?.summary ?? '' : transcript
+  useRestoreFocus()
+  useEscapeToClose(view.actions.closeMeeting)
+  useEffect(() => { setTab('summary'); setCopied(false); closeRef.current?.focus() }, [view.selectedMeetingId])
+  const copy = () => { void navigator.clipboard?.writeText(copyValue).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600) }) }
+  const copyLabel = tab === 'summary' ? 'Copy notes' : 'Copy transcript'
   return (
-    <div className="vc-panel-layer" role="presentation">
+    <div className="vc-panel-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) view.actions.closeMeeting() }}>
       <article className="vc-panel" role="dialog" aria-modal="true" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
-        <header className="vc-panel-head">
-          <button type="button" className="vc-back" onClick={view.actions.closeMeeting}><ArrowLeft aria-hidden="true" /> Close</button>
-          <button ref={closeRef} type="button" className="vc-icon-action" aria-label="Close Meeting" onClick={view.actions.closeMeeting}><X aria-hidden="true" /></button>
-        </header>
-        {meeting
-          ? <PanelBody view={view} meeting={meeting} transcript={transcript} tab={tab} onTab={setTab} />
-          : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : 'This Meeting is no longer available.'}</EmptyState>}
+        {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
+        {meeting ? <TabBar tab={tab} onChange={setTab} /> : null}
+        <div className="vc-panel-body proto-scroll">
+          {meeting
+            ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} />
+            : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : 'This Meeting is no longer available.'}</EmptyState>}
+        </div>
+        {meeting && copyValue ? (
+          <footer className="vc-panel-foot">
+            <Button
+              className="compact-action"
+              onClick={() => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, and audio for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: () => { void view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })}
+            >Delete Meeting</Button>
+            <Button className="compact-action" onClick={copy}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabel}</Button>
+          </footer>
+        ) : null}
       </article>
     </div>
   )
 }
 
-type PanelBodyProps = { view: PrototypeView; meeting: MeetingDetail; transcript: string; tab: TabId; onTab: (tab: TabId) => void }
-
-function PanelBody({ view, meeting, transcript, tab, onTab }: PanelBodyProps) {
+function PanelHead({ meeting, transcript, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
   return (
-    <div className="vc-panel-body proto-scroll">
+    <header className="vc-panel-top">
       <div className="vc-panel-titles">
         <p className="proto-eyebrow">{meetingTimeLabel(row)}</p>
-        <h1 className="proto-title">{meeting.title || 'Untitled meeting'}</h1>
+        <h1>{meeting.title || 'Untitled meeting'}</h1>
         <p className="vc-panel-meta">
-          {meetingDurationLabel(row)} · {meeting.speakers.length} {meeting.speakers.length === 1 ? 'speaker' : 'speakers'} · {artifactLine(row)}
+          <span>{meetingDurationLabel(row)}</span>
+          <span aria-hidden="true">·</span>
+          <span>{meeting.speakers.length} {meeting.speakers.length === 1 ? 'speaker' : 'speakers'}</span>
+          <span aria-hidden="true">·</span>
+          <span>{artifactLine(row)}</span>
           {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{statusLabel(row)}</StatusPill> : null}
         </p>
       </div>
+      <button ref={closeRef} type="button" className="vc-icon-action" aria-label="Close Meeting" onClick={onClose}><X aria-hidden="true" /></button>
+    </header>
+  )
+}
+
+function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+  return <header className="vc-panel-top"><div className="vc-panel-titles"><h1>Meeting</h1></div><button ref={closeRef} type="button" className="vc-icon-action" aria-label="Close Meeting" onClick={onClose}><X aria-hidden="true" /></button></header>
+}
+
+/** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
+function PanelContent({ view, meeting, transcript, tab }: { view: PrototypeView; meeting: MeetingDetail; transcript: string; tab: TabId }) {
+  const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
+  return (
+    <>
       {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
-      <DiarizationNotice view={view} />
+      {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
       <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} />
-      <TabBar tab={tab} onChange={onTab} copyValue={tab === 'summary' ? meeting.summary ?? '' : transcript} />
       <section className="vc-panel-pane" role="tabpanel" id={`vc-pane-${tab}`} aria-labelledby={`vc-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} /> : <TranscriptPane view={view} text={transcript} />}
       </section>
-    </div>
+    </>
   )
 }
 
@@ -85,7 +118,7 @@ function TranscriptPane({ view, text }: { view: PrototypeView; text: string }) {
 function DiarizationNotice({ view }: { view: PrototypeView }) {
   const [busy, setBusy] = useState(false)
   const meeting = view.selectedMeeting
-  if (!meeting || meeting.diarization.state !== 'degraded') return null
+  if (!meeting) return null
   const retry = async () => {
     setBusy(true)
     try { await view.actions.retryDiarization(meeting.id) } finally { setBusy(false) }
@@ -98,8 +131,7 @@ function DiarizationNotice({ view }: { view: PrototypeView }) {
   )
 }
 
-function TabBar({ tab, onChange, copyValue }: { tab: TabId; onChange: (tab: TabId) => void; copyValue: string }) {
-  const [copied, setCopied] = useState(false)
+function TabBar({ tab, onChange }: { tab: TabId; onChange: (tab: TabId) => void }) {
   const listRef = useRef<HTMLDivElement>(null)
   const move = (delta: number) => {
     const index = TABS.findIndex((item) => item.id === tab)
@@ -109,28 +141,23 @@ function TabBar({ tab, onChange, copyValue }: { tab: TabId; onChange: (tab: TabI
     listRef.current?.querySelector<HTMLButtonElement>(`#vc-tab-${next.id}`)?.focus()
   }
   return (
-    <div className="vc-tabbar">
-      <div ref={listRef} className="vc-tabs" role="tablist" aria-label="Meeting sections" onKeyDown={(event) => {
-        if (event.key === 'ArrowRight') { event.preventDefault(); move(1) }
-        if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1) }
-      }}>
-        {TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            id={`vc-tab-${item.id}`}
-            role="tab"
-            aria-selected={tab === item.id}
-            aria-controls={`vc-pane-${item.id}`}
-            tabIndex={tab === item.id ? 0 : -1}
-            className={cx('vc-tab', tab === item.id && 'is-active')}
-            onClick={() => onChange(item.id)}
-          >{item.label}</button>
-        ))}
-      </div>
-      {copyValue ? (
-        <Button className="compact-action" onClick={() => { void navigator.clipboard?.writeText(copyValue).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600) }) }}><Copy aria-hidden="true" />{copied ? 'Copied' : 'Copy'}</Button>
-      ) : null}
+    <div ref={listRef} className="vc-tabs" role="tablist" aria-label="Meeting sections" onKeyDown={(event) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); move(1) }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1) }
+    }}>
+      {TABS.map((item) => (
+        <button
+          key={item.id}
+          type="button"
+          id={`vc-tab-${item.id}`}
+          role="tab"
+          aria-selected={tab === item.id}
+          aria-controls={`vc-pane-${item.id}`}
+          tabIndex={tab === item.id ? 0 : -1}
+          className={cx('vc-tab', tab === item.id && 'is-active')}
+          onClick={() => onChange(item.id)}
+        >{item.label}</button>
+      ))}
     </div>
   )
 }

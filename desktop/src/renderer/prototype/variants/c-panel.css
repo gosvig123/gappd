@@ -1,4 +1,10 @@
-/* Variant C — Today Deck: the layered Meeting card with real tab semantics. */
+/*
+ * Variant C — Today Deck: the Meeting layover.
+ *
+ * The card floats over the section instead of replacing it. The scrim is light
+ * on purpose, so the table underneath stays legible and the layover reads as a
+ * layer rather than a page.
+ */
 
 .vc-panel-layer {
   position: fixed;
@@ -6,16 +12,19 @@
   z-index: 87;
   display: grid;
   justify-items: end;
-  padding: var(--space-5);
-  background: var(--color-overlay-scrim);
-  backdrop-filter: blur(4px);
+  /* align-items start, so the card hugs its content instead of always filling. */
+  align-items: start;
+  /* Bottom space clears the prototype switcher, which is not part of the design. */
+  padding: var(--space-4) var(--space-4) 3.6rem;
+  background: color-mix(in srgb, var(--color-overlay-scrim) 62%, transparent);
+  backdrop-filter: blur(2px);
 }
 
 .vc-panel {
-  inline-size: min(100%, 44rem);
+  inline-size: min(100%, 47rem);
   max-block-size: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-panel);
@@ -24,37 +33,21 @@
   animation: vc-panel-in var(--transition-smooth);
 }
 
-@keyframes vc-panel-in { from { opacity: 0; transform: translateX(1.5rem); } to { opacity: 1; transform: none; } }
+@keyframes vc-panel-in { from { opacity: 0; transform: translateX(1.5rem) scale(0.99); } to { opacity: 1; transform: none; } }
 
-.vc-panel-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* The title block is a fixed row, so the Meeting name survives a long transcript. */
+.vc-panel-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: var(--space-5);
-  padding: var(--space-5) var(--space-6);
+  padding: var(--space-6) var(--space-8) var(--space-5);
   border-block-end: 1px solid var(--color-border);
   background: linear-gradient(180deg, var(--color-accent-tint), transparent);
 }
 
-.vc-back {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-4);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text-soft);
-  font-size: var(--font-size-small);
-  font-weight: var(--font-weight-medium);
-}
-
-.vc-back svg { inline-size: 0.9rem; block-size: 0.9rem; }
-.vc-back:hover { color: var(--color-accent); background: var(--surface-hover); }
-
-.vc-panel-body { min-block-size: 0; display: grid; gap: var(--space-6); align-content: start; padding: var(--space-8) var(--space-8) var(--space-9); }
-.vc-panel-titles { display: grid; gap: var(--space-2); }
-.vc-panel-titles h1 { margin: 0; font-size: var(--font-size-display); }
+.vc-panel-titles { display: grid; gap: var(--space-2); min-inline-size: 0; }
+.vc-panel-titles h1 { margin: 0; font-size: var(--font-size-display); font-weight: var(--font-weight-semibold); letter-spacing: var(--tracking-display); line-height: var(--leading-display); overflow-wrap: anywhere; }
 
 .vc-panel-meta {
   display: flex;
@@ -64,6 +57,18 @@
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-small);
+}
+
+.vc-panel-body { min-block-size: 0; display: grid; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
+
+.vc-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-8);
+  border-block-start: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
 }
 
 .vc-notice {
@@ -79,41 +84,35 @@
   font-size: var(--font-size-small);
 }
 
-.vc-tabbar { display: flex; align-items: end; justify-content: space-between; gap: var(--space-5); border-block-end: 1px solid var(--color-border); }
-.vc-tabs { display: flex; gap: 2px; }
+/* The tab row is its own fixed row, so it never scrolls away from the pane. */
+.vc-tabs { display: flex; gap: var(--space-5); padding: 0 var(--space-8); border-block-end: 1px solid var(--color-border); }
 
 .vc-tab {
   margin-block-end: -1px;
-  padding: var(--space-4) var(--space-6) var(--space-5);
-  border: 1px solid transparent;
-  border-block-end-color: var(--color-border);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding: var(--space-4) 0 var(--space-5);
+  border: 0;
+  border-block-end: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
 }
 
-.vc-tab:hover { color: var(--color-text); background: var(--surface-hover); }
-.vc-tab.is-active { color: var(--color-text); border-color: var(--color-border); border-block-end-color: var(--color-card); background: var(--color-card); }
+.vc-tab:hover { color: var(--color-text); }
+.vc-tab:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+.vc-tab.is-active { color: var(--color-text); box-shadow: inset 0 -2px 0 var(--color-accent); }
 
 .vc-panel-pane {
   padding: var(--space-7) var(--space-8);
   border: 1px solid var(--color-border);
-  border-block-start: 0;
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  border-radius: var(--radius-lg);
   background: var(--reading-paper);
 }
 
 .vc-panel-pane:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-.vc-reading {
-  max-inline-size: 38rem;
-  font-family: var(--font-reading);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-reading);
-}
-
+/* One measure for the whole card, so text is not a narrow strip in a wide box. */
+.vc-reading { max-inline-size: 42rem; font-family: var(--font-reading); font-size: var(--font-size-lg); line-height: var(--line-height-reading); }
 .vc-reading :is(h1, h2, h3) { font-family: var(--font-ui); letter-spacing: var(--tracking-tight); }
 
 @media (prefers-reduced-motion: reduce) {
