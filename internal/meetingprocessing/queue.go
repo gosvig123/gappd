@@ -73,7 +73,8 @@ func (s Service) runClaim(ctx context.Context, store *db.DB, claim *db.Processin
 		return s.diarizeClaim(ctx, store, lifecycle, claim, result)
 	}
 	if err := s.processClaim(ctx, lifecycle, claim); err != nil {
-		return s.finalizeClaimError(ctx, lifecycle, claim, result, err)
+		// Failure finalization must outlive a canceled drain, or the Meeting stays claimed until its lease expires.
+		return s.finalizeClaimError(context.WithoutCancel(ctx), lifecycle, claim, result, err)
 	}
 	result.Completed++
 	return nil

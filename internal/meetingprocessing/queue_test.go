@@ -5,10 +5,19 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/diarize"
+	"github.com/gappd-dev/gappd/internal/transcribe"
 )
+
+type cancelingTranscriber struct{ cancel context.CancelFunc }
+
+func (c cancelingTranscriber) Transcribe(ctx context.Context, _, _ string) ([]transcribe.Segment, error) {
+	c.cancel()
+	return nil, ctx.Err()
+}
 
 func TestDeriveQueueStageArtifacts(t *testing.T) {
 	text, summary, extraction := "transcript", "summary", "{}"
@@ -88,6 +97,29 @@ func TestDiarizationDrainOutcomes(t *testing.T) {
 				t.Fatalf("%s: result=%#v meeting=%#v segments=%#v", mode, result, got, segments)
 			}
 		})
+	}
+}
+
+func TestCanceledTranscriptionDrainFinalizesClaimForImmediateRequeue(t *testing.T) {
+	store := openTestDB(t)
+	defer store.Close()
+	meeting := createCapturedMeeting(t, store)
+	if _, err := store.Conn.Exec(`UPDATE meetings SET audio_path=? WHERE id=?`, *writeUsableAudio(t), meeting.ID); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	// The canceled drain may still report the canceled claim check, so only the persisted outcome matters.
+	result, _ := (Service{Store: store, Transcriber: cancelingTranscriber{cancel}}).Drain(ctx, CapabilityTranscription)
+	if result.Requeued != 1 {
+		t.Fatalf("result = %#v", result)
+	}
+	got := getMeeting(t, store, meeting.ID)
+	if got.ProcessingStatus != db.ProcessingStatusPending || got.ProcessingClaimToken != nil {
+		t.Fatalf("claim = %q token=%v", got.ProcessingStatus, got.ProcessingClaimToken)
+	}
+	pending, err := store.PendingStages(context.Background(), time.Now(), claimTTL)
+	if err != nil || len(pending) != 1 || pending[0] != db.QueueStageTranscription {
+		t.Fatalf("PendingStages() = %#v, %v", pending, err)
 	}
 }
 
