@@ -4,6 +4,7 @@ import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AssignSpeakerInput, LinkCalendarInput, ParticipantContext, SavedPerson, SpeakerClip, SpeakerClipInput } from './participant-contract'
+import type { SlackConnectionStatus } from './slack-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -67,6 +68,11 @@ export type IpcInvokeContract = {
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
   }
+  slack: {
+    status: OperationSpec<[], SlackConnectionStatus>
+    connect: OperationSpec<[], SlackConnectionStatus>
+    disconnect: OperationSpec<[], SlackConnectionStatus>
+  }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
     checkNow: OperationSpec<[], UpdateStatus>
@@ -110,6 +116,7 @@ export const IPC_OPERATIONS = {
     snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect', contacts: 'googleCalendar:contacts',
     sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
   },
+  slack: { status: 'slack:status', connect: 'slack:connect', disconnect: 'slack:disconnect' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',

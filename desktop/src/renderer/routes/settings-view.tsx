@@ -8,12 +8,14 @@ import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { runtimeErrorView, runtimeOperationLabel, runtimeStatusTone, type ManagedRuntimeSnapshot } from '../components/managed-runtime-contract'
 import { LocalAIErrorBanner } from '../components/local-ai-error-banner'
 import { GoogleCalendarPanel } from '../components/google-calendar-panel'
+import { SlackPanel } from '../components/slack-panel'
 import { CodexModelFields, CodexModelStatus } from '../components/codex-model-fields'
 import { codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../shared/codex-models'
 import { useCodexCatalog } from '../hooks/use-codex-catalog'
 import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
 import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
+import type { SlackConnectionController } from '../hooks/use-slack-connection'
 
 type SettingsViewProps = {
   language: string
@@ -22,6 +24,7 @@ type SettingsViewProps = {
   onThemeChange: (theme: ThemeName) => void
   localAI: { status: ManagedRuntimeSnapshot | null; loading: boolean; busy: boolean; onRepair: () => void }
   calendar: GoogleCalendarController
+  slack: SlackConnectionController
   developerDebugEnabled: boolean
 }
 
@@ -30,8 +33,8 @@ const CODEX_PROVIDER = 'codex_exec'
 const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
-export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, developerDebugEnabled }: SettingsViewProps) {
-  return <section className="settings-stack settings-stack-plain"><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><GoogleCalendarPanel calendar={calendar} /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
+export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, slack, developerDebugEnabled }: SettingsViewProps) {
+  return <section className="settings-stack settings-stack-plain"><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} />{developerDebugEnabled ? <LocalAIDebug {...localAI} /> : null}</section>
 }
 
 function AppearancePanel({ theme, onThemeChange }: { theme: ThemeName; onThemeChange: (theme: ThemeName) => void }) {

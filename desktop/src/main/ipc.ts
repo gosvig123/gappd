@@ -9,6 +9,7 @@ import { managedRuntime } from './managed-runtime'
 import { configureCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda-drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
+import { connectSlack, disconnectSlack, slackConnectionStatus } from './slack-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, deleteMeeting, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
@@ -80,6 +81,11 @@ const IPC_HANDLERS: MainHandlers = {
     connect: () => connectGoogleCalendar(),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
+  },
+  slack: {
+    status: () => slackConnectionStatus(),
+    connect: () => connectSlack(),
+    disconnect: () => disconnectSlack(),
   },
   update: {
     getStatus: () => getUpdateStatus(),

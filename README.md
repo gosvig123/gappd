@@ -89,6 +89,7 @@ Electron desktop
 More detail:
 
 - [Architecture](docs/architecture.md)
+- [Slack integration](docs/slack-integration.md)
 - [macOS releases](docs/desktop-macos-release.md)
 - [Speaker labeling](docs/speaker-labeling.md)
 

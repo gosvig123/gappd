@@ -10,6 +10,7 @@ node_modules/
 /docs/*
 !/docs/desktop-macos-release.md
 !/docs/speaker-labeling.md
+!/docs/slack-integration.md
 # Go
 vendor/
 

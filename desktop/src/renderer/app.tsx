@@ -11,6 +11,7 @@ import { useManagedRuntime } from './hooks/use-managed-runtime'
 import { useMeetingDetails } from './hooks/use-meeting-details'
 import { useMeetingEvents } from './hooks/use-meeting-events'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
+import { useSlackConnection } from './hooks/use-slack-connection'
 import { useTheme, type ThemeName } from './hooks/use-theme'
 import { useUpdateStatus } from './hooks/use-update-status'
 import type { AppActions, AppView } from './lib/app-view'
@@ -20,6 +21,7 @@ export function App() {
   const permissions = useSetupPermissions(true)
   const dashboard = useDashboardData(true)
   const calendar = useGoogleCalendar()
+  const slack = useSlackConnection()
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
   const meetingDetails = useMeetingDetails(dashboard.meetings)
@@ -28,7 +30,7 @@ export function App() {
   const people = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
   const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme })
-  const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
+  const view = buildView({ dashboard, permissions, calendar, slack, update, runtime, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
   return <AppShell view={view} />
 }
 
@@ -36,6 +38,7 @@ type Inputs = {
   dashboard: ReturnType<typeof useDashboardData>
   permissions: ReturnType<typeof useSetupPermissions>
   calendar: ReturnType<typeof useGoogleCalendar>
+  slack: ReturnType<typeof useSlackConnection>
   update: ReturnType<typeof useUpdateStatus>
   runtime: ReturnType<typeof useManagedRuntime>
   meetingDetails: Map<string, MeetingDetail>
@@ -48,7 +51,7 @@ type Inputs = {
 }
 
 function buildView(input: Inputs): AppView {
-  const { dashboard, permissions, calendar, update, runtime } = input
+  const { dashboard, permissions, calendar, slack, update, runtime } = input
   return {
     meetings: dashboard.meetings, meetingDetails: input.meetingDetails, meetingEvents: input.meetingEvents,
     people: input.people, drafts: input.drafts,
@@ -62,6 +65,7 @@ function buildView(input: Inputs): AppView {
     permissionsReady: permissions.ready, permissionsBusy: permissions.state.status === 'checking',
     runtime: runtime.status, runtimeBusy: runtime.busy, runtimeLoading: runtime.loading,
     update: update.status, calendar: calendar.snapshot, calendarController: calendar,
+    slackController: slack,
     calendarBusy: calendar.busy, calendarError: calendar.error,
     language: dashboard.language, theme: input.theme,
     alertDismissals: input.dismissals, actions: input.actions,

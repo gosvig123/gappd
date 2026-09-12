@@ -5,6 +5,7 @@ import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import type { SavedPerson } from '../../shared/participant-contract'
 import { meetingProgressLabel } from '../components/meeting-progress'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
+import type { SlackConnectionController } from '../hooks/use-slack-connection'
 import type { ThemeName } from '../hooks/use-theme'
 
 /**
@@ -39,6 +40,7 @@ export type AppView = {
   update: UpdateStatus | null
   calendar: CalendarSnapshot | null
   calendarController: GoogleCalendarController
+  slackController: SlackConnectionController
   calendarBusy: string | null
   calendarError: string | null
   drafts: SavedAgendaDraft[]

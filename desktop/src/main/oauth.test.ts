@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
+import { createServer } from 'node:http'
 import test from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { authorizeOAuth, buildAuthorizationUrl, createPkce, parseTokenResponse, refreshOAuthToken, type OAuthConfig, type OAuthTokenRequest } from './oauth.ts'
+import { authorizeOAuth, buildAuthorizationUrl, createPkce, parseTokenResponse, refreshOAuthToken, startLoopback, type OAuthConfig, type OAuthTokenRequest } from './oauth.ts'
 
 const CONFIG: OAuthConfig = {
   clientId: 'public-client',
@@ -78,6 +79,15 @@ test('refresh can use a token requester and preserve the refresh token', async (
   })
   assert.deepEqual(request, { grantType: 'refresh_token', refreshToken: 'refresh' })
   assert.equal(tokens.refreshToken, 'refresh')
+})
+
+test('reports a busy fixed callback port', async (context) => {
+  const blocker = createServer()
+  await new Promise<void>((resolve) => blocker.listen(0, '127.0.0.1', resolve))
+  context.after(() => new Promise<void>((resolve) => blocker.close(() => resolve())))
+  const address = blocker.address()
+  const port = typeof address === 'object' && address ? address.port : 0
+  await assert.rejects(startLoopback('/callback', 'state', { callbackPort: port }), /local port \d+ is in use/)
 })
 
 test('loopback authorization rejects mismatched state', async () => {

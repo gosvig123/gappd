@@ -36,6 +36,8 @@ export type OAuthDependencies = {
 }
 
 type Loopback = { redirectUri: string; code: Promise<string>; close: () => void }
+
+export type LoopbackOptions = { timeoutMs?: number; callbackHost?: string; callbackPort?: number }
 type Completion = { resolve: (code: string) => void; reject: (error: Error) => void; done: boolean }
 
 export function createPkce(): { verifier: string; challenge: string; state: string } {
@@ -54,7 +56,7 @@ export function buildAuthorizationUrl(config: OAuthConfig, redirectUri: string, 
 export async function authorizeOAuth(config: OAuthConfig, dependencies: OAuthDependencies): Promise<OAuthTokenSet> {
   validateConfig(config)
   const pkce = createPkce()
-  const loopback = await startLoopback(config.callbackPath, pkce.state, dependencies.timeoutMs)
+  const loopback = await startLoopback(config.callbackPath, pkce.state, { timeoutMs: dependencies.timeoutMs })
   void loopback.code.catch(() => undefined)
   try {
     await dependencies.openExternal(buildAuthorizationUrl(config, loopback.redirectUri, pkce.challenge, pkce.state))
@@ -117,14 +119,14 @@ export function parseTokenResponse(value: Record<string, unknown>, now: number):
   return { accessToken: value.access_token, refreshToken: optionalString(value.refresh_token), expiresAt: now + expiresIn * 1000, tokenType: optionalString(value.token_type) || 'Bearer', scope: optionalString(value.scope) }
 }
 
-async function startLoopback(callbackPath: string, state: string, timeoutMs = DEFAULT_TIMEOUT_MS): Promise<Loopback> {
+export async function startLoopback(callbackPath: string, state: string, options: LoopbackOptions = {}): Promise<Loopback> {
   const server = createServer()
-  await listen(server)
+  await listen(server, options.callbackPort || 0)
   const port = serverAddressPort(server)
   const completion = createCompletion()
-  const expectedHost = `${LOOPBACK_HOST}:${port}`
+  const expectedHost = `${options.callbackHost || LOOPBACK_HOST}:${port}`
   server.on('request', (request, response) => handleCallback(request, response, callbackPath, expectedHost, state, completion))
-  const timer = setTimeout(() => rejectCompletion(completion, new Error('Authorization timed out.')), timeoutMs)
+  const timer = setTimeout(() => rejectCompletion(completion, new Error('Authorization timed out.')), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   const close = () => { clearTimeout(timer); server.close() }
   return { redirectUri: `http://${expectedHost}${callbackPath}`, code: completion.promise, close }
 }
@@ -170,8 +172,17 @@ function respond(response: ServerResponse, status: number, message: string, done
   response.end(message, done)
 }
 
-function listen(server: Server): Promise<void> {
-  return new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, LOOPBACK_HOST, () => { server.off('error', reject); resolve() }) })
+async function listen(server: Server, port = 0): Promise<void> {
+  try {
+    await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, LOOPBACK_HOST, () => { server.off('error', reject); resolve() }) })
+  } catch (error) {
+    if (port && isAddressInUse(error)) throw new Error(`Authorization could not start because local port ${port} is in use.`)
+    throw error
+  }
+}
+
+function isAddressInUse(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'EADDRINUSE')
 }
 
 function serverAddressPort(server: Server): number {
