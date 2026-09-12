@@ -90,6 +90,27 @@ test('disconnect clears the stored token set', async () => {
   await assert.rejects(connection.accessToken(), /not connected/)
 })
 
+test('identity is bound to the connected account and forgotten on disconnect', async () => {
+  const store = memoryStore(tokens())
+  const connection = new SlackConnection(CLIENT_ID, store, { openExternal: async () => undefined, now: () => NOW })
+  assert.deepEqual(await connection.identity(), { generation: 0, teamId: 'T0C19BLLJBX', userId: 'U00000001' })
+  assert.equal(await connection.withAccessToken({ generation: 0, teamId: 'T0C19BLLJBX', userId: 'U00000001' }, async (token) => token), 'xoxe.xoxp-1-old')
+  await connection.disconnect()
+  assert.equal(await connection.identity(), null)
+})
+
+test('a reviewed identity is refused after the account changes or reconnects', async () => {
+  const store = memoryStore(tokens())
+  const connection = new SlackConnection(CLIENT_ID, store, { openExternal: completeBrowserAuthorization, fetcher: async () => slackUserPayload(), now: () => NOW, callbackPort: 0 })
+  const identity = await connection.identity()
+  assert.ok(identity)
+  store.state.value = tokens({ teamId: 'T0OTHER0000', userId: 'U00000002' })
+  await assert.rejects(connection.requireIdentity(identity), /connection changed/)
+  await connection.disconnect()
+  await connection.connect()
+  await assert.rejects(connection.withAccessToken(identity, async (token) => token), /connection changed/)
+})
+
 function tokens(overrides: Partial<SlackTokenSet> = {}): SlackTokenSet {
   return {
     accessToken: 'xoxe.xoxp-1-old',

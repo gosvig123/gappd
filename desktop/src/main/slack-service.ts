@@ -1,12 +1,15 @@
 import { shell } from 'electron'
-import type { SlackConnectionStatus } from '../shared/slack-contract'
+import type { SlackConnectionStatus, SlackSendResult, SlackSendReview } from '../shared/slack-contract'
 import { createSecureStore } from './electron-secure-store'
 import { serviceConfig } from './service-config'
 import { SlackConnection } from './slack-connection'
+import { confirmSlackSend } from './slack-confirmation'
 import type { SlackTokenSet } from './slack-oauth'
+import { SlackSendService } from './slack-send'
 
 const CONNECTION_STORE_FILE = 'slack-connection.enc'
 let instance: SlackConnection | null = null
+let sendInstance: SlackSendService | null = null
 
 export function slackConnectionStatus(): Promise<SlackConnectionStatus> {
   return describeSlackConnection(connection())
@@ -22,6 +25,20 @@ export async function disconnectSlack(): Promise<SlackConnectionStatus> {
   const active = requireSlackConnection()
   await active.disconnect()
   return describeSlackConnection(active)
+}
+
+export function reviewSlackMessage(input: unknown): Promise<SlackSendReview> {
+  return slackSendService().review(input)
+}
+
+export function sendSlackMessage(reviewId: unknown): Promise<SlackSendResult> {
+  return slackSendService().send(reviewId)
+}
+
+function slackSendService(): SlackSendService {
+  const active = requireSlackConnection()
+  sendInstance ||= new SlackSendService(active, { confirm: confirmSlackSend })
+  return sendInstance
 }
 
 async function describeSlackConnection(connection: SlackConnection | null): Promise<SlackConnectionStatus> {

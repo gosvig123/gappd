@@ -1,0 +1,90 @@
+/* Slack composer and review. Reuses app surfaces; the review pane is the one new block. */
+
+.slack-composer {
+  display: grid;
+  gap: var(--space-5);
+  padding-block-start: var(--space-6);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.slack-message-input {
+  width: 100%;
+  min-height: 6rem;
+  resize: vertical;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+  color: inherit;
+  font: inherit;
+  line-height: var(--line-height-body);
+  padding: var(--space-4) var(--space-5);
+  transition: border-color var(--transition-quick), box-shadow var(--transition-quick);
+}
+
+.slack-message-input:hover { border-color: var(--color-border-strong); }
+
+.slack-message-input:focus {
+  outline: none;
+  border-color: var(--color-accent-border-strong);
+  box-shadow: var(--focus-ring);
+}
+
+.slack-composer-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.slack-composer-meta .danger { color: var(--color-danger); }
+
+.slack-review {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-7);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-tint);
+}
+
+.slack-review-head { display: grid; gap: var(--space-1); }
+
+.slack-review-head span {
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+}
+
+.slack-review-facts,
+.slack-review-facts > div {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.slack-review-facts > div { grid-template-columns: 8rem 1fr; gap: var(--space-4); }
+.slack-review-facts dt { color: var(--color-text-muted); }
+.slack-review-facts dd { margin: 0; font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.slack-review-text {
+  max-height: 12rem;
+  overflow: auto;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--surface-control);
+}
+
+.slack-message-link {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.status-note.success {
+  color: var(--color-success);
+  background: var(--color-success-bg);
+}
