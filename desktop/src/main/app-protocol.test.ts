@@ -22,6 +22,7 @@ function protocol(child: FakeChild) {
     '../shared/generated/app-protocol': { APP_COMMANDS: COMMANDS },
     '../shared/generated/protocol': { RECORDING_PROTOCOL_EVENT_TYPES: ['recording.completed'] },
     './native-runtime': NATIVE,
+    './selected-fixture-profile': { selectedFixtureBackendEnv: () => ({}) },
   }, { console })
 }
 

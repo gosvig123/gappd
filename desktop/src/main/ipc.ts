@@ -1,3 +1,4 @@
+import { selectedFixtureUpload } from './selected-fixture-service'
 import { demoUpload } from './demo-upload-service'
 import { generateMeetingAgenda } from './meeting-agenda'
 import { openPermissionsSettings } from './privacy-settings'
@@ -73,6 +74,7 @@ const IPC_HANDLERS: MainHandlers = {
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
+  selectedFixture: { status: () => selectedFixtureUpload().status(), preview: (_event, id) => selectedFixtureUpload().preview(id), cancel: () => selectedFixtureUpload().cancel(), connect: (_event, enabled) => selectedFixtureUpload().connect(enabled), setConsent: (_event, subject, enabled, action) => selectedFixtureUpload().setConsent(subject, enabled, action), perform: (_event, subject, action) => selectedFixtureUpload().perform(subject, action) },
   demoUpload: { status: () => demoUpload().status(), connect: (_event, enabled) => demoUpload().connect(enabled), setConsent: (_event, subject, enabled) => demoUpload().setConsent(subject, enabled), upload: (_event, subject) => demoUpload().upload(subject), setDeleteConsent: (_event, subject, enabled) => demoUpload().setDeleteConsent(subject, enabled), deleteCopy: (_event, subject) => demoUpload().deleteCopy(subject) },
   cloudAuth: { status: () => cloudAuthStatus(), setEnabled: (_event, enabled) => setCloudAuthEnabled(enabled) },
   slack: {

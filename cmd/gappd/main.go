@@ -27,7 +27,7 @@ func rootCmd() *cobra.Command {
 	}
 	root.AddCommand(
 		listenCmd(), devicesCmd(), meetingsCmd(), showCmd(),
-		setupCmd(), enhanceCmd(), appCmd(), mcpCmd(),
+		setupCmd(), enhanceCmd(), appCmd(), mcpCmd(), selectedFixtureCmd(),
 	)
 	return root
 }

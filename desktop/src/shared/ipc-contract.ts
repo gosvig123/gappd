@@ -1,3 +1,4 @@
+import type { SelectedFixtureStatus } from './selected-fixture-contract'
 import type { DemoUploadStatus } from './demo-upload-contract'
 import type { CloudAuthStatus } from './cloud-auth-contract'
 import type { MeetingAgendaDraft } from './meeting-agenda'
@@ -24,6 +25,7 @@ export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
 export type IpcInvokeContract = {
+  selectedFixture: { status: OperationSpec<[], SelectedFixtureStatus>; preview: OperationSpec<[id: string], SelectedFixtureStatus>; cancel: OperationSpec<[], void>; connect: OperationSpec<[enabled: boolean], SelectedFixtureStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean, action: 'upload' | 'delete'], SelectedFixtureStatus>; perform: OperationSpec<[subject: string, action: 'upload' | 'delete'], SelectedFixtureStatus> }
   demoUpload: { status: OperationSpec<[], DemoUploadStatus>; connect: OperationSpec<[enabled: boolean], DemoUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], DemoUploadStatus>; upload: OperationSpec<[subject: string], DemoUploadStatus>; setDeleteConsent: OperationSpec<[subject: string, enabled: boolean], DemoUploadStatus>; deleteCopy: OperationSpec<[subject: string], DemoUploadStatus> }
   cloudAuth: { status: OperationSpec<[], CloudAuthStatus>; setEnabled: OperationSpec<[enabled: boolean], CloudAuthStatus> }
   system: {
@@ -102,6 +104,7 @@ export type IpcInvokeApi = { [G in IpcOperationGroup]: { [N in IpcOperationName<
 type IpcOperationChannels = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: `${G}:${string}` } }
 
 export const IPC_OPERATIONS = {
+  selectedFixture: { status: 'selectedFixture:status', preview: 'selectedFixture:preview', cancel: 'selectedFixture:cancel', connect: 'selectedFixture:connect', setConsent: 'selectedFixture:setConsent', perform: 'selectedFixture:perform' },
   demoUpload: { status: 'demoUpload:status', connect: 'demoUpload:connect', setConsent: 'demoUpload:setConsent', upload: 'demoUpload:upload', setDeleteConsent: 'demoUpload:setDeleteConsent', deleteCopy: 'demoUpload:deleteCopy' },
   cloudAuth: { status: 'cloudAuth:status', setEnabled: 'cloudAuth:setEnabled' },
   system: {

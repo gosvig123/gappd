@@ -6,17 +6,22 @@ import { cloudAuthDevelopmentConfig } from './service-config'
 
 const resource = 'https://gappd-cloud-api-production.up.railway.app/mcp'
 let instance: DemoUpload | null = null
+let authorization: CloudAuth | null = null
+
+export function demoAuthorization(): CloudAuth {
+  authorization ||= new CloudAuth({ ...cloudAuthDevelopmentConfig(), resource }, createSecureStore<CloudCredential>('cloud-demo-development.enc'), {
+    openExternal: url => shell.openExternal(url), requireSecureStorage: requireEncryption,
+  })
+  return authorization
+}
 
 export function demoUpload(): DemoUpload {
   if (!instance) {
-    const auth = new CloudAuth({ ...cloudAuthDevelopmentConfig(), resource }, createSecureStore<CloudCredential>('cloud-demo-development.enc'), {
-      openExternal: url => shell.openExternal(url), requireSecureStorage: requireEncryption,
-    })
-    instance = new DemoUpload(auth, resource, process.env.GAPPD_SYNTHETIC_UPLOAD_ENABLED === 'true')
+    instance = new DemoUpload(demoAuthorization(), resource, process.env.GAPPD_SYNTHETIC_UPLOAD_ENABLED === 'true')
   }
   return instance
 }
 
 export async function cancelDemoUpload(): Promise<void> {
-  if (instance) await instance.connect(false)
+  if (authorization) await authorization.setEnabled(false)
 }

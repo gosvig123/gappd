@@ -1,3 +1,4 @@
+import { SelectedFixturePanel } from './selected-fixture-panel'
 import { useEffect, useRef, useState } from 'react'
 import { Copy, X } from 'lucide-react'
 import type { MeetingDetail } from '../../shared/contracts'
@@ -33,6 +34,7 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
     {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
     {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
     <div className="app-panel-body ui-scroll">
+      <SelectedFixturePanel key={view.selectedMeetingId} meetingId={view.selectedMeetingId} />
       {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
     </div>
     {meeting ? <PanelFooter key={`${meeting.id}:${tab}`} view={view} confirm={confirm} meeting={meeting} tab={tab} transcript={transcript} /> : null}

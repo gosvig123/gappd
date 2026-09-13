@@ -1,5 +1,12 @@
 # Gappd cloud MCP — Clerk setup
 
+The selected-local-fixture document transport is implemented for development only and
+OFF by default; see [isolated setup, consent and migration 003](cloud-selected-fixture.md).
+It reads only the explicitly bootstrapped synthetic SQLite Meeting. The original
+empty-body demo and its permanent deletion markers are unchanged. No real uploads
+or live deployment of this new slice are approved. Historical status below describes
+the original demo unless stated otherwise.
+
 ## Status
 
 Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.

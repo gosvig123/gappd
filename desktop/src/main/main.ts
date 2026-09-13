@@ -1,3 +1,4 @@
+import { initializeSelectedFixtureProfile } from './selected-fixture-profile'
 import path from 'node:path'
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor } from 'electron'
 import { registerIpc } from './ipc'
@@ -10,6 +11,8 @@ import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
+
+initializeSelectedFixtureProfile()
 
 const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
 

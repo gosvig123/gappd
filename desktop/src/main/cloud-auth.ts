@@ -9,7 +9,9 @@ type Dependencies = { openExternal(url: string): Promise<unknown>; requireSecure
 const LOGIN_ERROR = 'Cloud sign-in failed or was cancelled. Unlock this Mac, check your connection, and reconnect explicitly to retry.'
 
 export class CloudAuth {
+  private listeners = new Set<() => void>()
   private generation = 0
+  private authorizationVersion = 0
   private pending: AbortController | null = null
   private mutations: Promise<unknown> = Promise.resolve()
   private error: string | null = null
@@ -36,6 +38,7 @@ export class CloudAuth {
     if (enabled && this.pending) return this.status()
     this.forcedOff = true
     const generation = ++this.generation
+    this.invalidateAuthorization()
     this.pending?.abort(); this.pending = null; this.error = null
     if (!enabled) {
       try { await this.serialize(() => this.store.clear()) }
@@ -64,6 +67,19 @@ export class CloudAuth {
     if (!user || !safeText(user.sub) || !safeText(user.email) || user.email_verified !== true) throw new Error('Verified cloud account required.')
     const value: CloudCredential = { version: 1, ...this.config, subject: user.sub, email: user.email, tokens }
     await this.serialize(async () => { if (generation === this.generation && !signal.aborted) await this.store.write(value) })
+  }
+
+  invalidateAuthorization(): number {
+    this.authorizationVersion++
+    for (const listener of this.listeners) listener()
+    return this.authorizationVersion
+  }
+
+  authorizationGeneration(): number { return this.authorizationVersion }
+
+  observeAuthorization(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
   }
 
   async credential(): Promise<CloudCredential | null> {

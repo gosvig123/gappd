@@ -1,7 +1,7 @@
 import type { DemoUploadStatus } from '../shared/demo-upload-contract'
 import type { CloudAuth, CloudCredential } from './cloud-auth'
 
-type Authorization = Pick<CloudAuth, 'status' | 'setEnabled' | 'credential'>
+type Authorization = Pick<CloudAuth, 'status' | 'setEnabled' | 'credential'> & Partial<Pick<CloudAuth, 'observeAuthorization'>>
 type Consent = { subject: string; token: string; action: 'create' | 'delete' }
 
 /** Manual synthetic transport only. No local Meeting storage is referenced. */
@@ -20,6 +20,7 @@ export class DemoUpload {
     this.resource = resource
     this.available = available
     this.fetcher = fetcher
+    auth.observeAuthorization?.(() => this.invalidate())
   }
 
   async status(): Promise<DemoUploadStatus> {

@@ -16,6 +16,9 @@ var migration string
 //go:embed 002.sql
 var lifecycleMigration string
 
+//go:embed 003.sql
+var selectedMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -89,21 +92,16 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 	if _, err := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS cloud_migrations (version integer PRIMARY KEY)`); err != nil {
 		return err
 	}
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=1)`).Scan(&exists); err != nil {
-		return err
-	}
-	if !exists {
-		if _, err := tx.Exec(ctx, migration); err != nil {
+	for index, sql := range []string{migration, lifecycleMigration, selectedMigration} {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err
 		}
+		if !exists {
+			if _, err := tx.Exec(ctx, sql); err != nil {
+				return err
+			}
+		}
 	}
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=2)`).Scan(&exists); err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-	_, err := tx.Exec(ctx, lifecycleMigration)
-	return err
+	return nil
 }
