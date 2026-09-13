@@ -89,8 +89,15 @@ func TestMCP(t *testing.T) {
 	token := sign("user_synthetic")
 	session := connect(t, host.URL+"/mcp", &token)
 	tools, err := session.ListTools(context.Background(), nil)
-	if err != nil || len(tools.Tools) != 1 || tools.Tools[0].Name != "get_meeting" {
-		t.Fatalf("tools: %v %v", tools, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(tools.Tools))
+	for _, tool := range tools.Tools {
+		names = append(names, tool.Name)
+	}
+	if strings.Join(names, ",") != "get_meeting,list_meetings,search_meetings" {
+		t.Fatalf("tools: %v", names)
 	}
 	callMeeting(t, session, service.DemoID, false)
 	callMeeting(t, session, "bad-id", true)

@@ -103,11 +103,11 @@ See [Clerk setup and remaining integration gates](cloud-mcp-clerk.md) before imp
 Do not reuse Google Calendar tokens, distribute shared credentials, or expose upload scopes
 through an MCP read grant. Users must be able to revoke individual clients and devices.
 
-Only get_meeting is implemented, bounded to synthetic data. Future proposed tools:
-- list_meetings: date filters and pagination.
-- search_meetings: matching transcript/summary passages with source references.
-- get_meeting: one owned Meeting, with paginated transcript access.
-- get_sync_status: cloud-observed sync state and freshness, not invented device status.
+Only `get_meeting` is implemented, bounded to synthetic data. `list_meetings`
+(date filters and offset paging) and `search_meetings` (ranked transcript/summary passages)
+are also implemented, bounded to owned synthetic rows. Future proposed tools:
+- `get_meeting`: one owned Meeting, with paginated transcript access.
+- `get_sync_status`: cloud-observed sync state and freshness, not invented device status.
 
 Return Meeting IDs, revision, and transcript timestamps for citations. Do not expose arbitrary
 SQL against shared account data. Validate OAuth tokens and their audience/scopes; enforce

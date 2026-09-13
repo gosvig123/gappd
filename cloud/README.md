@@ -29,7 +29,9 @@ Base read-only runtime variables (optional demo configuration is below):
 `GET /health` is public liveness; `GET /ready` checks a runtime database connection.
 Both protected-resource metadata paths are public:
 `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`.
-`/mcp` is authenticated Streamable HTTP, stateless, with one `get_meeting({id})` tool.
+`/mcp` is authenticated Streamable HTTP, stateless, with three read-only tools over owned
+synthetic Meetings: `get_meeting({id})`, `list_meetings({since,until,offset,limit})` and
+`search_meetings({query,limit})`. List returns summaries only; search returns ranked passages.
 Each request verifies RS256, fixed issuer JWKS, `typ` at+jwt or application/at+jwt,
 expiration, optional nbf/iat, a single exact audience, nonempty subject, and
 `meetings:read`. Clerk's `scp` array takes precedence over space-delimited `scope`.
