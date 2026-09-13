@@ -6,7 +6,7 @@ audio, list, search, storage sync, or automatic seed exists.
 Deployed `9982063`; migration, role setup and explicit legacy backfill passed.
 On 2026-09-13, user-consented deletion passed: Pi denied the demo; its marker remained and live content was absent.
 The seeded fixture remained readable. Test credentials were removed, app closed and capability disabled (404).
-Live second-account/ChatGPT, cleanup scheduling, backups and restore checks remain pending; see [handover](../docs/cloud-mcp-handover.md).
+Live second-account/ChatGPT, cleanup alerts, backup removal/restore and log limits remain pending; see [operations](../docs/cloud-operations.md).
 
 ## Runtime
 
@@ -170,10 +170,10 @@ exact token, and is consumed once at the final action. No silent retry exists.
 General uploads/device registration, production identity, full retention/deletion, revocation,
 rate/cost controls, backups/restore and staging remain required before real Meeting data.
 
-## Synthetic lifecycle migration and cleanup (not deployed)
+## Synthetic lifecycle migration and cleanup
 
 Owner approved 30-day content, 7-day backup and 14-day content-free log periods;
-see [policy status](../docs/cloud-data-lifecycle.md). Only synthetic logical lifecycle is implemented.
+see [policy status](../docs/cloud-data-lifecycle.md). Synthetic lifecycle and hourly cleanup are deployed.
 Keep the capability disabled while applying these private steps. Do not seed or delete live rows.
 
 1. With temporary `ADMIN_DATABASE_URL`, run `/admin migrate`, `/admin provision`, then
@@ -190,10 +190,10 @@ Keep the capability disabled while applying these private steps. Do not seed or 
    for non-owner `gappd_demo_cleanup`. It can read expired lifecycle/content, mark and delete
    expired deterministic demos only; no INSERT, content UPDATE or marker removal. No API admin key.
 5. Each command removes at most 100 copies atomically, with content-free count/failure output.
-   Configure hourly invocations, alert on failures/backlog and size capacity above accepted demos.
-   Scheduling/monitoring is NOT configured here; the <=24-hour purge target remains UNVERIFIED.
+   Hourly invocations are configured and the first run passed; see [operations](../docs/cloud-operations.md).
+   Failure/backlog alerts are not configured; the <=24-hour purge target remains UNVERIFIED.
    Exercise backlog draining and deadlines before making that promise. No generic job framework exists.
 
 Retain lifecycle records indefinitely. Current-marker replay tests are not backup restore proof:
 external deletion control records/reconciliation remain required before exposing a restored snapshot.
-Backup retention/removal, log retention, live deletion/readback and fresh-ID re-creation remain gates.
+Daily backups retain 6 days; actual removal/restore, 14-day logs and fresh-ID re-creation remain gates.

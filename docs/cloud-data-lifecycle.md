@@ -4,7 +4,9 @@
 
 Owner-approved retention periods; not a full implementation or legal compliance claim.
 This batch implements only deterministic synthetic demo deletion and 30-day logical expiry.
-Physical cleanup scheduling, 7-day backups and 14-day log configuration remain unverified.
+Hourly cleanup ran successfully; daily backups are configured with 6-day retention.
+Actual backup removal/restore and cleanup alerts remain unverified. Railway Pro's documented
+30-day logs conflict with the approved 14-day maximum; see [operations](cloud-operations.md).
 Real Meeting uploads, account/device generations and account-wide deletion remain gated.
 No existing local or synthetic cloud data is deleted by this document.
 Local-first behavior and OFF-by-default sync remain unchanged.

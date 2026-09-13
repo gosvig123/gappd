@@ -14,6 +14,7 @@ node_modules/
 !/docs/cloud-mcp-handover.md
 !/docs/cloud-mcp-clerk.md
 !/docs/cloud-data-lifecycle.md
+!/docs/cloud-operations.md
 # Go
 vendor/
 
