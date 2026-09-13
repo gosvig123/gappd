@@ -4,8 +4,8 @@ import './settings-layout.css'
 type SettingsCategory = { label: string; content: ReactNode }
 
 /** Keep panels mounted so switching categories preserves unsaved provider fields. */
-export function SettingsLayout({ categories }: { categories: SettingsCategory[] }) {
-  const [selected, setSelected] = useState(categories[0]?.label)
+export function SettingsLayout({ categories, initialCategory }: { categories: SettingsCategory[]; initialCategory?: string }) {
+  const [selected, setSelected] = useState(initialCategory ?? categories[0]?.label)
   const id = useId()
   const active = categories.some(category => category.label === selected) ? selected : categories[0]?.label
   return <div className="settings-layout">

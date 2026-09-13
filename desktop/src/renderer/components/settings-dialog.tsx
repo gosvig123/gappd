@@ -6,7 +6,7 @@ import type { ThemeName } from '../hooks/use-theme'
 import { useFocusTrap } from '../hooks/use-focus-trap'
 import './settings-dialog.css'
 
-export function SettingsDialog({ view, onClose }: { view: AppView; onClose: () => void }) {
+export function SettingsDialog({ view, onClose, initialCategory }: { view: AppView; onClose: () => void; initialCategory?: string }) {
   const modalRef = useRef<HTMLDivElement>(null)
   useEscape(onClose)
   useFocusTrap(modalRef)
@@ -18,16 +18,10 @@ export function SettingsDialog({ view, onClose }: { view: AppView; onClose: () =
           <button type="button" className="app-icon-action" aria-label="Close settings" onClick={onClose}><X aria-hidden="true" /></button>
         </header>
         <div className="app-modal-body">
-          <SettingsView
-            language={view.language}
-            onLanguageChange={view.actions.setLanguage}
-            theme={view.theme}
-            onThemeChange={view.actions.setTheme as (theme: ThemeName) => void}
+          <SettingsView initialCategory={initialCategory} language={view.language} onLanguageChange={view.actions.setLanguage}
+            theme={view.theme} onThemeChange={view.actions.setTheme as (theme: ThemeName) => void}
             localAI={{ status: view.runtime, loading: view.runtimeLoading, busy: view.runtimeBusy, onRepair: view.actions.repairRuntime }}
-            calendar={view.calendarController}
-            slack={view.slackController}
-            developerDebugEnabled={import.meta.env.DEV}
-          />
+            calendar={view.calendarController} slack={view.slackController} developerDebugEnabled={import.meta.env.DEV} />
         </div>
       </div>
     </div>

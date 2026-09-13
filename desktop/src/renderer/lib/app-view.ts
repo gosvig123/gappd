@@ -2,7 +2,7 @@ import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calend
 import type { SavedAgendaDraft } from '../../shared/agenda-draft'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from '../../shared/contracts'
 import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
-import type { SavedPerson } from '../../shared/participant-contract'
+import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
 import { meetingProgressLabel } from '../components/meeting-progress'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 import type { SlackConnectionController } from '../hooks/use-slack-connection'
@@ -55,6 +55,7 @@ export type AppActions = {
   closeMeeting: () => void
   retryDiarization: (id: string) => Promise<void>
   meetingUpdated: (meeting: MeetingDetail) => void
+  linkMeetingCalendar: (input: LinkCalendarInput) => Promise<ParticipantContext>
   deleteMeeting: (id: string) => Promise<void>
   setDevice: (device: number) => void
   start: (eventSourceId?: string) => void

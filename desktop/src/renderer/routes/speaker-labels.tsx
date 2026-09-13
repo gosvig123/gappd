@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CalendarParticipant } from '../../shared/calendar-contract'
+import type { AppActions } from '../lib/app-view'
 import type { MeetingDetail } from '../../shared/contracts'
 import { useRequestGate } from '../hooks/request-gate'
 import { useSpeakerAudio } from '../hooks/use-speaker-audio'
@@ -7,10 +8,10 @@ import { personOptions, type ParticipantContext, type SavedPerson } from './spea
 import { SpeakerRow } from './speaker-row'
 import './speaker-labels.css'
 
-type Props = { meeting: MeetingDetail; onUpdated: (meeting: MeetingDetail) => void }
+type Props = { meeting: MeetingDetail; onUpdated: (meeting: MeetingDetail) => void; onLinkCalendar: AppActions['linkMeetingCalendar'] }
 
-export function SpeakerLabels({ meeting, onUpdated }: Props) {
-  const { people, contacts, context, error, link } = useParticipantOptions(meeting)
+export function SpeakerLabels({ meeting, onUpdated, onLinkCalendar }: Props) {
+  const { people, contacts, context, error, link } = useParticipantOptions(meeting, onLinkCalendar)
   const audio = useSpeakerAudio(meeting.id)
   if (!meeting.speakers?.length) return null
   const options = personOptions(people, context.event, contacts)
@@ -26,9 +27,9 @@ function calendarChoices(context: ParticipantContext) {
   return context.event ? [context.event, ...context.candidates.filter(event => event.sourceId !== context.event?.sourceId)] : context.candidates
 }
 
-function useParticipantOptions(meeting: MeetingDetail) {
+function useParticipantOptions(meeting: MeetingDetail, onLinkCalendar: Props['onLinkCalendar']) {
   const [people, setPeople] = useState<SavedPerson[]>([]), [contacts, setContacts] = useState<CalendarParticipant[]>([]), [error, setError] = useState<string | null>(null)
-  const calendar = useCalendarContext(meeting.id)
+  const calendar = useCalendarContext(meeting.id, onLinkCalendar)
   const assignedPeople = meeting.speakers?.map(speaker => speaker.personId).join(',')
   useEffect(() => {
     let active = true
@@ -39,7 +40,7 @@ function useParticipantOptions(meeting: MeetingDetail) {
   return { ...calendar, people, contacts, error: [error, calendar.error].filter(Boolean).join(' · ') || null }
 }
 
-function useCalendarContext(meetingId: string) {
+function useCalendarContext(meetingId: string, onLinkCalendar: Props['onLinkCalendar']) {
   const [context, setContext] = useState<ParticipantContext>({ candidates: [] }), [error, setError] = useState<string | null>(null)
   const request = useRequestGate()
   const apply = async (pending: Promise<ParticipantContext>) => {
@@ -51,5 +52,5 @@ function useCalendarContext(meetingId: string) {
     void apply(window.gappd.meetings.participantContext(meetingId))
     return request.cancel
   }, [meetingId])
-  return { context, error, link: (eventSourceId: string) => apply(window.gappd.meetings.linkCalendar({ id: meetingId, eventSourceId })) }
+  return { context, error, link: (eventSourceId: string) => apply(onLinkCalendar({ id: meetingId, eventSourceId })) }
 }

@@ -25,11 +25,11 @@ export function App() {
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
   const meetingDetails = useMeetingDetails(dashboard.meetings)
-  const meetingEvents = useMeetingEvents(dashboard.meetings, calendar.snapshot)
+  const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [drafts, reloadDrafts] = useSavedDrafts()
   const people = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
-  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme })
+  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar })
   const view = buildView({ dashboard, permissions, calendar, slack, update, runtime, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
   return <AppShell view={view} />
 }
@@ -73,13 +73,14 @@ function buildView(input: Inputs): AppView {
 }
 
 type ActionInputs = Pick<Inputs, 'dashboard' | 'permissions' | 'calendar' | 'update' | 'runtime'> & {
+  linkMeetingCalendar: AppActions['linkMeetingCalendar']
   reloadDrafts: () => void
   setDismissals: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void
   setTheme: (theme: ThemeName) => void
 }
 
 function useAppActions(input: ActionInputs): AppActions {
-  const { dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme } = input
+  const { dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar } = input
   return useMemo(() => ({
     openMeeting: (id) => void dashboard.actions.loadMeeting(id),
     closeMeeting: dashboard.actions.clearSelectedMeeting,
@@ -98,11 +99,17 @@ function useAppActions(input: ActionInputs): AppActions {
     syncAllCalendars: calendar.syncAll,
     connectCalendar: calendar.connect,
     disconnectCalendar: async (id) => { await calendar.disconnect(id); reloadDrafts() },
+    ...updateActions(update),
+    dismissAlert: (id) => setDismissals((current) => new Set([...current, id])),
+    setTheme, linkMeetingCalendar,
+  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar])
+}
+
+function updateActions(update: Inputs['update']) {
+  return {
     downloadUpdate: async () => { await update.downloadUpdate() },
     installUpdate: async () => { await update.installAndRestart() },
     checkForUpdate: async () => { await update.checkNow() },
     openReleasePage: async () => { await update.openUpdatePage() },
-    dismissAlert: (id) => setDismissals((current) => new Set([...current, id])),
-    setTheme,
-  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, reloadDrafts, setDismissals, setTheme])
+  }
 }

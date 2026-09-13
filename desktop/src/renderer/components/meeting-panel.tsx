@@ -5,7 +5,6 @@ import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meetin
 import { Markdown } from '../components/markdown'
 import { meetingHasWork, meetingProgressLabel } from '../components/meeting-progress'
 import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../components/ui'
-import { useFocusTrap } from '../hooks/use-focus-trap'
 import { SpeakerLabels } from '../routes/speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from '../routes/transcript-view'
 import { artifactLine, statusLabel, type AppView } from '../lib/app-view'
@@ -22,49 +21,33 @@ const TABS: ReadonlyArray<{ id: MeetingTab; label: string }> = [
 ]
 type TabId = MeetingTab
 
-/**
- * The Meeting layover: a modal for assistive technology, a floating card
- * visually. The row underneath keeps aria-current and the table keeps its
- * scroll position. Title and tabs stay fixed rows, so the Meeting name and its
- * section switcher remain reachable through a long transcript.
- */
-export function MeetingLayover({ view, confirm, initialTab, onOpenSettings }: { view: AppView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
+/** Inline Meeting content. No modal or focus trap: the list remains interactive. */
+export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { view: AppView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
   const [tab, setTab] = useState<TabId>(initialTab ?? 'summary')
-  const [copied, setCopied] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLElement>(null)
-  useFocusTrap(panelRef)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
   const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
-  const copyValue = copySourceFor(tab, meeting, transcript)
-  useRestoreFocus()
-  useEscapeToClose(view.actions.closeMeeting)
-  useEffect(() => { setTab(initialTab ?? 'summary'); setCopied(false); closeRef.current?.focus() }, [view.selectedMeetingId, initialTab])
-  const copy = () => { void navigator.clipboard?.writeText(copyValue).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600) }) }
-  const copyLabel = copyLabelFor(tab)
-  return (
-    <div className="app-panel-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) view.actions.closeMeeting() }}>
-      <article ref={panelRef} className="app-panel" role="dialog" aria-modal="true" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
-        {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
-        {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
-        <div className="app-panel-body ui-scroll">
-          {meeting
-            ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} />
-            : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : 'This Meeting is no longer available.'}</EmptyState>}
-        </div>
-        {meeting ? (
-          <footer className="app-panel-foot">
-            <Button
-              className="compact-action"
-              onClick={() => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, and audio for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: () => { void view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })}
-            >Delete Meeting</Button>
-            {copyLabel ? <Button className="compact-action" onClick={copy}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabel}</Button> : null}
-          </footer>
-        ) : null}
-      </article>
+  useEffect(() => { setTab(initialTab ?? 'summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId, initialTab])
+  return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
+    {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
+    {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
+    <div className="app-panel-body ui-scroll">
+      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
     </div>
-  )
+    {meeting ? <PanelFooter key={`${meeting.id}:${tab}`} view={view} confirm={confirm} meeting={meeting} tab={tab} transcript={transcript} /> : null}
+  </article>
+}
+
+function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; tab: TabId; transcript: string }) {
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(copySourceFor(tab, meeting, transcript)); setCopied(true); setError('') }
+    catch { setError('Could not copy. Select the text and copy it manually.') }
+  }
+  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, and audio for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
 }
 
 function PanelHead({ meeting, transcript, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -100,7 +83,7 @@ function PanelContent({ view, meeting, transcript, tab, onOpenSettings }: { view
     <>
       {meetingLevel && meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
       {meetingLevel && meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
-      {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} /> : null}
+      {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} onLinkCalendar={view.actions.linkMeetingCalendar} /> : null}
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} /> : null}
         {tab === 'agenda' ? <AgendaPane view={view} meetingId={meeting.id} onOpenSettings={onOpenSettings} /> : null}
@@ -167,34 +150,10 @@ function TabBar({ tab, onChange, labels = {} }: { tab: TabId; onChange: (tab: Ta
       if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1) }
     }}>
       {TABS.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          id={`app-tab-${item.id}`}
-          role="tab"
-          aria-selected={tab === item.id}
-          aria-controls={`app-pane-${item.id}`}
-          tabIndex={tab === item.id ? 0 : -1}
-          className={cx('app-tab', tab === item.id && 'is-active')}
-          onClick={() => onChange(item.id)}
-        >{labels[item.id] ?? item.label}</button>
+        <button key={item.id} type="button" id={`app-tab-${item.id}`} role="tab" aria-selected={tab === item.id}
+          aria-controls={`app-pane-${item.id}`} tabIndex={tab === item.id ? 0 : -1}
+          className={cx('app-tab', tab === item.id && 'is-active')} onClick={() => onChange(item.id)}>{labels[item.id] ?? item.label}</button>
       ))}
     </div>
   )
-}
-
-function useEscapeToClose(close: () => void): void {
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => { if (event.key === 'Escape') close() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [close])
-}
-
-/** Closing the card returns focus to the row or link that opened it. */
-function useRestoreFocus(): void {
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    return () => { previous?.focus?.() }
-  }, [])
 }

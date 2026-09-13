@@ -24,7 +24,7 @@ export function TodayView({ view, onOpenMeetings, onOpenCalendar }: TodayProps) 
       </header>
       {work.length ? <ul className="app-live">{work.map((meeting) => <LiveCard key={meeting.id} meeting={meeting} view={view} />)}</ul> : null}
       <section className="app-block" aria-label="Today's calendar">
-        <BlockHead title="Today's calendar" action={{ label: 'Manage calendars', onClick: onOpenCalendar }} />
+        <BlockHead title="Today's calendar" action={{ label: 'Upcoming events', onClick: onOpenCalendar }} />
         {events.length ? <Timeline events={events} view={view} /> : <UpNext view={view} />}
       </section>
       <section className="app-block" aria-label="Recent meetings">

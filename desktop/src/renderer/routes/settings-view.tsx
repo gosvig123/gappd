@@ -19,6 +19,7 @@ import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 import type { SlackConnectionController } from '../hooks/use-slack-connection'
 
 type SettingsViewProps = {
+  initialCategory?: string
   language: string
   onLanguageChange: (language: string) => void
   theme: ThemeName
@@ -34,14 +35,14 @@ const CODEX_PROVIDER = 'codex_exec'
 const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
-export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, slack, developerDebugEnabled }: SettingsViewProps) {
+export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, slack, developerDebugEnabled, initialCategory }: SettingsViewProps) {
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /></> },
     { label: 'Meeting processing', content: <><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
     { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
-  return <SettingsLayout categories={categories} />
+  return <SettingsLayout categories={categories} initialCategory={initialCategory} />
 }
 
 function AppearancePanel({ theme, onThemeChange }: { theme: ThemeName; onThemeChange: (theme: ThemeName) => void }) {
