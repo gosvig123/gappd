@@ -18,10 +18,11 @@ Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients su
 Client compatibility must be proved with real authorization and tool calls, not assumed.
 
 **The existing local MCP remains the default, unchanged. Cloud sync defaults to OFF. Real-copy
-storage now exists as an OFF-by-default transport: `POST /meeting` and `DELETE /meeting` write and
-remove owned copies behind `GAPPD_MEETING_STORAGE_ENABLED`, and no MCP tool reads them yet. There is
-still no desktop sync queue, no automatic upload, no device registration and no account generation.
-Enabling the real read surface for MCP clients is the next slice.**
+storage and reads now exist as an OFF-by-default pair: `POST /meeting` and `DELETE /meeting` write
+and remove owned copies, and the same capability switches the three read tools onto the union view
+of synthetic rows and owned cloud copies. Enabling it fails closed until migrations 004 and 005 are
+applied. There is still no desktop sync queue, no automatic upload, no device registration and no
+account generation, and real copies have no physical cleanup command.**
 Add an explicit Settings toggle. Installing, upgrading, signing in, or connecting Calendar must
 never enable sync, upload Meeting data, or replace the local MCP configuration automatically.
 Missing settings on existing installations mean OFF. Cloud access requires explicit consent.

@@ -51,6 +51,11 @@ func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
 	if uploads.Meeting != nil {
 		defer uploads.Meeting.Close()
 	}
+	// Enabling storage also exposes owned cloud copies to the read tools. It fails closed
+	// when the union view is absent, so a deploy before migration 005 cannot serve them.
+	if err := service.SetRealCopies(context.Background(), pool, uploads.Meeting != nil); err != nil {
+		return err
+	}
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer)}
 	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,

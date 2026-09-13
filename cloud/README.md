@@ -70,9 +70,11 @@ the identity deleted, removes the copy, and keeps a permanent marker, so the sam
 never be re-created. A repeated deletion is idempotent, and a deletion of an identity that was
 never uploaded is indistinguishable from a successful one.
 
-**No MCP tool reads `cloud_meetings` yet.** The read tools still require `synthetic=true`, so a
-stored real copy is reachable only by its own writer and by the reader's SQL, not by Pi or ChatGPT.
-Enabling the real read surface is the next slice.
+**A stored real copy is readable by the read tools once storage is enabled.** `GAPPD_MEETING_STORAGE_ENABLED=true`
+also switches `get_meeting`, `list_meetings` and `search_meetings` onto `cloud_read_meetings`, the
+migration-005 union view of synthetic rows and owned cloud copies. The switch fails closed on
+startup when that view is absent, so a deployment cannot serve real reads before migration 005.
+Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
 ## Private administrator setup
 
@@ -93,16 +95,17 @@ go run ./cmd/admin seed
 unset ADMIN_DATABASE_URL RUNTIME_DB_PASSWORD DEMO_OWNER_ID
 ```
 
-Migrations 001-004 are transactional, advisory-locked, and recorded in `cloud_migrations`.
+Migrations 001-005 are transactional, advisory-locked, and recorded in `cloud_migrations`.
 It creates `meetings`, enables/forces RLS, and grants no PUBLIC table access.
 Migration 004 additionally creates `cloud_meetings` and `meeting_lifecycle` for real copies:
 a separate table, separate identity namespace, 1 MiB transcript bound and its own guards. It is
 purely additive and does not alter `meetings`, its constraints, its policies or its records.
-Provision grants `gappd_reader` SELECT only on `meetings`, `demo_lifecycle`, `cloud_meetings`
-and `meeting_lifecycle`, with read-only defaults.
+Migration 005 adds `cloud_read_meetings`, a `security_invoker` union view of synthetic rows and
+owned cloud copies. `security_invoker` is required: without it the view runs as its owner and
+would bypass both tables' row level security.
+Provision grants `gappd_reader` SELECT only on `meetings`, `demo_lifecycle`, `cloud_meetings`,
+`meeting_lifecycle` and `cloud_read_meetings`, with read-only defaults.
 Both tables force owner RLS; missing owner context denies access. No lifecycle metadata is in MCP output.
-No API path reads `cloud_meetings` yet: the read tools still require `synthetic=true` until the
-real-copy read filter lands, so migration 004 alone changes no API behaviour.
 It disables PostgreSQL statement/duration/error statement logs in its transaction
 before password DDL. Confirm no external audit extension records password DDL;
 provision through your secret manager instead if policy mandates external auditing.

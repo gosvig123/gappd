@@ -58,8 +58,7 @@ func withReadTx(ctx context.Context, pool *pgxpool.Pool, owner string, fn func(c
 
 func readMeeting(ctx context.Context, tx pgx.Tx, owner, id string) (Meeting, error) {
 	var m Meeting
-	err := tx.QueryRow(ctx, `SELECT id::text,title,summary,transcript,started_at,updated_at,synthetic
- FROM meetings WHERE id=$1 AND owner_id=$2 AND synthetic=true`, id, owner).Scan(
+	err := tx.QueryRow(ctx, queries().meeting, id, owner).Scan(
 		&m.ID, &m.Title, &m.Summary, &m.Transcript, &m.StartedAt, &m.UpdatedAt, &m.Synthetic)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Meeting{}, unavailable

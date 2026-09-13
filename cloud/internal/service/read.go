@@ -40,7 +40,7 @@ func List(ctx context.Context, pool *pgxpool.Pool, owner string, p ListParams) (
 	}
 	// ponytail: offset paging over one owner's rows; add keyset paging if a page set grows past 1000.
 	err := withReadTx(ctx, pool, owner, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, listSQL,
+		rows, err := tx.Query(ctx, queries().list,
 			owner, optionalTime(p.Since), optionalTime(p.Until), p.Offset, p.Limit+1)
 		if err != nil {
 			return errors.New("Meetings unavailable")
@@ -79,12 +79,6 @@ func scanSummaries(rows pgx.Rows) ([]MeetingSummary, error) {
 	return items, nil
 }
 
-// One extra row only tells List whether a further page exists; it is trimmed before return.
-const listSQL = `SELECT id::text,title,started_at,updated_at FROM meetings
- WHERE owner_id=$1 AND synthetic=true
- AND ($2::timestamptz IS NULL OR started_at>=$2) AND ($3::timestamptz IS NULL OR started_at<$3)
- ORDER BY started_at DESC,id DESC OFFSET $4 LIMIT $5`
-
 func optionalTime(t time.Time) *time.Time {
 	if t.IsZero() {
 		return nil
@@ -111,7 +105,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, owner, query string, limit 
 	}
 	// ponytail: one on-the-fly tsvector scan, bounded by owner; add a stored tsvector column if search volume grows.
 	err := withReadTx(ctx, pool, owner, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, searchSQL, owner, query, limit)
+		rows, err := tx.Query(ctx, queries().search, owner, query, limit)
 		if err != nil {
 			return errors.New("Meetings unavailable")
 		}
@@ -142,10 +136,3 @@ func scanHits(rows pgx.Rows) ([]SearchHit, error) {
 func plainPassage(text string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(text, "<b>", ""), "</b>", "")
 }
-
-// The passage comes from the transcript when it matches, otherwise from the title and summary.
-const searchSQL = `SELECT id::text,title,started_at,ts_headline('english',
- CASE WHEN to_tsvector('english',transcript)@@q THEN transcript ELSE title||E'\n'||summary END,
- q,'MaxWords=30,MinWords=8,MaxFragments=1') FROM meetings,plainto_tsquery('english',$2) q
- WHERE owner_id=$1 AND synthetic=true AND to_tsvector('english',title||' '||summary||' '||transcript)@@q
- ORDER BY ts_rank(to_tsvector('english',title||' '||summary||' '||transcript),q) DESC,started_at DESC LIMIT $3`
