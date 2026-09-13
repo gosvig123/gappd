@@ -81,8 +81,8 @@ Changing accounts must not upload a previous account's pending changes to the ne
 
 Keep cmd/gappd/mcp.go and its local read-only SQL contract intact.
 Use remote MCP over Streamable HTTP with standards-based OAuth authorization.
-Reuse verified Gappd identity infrastructure where suitable; inspect its actual capabilities
-before selecting an OAuth authorization server or adding dependencies.
+Use the existing Gappd Clerk application; development OAuth configuration is prepared.
+See [Clerk setup and remaining integration gates](cloud-mcp-clerk.md) before implementation.
 Do not reuse Google Calendar tokens, distribute shared credentials, or expose upload scopes
 through an MCP read grant. Users must be able to revoke individual clients and devices.
 
