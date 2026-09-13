@@ -1,0 +1,78 @@
+/* Prototype-only styles. Native Gappd type and palette; structure is the variable. */
+.sp-workbench { --sp-bg: #282c33; --sp-panel: #2f343e; --sp-line: #484f5c; --sp-ink: #dce0e5; --sp-muted: #b2bac8; --sp-accent: #74ade8; height: 100dvh; display: flex; flex-direction: column; gap: 20px; padding: 20px 24px 84px; color: var(--sp-ink); background: var(--sp-bg); font: 14px/1.5 var(--font-ui); }
+.sp-workbench[data-preview-theme="light"] { --sp-bg: #edf0f4; --sp-panel: #fff; --sp-line: #ccd2dc; --sp-ink: #283243; --sp-muted: #566174; --sp-accent: #2764a5; color-scheme: light; }
+@media (prefers-color-scheme: light) { .sp-workbench[data-preview-theme="system"] { --sp-bg: #edf0f4; --sp-panel: #fff; --sp-line: #ccd2dc; --sp-ink: #283243; --sp-muted: #566174; --sp-accent: #2764a5; color-scheme: light; } }
+.sp-workbench * { box-sizing: border-box; }
+.sp-workbench button, .sp-workbench select { font: inherit; color: inherit; background: var(--sp-bg); border: 1px solid var(--sp-line); border-radius: 7px; padding: 8px 12px; cursor: pointer; }
+.sp-workbench :focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 3px; }
+.sp-workbench button:hover { border-color: var(--sp-accent); }
+.sp-app-head { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.sp-app-head strong { font-size: 20px; }
+.sp-app-head > span { color: var(--sp-muted); }
+.sp-app-head .sp-demo { margin-inline-start: auto; color: var(--sp-accent); }
+.sp-tools { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.sp-tools label { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.sp-tools input { accent-color: var(--sp-accent); width: clamp(100px, 20vw, 240px); }
+.sp-tools output { color: var(--sp-muted); font-variant-numeric: tabular-nums; }
+.sp-tools button { margin-inline-start: auto; }
+.sp-window { container-type: inline-size; width: 100%; min-height: 0; flex: 1; align-self: center; display: flex; flex-direction: column; background: var(--sp-panel); border: 1px solid var(--sp-line); border-radius: 14px; overflow: hidden; }
+.sp-heading { padding: clamp(16px, 3vw, 32px); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--sp-line); }
+.sp-heading h1 { margin: 0; font-size: 28px; letter-spacing: -.7px; }
+.sp-heading p { margin: 4px 0 0; color: var(--sp-muted); }
+.sp-heading > span { color: var(--sp-muted); font-size: 12px; }
+.sp-content { min-height: 0; flex: 1; overflow: auto; overscroll-behavior: contain; padding: 28px; }
+.sp-content h2 { font-size: 19px; margin: 0 0 16px; letter-spacing: -.25px; }
+.sp-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 18px; border-bottom: 1px solid var(--sp-line); }
+.sp-row > div { min-width: 0; }
+.sp-row strong { font-weight: 600; }
+.sp-row p, .sp-note { margin: 5px 0 0; color: var(--sp-muted); font-size: 13px; max-width: 65ch; }
+.sp-row select { max-width: 210px; min-width: 0; }
+.sp-row > button { flex-shrink: 0; }
+.sp-note { padding-top: 16px; }
+.sp-workbench .sp-toggle { padding: 3px; width: 38px; height: 23px; border-radius: 20px; background: var(--sp-bg); }
+.sp-toggle span { display: block; width: 15px; height: 15px; border-radius: 50%; background: var(--sp-muted); }
+.sp-workbench .sp-toggle[aria-checked="true"] { background: var(--sp-accent); }
+.sp-toggle[aria-checked="true"] span { margin-left: auto; background: var(--sp-bg); }
+.sp-sidebar-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 32px; }
+.sp-sidebar-layout nav { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.sp-sidebar-layout nav button { text-align: left; background: transparent; border-color: transparent; }
+.sp-sidebar-layout nav button[aria-current] { background: var(--sp-bg); color: var(--sp-accent); border-color: var(--sp-line); }
+.sp-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 350px), 1fr)); gap: 32px; }
+.sp-overview section { min-width: 0; }
+.sp-overview section:last-child { grid-column: 1 / -1; }
+.sp-disclosures { max-width: 900px; margin-inline: auto; }
+.sp-disclosures details { border-bottom: 1px solid var(--sp-line); padding: 8px 0 20px; }
+.sp-disclosures summary { cursor: pointer; padding: 12px 0; font-size: 18px; }
+.sp-disclosures summary small { float: right; font-size: 13px; color: var(--sp-muted); margin: 5px 0 0 8px; }
+.sp-disclosures .sp-row { margin-inline: 20px; }
+.sp-disclosures .sp-note { margin-inline: 20px; }
+.sp-state { padding: 10px 20px; border-top: 1px solid var(--sp-line); color: var(--sp-muted); font-size: 12px; max-height: 32%; overflow: auto; }
+.sp-state summary { cursor: pointer; }
+.sp-state pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sp-switcher { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 16px; padding: 6px; max-width: calc(100% - 16px); border: 1px solid var(--sp-line); border-radius: 12px; background: var(--sp-ink); color: var(--sp-bg); box-shadow: 0 4px 20px #0003; }
+.sp-switcher span { text-align: center; min-width: 0; }
+.sp-workbench .sp-switcher button { background: transparent; color: inherit; border: 0; font-size: 20px; }
+@container (max-width: 650px) {
+  .sp-sidebar-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .sp-sidebar-layout nav { flex-direction: row; flex-wrap: wrap; gap: 4px; }
+  .sp-content { padding: 18px; }
+  .sp-row { gap: 12px; flex-wrap: wrap; }
+  .sp-row > div { flex: 1 1 180px; }
+  .sp-row select { width: 100%; max-width: none; }
+  .sp-heading { padding: 18px; }
+  .sp-disclosures summary small { float: none; display: block; margin-left: 18px; }
+}
+@media (max-width: 480px) {
+  .sp-workbench { padding: 12px 8px 78px; gap: 12px; }
+  .sp-app-head { gap: 8px 16px; }
+  .sp-app-head .sp-demo { display: none; }
+  .sp-tools { gap: 8px; font-size: 12px; }
+  .sp-tools button { padding: 5px 8px; }
+}
+@media (max-height: 540px) {
+  .sp-workbench { gap: 8px; padding-top: 8px; }
+  .sp-app-head { display: none; }
+  .sp-heading { padding: 8px 16px; }
+  .sp-heading h1 { font-size: 22px; }
+  .sp-heading p { display: none; }
+}

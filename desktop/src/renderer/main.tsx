@@ -16,10 +16,14 @@ import './theme.css'
 import './styles.css'
 import './components/ui.css'
 
+const SettingsPrototype = import.meta.env.DEV && new URLSearchParams(location.search).has('variant')
+  ? React.lazy(() => import('./routes/settings-prototype').then(module => ({ default: module.SettingsPrototype })))
+  : null
+
 installTransientScrollbars()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {SettingsPrototype ? <React.Suspense fallback={null}><SettingsPrototype /></React.Suspense> : <App />}
   </React.StrictMode>,
 )
