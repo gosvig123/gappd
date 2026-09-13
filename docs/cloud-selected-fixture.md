@@ -5,7 +5,7 @@ This slice reads a real local SQLite Meeting, previews its exact version-1 JSON 
 then sends those retained bytes only after new one-use consent. It does not accept
 arbitrary Meeting documents. Migration 003 was applied privately on 2026-09-13;
 the old deletion marker and seeded fixture were verified intact. The live selected
-upload and exact Pi readback passed that day. No selected-copy deletion was performed.
+upload, exact Pi readback and subsequent selected-copy deletion passed that day.
 
 ## Live synthetic evidence (2026-09-13)
 
@@ -17,8 +17,12 @@ consent check was bypassed. Commit `ca64391` was deployed after migration 003.
 - Accepted cloud Meeting: `11599d4d-d5f2-8320-8748-2142c5de3fec`.
 - Fixed expiry: `2026-10-13T17:54:18.924521Z`.
 - Pi `get_meeting` returned the exact title, transcript, summary and start time.
-- App OFF cleared preview/consent and disabled the test account. The cloud copy remains;
-  OFF does not delete it. The temporary server mutation capability was disabled afterward.
+- A separately approved automated deletion consumed one-use deletion consent. Pi then
+  returned `Meeting not found`; private SQL verified content absent and the marker retained.
+- A new local export still matched the exact fixture; the original cloud seed remained intact.
+- App OFF cleared preview/consent and disabled the test account. The temporary server
+  mutation capability was disabled afterward. OFF itself does not delete cloud copies.
+- The selected cloud ID is permanently deleted and must not be recycled for another test.
 
 This proves synthetic document transport, not authorization for real Meeting data.
 
