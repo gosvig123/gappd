@@ -20,6 +20,7 @@ function buildOperationApi(): IpcInvokeApi {
     googleCalendar: invokeGroup('googleCalendar'),
     slack: invokeGroup('slack'),
     cloudAuth: invokeGroup('cloudAuth'),
+    demoUpload: invokeGroup('demoUpload'),
     update: invokeGroup('update'),
     startup: invokeGroup('startup'),
   }

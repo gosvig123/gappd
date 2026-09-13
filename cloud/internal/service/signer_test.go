@@ -15,6 +15,10 @@ import (
 )
 
 func signer(t *testing.T) (*service.Auth, func(string) string) {
+	return signerScopes(t, service.Scope, "")
+}
+
+func signerScopes(t *testing.T, scope, clientID string) (*service.Auth, func(string) string) {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -29,7 +33,7 @@ func signer(t *testing.T) (*service.Auth, func(string) string) {
 	a := &service.Auth{Issuer: host.URL, Resource: "https://example.test/mcp", Keys: service.NewKeys(host.URL)}
 	return a, func(owner string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{"iss": a.Issuer, "aud": a.Resource, "sub": owner,
-			"exp": time.Now().Add(time.Hour).Unix(), "scp": []string{service.Scope}})
+			"exp": time.Now().Add(time.Hour).Unix(), "scp": []string{scope}, "client_id": clientID})
 		token.Header["kid"], token.Header["typ"] = "synthetic", "at+jwt"
 		raw, err := token.SignedString(key)
 		if err != nil {

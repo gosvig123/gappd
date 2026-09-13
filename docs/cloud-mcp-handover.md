@@ -2,8 +2,10 @@
 
 ## Status and approved scope
 
-The desktop now implements a development auth-only preview. Cloud sync remains unimplemented. `/cloud` now implements a synthetic-only read MCP
-service, deployed from commit `7eb4058`. Live client authorization remains pending.
+The desktop retains its development auth-only preview. Cloud sync remains unimplemented.
+An OFF-by-default synthetic demo action now creates one fixed server-side Meeting per account;
+see the runbook for its separate consent, writer role, and parent-owned deployment gates.
+Pi live login and owned get_meeting passed; live second-account and ChatGPT checks are deferred.
 See [runbook](../cloud/README.md).
 Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
 Client compatibility must be proved with real authorization and tool calls, not assumed.
@@ -17,8 +19,9 @@ and without a Gappd identity. Remote MCP is an additional connection that users 
 
 Settings → Connections → Cloud sync defaults OFF and opens Clerk only after explicit ON.
 Only a verified account and protected credentials enable the auth-only preview. No Meetings
-are uploaded. The independent cloud slice has synthetic schema and read MCP only;
-no upload, sync, or device registration exists.
+are uploaded by that preview. Cloud MCP remains synthetic-only and read-only;
+no real Meeting upload, sync, or device registration exists. The gated empty-body demo POST
+is a consent/transport test, not a Meeting-document upload implementation.
 This preview consent is authentication only: a future upgrade MUST ask for new explicit upload
 consent. It must never interpret this credential or enabled state as upload permission.
 
@@ -149,7 +152,7 @@ Builder Dockerfile and `/ready` healthcheck are explicit service settings: the C
 `configFile=/cloud/railway.toml`. Config edits attempted old main builds, which failed;
 explicit source connection with `--branch beta` deployed the correct tested commit.
 Automatic push deployment and CI gating are NOT yet proved. Inspect branch selection before
-future configuration changes. Live client authorization remains pending.
+future configuration changes. Pi owned read passed; second-account and ChatGPT are deferred.
 The environment name production is Railway's default, not approval to serve production users.
 Before launch, add an isolated staging environment and choose the production release branch;
 beta is the current development branch, not a permanent production-branch decision.

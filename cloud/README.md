@@ -1,17 +1,19 @@
 # Synthetic cloud MCP
 
-Independent Go 1.25 service. The desktop and root CLI are unchanged. No uploads,
-real Meeting access, audio, list, search, storage sync, or automatic seed exists.
+Independent Go 1.25 service. Local MCP and the root CLI are unchanged. The optional
+synthetic demo transport creates fixed fabricated text only; no real Meeting access,
+audio, list, search, storage sync, or automatic seed exists.
 Private Railway migration, reader-role provisioning, and synthetic seed are complete.
 Independent review, Go 1.25.13 PostgreSQL 18 race tests, and Docker build passed.
 Railway deployed commit `7eb4058`; health, readiness, public metadata and unauthenticated
-401 checks passed. Clerk-issued tokens, Pi and hosted ChatGPT calls remain pending.
+401 checks passed. Pi live login and owned get_meeting passed. Live second-account
+and hosted ChatGPT checks are explicitly deferred, not validated.
 
 ## Runtime
 
 Railway uses root `/cloud`, branch `beta`, explicit Dockerfile builder and `/ready` healthcheck.
 These settings are configured on the service: the CLI did not persist the nested TOML path.
-Set only these runtime variables:
+Base read-only runtime variables (optional demo configuration is below):
 
 - `DATABASE_URL`: private PostgreSQL URL for **gappd_reader**, never the administrator.
 - `CLERK_ISSUER_URL`: `https://learning-mutt-4805.clerk.accounts.dev`.
@@ -84,6 +86,8 @@ and another account's Meeting give the same tool error. No `user_id` input exist
 Tests create only synthetic data. Use an isolated disposable PostgreSQL database.
 Set `TEST_ADMIN_DATABASE_URL` to its administrator URL and `TEST_DATABASE_URL` to its
 reader URL with password `synthetic-test-password-only`; the tests provision that role.
+For demo integration tests also set `TEST_DEMO_DATABASE_URL` to the isolated
+`gappd_demo_writer` URL with that same synthetic-only test password.
 Never point these variables at a deployed or real Meeting database.
 
 ```sh
@@ -117,3 +121,55 @@ reset, runtime write/admin rejection, schema/input limits, and fixed JWKS fetch 
 Before real data: production identity/domains, new desktop upload consent, deletion,
 rate/cost controls, grant revocation policy, retention, backups/restore, and staging.
 This slice intentionally serves only synthetic data and does not relax those gates.
+
+## Optional synthetic demo transport (disabled by default)
+
+`GAPPD_SYNTHETIC_UPLOAD_ENABLED=true` explicitly enables `POST /demo-meeting`.
+Missing/other values leave the route absent and never open a writer pool. Enabling
+requires `GAPPD_DESKTOP_OAUTH_CLIENT_ID` and `SYNTHETIC_UPLOAD_DATABASE_URL` for
+**gappd_demo_writer**, never admin or reader credentials. `/mcp` and public discovery
+still advertise/require only `meetings:read`; gappd_reader grants are unchanged.
+
+POST requires the same strict JWT checks plus `meetings:sync` and exact signed
+`client_id` equal to the configured Desktop client. Missing client_id fails closed.
+The body must be empty, including chunked requests; even `{}` or synthetic-tagged
+caller text is rejected. Server code constructs the fixed fixture. This proves demo
+creation/consent transport, NOT validation or upload of Meeting documents.
+Ownership comes only from verified token `sub`. A deterministic account-specific UUID
+provides idempotency without updates; a collision fails generically, never reassigns
+or exposes another account. The seeded demo ID is not reused or changed. A successful
+200 response contains `status: accepted`, `id`, and `subject`; use the returned ID in Pi.
+
+### Parent-owned live setup and checks
+
+1. Publish reviewed changes only after local tests/builds pass. Do not mutate seeded data.
+2. In the trusted private admin session described above, set
+   `PGOPTIONS='-c pg_stat_statements.track=none'` if preloaded, BEFORE opening the connection.
+   Supply `ADMIN_DATABASE_URL` and a securely generated `DEMO_WRITER_DB_PASSWORD`
+   (24+ characters). Confirm no external auditing captures role/password DDL.
+3. Run `go run ./cmd/admin migrate` then `go run ./cmd/admin provision-demo` (or `/admin`).
+   The latter creates the separate non-owner role and fixed-payload INSERT RLS policy;
+   grants SELECT/INSERT only, no UPDATE/DELETE. Use a fresh isolated role without other grants.
+   Unset admin URL/password after provisioning. Never place either in API runtime.
+4. Set private writer URL (URL-encoded password), Desktop client `iFaeusoYBwClQRoP`,
+   and the explicit capability flag on the API. Keep existing reader URL, issuer and
+   canonical resource unchanged. Deploy; disabled mode must need no writer configuration.
+5. Start an isolated desktop development profile with `GAPPD_SYNTHETIC_UPLOAD_ENABLED=true`.
+   No app binary replacement is needed. Settings → Connections → Synthetic demo Meeting:
+   Connect demo account explicitly; complete user-owned browser consent. OAuth requests
+   `email profile meetings:sync` and canonical resource, never offline_access/refresh.
+   Confirm actual signed client_id exists; do not relax validation if it does not.
+6. Verify displayed account, check the NEW unchecked consent, then Upload demo Meeting.
+   Read the acknowledged ID through Pi as its owner. Repeat only with new manual consent;
+   it returns the same ID. Check OFF, denied login, expired login, failure, and account switch.
+   No acknowledgment means outcome unknown, not proof that the server rejected it.
+7. Disable both flags after the coordinated test. OFF clears demo credentials/consent and
+   cancels locally; it does not recall accepted requests or delete cloud copies.
+
+Desktop demo credentials are separate, protected, and resource-bound. Startup only reads
+local credentials; saved auth-only credentials never enable uploads or browser login.
+Consent exists only in main-process memory, bound to the userinfo-verified account and
+exact token, and is consumed once at the final action. No silent retry exists.
+Automated two-account isolation is not live second-account proof. ChatGPT remains deferred.
+General uploads/device registration, production identity, retention/deletion, revocation,
+rate/cost controls, backups/restore and staging remain required before real Meeting data.

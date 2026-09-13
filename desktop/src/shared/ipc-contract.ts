@@ -1,3 +1,4 @@
+import type { DemoUploadStatus } from './demo-upload-contract'
 import type { CloudAuthStatus } from './cloud-auth-contract'
 import type { MeetingAgendaDraft } from './meeting-agenda'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
@@ -23,6 +24,7 @@ export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
 export type IpcInvokeContract = {
+  demoUpload: { status: OperationSpec<[], DemoUploadStatus>; connect: OperationSpec<[enabled: boolean], DemoUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], DemoUploadStatus>; upload: OperationSpec<[subject: string], DemoUploadStatus> }
   cloudAuth: { status: OperationSpec<[], CloudAuthStatus>; setEnabled: OperationSpec<[enabled: boolean], CloudAuthStatus> }
   system: {
     getDevices: OperationSpec<[], Device[]>
@@ -100,6 +102,7 @@ export type IpcInvokeApi = { [G in IpcOperationGroup]: { [N in IpcOperationName<
 type IpcOperationChannels = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: `${G}:${string}` } }
 
 export const IPC_OPERATIONS = {
+  demoUpload: { status: 'demoUpload:status', connect: 'demoUpload:connect', setConsent: 'demoUpload:setConsent', upload: 'demoUpload:upload' },
   cloudAuth: { status: 'cloudAuth:status', setEnabled: 'cloudAuth:setEnabled' },
   system: {
     getDevices: 'system:getDevices',

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gosvig123/gappd/cloud/internal/service"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -28,12 +29,23 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
+	writer, err := demoPool()
+	if err != nil {
+		return err
+	}
+	if writer != nil {
+		defer writer.Close()
+	}
+	return serve(issuer, resource, pool, writer)
+}
+
+func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer)}
-	server := &http.Server{Addr: ":" + port, Handler: service.Handler(auth, pool),
+	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithDemo(auth, pool, writer, os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
 	return server.ListenAndServe()
@@ -43,4 +55,14 @@ func validURL(raw, path string) bool {
 	u, err := url.Parse(raw)
 	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil &&
 		u.Path == path && u.RawQuery == "" && u.Fragment == "" && u.RawPath == ""
+}
+
+func demoPool() (*pgxpool.Pool, error) {
+	if os.Getenv("GAPPD_SYNTHETIC_UPLOAD_ENABLED") != "true" {
+		return nil, nil
+	}
+	if os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID") == "" || os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL") == "" {
+		return nil, errors.New("demo configuration required")
+	}
+	return service.OpenDemoPool(context.Background(), os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL"))
 }

@@ -1,3 +1,4 @@
+import { cancelDemoUpload } from './demo-upload-service'
 import { shell } from 'electron'
 import { CloudAuth, type CloudCredential } from './cloud-auth'
 import { createSecureStore, requireEncryption } from './electron-secure-store'
@@ -13,4 +14,7 @@ function cloudAuth(): CloudAuth {
 }
 
 export function cloudAuthStatus() { return cloudAuth().status() }
-export function setCloudAuthEnabled(enabled: unknown) { return cloudAuth().setEnabled(enabled) }
+export async function setCloudAuthEnabled(enabled: unknown) {
+  if (enabled === false) await cancelDemoUpload()
+  return cloudAuth().setEnabled(enabled)
+}

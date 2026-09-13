@@ -1,3 +1,4 @@
+import { demoUpload } from './demo-upload-service'
 import { generateMeetingAgenda } from './meeting-agenda'
 import { openPermissionsSettings } from './privacy-settings'
 import { cloudAuthStatus, setCloudAuthEnabled } from './cloud-auth-service'
@@ -72,6 +73,7 @@ const IPC_HANDLERS: MainHandlers = {
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
+  demoUpload: { status: () => demoUpload().status(), connect: (_event, enabled) => demoUpload().connect(enabled), setConsent: (_event, subject, enabled) => demoUpload().setConsent(subject, enabled), upload: (_event, subject) => demoUpload().upload(subject) },
   cloudAuth: { status: () => cloudAuthStatus(), setEnabled: (_event, enabled) => setCloudAuthEnabled(enabled) },
   slack: {
     status: () => slackConnectionStatus(),

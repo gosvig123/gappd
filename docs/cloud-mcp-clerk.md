@@ -4,8 +4,10 @@
 
 Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.
 Automated tests and a user-completed live development Settings login passed on 2026-09-13.
-`/cloud` now serves synthetic-only read MCP on Railway; live client auth checks are pending.
-No upload or device registration exists. See the [service runbook](../cloud/README.md).
+`/cloud` serves synthetic-only read MCP on Railway; Pi live login and owned get passed.
+Live second-account and ChatGPT checks are deferred. A disabled-by-default synthetic demo
+creation/consent transport is implemented; no real Meeting upload or device registration
+exists. See the [service runbook](../cloud/README.md#optional-synthetic-demo-transport-disabled-by-default).
 The existing local MCP remains the default. No Meetings are uploaded.
 
 This extends [the cloud MCP handover](cloud-mcp-handover.md). Reuse the existing Clerk
@@ -40,8 +42,9 @@ No client secrets, sign-in methods, user accounts, or redirect URIs were changed
 - Kept public Dynamic Client Registration (DCR) disabled. It exposes an unauthenticated
   registration endpoint and requires a deliberate onboarding/security decision.
 
-Not advertising a scope is NOT an authorization boundary. The cloud upload API must accept
-only the approved desktop client, the sync scope, a registered device, and the correct owner.
+Not advertising a scope is NOT an authorization boundary. A production upload API must accept only the approved desktop client, the sync scope,
+a registered device, and the correct owner. The fixed synthetic demo intentionally defers
+device registration; it verifies signed client_id, sync scope and token subject.
 Adding an allowed scope does not grant it to existing tokens or enable application sync.
 
 ## Read-only client setup
@@ -51,7 +54,7 @@ Its only allowed scopes are `meetings:read offline_access`; callback is
 `http://127.0.0.1/callback`. Desktop registration and DCR remain unchanged.
 Pi configuration was added to the user's shared MCP file; `/reload` is needed to load it.
 Automatic installation failed because DCR is disabled; the explicit public client avoids DCR.
-Pi live authorization is pending. ChatGPT Developer mode was OFF during inspection;
+Pi live authorization and owned get_meeting passed. ChatGPT Developer mode was OFF during inspection;
 the user must enable it before its exact connection callback can be obtained.
 
 ## Railway configuration
@@ -145,8 +148,9 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
   grants, meetings:read advertised, meetings:sync absent, registration endpoint absent.
 - Live Settings login verified token exchange and verified account display. The encrypted file
   was owner-only (0600); OFF removed it. All 258 desktop tests, typecheck, and builds passed.
-- Synthetic remote MCP has automated local coverage, not live Clerk/client proof.
-  No device upload is implemented. No Meetings were uploaded.
+- Synthetic remote MCP has automated isolation coverage plus Pi live owned-read proof;
+  live second-account and hosted ChatGPT remain deferred.
+  No device upload is implemented. The new demo creates server-fixed fabricated text only.
 - Application-wide PKCE enforcement affects future logins for every OAuth client in this
   development instance. Only the existing public Gappd Desktop client was listed during setup.
 
@@ -159,3 +163,16 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
 Raw JWT claim references used by `/cloud` (no live tokens retained):
 - [Clerk OAuthJwtPayload scp/scope](https://github.com/clerk/javascript/blob/main/packages/backend/src/api/resources/IdPOAuthAccessToken.ts)
 - [Clerk OAuth at+jwt discriminator](https://github.com/clerk/javascript/blob/main/packages/backend/src/tokens/machine.ts)
+
+### Synthetic demo authorization
+
+The demo uses the existing public Desktop client and PKCE helpers but a separate protected
+`cloud-demo-development.enc` store. Only explicit Connect demo account requests
+`email profile meetings:sync` and resource `https://gappd-cloud-api-production.up.railway.app/mcp`.
+No refresh token is requested or retained. Existing auth-only credentials are unchanged.
+Trusted HTTPS userinfo verifies the account with the exact Bearer token used by POST;
+redirects are rejected. Main-process one-use consent binds that account/token and final action.
+OFF/account changes invalidate consent; expiry needs explicit reconnect. No startup network,
+automatic upload, backfill or local Meeting reads exist. Both capability flags default disabled.
+Live demo validation and actual signed Desktop client_id verification are parent-owned gates;
+never weaken the server's fail-closed client check to make a development login pass.

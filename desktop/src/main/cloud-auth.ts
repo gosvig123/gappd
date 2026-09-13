@@ -2,11 +2,11 @@ import type { CloudAuthStatus } from '../shared/cloud-auth-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { authorizeOAuth, parseTokenResponse, type OAuthTokenRequest, type OAuthTokenSet } from './oauth.ts'
 
-export type CloudAuthConfig = { issuer: string; clientId: string }
-export type CloudCredential = { version: 1; issuer: string; clientId: string; subject: string; email: string; tokens: OAuthTokenSet }
+export type CloudAuthConfig = { issuer: string; clientId: string; resource?: string }
+export type CloudCredential = { version: 1; issuer: string; clientId: string; resource?: string; subject: string; email: string; tokens: OAuthTokenSet }
 type Store = { read(): Promise<CloudCredential | null>; write(value: CloudCredential): Promise<void>; clear(): Promise<void> }
 type Dependencies = { openExternal(url: string): Promise<unknown>; requireSecureStorage(): void; fetcher?: typeof fetch; now?: () => number; timeoutMs?: number }
-const LOGIN_ERROR = 'Cloud sign-in failed or was cancelled. Unlock this Mac, check your connection, and turn Cloud sync on to retry.'
+const LOGIN_ERROR = 'Cloud sign-in failed or was cancelled. Unlock this Mac, check your connection, and reconnect explicitly to retry.'
 
 export class CloudAuth {
   private generation = 0
@@ -26,7 +26,7 @@ export class CloudAuth {
     if (this.forcedOff) return this.snapshot(null, this.error)
     try {
       const value = await this.serialize(() => this.store.read())
-      if (value && !validCredential(value, this.config, this.now())) return this.snapshot(null, 'Cloud sign-in expired or is invalid. Turn Cloud sync on to reconnect.')
+      if (value && !validCredential(value, this.config, this.now())) return this.snapshot(null, 'Cloud sign-in expired or is invalid. Reconnect explicitly.')
       return this.snapshot(value, this.error)
     } catch { return this.snapshot(null, 'Secure cloud credentials are unavailable. Unlock this Mac or choose Remove local credentials.') }
   }
@@ -55,7 +55,7 @@ export class CloudAuth {
     await this.serialize(() => this.store.clear())
     signal.throwIfAborted()
     const fetcher: typeof fetch = (url, init) => (this.dependencies.fetcher || fetch)(url, { ...init, redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]) })
-    const tokens = await authorizeOAuth({ clientId: this.config.clientId, authorizeUrl: `${this.config.issuer}/oauth/authorize`, tokenUrl: `${this.config.issuer}/oauth/token`, scopes: ['email', 'profile'], callbackPath: '/callback', issuer: this.config.issuer, authorizeParams: { prompt: 'consent' } }, { ...this.dependencies, fetcher, signal, tokenRequester: request => requestCloudTokens(this.config, request, fetcher, this.now()) })
+    const tokens = await authorizeOAuth({ clientId: this.config.clientId, authorizeUrl: `${this.config.issuer}/oauth/authorize`, tokenUrl: `${this.config.issuer}/oauth/token`, scopes: this.config.resource ? ['email', 'profile', 'meetings:sync'] : ['email', 'profile'], callbackPath: '/callback', issuer: this.config.issuer, authorizeParams: { prompt: 'consent', ...(this.config.resource ? { resource: this.config.resource } : {}) } }, { ...this.dependencies, fetcher, signal, tokenRequester: request => requestCloudTokens(this.config, request, fetcher, this.now()) })
     if (!validTokens(tokens, this.now())) throw new Error('Invalid cloud token.')
     signal.throwIfAborted()
     const response = await fetcher(`${this.config.issuer}/oauth/userinfo`, { headers: { Authorization: `Bearer ${tokens.accessToken}` } })
@@ -64,6 +64,13 @@ export class CloudAuth {
     if (!user || !safeText(user.sub) || !safeText(user.email) || user.email_verified !== true) throw new Error('Verified cloud account required.')
     const value: CloudCredential = { version: 1, ...this.config, subject: user.sub, email: user.email, tokens }
     await this.serialize(async () => { if (generation === this.generation && !signal.aborted) await this.store.write(value) })
+  }
+
+  async credential(): Promise<CloudCredential | null> {
+    const generation = this.generation
+    if (this.forcedOff || this.pending) return null
+    const value = await this.serialize(() => this.store.read())
+    return generation === this.generation && !this.forcedOff && value && validCredential(value, this.config, this.now()) ? value : null
   }
 
   private snapshot(value: CloudCredential | null, error: string | null): CloudAuthStatus {
@@ -88,7 +95,7 @@ function validTokens(value: OAuthTokenSet, now: number): boolean {
 }
 
 function validCredential(value: CloudCredential, config: CloudAuthConfig, now: number): boolean {
-  return value.version === 1 && value.issuer === config.issuer && value.clientId === config.clientId && safeText(value.subject) && safeText(value.email) && validTokens(value.tokens, now)
+  return value.version === 1 && value.issuer === config.issuer && value.clientId === config.clientId && value.resource === config.resource && safeText(value.subject) && safeText(value.email) && validTokens(value.tokens, now)
 }
 
 async function requestCloudTokens(config: CloudAuthConfig, request: OAuthTokenRequest, fetcher: typeof fetch, now: number): Promise<OAuthTokenSet> {

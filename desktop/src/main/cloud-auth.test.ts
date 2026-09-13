@@ -4,7 +4,7 @@ import test from 'node:test'
 import { CloudAuth, type CloudCredential } from './cloud-auth.ts'
 const config = { issuer: 'https://issuer.example', clientId: 'desktop' }
 
-function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; timeoutMs?: number; invalidUser?: boolean } = {}) {
+function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; timeoutMs?: number; invalidUser?: boolean; resource?: string } = {}) {
   let saved: CloudCredential | null = null
   let browserUrl = ''
   let opened!: () => void
@@ -19,7 +19,7 @@ function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; t
     },
     timeoutMs: options.timeoutMs ?? 500,
   }
-  return { auth: new CloudAuth(config, store, dependencies), store, dependencies, browser, url: () => browserUrl }
+  return { auth: new CloudAuth({ ...config, ...(options.resource ? { resource: options.resource } : {}) }, store, dependencies), store, dependencies, browser, url: () => browserUrl }
 }
 
 async function callback(url: string, overrides: Record<string, string> = {}) {
@@ -143,4 +143,25 @@ test('malformed token lifetime or type cannot be persisted', async () => {
     assert.equal((await h.auth.setEnabled(true)).enabled, false)
     assert.equal(await h.store.read(), null)
   }
+})
+
+
+test('demo authorization explicitly requests sync resource and binds protected credentials', async () => {
+  const h = harness({ resource: 'https://example.test/mcp' })
+  let tokenUsed = ''
+  const fetcher = h.dependencies.fetcher
+  h.dependencies.fetcher = async (url, init?: RequestInit) => {
+    if (String(url).endsWith('/userinfo')) {
+      tokenUsed = new Headers(init?.headers).get('Authorization') || ''
+      assert.equal(init?.redirect, 'error')
+    }
+    return fetcher(url)
+  }
+  await h.auth.setEnabled(true)
+  assert.equal(new URL(h.url()).searchParams.get('scope'), 'email profile meetings:sync')
+  assert.equal(new URL(h.url()).searchParams.get('resource'), 'https://example.test/mcp')
+  assert.equal(tokenUsed, 'Bearer synthetic-access')
+  assert.equal((await h.auth.credential())?.resource, 'https://example.test/mcp')
+  const oldAuth = new CloudAuth(config, h.store, h.dependencies)
+  assert.equal(await oldAuth.credential(), null)
 })

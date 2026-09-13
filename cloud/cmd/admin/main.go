@@ -28,14 +28,20 @@ func run() error {
 		return err
 	}
 	defer conn.Close(ctx)
-	switch os.Args[1] {
+	return execute(ctx, conn, os.Args[1])
+}
+
+func execute(ctx context.Context, conn *pgx.Conn, command string) error {
+	switch command {
 	case "migrate":
 		return admin.Migrate(ctx, conn)
 	case "provision":
 		return admin.Provision(ctx, conn, os.Getenv("RUNTIME_DB_PASSWORD"))
+	case "provision-demo":
+		return admin.ProvisionDemo(ctx, conn, os.Getenv("DEMO_WRITER_DB_PASSWORD"))
 	case "seed":
 		return admin.Seed(ctx, conn, os.Getenv("DEMO_OWNER_ID"))
 	default:
-		return errors.New("use migrate, provision, or seed")
+		return errors.New("use migrate, provision, provision-demo, or seed")
 	}
 }

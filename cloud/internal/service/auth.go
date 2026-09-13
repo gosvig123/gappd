@@ -14,8 +14,9 @@ const Scope = "meetings:read"
 
 type ownerKey struct{}
 type Auth struct {
-	Issuer, Resource string
-	Keys             *Keys
+	Issuer, Resource        string
+	Keys                    *Keys
+	RequiredScope, ClientID string
 }
 
 var errScope = errors.New("insufficient scope")
@@ -34,41 +35,45 @@ func (a *Auth) verify(ctx context.Context, raw string) (string, error) {
 	if err != nil || !token.Valid {
 		return "", errors.New("invalid token")
 	}
+	return a.identity(claims)
+}
+
+func (a *Auth) identity(claims jwt.MapClaims) (string, error) {
 	aud, _ := claims.GetAudience()
 	sub, _ := claims.GetSubject()
 	if len(aud) != 1 || aud[0] != a.Resource || strings.TrimSpace(sub) != sub || sub == "" || len(sub) > 256 {
 		return "", errors.New("invalid identity")
 	}
-	if !hasScope(claims) {
+	if a.ClientID != "" && claims["client_id"] != a.ClientID {
+		return "", errors.New("invalid client")
+	}
+	if !hasRequiredScope(claims, a.scope()) {
 		return "", errScope
 	}
 	return sub, nil
 }
 
 // Clerk OAuthJwtPayload uses scp, or space-delimited scope when scp is absent.
-func hasScope(c jwt.MapClaims) bool {
+func hasScope(c jwt.MapClaims) bool { return hasRequiredScope(c, Scope) }
+
+func (a *Auth) scope() string {
+	if a.RequiredScope != "" {
+		return a.RequiredScope
+	}
+	return Scope
+}
+
+func hasRequiredScope(c jwt.MapClaims, required string) bool {
 	if v, ok := c["scope"]; ok {
 		if _, ok := v.(string); !ok {
 			return false
 		}
 	}
 	if v, ok := c["scp"]; ok {
-		values, ok := v.([]any)
-		if !ok {
-			return false
-		}
-		found := false
-		for _, v := range values {
-			s, ok := v.(string)
-			if !ok {
-				return false
-			}
-			found = found || s == Scope
-		}
-		return found
+		return scopeArray(v, required)
 	}
 	s, _ := c["scope"].(string)
-	return slices.Contains(strings.Split(s, " "), Scope)
+	return slices.Contains(strings.Split(s, " "), required)
 }
 
 func (a *Auth) protect(next http.Handler) http.Handler {
@@ -82,14 +87,34 @@ func (a *Auth) protect(next http.Handler) http.Handler {
 			err = errors.New("missing token")
 		}
 		if err != nil {
-			status := http.StatusUnauthorized
-			if errors.Is(err, errScope) {
-				status = http.StatusForbidden
-			}
-			w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+a.ResourceMetadata()+`", scope="`+Scope+`"`)
-			http.Error(w, http.StatusText(status), status)
+			a.reject(w, err)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, owner)))
 	})
+}
+
+func (a *Auth) reject(w http.ResponseWriter, err error) {
+	status := http.StatusUnauthorized
+	if errors.Is(err, errScope) {
+		status = http.StatusForbidden
+	}
+	w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+a.ResourceMetadata()+`", scope="`+a.scope()+`"`)
+	http.Error(w, http.StatusText(status), status)
+}
+
+func scopeArray(value any, required string) bool {
+	values, ok := value.([]any)
+	if !ok {
+		return false
+	}
+	found := false
+	for _, value := range values {
+		scope, ok := value.(string)
+		if !ok {
+			return false
+		}
+		found = found || scope == required
+	}
+	return found
 }
