@@ -21,8 +21,11 @@ Client compatibility must be proved with real authorization and tool calls, not 
 storage and reads now exist as an OFF-by-default pair: `POST /meeting` and `DELETE /meeting` write
 and remove owned copies, and the same capability switches the three read tools onto the union view
 of synthetic rows and owned cloud copies. Enabling it fails closed until migrations 004 and 005 are
-applied. There is still no desktop sync queue, no automatic upload, no device registration and no
-account generation, and real copies have no physical cleanup command.**
+applied. A durable upload queue now exists in the desktop main process: it assigns the monotonic
+revision, keeps the exact accepted document, retries a bounded number of times and survives a
+restart. Nothing calls it yet, so there is still no sender, no upload consent, no Settings toggle,
+no automatic upload, no device registration and no account generation, and real copies have no
+physical cleanup command.**
 Add an explicit Settings toggle. Installing, upgrading, signing in, or connecting Calendar must
 never enable sync, upload Meeting data, or replace the local MCP configuration automatically.
 Missing settings on existing installations mean OFF. Cloud access requires explicit consent.
