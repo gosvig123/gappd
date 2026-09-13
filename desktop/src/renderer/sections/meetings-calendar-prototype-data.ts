@@ -15,5 +15,5 @@ export function dateLabel(day: string) {
   return new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-export const variantNames = { A: 'Next + history', B: 'Upcoming / Past', C: 'One list' }
+export const variantNames = { A: 'Reading workspace', B: 'Full page', C: 'Inline expansion' }
 export type Variant = keyof typeof variantNames

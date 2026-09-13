@@ -1,4 +1,4 @@
-/* Round 2: native Gappd type/palette, one reading column, fewer controls. */
+/* Next + history baseline. Round 3 varies the content surface, not the list. */
 .mc-prototype { height: 100dvh; display: grid; grid-template-columns: 176px minmax(0, 1fr); background: var(--color-card); color: var(--color-text); font: 14px/1.5 var(--font-ui); }
 .mc-prototype * { box-sizing: border-box; }
 .mc-prototype button, .mc-prototype input, .mc-prototype select, .mc-prototype textarea { font: inherit; color: inherit; }
@@ -22,10 +22,9 @@
 .mc-search input { min-width: 0; width: 100%; border: 0; background: transparent; }
 .mc-search svg { flex-shrink: 0; color: var(--color-text-muted); }
 .mc-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; align-items: start; }
-.mc-workspace.mc-has-detail { grid-template-columns: minmax(0, 1fr) minmax(260px, 320px); }
 .mc-results { min-width: 0; }
 .mc-group { margin-bottom: 28px; }
-.mc-group h2, .mc-next h2 { font-size: 14px; color: var(--color-text-soft); font-weight: 500; margin: 0 0 10px; }
+.mc-group > h2, .mc-next > h2 { font-size: 14px; color: var(--color-text-soft); font-weight: 500; margin: 0 0 10px; }
 .mc-prototype .mc-entry { display: flex; gap: 14px; align-items: center; width: 100%; padding: 15px 10px; border-radius: 0; border-width: 0 0 1px; text-align: left; }
 .mc-entry[aria-pressed="true"] { background: var(--color-accent-tint); box-shadow: inset 3px 0 var(--color-accent); }
 .mc-entry svg { flex-shrink: 0; color: var(--color-text-muted); }
@@ -36,26 +35,11 @@
 .mc-planned { color: var(--color-accent); }
 .mc-recorded { color: var(--color-secure); }
 .mc-next { padding: 18px 20px; border: 1px solid var(--color-border); border-radius: 10px; margin-bottom: 32px; }
-.mc-next > .mc-entry { border: 0; padding-inline: 0; }
-.mc-next > .mc-entry .mc-entry-copy strong { font-size: 20px; }
+.mc-next > .mc-entry-wrap > .mc-entry { border: 0; padding-inline: 0; }
+.mc-next > .mc-entry-wrap > .mc-entry .mc-entry-copy strong { font-size: 20px; }
 .mc-more { margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 12px; }
 .mc-more summary { cursor: pointer; font-size: 12px; color: var(--color-text-muted); }
-.mc-period { display: flex; gap: 24px; margin-bottom: 14px; border-bottom: 1px solid var(--color-border); }
-.mc-period button { border: 0; border-radius: 0; padding: 10px 0; border-bottom: 2px solid transparent; }
-.mc-period button[aria-pressed="true"] { border-bottom-color: var(--color-accent); color: var(--color-accent); }
-.mc-past-divider { display: flex; gap: 16px; align-items: center; color: var(--color-text-muted); font-size: 12px; padding: 28px 0 12px; }
-.mc-past-divider::after { content: ''; height: 1px; background: var(--color-border); flex: 1; }
-.mc-detail { min-width: 0; padding: 22px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; }
-.mc-detail header { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-soft); }
-.mc-detail header button { border: 0; font-size: 22px; padding: 0 6px; }
-.mc-detail h2 { font-size: 22px; line-height: 1.3; margin: 16px 0 8px; }
-.mc-detail h3 { font-size: 14px; margin: 24px 0 8px; }
-.mc-detail p { color: var(--color-text-soft); overflow-wrap: anywhere; }
-.mc-agenda-label { display: grid; gap: 10px; margin-top: 24px; }
-.mc-agenda-label textarea { width: 100%; min-height: 140px; resize: vertical; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 7px; padding: 12px; }
-.mc-transcript { font-family: var(--font-reading); font-size: 17px; line-height: 1.5; }
-.mc-prototype .mc-primary { background: var(--color-accent-tint); border-color: var(--color-accent); color: var(--color-accent); width: 100%; }
-.mc-muted, .mc-detail .mc-muted { color: var(--color-text-muted); font-size: 12px; }
+.mc-muted { color: var(--color-text-muted); font-size: 12px; }
 .mc-empty { padding: 22px 0; color: var(--color-text-muted); }
 .mc-empty h2 { color: var(--color-text); font-size: 20px; }
 .mc-state { margin-top: 40px; color: var(--color-text-muted); font-size: 12px; }
@@ -67,10 +51,6 @@
 .mc-switcher span { white-space: nowrap; text-align: center; }
 .mc-switcher small { display: block; font-size: 10px; }
 .mc-switcher button { color: inherit; border: 0; font-size: 20px; }
-@container merged-meetings (max-width: 940px) {
-  .mc-workspace.mc-has-detail { grid-template-columns: minmax(0, 1fr); }
-  .mc-detail { grid-row: 1; }
-}
 @container merged-meetings (max-width: 440px) {
   .mc-entry { flex-wrap: wrap; gap: 8px; }
   .mc-entry-copy { flex-basis: 75%; }

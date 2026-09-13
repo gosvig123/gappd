@@ -1,10 +1,8 @@
-# Combined Meetings and Calendar: round 2
+# Combined Meetings and Calendar: round 3
 
-Question: can a simpler combined Meetings section keep preparation and recorded
-history together without treating Calendar events as recordings?
-
-The user liked the combined direction but asked for three simpler ideas. No design
-is selected. Round 1 is preserved at commit `39bc3c8` on this prototype branch.
+The user selected round 2's A, **Next + history**, as the baseline. This round asks
+how Agenda planning and recorded Meeting content can get enough space to use.
+The list stays the same in all three variants. No content layout is selected yet.
 
 ## Run
 
@@ -12,42 +10,44 @@ is selected. Round 1 is preserved at commit `39bc3c8` on this prototype branch.
 npm --prefix desktop run prototype:meetings-calendar
 ```
 
-Open http://127.0.0.1:5175/?variant=A. Use the bottom arrows or Left/Right:
+Open http://127.0.0.1:5175/?variant=A. An Agenda opens initially. Use the bottom
+arrows or Left/Right to compare the same content in each layout:
 
-- **A — Next + history:** one upcoming event above history; expand the remaining
-  upcoming events only when needed.
-- **B — Upcoming / Past:** two choices, one list at a time. Search covers both.
-- **C — One list:** all items visible, with one divider before past items.
+- **A — Reading workspace:** compact Next + history navigation beside a wide
+  content area. On narrow windows, content temporarily replaces the list.
+- **B — Full page:** content replaces the main list. Back to Meetings returns to
+  the baseline. The editor uses a comfortable reading width inside the full page.
+- **C — Inline expansion:** the selected row expands into a full-width editor,
+  with the rest of Next + history still above and below it.
 
-Removed the calendar account strip, microphone toolbar, four filter buttons,
-date selector, repeated row descriptions, people metadata, counts, and action
-arrows. Rows show a title, date/time, and plain-text state. Open a row for people,
-Agenda topics, a summary, or the demo recording action. The demo scenario selector
-and full state now sit in a disclosure below the content, not in the app header.
+## Interactions
 
-## Try
+- Add, edit, and remove Agenda topics; write Preparation notes.
+- Close content and choose a recorded Meeting from History. Switch between its
+  Summary, Transcript, and editable Notes.
+- Variant switches preserve topics, notes, selection, and the active content tab.
+- Start and stop a demo recording. The planned row becomes recorded without a
+  duplicate. Planning topics and preparation notes remain in demo state.
+- Demo controls & state below the list shows all state. Choose a disconnected
+  Calendar or first-use scenario; this explicitly resets demo edits.
 
-- Search a title, person, or Agenda topic across all items.
-- Open a planned event, edit topics, then start and stop a demo recording.
-  The same row becomes recorded; no duplicate is added.
-- Open Demo controls & state. Choose No Calendar connection: three recorded
-  Meetings and one Saved Agenda draft remain. First use shows an empty state.
-- Resize the window. Detail panels stack above results when space is narrow.
+The selected content receives focus and opens at its top. Close/Back returns focus
+to the corresponding row where available. Inputs keep normal Left/Right behavior.
+Wide editing fields resize vertically; content scrolls with the window.
 
-Scenario changes reset demo state. All data is fictional, with a fixed clock of
-14 September 2026 at 09:50. Changes stay in memory. No audio, AI processing,
-OAuth, Calendar writes, real search index, or persistence is called. Unrelated
-sidebar navigation is disabled. Calendar remains read-only.
+## Scope and evidence
 
-The renderer's existing URL hosts a development-only preview before App mounts.
-Without `variant`, the normal app mounts. Production removes the preview import.
-Keep alternatives on `prototype/meetings-calendar`; implement a chosen design
-separately on `beta`, not by merging this throwaway code.
+All data and summary/transcript/context text are illustrative. No audio, AI,
+Calendar writes, OAuth, or persistence is called. The normal app still mounts
+without `variant`; production excludes the development-only preview.
 
-## Validation
+TypeScript, renderer build, and all 225 desktop tests passed. Browser checks covered
+320×568, 600×400, and 1440×900 with no horizontal overflow. At 1440 px, the initial
+A editor measured 818 px wide (previous round capped details at 320 px). B and C
+use the main content width. Checked topic addition, topic and note retention
+across all variants, recorded Meeting notes, five-turn transcript, and visible
+Close/Back controls. Screenshots reviewed in all three layouts.
 
-TypeScript, renderer build, and 225 desktop tests passed. Browser checks found no
-horizontal overflow in A/B/C, with and without details, at 320×568, 600×400, and
-1440×900. Checked upcoming expansion, Upcoming/Past switching, search across both
-periods, editable draft access, demo start/stop without duplication, and retained
-recordings/drafts when disconnected. No new domain knowledge was introduced.
+Keep this on `prototype/meetings-calendar`; do not merge throwaway code into beta.
+Earlier rounds remain at `39bc3c8` (round 1) and `574fda8` (round 2 and its selected
+A baseline). No domain-model change is implied and CONTEXT.md is unchanged.

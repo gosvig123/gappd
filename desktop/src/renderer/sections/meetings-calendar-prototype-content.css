@@ -1,0 +1,66 @@
+/* Content gets the majority of the width, with a comfortable reading measure. */
+.mc-workspace.mc-mode-A.mc-has-detail { grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); gap: 24px; }
+.mc-mode-A.mc-has-detail .mc-results { max-height: calc(100dvh - 260px); min-height: 180px; overflow: auto; padding-right: 8px; position: sticky; top: 0; }
+.mc-mode-A.mc-has-detail .mc-next { padding: 12px; }
+.mc-mode-A.mc-has-detail .mc-entry { flex-wrap: wrap; gap: 8px; }
+.mc-mode-A.mc-has-detail .mc-entry-copy { flex-basis: 70%; }
+.mc-mode-A.mc-has-detail .mc-kind { margin-left: 25px; font-size: 11px; }
+.mc-mode-A.mc-has-detail .mc-next .mc-entry-copy strong { font-size: 15px; }
+.mc-workspace.mc-mode-B { display: block; }
+.mc-focus-page > .mc-head, .mc-focus-page > .mc-controls { display: none; }
+.mc-mode-C .mc-document { margin: 16px 0 28px; }
+.mc-mode-C .mc-next:has(.mc-document) { padding: 0; border: 0; }
+.mc-document { min-width: 0; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow-wrap: anywhere; container: meeting-document / inline-size; }
+.mc-document:focus { outline: none; }
+.mc-document:focus-visible { outline: none; }
+.mc-document-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 24px; border-bottom: 1px solid var(--color-border); }
+.mc-document-toolbar span { font-size: 11px; color: var(--color-text-muted); }
+.mc-document-head { max-width: 960px; margin-inline: auto; padding: clamp(20px, 4cqi, 44px) clamp(20px, 5cqi, 56px) 26px; }
+.mc-document-head p { font-size: 12px; color: var(--color-accent); margin: 0 0 12px; }
+.mc-document-head h2 { margin: 0 0 14px; font-size: clamp(24px, 4cqi, 36px); line-height: 1.2; font-weight: 600; letter-spacing: -.5px; }
+.mc-document-head > span { font-size: 13px; color: var(--color-text-muted); }
+.mc-document-body { max-width: 960px; margin-inline: auto; padding: 12px clamp(20px, 5cqi, 56px) 40px; }
+.mc-document-body h3 { font-size: 17px; font-weight: 600; margin: 0 0 12px; }
+.mc-topic-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.mc-topic-heading span { color: var(--color-text-muted); font-size: 12px; }
+.mc-content-muted { font-size: 12px; color: var(--color-text-muted); }
+.mc-topics { display: grid; gap: 18px; margin: 26px 0 18px; }
+.mc-topic { display: flex; gap: 10px; align-items: flex-start; }
+.mc-topic label { display: grid; gap: 8px; flex: 1; min-width: 0; }
+.mc-topic label > span { font-size: 12px; color: var(--color-text-muted); }
+.mc-document textarea { display: block; width: 100%; min-width: 0; resize: vertical; color: var(--color-text); background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 14px 16px; line-height: 1.6; }
+.mc-topic textarea { min-height: 84px; }
+.mc-topic > button { margin-top: 28px; border: 0; color: var(--color-text-muted); }
+.mc-prototype .mc-add-topic { border-style: dashed; width: 100%; text-align: left; padding: 11px 16px; color: var(--color-accent); }
+.mc-writing { display: grid; gap: 12px; margin-top: 30px; }
+.mc-writing > span { font-size: 17px; font-weight: 600; }
+.mc-writing textarea { min-height: 240px; }
+.mc-context { margin-block: 26px; border-top: 1px solid var(--color-border); padding-top: 18px; font-size: 13px; color: var(--color-text-soft); }
+.mc-context summary { cursor: pointer; }
+.mc-context p { line-height: 1.7; }
+.mc-document-foot { padding: 18px 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; border-top: 1px solid var(--color-border); }
+.mc-document-foot span { color: var(--color-text-muted); font-size: 12px; }
+.mc-prototype .mc-record { border-color: var(--color-accent); background: var(--color-accent-tint); color: var(--color-accent); }
+.mc-content-tabs { display: flex; gap: 24px; padding-inline: clamp(20px, 5cqi, 56px); margin-bottom: 26px; border-bottom: 1px solid var(--color-border); }
+.mc-prototype .mc-content-tabs button { border: 0; border-radius: 0; padding: 10px 0; border-bottom: 2px solid transparent; }
+.mc-prototype .mc-content-tabs button[aria-pressed="true"] { color: var(--color-accent); border-bottom-color: var(--color-accent); }
+.mc-reading { max-width: 68ch; margin-inline: auto; line-height: 1.8; }
+.mc-reading > p, .mc-reading > ul { font-size: 16px; color: var(--color-text-soft); margin: 0 0 28px; }
+.mc-reading .mc-summary-lead { font-family: var(--font-reading); font-size: 23px; line-height: 1.55; color: var(--color-text); }
+.mc-turn { border-bottom: 1px solid var(--color-border); padding: 18px 0; }
+.mc-turn > div { display: flex; gap: 16px; align-items: center; font-size: 13px; }
+.mc-turn time { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.mc-turn p { font-family: var(--font-reading); font-size: 20px; line-height: 1.65; margin: 10px 0 0; }
+@container merged-meetings (max-width: 800px) {
+  .mc-workspace.mc-mode-A.mc-has-detail { grid-template-columns: minmax(0, 1fr); }
+  .mc-mode-A.mc-has-detail .mc-results { display: none; }
+}
+@container meeting-document (max-width: 440px) {
+  .mc-document-toolbar { padding: 12px; }
+  .mc-document-head { padding: 22px 16px; }
+  .mc-document-body { padding: 8px 16px 28px; }
+  .mc-content-tabs { gap: 18px; padding-inline: 16px; }
+  .mc-topic { gap: 2px; }
+  .mc-topic textarea { padding: 12px; }
+  .mc-document-foot { padding: 16px; }
+}
