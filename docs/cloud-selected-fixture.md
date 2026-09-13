@@ -4,8 +4,23 @@ Development only, OFF by default. Automatic sync and real Meeting uploads remain
 This slice reads a real local SQLite Meeting, previews its exact version-1 JSON bytes,
 then sends those retained bytes only after new one-use consent. It does not accept
 arbitrary Meeting documents. Migration 003 was applied privately on 2026-09-13;
-the old deletion marker and seeded fixture were verified intact. No live selected
-upload or deletion has been performed for this slice.
+the old deletion marker and seeded fixture were verified intact. The live selected
+upload and exact Pi readback passed that day. No selected-copy deletion was performed.
+
+## Live synthetic evidence (2026-09-13)
+
+The owner explicitly authorized automated execution of the test's consent steps.
+The isolated app used the real preview, one-use consent and upload IPC; no product
+consent check was bypassed. Commit `ca64391` was deployed after migration 003.
+
+- Local Meeting: `72619a1d-f713-4f46-a2b8-c74e568726b1`.
+- Accepted cloud Meeting: `11599d4d-d5f2-8320-8748-2142c5de3fec`.
+- Fixed expiry: `2026-10-13T17:54:18.924521Z`.
+- Pi `get_meeting` returned the exact title, transcript, summary and start time.
+- App OFF cleared preview/consent and disabled the test account. The cloud copy remains;
+  OFF does not delete it. The temporary server mutation capability was disabled afterward.
+
+This proves synthetic document transport, not authorization for real Meeting data.
 
 ## Explicit isolated local setup
 
