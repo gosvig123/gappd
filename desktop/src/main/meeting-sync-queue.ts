@@ -22,14 +22,20 @@ export class MeetingSyncQueue {
     this.clock = clock
   }
 
-  /** Queues one document for upload and returns its assigned entry. */
-  enqueue(localId: string, document: string): Promise<MeetingSyncEntry> {
+  /**
+   * Queues one Meeting and returns its assigned entry. The loader receives the revision, so
+   * the document always carries the revision the queue will send it with. A loader failure
+   * queues nothing.
+   */
+  enqueue(localId: string, load: (revision: number) => Promise<string>): Promise<MeetingSyncEntry> {
     return this.serialize(async () => {
-      const state = await this.load()
-      if (typeof localId !== 'string' || localId.length === 0 || typeof document !== 'string' || document.length === 0) {
-        throw new Error('A Meeting and its document are required.')
+      if (typeof localId !== 'string' || localId.length === 0 || typeof load !== 'function') {
+        throw new Error('A Meeting and a document loader are required.')
       }
+      const state = await this.load()
       const revision = nextRevision(state, localId)
+      const document = await load(revision)
+      if (typeof document !== 'string' || document.length === 0) throw new Error('The Meeting document is unavailable.')
       state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null }
       await this.persist(state)
       return entryOf(localId, state)
@@ -71,6 +77,22 @@ export class MeetingSyncQueue {
       stored.updatedAt = this.timestamp()
       stored.error = message
       if (stored.attempts >= MAX_SYNC_ATTEMPTS) stored.state = 'failed'
+      await this.persist(state)
+    })
+  }
+
+  /**
+   * Marks one revision as permanently unacceptable. A document the server refuses for its
+   * own content will never become acceptable, so it must not consume retries.
+   */
+  reject(localId: string, revision: number, message: string): Promise<void> {
+    return this.serialize(async () => {
+      const state = await this.load()
+      const stored = state.entries[localId]
+      if (!stored || stored.revision !== revision || stored.state === 'failed') return
+      stored.state = 'failed'
+      stored.error = message
+      stored.updatedAt = this.timestamp()
       await this.persist(state)
     })
   }

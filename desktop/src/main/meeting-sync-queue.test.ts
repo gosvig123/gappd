@@ -30,8 +30,8 @@ function queue(clock?: () => Date) {
 
 test('enqueue assigns increasing revisions and replaces the older pending copy', async () => {
   const { queue: sync } = queue()
-  assert.equal((await sync.enqueue(MEETING, '{"version":1,"revision":1}')).revision, 1)
-  const second = await sync.enqueue(MEETING, '{"version":1,"revision":2}')
+  assert.equal((await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')).revision, 1)
+  const second = await sync.enqueue(MEETING, async () => '{"version":1,"revision":2}')
   assert.equal(second.revision, 2)
   const status = await sync.status()
   assert.equal(status.entries.length, 1)
@@ -41,18 +41,18 @@ test('enqueue assigns increasing revisions and replaces the older pending copy',
 
 test('a queued revision never repeats, even after the entry is accepted', async () => {
   const { queue: sync } = queue()
-  const first = await sync.enqueue(MEETING, 'first')
+  const first = await sync.enqueue(MEETING, async () => 'first')
   await sync.succeed(MEETING, first.revision)
   assert.equal((await sync.status()).entries.length, 0)
-  const again = await sync.enqueue(MEETING, 'second')
+  const again = await sync.enqueue(MEETING, async () => 'second')
   assert.equal(again.revision, 2)
   assert.equal(await sync.pending().then((work) => work?.document), 'second')
 })
 
 test('a late acknowledgment cannot delete newer pending work', async () => {
   const { queue: sync } = queue()
-  const first = await sync.enqueue(MEETING, 'first')
-  await sync.enqueue(MEETING, 'second')
+  const first = await sync.enqueue(MEETING, async () => 'first')
+  await sync.enqueue(MEETING, async () => 'second')
   await sync.succeed(MEETING, first.revision)
   assert.equal((await sync.pending())?.document, 'second')
   assert.equal((await sync.status()).entries[0].revision, 2)
@@ -60,7 +60,7 @@ test('a late acknowledgment cannot delete newer pending work', async () => {
 
 test('retry attempts are bounded and then reported as failed', async () => {
   const { queue: sync } = queue()
-  const entry = await sync.enqueue(MEETING, 'document')
+  const entry = await sync.enqueue(MEETING, async () => 'document')
   for (let attempt = 1; attempt <= 4; attempt++) {
     await sync.fail(MEETING, entry.revision, 'no acknowledgment')
   }
@@ -75,8 +75,8 @@ test('retry attempts are bounded and then reported as failed', async () => {
 
 test('a failure for a superseded revision is ignored', async () => {
   const { queue: sync } = queue()
-  const first = await sync.enqueue(MEETING, 'first')
-  await sync.enqueue(MEETING, 'second')
+  const first = await sync.enqueue(MEETING, async () => 'first')
+  await sync.enqueue(MEETING, async () => 'second')
   await sync.fail(MEETING, first.revision, 'late failure')
   const entry = (await sync.status()).entries[0]
   assert.equal(entry.revision, 2)
@@ -86,8 +86,8 @@ test('a failure for a superseded revision is ignored', async () => {
 
 test('queued work survives a restart and drains one Meeting at a time', async () => {
   const { store, queue: sync } = queue()
-  await sync.enqueue(MEETING, 'durable')
-  await sync.enqueue(OTHER, 'other')
+  await sync.enqueue(MEETING, async () => 'durable')
+  await sync.enqueue(OTHER, async () => 'other')
   const restarted = new MeetingSyncQueue(store)
   assert.equal((await restarted.status()).pending, 2)
   // Sorted local ids, so the first Meeting cannot starve the second.
@@ -95,20 +95,48 @@ test('queued work survives a restart and drains one Meeting at a time', async ()
   assert.equal(first?.localId, OTHER)
   await restarted.succeed(OTHER, first!.revision)
   assert.equal((await restarted.pending())?.document, 'durable')
-  const next = await restarted.enqueue(MEETING, 'newer')
+  const next = await restarted.enqueue(MEETING, async () => 'newer')
   assert.equal(next.revision, 2)
 })
 
 test('an invalid argument is refused and queues nothing', async () => {
   const { queue: sync } = queue()
-  await assert.rejects(sync.enqueue('', 'document'))
-  await assert.rejects(sync.enqueue(MEETING, ''))
+  await assert.rejects(sync.enqueue('', async () => 'document'))
+  await assert.rejects(sync.enqueue(MEETING, async () => ''))
   assert.equal((await sync.status()).entries.length, 0)
+})
+
+test('the loader receives the revision the queue will send', async () => {
+  const { queue: sync } = queue()
+  const seen: number[] = []
+  const entry = await sync.enqueue(MEETING, async (revision) => { seen.push(revision); return 'document' })
+  assert.deepEqual(seen, [entry.revision])
+  const second = await sync.enqueue(MEETING, async (revision) => { seen.push(revision); return 'newer' })
+  assert.deepEqual(seen, [1, second.revision])
+})
+
+test('a loader failure queues nothing', async () => {
+  const { queue: sync } = queue()
+  await assert.rejects(sync.enqueue(MEETING, async () => { throw new Error('Meeting document unavailable') }))
+  assert.equal((await sync.status()).entries.length, 0)
+})
+
+test('a rejected revision stops retrying immediately', async () => {
+  const { queue: sync } = queue()
+  const entry = await sync.enqueue(MEETING, async () => 'document')
+  await sync.reject(MEETING, entry.revision, 'The server refused this document.')
+  const status = await sync.status()
+  assert.equal(status.pending, 0)
+  assert.equal(status.failed, 1)
+  assert.equal(status.entries[0].attempts, 0)
+  assert.equal(status.entries[0].error, 'The server refused this document.')
+  await sync.reject(MEETING, entry.revision, 'late')
+  assert.equal((await sync.status()).entries[0].error, 'The server refused this document.')
 })
 
 test('a damaged or unsupported queue file is refused whole', async () => {
   const { store, queue: sync } = queue()
-  await sync.enqueue(MEETING, 'durable')
+  await sync.enqueue(MEETING, async () => 'durable')
   const damaged = { ...store.stored, version: 99 }
   store.stored = damaged as MeetingSyncDocument
   await assert.rejects(new MeetingSyncQueue(store).status())
@@ -118,7 +146,7 @@ test('a damaged or unsupported queue file is refused whole', async () => {
 
 test('status never returns document text', async () => {
   const { queue: sync } = queue()
-  await sync.enqueue(MEETING, 'secret transcript')
+  await sync.enqueue(MEETING, async () => 'secret transcript')
   const status = await sync.status()
   assert.equal(JSON.stringify(status).includes('secret transcript'), false)
   assert.equal(status.entries[0].localId, MEETING)
