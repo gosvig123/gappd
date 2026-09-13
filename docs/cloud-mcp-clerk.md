@@ -174,5 +174,7 @@ Trusted HTTPS userinfo verifies the account with the exact Bearer token used by 
 redirects are rejected. Main-process one-use consent binds that account/token and final action.
 OFF/account changes invalidate consent; expiry needs explicit reconnect. No startup network,
 automatic upload, backfill or local Meeting reads exist. Both capability flags default disabled.
-Live demo validation and actual signed Desktop client_id verification are parent-owned gates;
-never weaken the server's fail-closed client check to make a development login pass.
+Live demo login, new consent, server acceptance and Pi readback passed on 2026-09-13,
+including the strict signed Desktop client_id check. OFF removed isolated demo credentials;
+the app was closed and cloud capability disabled. No raw tokens were inspected or logged.
+Live second-account and ChatGPT checks remain deferred; real Meeting uploads remain gated.

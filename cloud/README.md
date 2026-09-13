@@ -5,9 +5,14 @@ synthetic demo transport creates fixed fabricated text only; no real Meeting acc
 audio, list, search, storage sync, or automatic seed exists.
 Private Railway migration, reader-role provisioning, and synthetic seed are complete.
 Independent review, Go 1.25.13 PostgreSQL 18 race tests, and Docker build passed.
-Railway deployed commit `7eb4058`; health, readiness, public metadata and unauthenticated
+Railway deployed commit `3ca92e2`; health, readiness, public metadata and unauthenticated
 401 checks passed. Pi live login and owned get_meeting passed. Live second-account
 and hosted ChatGPT checks are explicitly deferred, not validated.
+On 2026-09-13, user-completed desktop login, new one-use consent, demo acceptance and
+Pi readback passed for `eb811da9-bdb3-8bdd-befd-ccdfecb5acd6`. The server accepted the
+signed Desktop client_id/sync scope. Consent reset; OFF removed isolated demo credentials.
+The test app was closed and the cloud capability disabled (POST now returns 404).
+This proves fixed synthetic creation, not actual Meeting-document uploads.
 
 ## Runtime
 
