@@ -88,6 +88,20 @@ func TestMCP(t *testing.T) {
 	defer host.Close()
 	token := sign("user_synthetic")
 	session := connect(t, host.URL+"/mcp", &token)
+	assertTools(t, session)
+	callMeeting(t, session, service.DemoID, false)
+	callMeeting(t, session, "bad-id", true)
+	token = sign("user_other")
+	callMeeting(t, session, service.DemoID, true)
+	token = "invalid"
+	if _, err := session.ListTools(context.Background(), nil); err == nil {
+		t.Fatal("request reused prior identity")
+	}
+	checkPayload(t, host.URL, sign("user_synthetic"))
+}
+
+func assertTools(t *testing.T, session *mcp.ClientSession) {
+	t.Helper()
 	tools, err := session.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -99,15 +113,6 @@ func TestMCP(t *testing.T) {
 	if strings.Join(names, ",") != "get_meeting,list_meetings,search_meetings" {
 		t.Fatalf("tools: %v", names)
 	}
-	callMeeting(t, session, service.DemoID, false)
-	callMeeting(t, session, "bad-id", true)
-	token = sign("user_other")
-	callMeeting(t, session, service.DemoID, true)
-	token = "invalid"
-	if _, err = session.ListTools(context.Background(), nil); err == nil {
-		t.Fatal("request reused prior identity")
-	}
-	checkPayload(t, host.URL, sign("user_synthetic"))
 }
 
 func callMeeting(t *testing.T, s *mcp.ClientSession, id string, wantError bool) {
