@@ -17,6 +17,6 @@ const electronCipher: StoreCipher = {
   },
 }
 
-function requireEncryption(): void {
+export function requireEncryption(): void {
   if (!safeStorage.isEncryptionAvailable()) throw new Error('macOS secure storage is unavailable. Unlock this Mac and try again.')
 }

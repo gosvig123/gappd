@@ -2,10 +2,10 @@
 
 ## Status
 
-Clerk development configuration is prepared. No cloud backend or device registration has
-been implemented, no login flow has been completed here, and no real Meeting data was uploaded.
-The existing local MCP remains the default. Cloud sync remains an OFF-by-default feature to
-implement behind an explicit Settings toggle. Signing in must never turn it on.
+Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.
+Automated tests and a user-completed live development Settings login passed on 2026-09-13.
+No cloud backend, upload, device registration, or remote MCP is implemented.
+The existing local MCP remains the default. No Meetings are uploaded.
 
 This extends [the cloud MCP handover](cloud-mcp-handover.md). Reuse the existing Clerk
 application; do not create a second Gappd identity system or reuse Google Calendar credentials.
@@ -57,14 +57,52 @@ to Clerk DEVELOPMENT; it must not accept production users or Meeting data in thi
 No Clerk secret key was copied into Railway or Git. JWT signature verification can use the
 public signing-key endpoint; administrative operations may need separately provisioned keys.
 
-## Required implementation
+## Implemented authentication-only preview
+
+- Explicit development issuer/client in `service-config.ts`; no production fallback or secret.
+- ON opens the system browser with public-client authorization code + S256 PKCE and only
+  `email profile`. No `meetings:sync`, `offline_access`, resource or upload grant is requested.
+- Loopback checks state, duplicate parameters and Clerk issuer before code exchange; errors
+  are safe local messages. Trusted HTTPS `/oauth/userinfo` must return subject and verified email.
+- Only successful account verification and protected persistence enable the preview. Renderer
+  receives account/status only. Tokens never enter preferences, renderer, or logs.
+- Credentials use Electron safeStorage in a separate `cloud-auth-development.enc` file.
+  Secure storage failure blocks login before opening the browser; there is no plaintext fallback.
+- OFF/cancel invalidates pending login, closes the loopback listener, aborts network requests,
+  and serializes credential deletion after any in-flight write. It touches no Calendar data.
+- Startup reads local protected credentials only, never opens a browser or calls cloud services.
+  Expired credentials require explicit reconnect; no refresh token is retained or automatically
+  used. Cached identity is not a promise of live Clerk session validity or immediate revocation.
+- OFF removes local credentials, not the Clerk browser session or server-side OAuth grant.
+  The next login shows consent and the verified account; use Clerk's browser account switch
+  if needed. No account is inferred from a Google Calendar connection.
+- Authentication consent is NOT future upload consent. A later sync feature MUST ask again,
+  including separate historical Meeting consent; it cannot upgrade this state into upload rights.
+- Clerk's official CLI guide documents accepting dynamic native loopback ports with the exact
+  registered `http://127.0.0.1/callback`. No redirect allowlist changes were made here.
+  Source: https://clerk.com/blog/adding-clerk-auth-to-your-cli . The live development flow passed.
+
+## Live Settings smoke test
+
+Run `cd desktop && npm run dev` (or `npm run dev:start` if native artifacts are prepared).
+Do not install/replace app binaries or alter existing user credentials. Use a coordinated test
+profile when isolation is needed. Open Settings → Connections, verify OFF and preview copy,
+then explicitly turn ON. The user owns browser sign-in/password/2FA. Confirm displayed subject
+and verified email, restart without a browser launch, and test OFF/cancel and denied consent.
+Do not print OAuth codes or tokens, browser callback URLs, or decrypted store contents.
+Live development checks passed: real callback/token/userinfo acceptance, protected credential
+persistence through restart without browser launch, OFF removal, recovery after a simulated
+filesystem deletion failure, and pending-status refresh after closing/reopening Settings.
+The isolated profile ended OFF with its credential file removed. Production remains a gate.
+For isolated tests, keep the Electron process HOME unchanged so macOS secure storage works;
+isolate Electron userData and pass a separate HOME to backend subprocesses instead.
+
+## Remaining implementation
 
 1. Reuse `desktop/src/main/oauth.ts` for PKCE and token exchange where its contracts fit.
-   It currently allocates a random loopback port. Clerk lists an exact redirect URI without
-   a port; prove Clerk's native loopback-port matching behavior before reusing this callback.
-   If unsupported, choose and register a safe callback strategy. Do not add wildcard redirects
-   or claim the current desktop flow works without completing an actual authorization test.
-2. After explicit sync consent, request `meetings:sync` and the intended upload API resource.
+   Dynamic loopback ports follow Clerk's documented native-client contract above.
+   Development end-to-end sign-in passed; repeat against the production instance before release.
+2. Only in a future sync implementation, after NEW explicit upload consent, request `meetings:sync` and the intended upload API resource.
    Bind the authenticated account and approved desktop client to a device registration.
    Store credentials with macOS-protected storage; a supplied device ID is not authentication.
 3. Validate OAuth access tokens, not ID tokens: signature, issuer, expiration, intended audience,
@@ -93,7 +131,9 @@ public signing-key endpoint; administrative operations may need separately provi
   and public DCR disabled.
 - Fetched live OAuth metadata: expected issuer, S256 support, authorization-code and refresh
   grants, meetings:read advertised, meetings:sync absent, registration endpoint absent.
-- This verifies configuration, NOT a successful token exchange, device upload, or MCP request.
+- Live Settings login verified token exchange and verified account display. The encrypted file
+  was owner-only (0600); OFF removed it. All 258 desktop tests, typecheck, and builds passed.
+- No device upload or remote MCP request is implemented or claimed. No Meetings were uploaded.
 - Application-wide PKCE enforcement affects future logins for every OAuth client in this
   development instance. Only the existing public Gappd Desktop client was listed during setup.
 

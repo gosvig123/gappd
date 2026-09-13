@@ -2,7 +2,8 @@
 
 ## Status and approved scope
 
-This is an approved direction, not an implemented feature. Infrastructure is reserved below.
+The desktop now implements a development auth-only preview. Cloud sync and remote MCP
+remain approved directions, not implemented features. Infrastructure is reserved below.
 Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
 Client compatibility must be proved with real authorization and tool calls, not assumed.
 
@@ -13,8 +14,11 @@ Missing settings on existing installations mean OFF. Cloud access requires expli
 Local recording, transcription, history, settings, and local MCP must remain usable offline
 and without a Gappd identity. Remote MCP is an additional connection that users choose.
 
-This task provisions resources and records the handover only. It does not implement sync,
-a cloud API, authentication, a database schema, or a public MCP endpoint.
+Settings → Connections → Cloud sync defaults OFF and opens Clerk only after explicit ON.
+Only a verified account and protected credentials enable the auth-only preview. No Meetings
+are uploaded. No cloud API, sync, schema, device registration, or public MCP is implemented.
+This preview consent is authentication only: a future upgrade MUST ask for new explicit upload
+consent. It must never interpret this credential or enabled state as upload permission.
 
 ## Proposed architecture
 
@@ -37,7 +41,8 @@ automatic backups, or recovery. Configure and test those operational controls be
 
 ## Settings and consent contract
 
-- Suggested toggle: "Sync Meetings to Gappd Cloud"; default OFF on every installation.
+- Current toggle: "Cloud sync", labelled development auth-only preview; default OFF.
+- The remaining bullets describe future sync gates, not behavior enabled by this preview.
 - Explain that uploaded text becomes available to explicitly authorized AI clients.
 - Enabling requires a Gappd identity and consent; a Google Calendar connection is unrelated.
 - Ask separately whether to include existing Meetings; do not silently backfill history.

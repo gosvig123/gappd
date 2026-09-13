@@ -1,3 +1,7 @@
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { requestTokens } from './oauth-tokens.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+export { parseTokenResponse } from './oauth-tokens.ts'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 
@@ -25,6 +29,7 @@ export type OAuthConfig = {
   scopes: string[]
   callbackPath: '' | `/${string}`
   authorizeParams?: Record<string, string>
+  issuer?: string
 }
 
 export type OAuthDependencies = {
@@ -32,12 +37,13 @@ export type OAuthDependencies = {
   fetcher?: typeof fetch
   now?: () => number
   timeoutMs?: number
+  signal?: AbortSignal
   tokenRequester?: OAuthTokenRequester
 }
 
 type Loopback = { redirectUri: string; code: Promise<string>; close: () => void }
 
-export type LoopbackOptions = { timeoutMs?: number; callbackHost?: string; callbackPort?: number }
+export type LoopbackOptions = { timeoutMs?: number; callbackHost?: string; callbackPort?: number; issuer?: string }
 type Completion = { resolve: (code: string) => void; reject: (error: Error) => void; done: boolean }
 
 export function createPkce(): { verifier: string; challenge: string; state: string } {
@@ -54,17 +60,21 @@ export function buildAuthorizationUrl(config: OAuthConfig, redirectUri: string, 
 }
 
 export async function authorizeOAuth(config: OAuthConfig, dependencies: OAuthDependencies): Promise<OAuthTokenSet> {
+  dependencies.signal?.throwIfAborted()
   validateConfig(config)
   const pkce = createPkce()
-  const loopback = await startLoopback(config.callbackPath, pkce.state, { timeoutMs: dependencies.timeoutMs })
+  const loopback = await startLoopback(config.callbackPath, pkce.state, { timeoutMs: dependencies.timeoutMs, issuer: config.issuer })
   void loopback.code.catch(() => undefined)
+  const abort = () => loopback.close()
+  dependencies.signal?.addEventListener('abort', abort, { once: true })
   try {
+    dependencies.signal?.throwIfAborted()
     await dependencies.openExternal(buildAuthorizationUrl(config, loopback.redirectUri, pkce.challenge, pkce.state))
     const code = await loopback.code
     const request: OAuthTokenRequest = { grantType: 'authorization_code', code, redirectUri: loopback.redirectUri, codeVerifier: pkce.verifier }
     if (dependencies.tokenRequester) return dependencies.tokenRequester(request)
     return exchangeCode(config, code, loopback.redirectUri, pkce.verifier, dependencies.fetcher, dependencies.now)
-  } finally { loopback.close() }
+  } finally { dependencies.signal?.removeEventListener('abort', abort); loopback.close() }
 }
 
 export async function refreshOAuthToken(config: OAuthConfig, tokens: OAuthTokenSet, fetcher: typeof fetch = fetch, now: () => number = Date.now, tokenRequester?: OAuthTokenRequester): Promise<OAuthTokenSet> {
@@ -85,62 +95,31 @@ async function exchangeCode(config: OAuthConfig, code: string, redirectUri: stri
   return requestTokens(config.tokenUrl, body, fetcher, now)
 }
 
-async function requestTokens(url: string, body: URLSearchParams, fetcher: typeof fetch, now: () => number): Promise<OAuthTokenSet> {
-  const response = await fetcher(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
-  if (!response.ok) throw await tokenResponseError(response)
-  const value = await response.json() as Record<string, unknown>
-  return parseTokenResponse(value, now())
-}
-
-async function tokenResponseError(response: Response): Promise<Error> {
-  const payload = await response.clone().json().catch(() => null) as Record<string, unknown> | null
-  const code = payload ? safeProviderCode(payload.error) : null
-  const hint = payload ? providerErrorHint(payload.error_description) : null
-  const detail = [code, hint].filter(Boolean).join('/')
-  return new Error(`Authorization token request failed (${response.status}${detail ? `: ${detail}` : ''}).`)
-}
-
-function safeProviderCode(value: unknown): string | null {
-  return typeof value === 'string' && /^[a-z_]{1,60}$/.test(value) ? value : null
-}
-
-function providerErrorHint(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const description = value.toLowerCase()
-  if (description.includes('code_verifier')) return 'code_verifier'
-  if (description.includes('client_secret')) return 'client_secret'
-  if (description.includes('redirect_uri')) return 'redirect_uri'
-  return null
-}
-
-export function parseTokenResponse(value: Record<string, unknown>, now: number): OAuthTokenSet {
-  if (typeof value.access_token !== 'string') throw new Error('Authorization server returned an invalid token response.')
-  const expiresIn = typeof value.expires_in === 'number' ? value.expires_in : 3600
-  return { accessToken: value.access_token, refreshToken: optionalString(value.refresh_token), expiresAt: now + expiresIn * 1000, tokenType: optionalString(value.token_type) || 'Bearer', scope: optionalString(value.scope) }
-}
-
 export async function startLoopback(callbackPath: string, state: string, options: LoopbackOptions = {}): Promise<Loopback> {
   const server = createServer()
   await listen(server, options.callbackPort || 0)
   const port = serverAddressPort(server)
   const completion = createCompletion()
   const expectedHost = `${options.callbackHost || LOOPBACK_HOST}:${port}`
-  server.on('request', (request, response) => handleCallback(request, response, callbackPath, expectedHost, state, completion))
+  server.on('request', (request, response) => handleCallback(request, response, callbackPath, expectedHost, state, completion, options.issuer))
   const timer = setTimeout(() => rejectCompletion(completion, new Error('Authorization timed out.')), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-  const close = () => { clearTimeout(timer); server.close() }
+  const close = () => { clearTimeout(timer); rejectCompletion(completion, new Error('Authorization cancelled.')); server.close() }
   return { redirectUri: `http://${expectedHost}${callbackPath}`, code: completion.promise, close }
 }
 
-function handleCallback(request: IncomingMessage, response: ServerResponse, path: string, host: string, state: string, completion: Completion & { promise: Promise<string> }): void {
+function handleCallback(request: IncomingMessage, response: ServerResponse, path: string, host: string, state: string, completion: Completion & { promise: Promise<string> }, issuer?: string): void {
   if (request.method !== 'GET') return respond(response, 405, 'Method not allowed')
   if (request.headers.host !== host) return respond(response, 400, 'Invalid callback host')
-  const url = new URL(request.url || '/', `http://${host}`)
+  let url: URL
+  try { url = new URL(request.url || '/', `http://${host}`) }
+  catch { return respond(response, 400, 'Invalid callback URL') }
   if (url.pathname !== (path || '/')) return respond(response, 404, 'Not found')
-  const error = url.searchParams.get('error')
-  if (error) return finishError(response, completion, `Authorization was not completed (${error}).`)
   if (!safeEqual(url.searchParams.get('state') || '', state)) return finishError(response, completion, 'Authorization state did not match.')
+  if (['state', 'code', 'error', 'iss'].some(key => url.searchParams.getAll(key).length > 1)) return finishError(response, completion, 'Invalid authorization callback.')
+  if (issuer && url.searchParams.get('iss') !== issuer) return finishError(response, completion, 'Authorization issuer did not match.')
+  if (url.searchParams.has('error')) return finishError(response, completion, 'Authorization was not completed. Try again.')
   const code = url.searchParams.get('code')
-  if (!code) return finishError(response, completion, 'Authorization code was missing.')
+  if (!code || code.length > 4096 || /[\x00-\x20\x7f]/.test(code)) return finishError(response, completion, 'Authorization code was missing or invalid.')
   respond(response, 200, 'Authorization complete. You can return to Gappd.', () => resolveCompletion(completion, code))
 }
 
@@ -203,8 +182,4 @@ function safeEqual(value: string, expected: string): boolean {
 
 function base64Url(value: Buffer): string {
   return value.toString('base64url')
-}
-
-function optionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value ? value : undefined
 }

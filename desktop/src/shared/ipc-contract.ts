@@ -1,3 +1,4 @@
+import type { CloudAuthStatus } from './cloud-auth-contract'
 import type { MeetingAgendaDraft } from './meeting-agenda'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
@@ -22,6 +23,7 @@ export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
 export type IpcInvokeContract = {
+  cloudAuth: { status: OperationSpec<[], CloudAuthStatus>; setEnabled: OperationSpec<[enabled: boolean], CloudAuthStatus> }
   system: {
     getDevices: OperationSpec<[], Device[]>
     requestCapturePermissions: OperationSpec<[], CapturePermissions>
@@ -98,6 +100,7 @@ export type IpcInvokeApi = { [G in IpcOperationGroup]: { [N in IpcOperationName<
 type IpcOperationChannels = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: `${G}:${string}` } }
 
 export const IPC_OPERATIONS = {
+  cloudAuth: { status: 'cloudAuth:status', setEnabled: 'cloudAuth:setEnabled' },
   system: {
     getDevices: 'system:getDevices',
     requestCapturePermissions: 'system:requestCapturePermissions',

@@ -1,3 +1,4 @@
+import { CloudAuthPanel } from '../components/cloud-auth-panel'
 import '../components/local-ai.css'
 
 import { type ReactNode, useEffect, useState } from 'react'
@@ -39,7 +40,7 @@ export function SettingsView({ language, onLanguageChange, theme, onThemeChange,
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /></> },
     { label: 'Meeting processing', content: <><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
-    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /></> },
+    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /><CloudAuthPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
   return <SettingsLayout categories={categories} initialCategory={initialCategory} />

@@ -25,3 +25,8 @@ function buildGoogleClientId(): string {
 function buildSlackClientId(): string {
   return typeof __GAPPD_SLACK_OAUTH_CLIENT_ID__ === 'string' ? __GAPPD_SLACK_OAUTH_CLIENT_ID__.trim() : ''
 }
+
+/** Explicit development identity only. Production must supply a separately reviewed configuration. */
+export function cloudAuthDevelopmentConfig() {
+  return { issuer: 'https://learning-mutt-4805.clerk.accounts.dev', clientId: 'iFaeusoYBwClQRoP' }
+}

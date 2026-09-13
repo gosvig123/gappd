@@ -1,6 +1,7 @@
 import { generateMeetingAgenda } from './meeting-agenda'
-import os from 'node:os'
-import { BrowserWindow, ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { openPermissionsSettings } from './privacy-settings'
+import { cloudAuthStatus, setCloudAuthEnabled } from './cloud-auth-service'
+import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { LOCAL_AI_PROVIDER_LLAMACPP } from '../shared/managed-local-ai'
 import { requestCapturePermissions } from './capture-permissions'
@@ -18,17 +19,6 @@ import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
-
-const SYSTEM_SETTINGS_DARWIN_MAJOR = 22
-const LEGACY_PRIVACY_SECURITY_PANE = 'com.apple.preference.security'
-const MODERN_PRIVACY_SECURITY_PANE = 'com.apple.settings.PrivacySecurity.extension'
-const PRIVACY_MAIN_ANCHOR = 'Privacy'
-const PRIVACY_MICROPHONE_ANCHOR = 'Privacy_Microphone'
-const PRIVACY_SCREEN_CAPTURE_ANCHOR = 'Privacy_ScreenCapture'
-const PRIVACY_ANCHORS: Record<CapturePermissionTarget, string> = {
-  'microphone': PRIVACY_MICROPHONE_ANCHOR,
-  'screen-recording': PRIVACY_SCREEN_CAPTURE_ANCHOR,
-}
 
 type Awaitable<T> = T | Promise<T>
 type IpcHandler = Parameters<typeof ipcMain.handle>[1]
@@ -82,6 +72,7 @@ const IPC_HANDLERS: MainHandlers = {
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
+  cloudAuth: { status: () => cloudAuthStatus(), setEnabled: (_event, enabled) => setCloudAuthEnabled(enabled) },
   slack: {
     status: () => slackConnectionStatus(),
     connect: () => connectSlack(),
@@ -167,30 +158,6 @@ function operationNames<G extends IpcOperationGroup>(group: G): IpcOperationName
 function registerIpcGroup<G extends IpcOperationGroup>(group: G): void {
   const channels = IPC_OPERATIONS[group] as Record<IpcOperationName<G>, string>
   for (const name of operationNames(group)) ipcMain.handle(channels[name], IPC_HANDLERS[group][name] as IpcHandler)
-}
-
-function privacySettingsUrl(target?: CapturePermissionTarget): string {
-  const anchor = target ? PRIVACY_ANCHORS[target] : legacyPrivacyAnchor()
-  const suffix = anchor ? `?${anchor}` : ''
-  return `x-apple.systempreferences:${privacySecurityPane()}${suffix}`
-}
-
-function privacySecurityPane(): string {
-  return usesModernPrivacyPane() ? MODERN_PRIVACY_SECURITY_PANE : LEGACY_PRIVACY_SECURITY_PANE
-}
-
-function legacyPrivacyAnchor(): string {
-  return usesModernPrivacyPane() ? '' : PRIVACY_MAIN_ANCHOR
-}
-
-function usesModernPrivacyPane(): boolean {
-  if (process.platform !== 'darwin') return true
-  const darwinMajor = Number.parseInt(os.release().split('.')[0] ?? '', 10)
-  return Number.isNaN(darwinMajor) || darwinMajor >= SYSTEM_SETTINGS_DARWIN_MAJOR
-}
-
-async function openPermissionsSettings(target?: CapturePermissionTarget): Promise<void> {
-  await shell.openExternal(privacySettingsUrl(target), { activate: true })
 }
 
 function disposeWindowSubscriptions(mainWindow: BrowserWindow): void {
