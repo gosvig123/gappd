@@ -4,9 +4,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -o /server ./cmd/server && \
-    CGO_ENABLED=0 go build -trimpath -o /admin ./cmd/admin
+    CGO_ENABLED=0 go build -trimpath -o /admin ./cmd/admin && \
+    CGO_ENABLED=0 go build -trimpath -o /cleanup ./cmd/cleanup
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /server /server
 COPY --from=build /admin /admin
+COPY --from=build /cleanup /cleanup
 EXPOSE 8080
 ENTRYPOINT ["/server"]

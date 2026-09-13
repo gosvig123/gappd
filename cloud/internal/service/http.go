@@ -32,6 +32,7 @@ func HandlerWithDemo(a *Auth, pool, writer *pgxpool.Pool, clientID string) http.
 		uploadAuth := *a
 		uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", clientID
 		mux.Handle("POST /demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(demoHandler(writer))))
+        mux.Handle("DELETE /demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(demoHandler(writer))))
 	}
 	mux.Handle("/mcp", a.protect(http.NewCrossOriginProtection().Handler(meetingTransport(pool))))
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.metadata)

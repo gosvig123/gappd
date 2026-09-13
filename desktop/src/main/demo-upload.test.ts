@@ -8,7 +8,7 @@ import { DemoUpload } from './demo-upload.ts'
 const id = '11111111-1111-5111-8111-111111111111'
 const credential = (subject = 'user_a'): CloudCredential => ({ version: 1, issuer: 'https://issuer.test', clientId: 'desktop', subject, email: `${subject}@example.test`, tokens: { accessToken: `synthetic-${subject}`, expiresAt: Date.now() + 3600000, tokenType: 'Bearer' } })
 
-function harness(fetcher: typeof fetch = async () => Response.json({ id, status: 'accepted', subject: 'user_a' }), available = true) {
+function harness(fetcher: typeof fetch = async () => Response.json({ id, expires_at: '2026-10-13T12:00:00Z', status: 'accepted', subject: 'user_a' }), available = true) {
   let saved: CloudCredential | null = credential()
   let sends = 0
   const auth = {
@@ -43,7 +43,7 @@ test('final action sends empty POST exactly once and displays returned ID', asyn
     assert.equal(init?.method, 'POST'); assert.equal(init?.body, undefined)
     assert.equal(init?.redirect, 'error')
     assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer synthetic-user_a')
-    return Response.json({ id, status: 'accepted', subject: 'user_a' })
+    return Response.json({ id, expires_at: '2026-10-13T12:00:00Z', status: 'accepted', subject: 'user_a' })
   })
   await consent(h)
   const result = await h.demo.upload('user_a')
@@ -83,14 +83,14 @@ test('OFF after send reports uncertainty; stale acknowledgment cannot restore co
   const upload = h.demo.upload('user_a'); await started
   const off = await h.demo.connect(false)
   assert.match(off.result || '', /may already have accepted/)
-  release(Response.json({ id, status: 'accepted', subject: 'user_a' }))
+  release(Response.json({ id, expires_at: '2026-10-13T12:00:00Z', status: 'accepted', subject: 'user_a' }))
   const result = await upload
   assert.equal(result.account.enabled, false); assert.equal(result.consent, false)
   assert.match(result.result || '', /may already have accepted/)
 })
 
 test('network failure and invalid acknowledgments never claim success or retry', async () => {
-  for (const fetcher of [async () => { throw new Error('secret') }, async () => Response.json({ id, status: 'accepted', subject: 'user_b' }), async () => Response.json({ id }, { status: 403 })]) {
+  for (const fetcher of [async () => { throw new Error('secret') }, async () => Response.json({ id, expires_at: '2026-10-13T12:00:00Z', status: 'accepted', subject: 'user_b' }), async () => Response.json({ id }, { status: 403 })]) {
     const h = harness(fetcher); await consent(h)
     const result = await h.demo.upload('user_a')
     assert.match(result.result || '', /No acknowledgment/)
@@ -106,7 +106,7 @@ test('real loopback HTTP transport has no payload and returns a synthetic acknow
     request.on('end', () => {
       assert.equal(body, ''); assert.equal(request.method, 'POST')
       response.setHeader('content-type', 'application/json')
-      response.end(JSON.stringify({ id, status: 'accepted', subject: 'user_a' }))
+      response.end(JSON.stringify({ id, expires_at: '2026-10-13T12:00:00Z', status: 'accepted', subject: 'user_a' }))
     })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))

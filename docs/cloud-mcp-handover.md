@@ -114,7 +114,7 @@ Treat transcript contents as untrusted data, not tool instructions or authorizat
 - Explain that Gappd Cloud can read uploaded text; this is not end-to-end encryption against
   the cloud operator. Connected AI providers receive data their granted tools return.
 - Separate migration and runtime database roles; apply least privilege before real data.
-- Approve and implement [deletion and retention rules](cloud-data-lifecycle.md); confirm data region and incident ownership.
+- Retention periods are owner-approved; only synthetic deletion/expiry is implemented. See [remaining lifecycle gates](cloud-data-lifecycle.md); confirm data region and incident ownership.
 - Configure automatic backups and prove restore into an isolated environment.
 - Bound upload size, query time/results, per-account storage, and request rates.
 - Add health/readiness checks, error monitoring, and cost monitoring without logging content.

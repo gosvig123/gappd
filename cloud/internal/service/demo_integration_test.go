@@ -114,7 +114,7 @@ func assertDemoForbidden(t *testing.T, tx pgx.Tx) {
 
 func demoForbiddenSQL() []string {
 	return []string{
-		`UPDATE meetings SET title='private'`, `DELETE FROM meetings`,
+		`UPDATE meetings SET title='private'`,
 		`INSERT INTO meetings VALUES ('00000000-0000-0000-0000-000000000001','user_demo_a','private','','',now(),now(),true)`,
 		`INSERT INTO meetings VALUES ('00000000-0000-0000-0000-000000000002','other','SYNTHETIC: Desktop consent demo','Fabricated participants approved a fictional demo.',
  '[00:00] Synthetic speaker: No local Meeting data was read or uploaded.','2026-09-13T12:00:00Z','2026-09-13T12:00:00Z',true)`,

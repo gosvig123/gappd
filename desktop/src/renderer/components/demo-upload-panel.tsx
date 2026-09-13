@@ -44,6 +44,9 @@ export function DemoUploadPanel() {
     <p>{account.enabled ? `Demo account: ${account.email} (${subject})` : 'Demo OFF. Connect explicitly; existing Cloud sync login is not upload consent.'}</p>
     <label><input type="checkbox" checked={status.consent} disabled={!account.enabled || busy} onChange={event => void run(() => window.gappd.demoUpload.setConsent(subject, event.target.checked))} /> I consent to create one fixed synthetic Meeting for this account. This consent is used once.</label>
     <div className="actions-row"><Button disabled={!status.consent || busy} onClick={() => void run(() => window.gappd.demoUpload.upload(subject))}>Upload demo Meeting</Button></div>
+    <p>Cloud expiry is fixed at 30 days from first server acceptance. Reads stop at expiry; physical cleanup scheduling and 7-day backup retention remain unverified.</p>
+    <label><input type="checkbox" checked={status.deleteConsent} disabled={!account.enabled || busy} onChange={event => void run(() => window.gappd.demoUpload.setDeleteConsent(subject, event.target.checked))} /> I confirm permanent deletion of only the synthetic cloud copy for {account.email} ({subject}). Local Meetings and audio stay on this Mac. This demo ID cannot be created again. This separate confirmation is used once.</label>
+    <div className="actions-row"><Button disabled={!status.deleteConsent || busy} onClick={() => void run(() => window.gappd.demoUpload.deleteCopy(subject))}>Delete synthetic cloud copy</Button></div>
     <p>OFF cancels locally, not an accepted request. Cloud copies remain. No automatic retry or real Meeting sync.</p>
     <div role={error || account.error ? 'alert' : 'status'}>{error || account.error || status.result || (busy ? 'Waiting for demo operation…' : '')}</div>
   </Card>

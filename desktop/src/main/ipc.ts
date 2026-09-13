@@ -73,7 +73,7 @@ const IPC_HANDLERS: MainHandlers = {
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
-  demoUpload: { status: () => demoUpload().status(), connect: (_event, enabled) => demoUpload().connect(enabled), setConsent: (_event, subject, enabled) => demoUpload().setConsent(subject, enabled), upload: (_event, subject) => demoUpload().upload(subject) },
+  demoUpload: { status: () => demoUpload().status(), connect: (_event, enabled) => demoUpload().connect(enabled), setConsent: (_event, subject, enabled) => demoUpload().setConsent(subject, enabled), upload: (_event, subject) => demoUpload().upload(subject), setDeleteConsent: (_event, subject, enabled) => demoUpload().setDeleteConsent(subject, enabled), deleteCopy: (_event, subject) => demoUpload().deleteCopy(subject) },
   cloudAuth: { status: () => cloudAuthStatus(), setEnabled: (_event, enabled) => setCloudAuthEnabled(enabled) },
   slack: {
     status: () => slackConnectionStatus(),

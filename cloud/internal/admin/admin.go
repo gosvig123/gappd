@@ -13,6 +13,9 @@ import (
 //go:embed 001.sql
 var migration string
 
+//go:embed 002.sql
+var lifecycleMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -46,7 +49,7 @@ func Provision(ctx context.Context, conn *pgx.Conn, password string) error {
 	if err = setPassword(ctx, tx, password); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings TO gappd_reader;
+	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, demo_lifecycle TO gappd_reader;
  ALTER ROLE gappd_reader SET default_transaction_read_only=on; ALTER ROLE gappd_reader SET statement_timeout='3s'`)
 	if err != nil {
 		return err
@@ -90,9 +93,17 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=1)`).Scan(&exists); err != nil {
 		return err
 	}
+	if !exists {
+		if _, err := tx.Exec(ctx, migration); err != nil {
+			return err
+		}
+	}
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=2)`).Scan(&exists); err != nil {
+		return err
+	}
 	if exists {
 		return nil
 	}
-	_, err := tx.Exec(ctx, migration)
+	_, err := tx.Exec(ctx, lifecycleMigration)
 	return err
 }

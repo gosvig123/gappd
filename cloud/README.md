@@ -3,16 +3,10 @@
 Independent Go 1.25 service. Local MCP and the root CLI are unchanged. The optional
 synthetic demo transport creates fixed fabricated text only; no real Meeting access,
 audio, list, search, storage sync, or automatic seed exists.
-Private Railway migration, reader-role provisioning, and synthetic seed are complete.
-Independent review, Go 1.25.13 PostgreSQL 18 race tests, and Docker build passed.
-Railway deployed commit `3ca92e2`; health, readiness, public metadata and unauthenticated
-401 checks passed. Pi live login and owned get_meeting passed. Live second-account
-and hosted ChatGPT checks are explicitly deferred, not validated.
-On 2026-09-13, user-completed desktop login, new one-use consent, demo acceptance and
-Pi readback passed for `eb811da9-bdb3-8bdd-befd-ccdfecb5acd6`. The server accepted the
-signed Desktop client_id/sync scope. Consent reset; OFF removed isolated demo credentials.
-The test app was closed and the cloud capability disabled (POST now returns 404).
-This proves fixed synthetic creation, not actual Meeting-document uploads.
+Deployed code remains `3ca92e2`; the lifecycle slice below is not deployed.
+Pi owned read and user-consented synthetic creation passed on 2026-09-13; capability is OFF.
+Live second-account, hosted ChatGPT and deletion/readback remain unverified.
+See [handover](../docs/cloud-mcp-handover.md) for prior deployment evidence.
 
 ## Runtime
 
@@ -67,9 +61,10 @@ go run ./cmd/admin seed
 unset ADMIN_DATABASE_URL RUNTIME_DB_PASSWORD DEMO_OWNER_ID
 ```
 
-Migration 001 is transactional, advisory-locked, and recorded in `cloud_migrations`.
+Migrations 001/002 are transactional, advisory-locked, and recorded in `cloud_migrations`.
 It creates `meetings`, enables/forces RLS, and grants no PUBLIC table access.
-Provision creates/updates `gappd_reader` with SELECT only and read-only defaults.
+Provision grants `gappd_reader` SELECT only on `meetings` and `demo_lifecycle`, with read-only defaults.
+Both tables force owner RLS; missing owner context denies access. No lifecycle metadata is in MCP output.
 It disables PostgreSQL statement/duration/error statement logs in its transaction
 before password DDL. Confirm no external audit extension records password DDL;
 provision through your secret manager instead if policy mandates external auditing.
@@ -82,17 +77,15 @@ No runtime process migrates, provisions, or seeds. No admin secret belongs in ru
 Replace Railway's original admin DATABASE_URL reference with a private reader URL;
 URL-encode its password. Keep admin credentials only in the administrator session.
 
-Demo Meeting ID: `b47c5e70-8030-4b9e-bb5a-146d17c68731`.
-Title, summary, transcript, and timestamps are clearly fabricated. A missing Meeting
-and another account's Meeting give the same tool error. No `user_id` input exists.
+Original seed: `b47c5e70-8030-4b9e-bb5a-146d17c68731`; never reused by the demo transport.
 
 ## Local/CI checks
 
 Tests create only synthetic data. Use an isolated disposable PostgreSQL database.
 Set `TEST_ADMIN_DATABASE_URL` to its administrator URL and `TEST_DATABASE_URL` to its
 reader URL with password `synthetic-test-password-only`; the tests provision that role.
-For demo integration tests also set `TEST_DEMO_DATABASE_URL` to the isolated
-`gappd_demo_writer` URL with that same synthetic-only test password.
+Also set `TEST_DEMO_DATABASE_URL` (`gappd_demo_writer`) and `TEST_CLEANUP_DATABASE_URL`
+(`gappd_demo_cleanup`), using that same synthetic-only test password. CI supplies all four URLs.
 Never point these variables at a deployed or real Meeting database.
 
 ```sh
@@ -125,15 +118,14 @@ reset, runtime write/admin rejection, schema/input limits, and fixed JWKS fetch 
 
 Before real data: production identity/domains, new desktop upload consent, deletion,
 rate/cost controls, grant revocation policy, retention, backups/restore, and staging.
-This slice intentionally serves only synthetic data and does not relax those gates.
 
 ## Optional synthetic demo transport (disabled by default)
 
-`GAPPD_SYNTHETIC_UPLOAD_ENABLED=true` explicitly enables `POST /demo-meeting`.
+`GAPPD_SYNTHETIC_UPLOAD_ENABLED=true` enables empty-body `POST` and `DELETE /demo-meeting`.
 Missing/other values leave the route absent and never open a writer pool. Enabling
 requires `GAPPD_DESKTOP_OAUTH_CLIENT_ID` and `SYNTHETIC_UPLOAD_DATABASE_URL` for
 **gappd_demo_writer**, never admin or reader credentials. `/mcp` and public discovery
-still advertise/require only `meetings:read`; gappd_reader grants are unchanged.
+still advertise/require only `meetings:read`; the reader gains only forced-owner-RLS lifecycle SELECT.
 
 POST requires the same strict JWT checks plus `meetings:sync` and exact signed
 `client_id` equal to the configured Desktop client. Missing client_id fails closed.
@@ -143,7 +135,10 @@ creation/consent transport, NOT validation or upload of Meeting documents.
 Ownership comes only from verified token `sub`. A deterministic account-specific UUID
 provides idempotency without updates; a collision fails generically, never reassigns
 or exposes another account. The seeded demo ID is not reused or changed. A successful
-200 response contains `status: accepted`, `id`, and `subject`; use the returned ID in Pi.
+200 response contains `status: accepted`, `id`, `subject`, and fixed `expires_at`; use the ID in Pi.
+DELETE has the same strict auth and empty body; no caller ID/revision is accepted. It returns
+only `status: deleted` and `subject`, after atomic content removal and a durable marker.
+Absent/other-owner copies are indistinguishable. Deleted/expired IDs cannot be reused.
 
 ### Parent-owned live setup and checks
 
@@ -154,27 +149,51 @@ or exposes another account. The seeded demo ID is not reused or changed. A succe
    (24+ characters). Confirm no external auditing captures role/password DDL.
 3. Run `go run ./cmd/admin migrate` then `go run ./cmd/admin provision-demo` (or `/admin`).
    The latter creates the separate non-owner role and fixed-payload INSERT RLS policy;
-   grants SELECT/INSERT only, no UPDATE/DELETE. Use a fresh isolated role without other grants.
+   grants fixed-identity SELECT/INSERT/marked DELETE on content and SELECT/INSERT/
+   UPDATE(deleted_at) on lifecycle. No content UPDATE or marker deletion is allowed.
    Unset admin URL/password after provisioning. Never place either in API runtime.
 4. Set private writer URL (URL-encoded password), Desktop client `iFaeusoYBwClQRoP`,
    and the explicit capability flag on the API. Keep existing reader URL, issuer and
    canonical resource unchanged. Deploy; disabled mode must need no writer configuration.
-5. Start an isolated desktop development profile with `GAPPD_SYNTHETIC_UPLOAD_ENABLED=true`.
-   No app binary replacement is needed. Settings → Connections → Synthetic demo Meeting:
-   Connect demo account explicitly; complete user-owned browser consent. OAuth requests
-   `email profile meetings:sync` and canonical resource, never offline_access/refresh.
-   Confirm actual signed client_id exists; do not relax validation if it does not.
-6. Verify displayed account, check the NEW unchecked consent, then Upload demo Meeting.
-   Read the acknowledged ID through Pi as its owner. Repeat only with new manual consent;
-   it returns the same ID. Check OFF, denied login, expired login, failure, and account switch.
-   No acknowledgment means outcome unknown, not proof that the server rejected it.
-7. Disable both flags after the coordinated test. OFF clears demo credentials/consent and
-   cancels locally; it does not recall accepted requests or delete cloud copies.
+5. Start an isolated desktop development profile with the capability flag; never replace the app.
+   Connect demo account explicitly. Confirm the displayed account and NEW create consent.
+   For deletion, use the separate unchecked destructive confirmation and Delete synthetic cloud copy.
+   Neither operation reads local Meetings. Deletion cannot be undone by another create consent.
+   Lost acknowledgment is uncertain; retry only after another explicit confirmation.
+6. Parent owns consented live deletion/Pi readback. Disable both flags after coordinated testing.
+   OFF clears credentials/consent and cancels locally; it never requests deletion.
 
 Desktop demo credentials are separate, protected, and resource-bound. Startup only reads
 local credentials; saved auth-only credentials never enable uploads or browser login.
 Consent exists only in main-process memory, bound to the userinfo-verified account and
 exact token, and is consumed once at the final action. No silent retry exists.
-Automated two-account isolation is not live second-account proof. ChatGPT remains deferred.
-General uploads/device registration, production identity, retention/deletion, revocation,
+General uploads/device registration, production identity, full retention/deletion, revocation,
 rate/cost controls, backups/restore and staging remain required before real Meeting data.
+
+## Synthetic lifecycle migration and cleanup (not deployed)
+
+Owner approved 30-day content, 7-day backup and 14-day content-free log periods;
+see [policy status](../docs/cloud-data-lifecycle.md). Only synthetic logical lifecycle is implemented.
+Keep the capability disabled while applying these private steps. Do not seed or delete live rows.
+
+1. With temporary `ADMIN_DATABASE_URL`, run `/admin migrate`, `/admin provision`, then
+   `/admin provision-demo` with the existing role password variables described above.
+   Migration 002 adds lifecycle/guards; missing legacy state fails closed on read/create.
+2. For each existing deterministic demo, set verified `DEMO_OWNER_ID` and `DEMO_ACCEPTED_AT`
+   (RFC3339, evidence-based first acceptance, no later than server now); run `/admin backfill-demo`.
+   Record timestamp provenance privately. Never use fabricated started_at/updated_at or migration time.
+   Existing lifecycle/expiry is never overwritten. No new row is backfilled without matching content.
+   The original seeded fixture is unchanged/exempt: a synthetic test exception, not policy coverage.
+3. Set a separate 24+ character `DEMO_CLEANUP_DB_PASSWORD`; run `/admin provision-cleanup`.
+   Unset admin URL/passwords/owner/time after setup. Preserve the password-DDL safeguards above.
+4. A separate private process runs `/cleanup` with only `SYNTHETIC_CLEANUP_DATABASE_URL`
+   for non-owner `gappd_demo_cleanup`. It can read expired lifecycle/content, mark and delete
+   expired deterministic demos only; no INSERT, content UPDATE or marker removal. No API admin key.
+5. Each command removes at most 100 copies atomically, with content-free count/failure output.
+   Configure hourly invocations, alert on failures/backlog and size capacity above accepted demos.
+   Scheduling/monitoring is NOT configured here; the <=24-hour purge target remains UNVERIFIED.
+   Exercise backlog draining and deadlines before making that promise. No generic job framework exists.
+
+Retain lifecycle records indefinitely. Current-marker replay tests are not backup restore proof:
+external deletion control records/reconciliation remain required before exposing a restored snapshot.
+Backup retention/removal, log retention, live deletion/readback and fresh-ID re-creation remain gates.

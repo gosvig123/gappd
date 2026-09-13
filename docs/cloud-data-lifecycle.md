@@ -2,8 +2,10 @@
 
 ## Status and scope
 
-Proposed release contract, not implemented behavior or a legal compliance claim.
-The retention periods below need owner approval before real Meeting uploads are enabled.
+Owner-approved retention periods; not a full implementation or legal compliance claim.
+This batch implements only deterministic synthetic demo deletion and 30-day logical expiry.
+Physical cleanup scheduling, 7-day backups and 14-day log configuration remain unverified.
+Real Meeting uploads, account/device generations and account-wide deletion remain gated.
 No existing local or synthetic cloud data is deleted by this document.
 Local-first behavior and OFF-by-default sync remain unchanged.
 See [cloud handover](cloud-mcp-handover.md) for the wider release gates.
@@ -13,9 +15,9 @@ A **deletion marker** stores only enough identity/version data to reject an old 
 An **account generation** is a server-issued version that invalidates earlier upload grants.
 These are proposed cloud terms, not changes to the local Meeting model.
 
-## Proposed retention defaults
+## Owner-approved retention periods
 
-| Data | Proposed rule |
+| Data | Approved rule |
 | --- | --- |
 | Local Meetings and audio | Keep existing local behavior; cloud expiry never deletes local data. |
 | Active cloud copies | Expire 30 days after the first accepted upload. |
@@ -69,7 +71,7 @@ Unknown, deleted or invalidated device/account state must fail closed on upload.
 ## Backups, restore and revocation
 
 Deleted content may remain only in restricted backups until those backups expire.
-With the proposed 24-hour cleanup and 7-day backup limits, expiry-related backup removal
+With the required 24-hour cleanup and 7-day backup limits, expiry-related backup removal
 can take up to 8 days after logical expiry. State this limit rather than promising instant erasure.
 User-requested deletion removes live content at acknowledgment; backup removal is within 7 days.
 
@@ -86,7 +88,7 @@ checks or supported online token validation. Deleting content still blocks later
 
 ## Gates before real uploads
 
-- Approve the 30-day content, 7-day backup and 14-day log periods and consent wording.
+- Periods are owner-approved: 30-day content, 7-day backups, 14-day logs. Approve real-upload consent wording separately.
 - Implement deletion, expiry filtering, generation/device validation and bounded cleanup.
 - Test offline deletion, account switch, OFF, reconnect, concurrent upload/delete, expiry,
   lost acknowledgment, duplicate requests and delayed higher-revision uploads.
@@ -95,5 +97,24 @@ checks or supported online token validation. Deleting content still blocks later
 - Show account, expiry, pending deletion and backup limits in the app.
 - Keep the existing production identity, isolation, rate/cost and rollout gates.
 
-Start implementation with synthetic data: delete one cloud copy, prove Pi can no longer
-read it, then prove delayed writes and backup restoration cannot restore it.
+## Synthetic implementation status
+
+`DELETE /demo-meeting` takes no content or ID and targets only the authenticated account's
+fixed demo ID. It requires signed Desktop client identity, sync scope and a new, separate
+one-use desktop destructive confirmation naming that account and scope. OFF/reconnect do
+not delete. Missing/other-owner copies have the same committed acknowledgment. A lost
+acknowledgment is uncertain; there is no queue, startup network or automatic retry.
+
+A forced-RLS content-free lifecycle table serializes creates/deletes, including absent IDs.
+Committed markers and expired identities reject ordinary writes permanently. Acceptance
+uses server time, not fabricated Meeting dates; retries never extend the fixed expiry.
+Legacy rows fail closed until an operator supplies an evidence-based acceptance timestamp;
+backfill only fills missing lifecycle records. The original administrator-seeded fixture is
+unchanged and exempt from this synthetic slice: this is a test exception, not general policy.
+
+A restricted cleanup command removes at most 100 expired copies per invocation. The 24-hour
+physical purge target is NOT verified until scheduling, capacity and monitoring are configured.
+Tests replay old content against current markers; they do not prove a restored database
+contains later deletion evidence. External restore control records, backup removal, live Pi
+delete/readback, account-wide deletion and intentional fresh-ID re-creation remain gates.
+See the [runbook](../cloud/README.md) for migration and private setup.

@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,13 +29,12 @@ func demoHandler(pool *pgxpool.Pool) http.Handler {
 			return
 		}
 		owner, _ := r.Context().Value(ownerKey{}).(string)
-		id, err := CreateDemo(r.Context(), pool, owner)
+		id, status, err := mutateDemo(r.Context(), pool, owner, r.Method)
 		if err != nil {
 			http.Error(w, "demo unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"id": id, "status": "accepted", "subject": owner})
+		acknowledgeDemo(w, r, pool, owner, id, status)
 	})
 }
 
@@ -49,7 +47,7 @@ func CreateDemo(ctx context.Context, pool *pgxpool.Pool, owner string) (string, 
 		return "", err
 	}
 	defer tx.Rollback(context.Background())
-	if _, err = tx.Exec(ctx, `SELECT set_config('app.owner_id',$1,true)`, owner); err != nil {
+	if err = lockDemo(ctx, tx, owner); err != nil {
 		return "", err
 	}
 	id := DemoMeetingID(owner)
@@ -75,6 +73,8 @@ func insertDemo(ctx context.Context, tx pgx.Tx, owner, id string) error {
  AND summary='Fabricated participants approved a fictional demo.'
  AND transcript='[00:00] Synthetic speaker: No local Meeting data was read or uploaded.'
  AND started_at='2026-09-13T12:00:00Z' AND updated_at=started_at AND synthetic
+ AND EXISTS (SELECT FROM demo_lifecycle l WHERE l.id=meetings.id AND l.owner_id=meetings.owner_id
+ AND l.deleted_at IS NULL AND l.expires_at>clock_timestamp())
  FROM meetings WHERE id=$1 AND owner_id=$2`, id, owner).Scan(&valid)
 	if err != nil || !valid {
 		return errors.New("demo unavailable")
@@ -99,10 +99,18 @@ func verifyDemoRole(ctx context.Context, conn *pgx.Conn) error {
 	var safe bool
 	err := conn.QueryRow(ctx, `SELECT current_user='gappd_demo_writer' AND NOT rolsuper AND NOT rolbypassrls
  AND NOT EXISTS (SELECT FROM pg_auth_members WHERE member=pg_roles.oid)
- AND NOT EXISTS (SELECT FROM pg_class WHERE relname='meetings' AND relowner=pg_roles.oid)
+ AND NOT EXISTS (SELECT FROM pg_class WHERE relname IN ('meetings','demo_lifecycle') AND relowner=pg_roles.oid)
  FROM pg_roles WHERE rolname=current_user`).Scan(&safe)
 	if err != nil || !safe {
 		return errors.New("runtime requires isolated gappd_demo_writer role")
 	}
 	return nil
+}
+
+func mutateDemo(ctx context.Context, pool *pgxpool.Pool, owner, method string) (string, string, error) {
+	if method == http.MethodDelete {
+		return "", "deleted", DeleteDemo(ctx, pool, owner)
+	}
+	id, err := CreateDemo(ctx, pool, owner)
+	return id, "accepted", err
 }

@@ -6,7 +6,7 @@ Clerk development auth is wired to Settings → Connections → Cloud sync, defa
 Automated tests and a user-completed live development Settings login passed on 2026-09-13.
 `/cloud` serves synthetic-only read MCP on Railway; Pi live login and owned get passed.
 Live second-account and ChatGPT checks are deferred. A disabled-by-default synthetic demo
-creation/consent transport is implemented; no real Meeting upload or device registration
+creation/deletion consent transport is implemented; no real Meeting upload or device registration
 exists. See the [service runbook](../cloud/README.md#optional-synthetic-demo-transport-disabled-by-default).
 The existing local MCP remains the default. No Meetings are uploaded.
 
@@ -170,8 +170,8 @@ The demo uses the existing public Desktop client and PKCE helpers but a separate
 `cloud-demo-development.enc` store. Only explicit Connect demo account requests
 `email profile meetings:sync` and resource `https://gappd-cloud-api-production.up.railway.app/mcp`.
 No refresh token is requested or retained. Existing auth-only credentials are unchanged.
-Trusted HTTPS userinfo verifies the account with the exact Bearer token used by POST;
-redirects are rejected. Main-process one-use consent binds that account/token and final action.
+Trusted HTTPS userinfo verifies the account with the exact Bearer token used by POST/DELETE;
+redirects are rejected. Separate main-process one-use create/delete consent binds that account/token and final action.
 OFF/account changes invalidate consent; expiry needs explicit reconnect. No startup network,
 automatic upload, backfill or local Meeting reads exist. Both capability flags default disabled.
 Live demo login, new consent, server acceptance and Pi readback passed on 2026-09-13,
