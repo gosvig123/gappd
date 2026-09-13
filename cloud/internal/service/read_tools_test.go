@@ -66,7 +66,7 @@ func TestSearchOwnedMeetings(t *testing.T) {
 	if err != nil || len(result.Matches) != 1 || result.Matches[0].ID != service.DemoID {
 		t.Fatalf("owned search: %v %v", result, err)
 	}
-	if !strings.Contains(result.Matches[0].Passage, "prototype") {
+	if !strings.Contains(result.Matches[0].Passage, "prototype") || strings.Contains(result.Matches[0].Passage, "<b>") {
 		t.Fatalf("passage: %q", result.Matches[0].Passage)
 	}
 }

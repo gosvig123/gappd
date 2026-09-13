@@ -12,6 +12,7 @@ node_modules/
 !/docs/speaker-labeling.md
 !/docs/slack-integration.md
 !/docs/cloud-mcp-handover.md
+!/docs/cloud-meeting-document.md
 !/docs/cloud-mcp-clerk.md
 !/docs/cloud-data-lifecycle.md
 !/docs/cloud-operations.md

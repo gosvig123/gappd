@@ -69,6 +69,7 @@ automatic backups, or recovery. Configure and test those operational controls be
 ## Data and ownership
 
 Export a versioned, explicit Meeting document, not a copy of the entire local SQLite database.
+Version 1 is specified in [the Meeting document contract](cloud-meeting-document.md).
 Include stable Meeting ID, title, time/duration, transcript turns and timestamps, Meeting
 speaker labels, summaries, existing derived meeting data, revision, and sync timestamps.
 Keep audio, speaker embeddings, voice samples, local paths, credentials, Calendar caches,

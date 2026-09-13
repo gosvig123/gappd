@@ -129,12 +129,18 @@ func scanHits(rows pgx.Rows) ([]SearchHit, error) {
 		if err := rows.Scan(&h.ID, &h.Title, &h.StartedAt, &h.Passage); err != nil {
 			return nil, errors.New("Meetings unavailable")
 		}
+		h.Passage = plainPassage(h.Passage)
 		items = append(items, h)
 	}
 	if rows.Err() != nil {
 		return nil, errors.New("Meetings unavailable")
 	}
 	return items, nil
+}
+
+// plainPassage drops the ts_headline match markers from returned text.
+func plainPassage(text string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(text, "<b>", ""), "</b>", "")
 }
 
 // The passage comes from the transcript when it matches, otherwise from the title and summary.
