@@ -90,7 +90,14 @@ func (d MeetingDocument) validate() error {
 	if err != nil {
 		return err
 	}
-	return d.validateTurns(keys)
+	if err := d.validateTurns(keys); err != nil {
+		return err
+	}
+	// The bounded text is the flattened transcript, not the sum of turn texts.
+	if len(d.Transcript()) > MaxTranscriptBytes {
+		return errDocument
+	}
+	return nil
 }
 
 func (d MeetingDocument) validateEnvelope() error {
@@ -147,7 +154,7 @@ func (d MeetingDocument) validateTurns(keys map[string]string) error {
 	if len(d.Turns) > MaxTurns {
 		return errDocument
 	}
-	total, previousEnd := 0, 0.0
+	previousEnd := 0.0
 	for _, turn := range d.Turns {
 		if turn.StartSec < previousEnd || turn.EndSec < turn.StartSec || turn.EndSec > MaxMeetingSeconds {
 			return errDocument
@@ -155,10 +162,7 @@ func (d MeetingDocument) validateTurns(keys map[string]string) error {
 		if _, ok := keys[turn.SpeakerKey]; !ok || len(turn.Text) > MaxTurnBytes {
 			return errDocument
 		}
-		total, previousEnd = total+len(turn.Text), turn.EndSec
-	}
-	if total > MaxTranscriptBytes {
-		return errDocument
+		previousEnd = turn.EndSec
 	}
 	return nil
 }

@@ -51,6 +51,29 @@ Schema limits UTF-8 bytes: title 512, summary 4096, transcript 16384. JSON escap
 and SDK text/structured duplication can expand the response but remain bounded by
 these constraints. Only `synthetic=true` rows are allowed and returned.
 
+## Optional real Meeting storage transport (disabled by default)
+
+`GAPPD_MEETING_STORAGE_ENABLED=true` enables `POST /meeting` and `DELETE /meeting`, and requires
+`MEETING_STORAGE_DATABASE_URL` for **gappd_meeting_writer** plus the existing Desktop client id.
+Missing/other values leave both routes absent and open no writer pool. This needs migration 004
+and `provision-meeting` first; both routes are `meetings:sync` and the exact signed Desktop client.
+
+POST takes one version-1 Meeting document ([contract](../docs/cloud-meeting-document.md)), bounded
+to 2 MiB. The server validates it, flattens the turns into the searchable transcript, and replaces
+the whole copy atomically. A retry never extends the fixed 30-day expiry, an older revision never
+replaces a newer one, and one revision always means one document. The 200 response carries
+`status`, `subject`, `id`, `revision` and `expires_at`; the reported revision is the stored one,
+so a stale upload is visible rather than silent.
+
+DELETE takes a small `{"meeting_id":"<local Meeting UUID>"}` body bounded to 256 bytes. It marks
+the identity deleted, removes the copy, and keeps a permanent marker, so the same identity can
+never be re-created. A repeated deletion is idempotent, and a deletion of an identity that was
+never uploaded is indistinguishable from a successful one.
+
+**No MCP tool reads `cloud_meetings` yet.** The read tools still require `synthetic=true`, so a
+stored real copy is reachable only by its own writer and by the reader's SQL, not by Pi or ChatGPT.
+Enabling the real read surface is the next slice.
+
 ## Private administrator setup
 
 Use a trusted private Railway shell with Go source or the image's `/admin` binary.

@@ -44,11 +44,32 @@ func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
 	if port == "" {
 		port = "8080"
 	}
+	uploads, err := meetingPool(writer)
+	if err != nil {
+		return err
+	}
+	if uploads.Meeting != nil {
+		defer uploads.Meeting.Close()
+	}
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer)}
-	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithDemo(auth, pool, writer, os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")),
+	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
 	return server.ListenAndServe()
+}
+
+// meetingPool opens the real-copy writer only when its separate capability is explicitly on.
+func meetingPool(demo *pgxpool.Pool) (service.Uploads, error) {
+	uploads := service.Uploads{Demo: demo, ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
+	if os.Getenv("GAPPD_MEETING_STORAGE_ENABLED") != "true" {
+		return uploads, nil
+	}
+	if uploads.ClientID == "" || os.Getenv("MEETING_STORAGE_DATABASE_URL") == "" {
+		return uploads, errors.New("meeting storage configuration required")
+	}
+	pool, err := service.OpenMeetingPool(context.Background(), os.Getenv("MEETING_STORAGE_DATABASE_URL"))
+	uploads.Meeting = pool
+	return uploads, err
 }
 
 func validURL(raw, path string) bool {

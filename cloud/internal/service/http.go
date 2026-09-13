@@ -22,19 +22,39 @@ func (a *Auth) ResourceMetadata() string {
 	return u.Scheme + "://" + u.Host + "/.well-known/oauth-protected-resource" + u.Path
 }
 
+// Uploads carries the optional write pools. A nil pool leaves its routes absent.
+type Uploads struct {
+	Demo     *pgxpool.Pool
+	Meeting  *pgxpool.Pool
+	ClientID string
+}
+
 func Handler(a *Auth, pool *pgxpool.Pool) http.Handler {
-	return HandlerWithDemo(a, pool, nil, "")
+	return HandlerWithUploads(a, pool, Uploads{})
 }
 
 func HandlerWithDemo(a *Auth, pool, writer *pgxpool.Pool, clientID string) http.Handler {
+	return HandlerWithUploads(a, pool, Uploads{Demo: writer, ClientID: clientID})
+}
+
+func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handler {
 	mux := http.NewServeMux()
-	if writer != nil && clientID != "" {
+	if uploads.ClientID != "" {
 		uploadAuth := *a
-		uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", clientID
-		mux.Handle("POST /selected-demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(selectedDemoHandler(writer))))
-		mux.Handle("DELETE /selected-demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(selectedDemoHandler(writer))))
-		mux.Handle("POST /demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(demoHandler(writer))))
-		mux.Handle("DELETE /demo-meeting", uploadAuth.protect(http.NewCrossOriginProtection().Handler(demoHandler(writer))))
+		uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
+		protect := func(h http.Handler) http.Handler {
+			return uploadAuth.protect(http.NewCrossOriginProtection().Handler(h))
+		}
+		if uploads.Demo != nil {
+			mux.Handle("POST /selected-demo-meeting", protect(selectedDemoHandler(uploads.Demo)))
+			mux.Handle("DELETE /selected-demo-meeting", protect(selectedDemoHandler(uploads.Demo)))
+			mux.Handle("POST /demo-meeting", protect(demoHandler(uploads.Demo)))
+			mux.Handle("DELETE /demo-meeting", protect(demoHandler(uploads.Demo)))
+		}
+		if uploads.Meeting != nil {
+			mux.Handle("POST /meeting", protect(meetingHandler(uploads.Meeting)))
+			mux.Handle("DELETE /meeting", protect(meetingHandler(uploads.Meeting)))
+		}
 	}
 	mux.Handle("/mcp", a.protect(http.NewCrossOriginProtection().Handler(meetingTransport(pool))))
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.metadata)
