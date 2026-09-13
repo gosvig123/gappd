@@ -160,3 +160,32 @@ while IFS= read -r line; do
   esac
 done
 `
+
+// A dead child can be noticed while writing or while reading. Both paths must name the same
+// step, so the reported failure does not depend on which syscall loses the race.
+func TestCodexCatalogNamesTheStepWhenTheWriteFails(t *testing.T) {
+	session, err := startCodexCatalog(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.close()
+	if err := session.in.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = session.readModels()
+	if err == nil || !strings.Contains(err.Error(), "initialize Codex model catalog") {
+		t.Fatalf("readModels() error = %v", err)
+	}
+}
+
+func TestCodexCatalogNamesTheStepWhenTheReadFails(t *testing.T) {
+	session, err := startCodexCatalog(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.close()
+	_, err = session.readModels()
+	if err == nil || !strings.Contains(err.Error(), "initialize Codex model catalog") {
+		t.Fatalf("readModels() error = %v", err)
+	}
+}

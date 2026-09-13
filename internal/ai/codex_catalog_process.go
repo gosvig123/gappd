@@ -91,8 +91,10 @@ func (s *codexCatalogSession) close() {
 
 func (s *codexCatalogSession) readModels() ([]CodexModel, error) {
 	init := map[string]any{"clientInfo": map[string]any{"name": "gappd", "version": "1"}}
+	// Both the write and the read name the same step, so the reported failure does not depend
+	// on whether a broken child is noticed while writing or while reading.
 	if err := s.send(codexCatalogInitID, "initialize", init); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("initialize Codex model catalog: %w", err)
 	}
 	if _, err := s.await(codexCatalogInitID); err != nil {
 		return nil, fmt.Errorf("initialize Codex model catalog: %w", err)
@@ -119,7 +121,7 @@ func (s *codexCatalogSession) readPage(cursor string) (codexCatalogPage, error) 
 		params["cursor"] = cursor
 	}
 	if err := s.send(codexCatalogListID, "model/list", params); err != nil {
-		return codexCatalogPage{}, err
+		return codexCatalogPage{}, fmt.Errorf("read Codex model catalog: %w", err)
 	}
 	result, err := s.await(codexCatalogListID)
 	if err != nil {
