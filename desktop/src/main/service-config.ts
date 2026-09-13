@@ -30,3 +30,10 @@ function buildSlackClientId(): string {
 export function cloudAuthDevelopmentConfig() {
   return { issuer: 'https://learning-mutt-4805.clerk.accounts.dev', clientId: 'iFaeusoYBwClQRoP' }
 }
+
+const DEFAULT_CLOUD_RESOURCE = 'https://gappd-cloud-api-production.up.railway.app/mcp'
+
+/** The Upload API and the MCP endpoint share one origin and one canonical resource URL. */
+export function cloudResource(): string {
+  return process.env.GAPPD_CLOUD_RESOURCE_URL?.trim() || DEFAULT_CLOUD_RESOURCE
+}

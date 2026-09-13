@@ -3,6 +3,7 @@ import { demoUpload } from './demo-upload-service'
 import { generateMeetingAgenda } from './meeting-agenda'
 import { openPermissionsSettings } from './privacy-settings'
 import { cloudAuthStatus, setCloudAuthEnabled } from './cloud-auth-service'
+import { meetingUpload } from './meeting-upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { LOCAL_AI_PROVIDER_LLAMACPP } from '../shared/managed-local-ai'
@@ -77,6 +78,7 @@ const IPC_HANDLERS: MainHandlers = {
   selectedFixture: { status: () => selectedFixtureUpload().status(), preview: (_event, id) => selectedFixtureUpload().preview(id), cancel: () => selectedFixtureUpload().cancel(), connect: (_event, enabled) => selectedFixtureUpload().connect(enabled), setConsent: (_event, subject, enabled, action) => selectedFixtureUpload().setConsent(subject, enabled, action), perform: (_event, subject, action) => selectedFixtureUpload().perform(subject, action) },
   demoUpload: { status: () => demoUpload().status(), connect: (_event, enabled) => demoUpload().connect(enabled), setConsent: (_event, subject, enabled) => demoUpload().setConsent(subject, enabled), upload: (_event, subject) => demoUpload().upload(subject), setDeleteConsent: (_event, subject, enabled) => demoUpload().setDeleteConsent(subject, enabled), deleteCopy: (_event, subject) => demoUpload().deleteCopy(subject) },
   cloudAuth: { status: () => cloudAuthStatus(), setEnabled: (_event, enabled) => setCloudAuthEnabled(enabled) },
+  meetingUpload: { status: () => meetingUpload().status(), connect: (_event, enabled) => meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
   slack: {
     status: () => slackConnectionStatus(),
     connect: () => connectSlack(),

@@ -24,10 +24,17 @@ of synthetic rows and owned cloud copies. Enabling it fails closed until migrati
 applied. A durable upload queue now exists in the desktop main process: it assigns the monotonic revision,
 keeps the exact accepted document, retries a bounded number of times and survives a restart. An
 upload service sends that queue, and it needs its own explicit consent, bound to the verified
-account and its exact token, before it sends anything. Neither is wired to IPC, the renderer or the
-Settings UI yet, and no Meeting is queued automatically, so the app still uploads nothing. There is
+account and its exact token, before it sends anything. Settings now surfaces this as "Cloud Meeting
+upload": a separate sign-in and protected credential store, the sync toggle, the consent, the queue
+state, and explicit per-Meeting upload and delete-copy actions. Queueing is always an explicit user
+action, so nothing is uploaded automatically and no Meeting is queued in the background. There is
 still no device registration, no account generation, and real copies have no physical cleanup
-command.**
+command.
+
+The desktop capability is `GAPPD_MEETING_UPLOAD_ENABLED=true`, off by default, and it needs the
+server's `GAPPD_MEETING_STORAGE_ENABLED` plus migrations 004 and 005. The upload service keeps its
+own credential store, because the authentication-only preview credential must never become upload
+authority; the user therefore signs in once for the preview and once for upload.**
 Add an explicit Settings toggle. Installing, upgrading, signing in, or connecting Calendar must
 never enable sync, upload Meeting data, or replace the local MCP configuration automatically.
 Missing settings on existing installations mean OFF. Cloud access requires explicit consent.
