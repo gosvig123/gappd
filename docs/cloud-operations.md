@@ -39,6 +39,29 @@ Before real data, configure failure/missed-run alerts, backlog-age monitoring an
 capacity, then exercise the <=24-hour physical cleanup deadline. These alerts are not set up.
 The seeded fixture remains an explicit synthetic exception, not general retention coverage.
 
+### Deployment path
+
+A push to `beta` does NOT deploy. Commit `dfda434` reached `beta` and the service kept
+serving `ca64391`; the handover's "automatic push deployment is not yet proved" is now
+settled as disabled for `gappd-cloud-api`. Check the source/auto-deploy setting in the
+dashboard before relying on a push.
+
+`railway redeploy --service 7407bf7c-600e-4a4c-928d-bf4c02747463 --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb`
+rebuilds the SAME commit and cannot ship a newer one. The working path is an upload from the
+repository root, because the service sets `rootDirectory=/cloud` with
+`dockerfilePath=Dockerfile`, so the Dockerfile only resolves when the upload root is the
+repository root:
+
+```sh
+railway up --service 7407bf7c-600e-4a4c-928d-bf4c02747463 \
+  --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb \
+  --project b73b1b1e-810b-4c3d-af03-6136244852c0 --detach --yes
+```
+
+Confirm the new deployment reports `SUCCESS`, then check `/health`, `/ready` and the MCP
+tool list. An upload deploys the working tree, not a commit, so keep the tree clean.
+`railway up` from `/cloud` does not resolve the configured Dockerfile path.
+
 ### Daily volume backups
 
 - PostgreSQL volume: `09e2971f-5fba-4cc9-8d60-729a27812e94`.
