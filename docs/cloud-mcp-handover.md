@@ -3,7 +3,8 @@
 ## Status and approved scope
 
 The desktop now implements a development auth-only preview. Cloud sync remains unimplemented. `/cloud` now implements a synthetic-only read MCP
-service; deployment and live client authorization remain pending. See [runbook](../cloud/README.md).
+service, deployed from commit `7eb4058`. Live client authorization remains pending.
+See [runbook](../cloud/README.md).
 Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
 Client compatibility must be proved with real authorization and tool calls, not assumed.
 
@@ -142,8 +143,13 @@ one explicit synthetic seed completed through SSH. No user Meeting data was uplo
 The original administrator DATABASE_URL reference was replaced and verified as gappd_reader.
 Independent review, Go 1.25.13 race tests against PostgreSQL 18, and Docker build passed.
 `/cloud` contains the service, admin commands, Docker and Railway configuration.
-Parent owns first deployment and live client verification; those remain pending.
-Verify GitHub push/CI gating end-to-end with the first cloud change.
+Deployment `d0ceed7a-1c53-443f-811b-5b160f6ec015` serves commit `7eb4058` from GitHub beta.
+Public health/readiness/metadata and unauthenticated 401 checks passed; CI passed.
+Builder Dockerfile and `/ready` healthcheck are explicit service settings: the CLI discarded
+`configFile=/cloud/railway.toml`. Config edits attempted old main builds, which failed;
+explicit source connection with `--branch beta` deployed the correct tested commit.
+Automatic push deployment and CI gating are NOT yet proved. Inspect branch selection before
+future configuration changes. Live client authorization remains pending.
 The environment name production is Railway's default, not approval to serve production users.
 Before launch, add an isolated staging environment and choose the production release branch;
 beta is the current development branch, not a permanent production-branch decision.

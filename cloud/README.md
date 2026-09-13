@@ -4,11 +4,14 @@ Independent Go 1.25 service. The desktop and root CLI are unchanged. No uploads,
 real Meeting access, audio, list, search, storage sync, or automatic seed exists.
 Private Railway migration, reader-role provisioning, and synthetic seed are complete.
 Independent review, Go 1.25.13 PostgreSQL 18 race tests, and Docker build passed.
-Live API deployment, Clerk, Pi, and hosted ChatGPT validation remain pending.
+Railway deployed commit `7eb4058`; health, readiness, public metadata and unauthenticated
+401 checks passed. Clerk-issued tokens, Pi and hosted ChatGPT calls remain pending.
 
 ## Runtime
 
-Set only these variables on the Railway API service (root `/cloud`, branch `beta`):
+Railway uses root `/cloud`, branch `beta`, explicit Dockerfile builder and `/ready` healthcheck.
+These settings are configured on the service: the CLI did not persist the nested TOML path.
+Set only these runtime variables:
 
 - `DATABASE_URL`: private PostgreSQL URL for **gappd_reader**, never the administrator.
 - `CLERK_ISSUER_URL`: `https://learning-mutt-4805.clerk.accounts.dev`.

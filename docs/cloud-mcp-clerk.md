@@ -4,7 +4,7 @@
 
 Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.
 Automated tests and a user-completed live development Settings login passed on 2026-09-13.
-`/cloud` now implements synthetic-only read MCP; live deployment/auth checks are pending.
+`/cloud` now serves synthetic-only read MCP on Railway; live client auth checks are pending.
 No upload or device registration exists. See the [service runbook](../cloud/README.md).
 The existing local MCP remains the default. No Meetings are uploaded.
 
@@ -49,6 +49,8 @@ Adding an allowed scope does not grant it to existing tokens or enable applicati
 Pi has a separate public client, `Gappd MCP - Pi (development)`, with consent enabled.
 Its only allowed scopes are `meetings:read offline_access`; callback is
 `http://127.0.0.1/callback`. Desktop registration and DCR remain unchanged.
+Pi configuration was added to the user's shared MCP file; `/reload` is needed to load it.
+Automatic installation failed because DCR is disabled; the explicit public client avoids DCR.
 Pi live authorization is pending. ChatGPT Developer mode was OFF during inspection;
 the user must enable it before its exact connection callback can be obtained.
 
