@@ -3,10 +3,10 @@
 Independent Go 1.25 service. Local MCP and the root CLI are unchanged. The optional
 synthetic demo transport creates fixed fabricated text only; no real Meeting access,
 audio, list, search, storage sync, or automatic seed exists.
-Deployed code remains `3ca92e2`; the lifecycle slice below is not deployed.
-Pi owned read and user-consented synthetic creation passed on 2026-09-13; capability is OFF.
-Live second-account, hosted ChatGPT and deletion/readback remain unverified.
-See [handover](../docs/cloud-mcp-handover.md) for prior deployment evidence.
+Deployed `9982063`; migration, role setup and explicit legacy backfill passed.
+On 2026-09-13, user-consented deletion passed: Pi denied the demo; its marker remained and live content was absent.
+The seeded fixture remained readable. Test credentials were removed, app closed and capability disabled (404).
+Live second-account/ChatGPT, cleanup scheduling, backups and restore checks remain pending; see [handover](../docs/cloud-mcp-handover.md).
 
 ## Runtime
 

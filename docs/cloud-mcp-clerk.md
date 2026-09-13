@@ -178,3 +178,8 @@ Live demo login, new consent, server acceptance and Pi readback passed on 2026-0
 including the strict signed Desktop client_id check. OFF removed isolated demo credentials;
 the app was closed and cloud capability disabled. No raw tokens were inspected or logged.
 Live second-account and ChatGPT checks remain deferred; real Meeting uploads remain gated.
+Live separate delete confirmation and Pi denial passed on 2026-09-13 for the created demo.
+Private checks confirmed its marker remained and live content was removed; the seed was unchanged.
+Legacy acceptance used the conservative UTC start of the documented test day, not a recovered
+exact timestamp: 2026-09-13T00:00:00Z, with expiry 2026-10-13T00:00:00Z.
+Cleanup completed with credentials removed, test app closed and cloud mutation route disabled.
