@@ -70,10 +70,16 @@ go run ./cmd/admin seed
 unset ADMIN_DATABASE_URL RUNTIME_DB_PASSWORD DEMO_OWNER_ID
 ```
 
-Migrations 001/002 are transactional, advisory-locked, and recorded in `cloud_migrations`.
+Migrations 001-004 are transactional, advisory-locked, and recorded in `cloud_migrations`.
 It creates `meetings`, enables/forces RLS, and grants no PUBLIC table access.
-Provision grants `gappd_reader` SELECT only on `meetings` and `demo_lifecycle`, with read-only defaults.
+Migration 004 additionally creates `cloud_meetings` and `meeting_lifecycle` for real copies:
+a separate table, separate identity namespace, 1 MiB transcript bound and its own guards. It is
+purely additive and does not alter `meetings`, its constraints, its policies or its records.
+Provision grants `gappd_reader` SELECT only on `meetings`, `demo_lifecycle`, `cloud_meetings`
+and `meeting_lifecycle`, with read-only defaults.
 Both tables force owner RLS; missing owner context denies access. No lifecycle metadata is in MCP output.
+No API path reads `cloud_meetings` yet: the read tools still require `synthetic=true` until the
+real-copy read filter lands, so migration 004 alone changes no API behaviour.
 It disables PostgreSQL statement/duration/error statement logs in its transaction
 before password DDL. Confirm no external audit extension records password DDL;
 provision through your secret manager instead if policy mandates external auditing.
@@ -94,7 +100,8 @@ Tests create only synthetic data. Use an isolated disposable PostgreSQL database
 Set `TEST_ADMIN_DATABASE_URL` to its administrator URL and `TEST_DATABASE_URL` to its
 reader URL with password `synthetic-test-password-only`; the tests provision that role.
 Also set `TEST_DEMO_DATABASE_URL` (`gappd_demo_writer`) and `TEST_CLEANUP_DATABASE_URL`
-(`gappd_demo_cleanup`), using that same synthetic-only test password. CI supplies all four URLs.
+(`gappd_demo_cleanup`), plus `TEST_MEETING_DATABASE_URL` (`gappd_meeting_writer`) for the
+real-copy isolation tests, using that same synthetic-only test password. CI supplies all five URLs.
 Never point these variables at a deployed or real Meeting database.
 
 ```sh
@@ -156,7 +163,10 @@ Absent/other-owner copies are indistinguishable. Deleted/expired IDs cannot be r
    `PGOPTIONS='-c pg_stat_statements.track=none'` if preloaded, BEFORE opening the connection.
    Supply `ADMIN_DATABASE_URL` and a securely generated `DEMO_WRITER_DB_PASSWORD`
    (24+ characters). Confirm no external auditing captures role/password DDL.
-3. Run `go run ./cmd/admin migrate` then `go run ./cmd/admin provision-demo` (or `/admin`).
+3. Run `go run ./cmd/admin migrate` then `go run ./cmd/admin provision`,
+   `go run ./cmd/admin provision-demo` and `go run ./cmd/admin provision-meeting` (or `/admin`).
+   `provision-meeting` creates the separate `gappd_meeting_writer` role and its owner-scoped
+   policies on `cloud_meetings` and `meeting_lifecycle`; the synthetic roles keep no access there.
    The latter creates the separate non-owner role and fixed-payload INSERT RLS policy;
    grants fixed-identity SELECT/INSERT/marked DELETE on content and SELECT/INSERT/
    UPDATE(deleted_at) on lifecycle. No content UPDATE or marker deletion is allowed.

@@ -19,6 +19,9 @@ var lifecycleMigration string
 //go:embed 003.sql
 var selectedMigration string
 
+//go:embed 004.sql
+var meetingMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -52,7 +55,7 @@ func Provision(ctx context.Context, conn *pgx.Conn, password string) error {
 	if err = setPassword(ctx, tx, password); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, demo_lifecycle TO gappd_reader;
+	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, demo_lifecycle, cloud_meetings, meeting_lifecycle TO gappd_reader;
  ALTER ROLE gappd_reader SET default_transaction_read_only=on; ALTER ROLE gappd_reader SET statement_timeout='3s'`)
 	if err != nil {
 		return err
@@ -92,7 +95,7 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 	if _, err := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS cloud_migrations (version integer PRIMARY KEY)`); err != nil {
 		return err
 	}
-	for index, sql := range []string{migration, lifecycleMigration, selectedMigration} {
+	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration} {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err

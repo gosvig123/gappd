@@ -66,9 +66,16 @@ decoded document is always valid UTF-8.
    used in version 1.
 4. A deleted or expired cloud copy rejects later writes even when their revision is higher.
 
-## Required schema change
+## Storage
 
-The deployed `meetings.transcript` column caps UTF-8 bytes at 16384. That is a synthetic-demo
-bound, not a real-Meeting bound; a 30-minute Meeting exceeds it. Migration 004 must raise the
-searchable transcript projection to the 1 MiB transcript limit above, and must keep the
-`title` and `summary` caps this table already matches.
+Migration 004 puts a real copy in its own `cloud_meetings` table with 1 MiB `transcript`,
+512-byte `title`, 4096-byte `summary` and 2 MiB `document` bounds. The synthetic `meetings`
+table keeps its 16384-byte transcript cap, its constraints and its policies untouched, so a
+real copy and a demo row never share a table or a policy.
+
+`cloud_meetings.id` is `meeting_copy_id(owner_id, local_id)` in a namespace separate from
+every synthetic namespace. `meeting_lifecycle` holds the acceptance, the fixed 30-day expiry
+and the permanent deletion marker, and it owns the `local_id` mapping.
+
+An insert must find a live accepted lifecycle row; the trigger never creates one. A copy that
+is deleted or expired can never be inserted again, even at a higher revision.

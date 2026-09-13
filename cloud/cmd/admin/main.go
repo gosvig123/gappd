@@ -43,9 +43,11 @@ func execute(ctx context.Context, conn *pgx.Conn, command string) error {
 		return admin.BackfillDemo(ctx, conn, os.Getenv("DEMO_OWNER_ID"), os.Getenv("DEMO_ACCEPTED_AT"))
 	case "provision-cleanup":
 		return admin.ProvisionCleanup(ctx, conn, os.Getenv("DEMO_CLEANUP_DB_PASSWORD"))
+	case "provision-meeting":
+		return admin.ProvisionMeeting(ctx, conn, os.Getenv("MEETING_WRITER_DB_PASSWORD"))
 	case "seed":
 		return admin.Seed(ctx, conn, os.Getenv("DEMO_OWNER_ID"))
 	default:
-		return errors.New("use migrate, provision, provision-demo, provision-cleanup, backfill-demo, or seed")
+		return errors.New("use migrate, provision, provision-demo, provision-cleanup, provision-meeting, backfill-demo, or seed")
 	}
 }
