@@ -1,4 +1,4 @@
-/* Settings dialog. Width is fluid so the settings grid can choose its columns. */
+/* Stable fluid frame: category content scrolls without moving the navigation. */
 
 .app-modal-layer {
   position: fixed;
@@ -12,14 +12,16 @@
 }
 
 .app-modal {
-  inline-size: min(100%, clamp(32rem, 46vw, 52rem));
+  inline-size: min(100%, clamp(36rem, 78vw, 76rem));
+  block-size: min(48rem, 100%);
   max-block-size: 100%;
+  min-block-size: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-panel);
-  background: var(--color-surface-elevated);
+  background: var(--color-surface);
   box-shadow: inset 0 1px 0 var(--highlight-subtle), var(--shadow-sheet);
   animation: app-modal-in var(--transition-smooth);
 }
@@ -28,7 +30,7 @@
 
 .app-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-7) var(--space-8); border-block-end: 1px solid var(--color-border); }
 .app-modal-head h2 { margin: 0; font-size: var(--font-size-title); letter-spacing: var(--tracking-tight); }
-.app-modal-body { min-block-size: 0; padding: var(--space-8); }
+.app-modal-body { min-block-size: 0; min-inline-size: 0; overflow: hidden; padding: var(--space-8); container: settings-dialog / inline-size; }
 
 @media (max-width: 45rem) {
   .app-modal-layer { padding: var(--space-4) var(--space-4) 5rem; }

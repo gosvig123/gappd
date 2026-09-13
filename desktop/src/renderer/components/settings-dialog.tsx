@@ -17,7 +17,7 @@ export function SettingsDialog({ view, onClose }: { view: AppView; onClose: () =
           <h2>Settings</h2>
           <button type="button" className="app-icon-action" aria-label="Close settings" onClick={onClose}><X aria-hidden="true" /></button>
         </header>
-        <div className="app-modal-body ui-scroll">
+        <div className="app-modal-body">
           <SettingsView
             language={view.language}
             onLanguageChange={view.actions.setLanguage}

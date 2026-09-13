@@ -26,6 +26,7 @@ export function useFocusTrap(container: RefObject<HTMLElement | null>): void {
 
 function trapTab(event: KeyboardEvent, node: HTMLElement): void {
   const items = [...node.querySelectorAll<HTMLElement>(FOCUSABLE)]
+    .filter(item => item.getClientRects().length > 0 && getComputedStyle(item).visibility !== 'hidden')
   event.preventDefault()
   if (!items.length) return
   const index = items.indexOf(document.activeElement as HTMLElement)
