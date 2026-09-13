@@ -1,0 +1,182 @@
+# Gappd optional cloud MCP — implementation handover
+
+## Status and approved scope
+
+This is an approved direction, not an implemented feature. Infrastructure is reserved below.
+Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
+Client compatibility must be proved with real authorization and tool calls, not assumed.
+
+**The existing local MCP remains the default, unchanged. Cloud sync defaults to OFF.**
+Add an explicit Settings toggle. Installing, upgrading, signing in, or connecting Calendar must
+never enable sync, upload Meeting data, or replace the local MCP configuration automatically.
+Missing settings on existing installations mean OFF. Cloud access requires explicit consent.
+Local recording, transcription, history, settings, and local MCP must remain usable offline
+and without a Gappd identity. Remote MCP is an additional connection that users choose.
+
+This task provisions resources and records the handover only. It does not implement sync,
+a cloud API, authentication, a database schema, or a public MCP endpoint.
+
+## Proposed architecture
+
+```text
+Gappd recording device                    Gappd cloud service
+Local Meeting + durable pending changes --HTTPS--> Upload API
+Local audio stays here                              |
+                                                    v
+                                            PostgreSQL + text search
+                                                    ^
+                                                    |
+ChatGPT / desktop MCP clients --------HTTPS--> Read-only MCP endpoint
+```
+
+Use one cloud service for uploads and MCP, with separate permissions. Use PostgreSQL text
+search first. Do not add Redis, a vector database, object storage, or a queue service initially.
+The existing OAuth relay at auth.getgappd.com remains isolated from Meeting storage.
+Railway hosts PostgreSQL with persistent storage; this is not a promise of managed HA,
+automatic backups, or recovery. Configure and test those operational controls before launch.
+
+## Settings and consent contract
+
+- Suggested toggle: "Sync Meetings to Gappd Cloud"; default OFF on every installation.
+- Explain that uploaded text becomes available to explicitly authorized AI clients.
+- Enabling requires a Gappd identity and consent; a Google Calendar connection is unrelated.
+- Ask separately whether to include existing Meetings; do not silently backfill history.
+- Show per-Meeting pending/synced/failed state and the last successful device sync.
+- Turning OFF stops new uploads and pending retries. Do not silently delete cloud copies.
+- State clearly that existing cloud copies can remain readable until access is revoked or
+  cloud data is deleted. Provide separate client revocation and "Delete cloud data" controls.
+- Define in-flight upload behavior; do not claim an accepted upload can be recalled by OFF.
+- Resolve pending deletions and re-enable behavior before shipping; OFF must not leak uploads.
+- No cloud read failure may trigger local recording failure or silently switch MCP sources.
+
+## Data and ownership
+
+Export a versioned, explicit Meeting document, not a copy of the entire local SQLite database.
+Include stable Meeting ID, title, time/duration, transcript turns and timestamps, Meeting
+speaker labels, summaries, existing derived meeting data, revision, and sync timestamps.
+Keep audio, speaker embeddings, voice samples, local paths, credentials, Calendar caches,
+Saved Agenda drafts, and the global Person directory local in the first version.
+
+Every cloud Meeting belongs to one verified Gappd account. Its source device owns updates.
+Use globally unique cloud Meeting identifiers; inspect existing local IDs before deciding
+whether to reuse them or add a stable mapping. Two recordings of the same Calendar event
+remain separate Meetings. Multiple recording devices can upload different Meetings.
+Cross-device app history, editing, team sharing, and device ownership transfer are out of scope.
+Changing accounts must not upload a previous account's pending changes to the new account.
+
+## Sync behavior
+
+1. When enabled, a ready Meeting or later edit durably queues a newer revision.
+2. Replace the complete cloud Meeting atomically; avoid row-by-row transcript sync initially.
+3. An acknowledged revision clears only that queued revision, not a later local edit.
+4. Retries use account, Meeting ID, and revision. Duplicate uploads are harmless; old revisions
+   never overwrite newer ones. Use a monotonic revision, not device wall clocks, for ordering.
+5. Persist a deletion record before removing local Meeting data. Retain sufficient cloud
+   deletion state to reject delayed uploads. Account-wide cloud deletion must also invalidate
+   stale upload attempts so a device cannot silently restore erased data.
+6. Keep pending work across app restarts and network failures. Bound retries and payload sizes.
+7. Report cloud freshness honestly. An offline device cannot report its unsent local edits.
+
+## Remote MCP and authentication
+
+Keep cmd/gappd/mcp.go and its local read-only SQL contract intact.
+Use remote MCP over Streamable HTTP with standards-based OAuth authorization.
+Reuse verified Gappd identity infrastructure where suitable; inspect its actual capabilities
+before selecting an OAuth authorization server or adding dependencies.
+Do not reuse Google Calendar tokens, distribute shared credentials, or expose upload scopes
+through an MCP read grant. Users must be able to revoke individual clients and devices.
+
+Proposed bounded tools:
+- list_meetings: date filters and pagination.
+- search_meetings: matching transcript/summary passages with source references.
+- get_meeting: one owned Meeting, with paginated transcript access.
+- get_sync_status: cloud-observed sync state and freshness, not invented device status.
+
+Return Meeting IDs, revision, and transcript timestamps for citations. Do not expose arbitrary
+SQL against shared account data. Validate OAuth tokens and their audience/scopes; enforce
+account ownership on every read/write, including search, pagination, and deletion.
+Use row-level security as defense in depth with a non-owner runtime database role and tests.
+Treat transcript contents as untrusted data, not tool instructions or authorization.
+
+## Privacy and operations gates
+
+- HTTPS, encrypted storage/backups, no credentials in Git, and no transcript bodies in logs.
+- Explain that Gappd Cloud can read uploaded text; this is not end-to-end encryption against
+  the cloud operator. Connected AI providers receive data their granted tools return.
+- Separate migration and runtime database roles; apply least privilege before real data.
+- Define retention, account deletion, backup expiry, data region, and incident ownership.
+- Configure automatic backups and prove restore into an isolated environment.
+- Bound upload size, query time/results, per-account storage, and request rates.
+- Add health/readiness checks, error monitoring, and cost monitoring without logging content.
+- Use synthetic data until authentication, tenant isolation, deletion, and restore tests pass.
+
+## Provisioned Railway resources
+
+Workspace: Kristian Gosvig's Projects (the existing workspace containing Gappd services).
+Project: [gappd-cloud](https://railway.com/project/b73b1b1e-810b-4c3d-af03-6136244852c0).
+This is separate from the existing site/auth project. PostgreSQL incurs ongoing usage costs.
+
+| Resource | Identifier / configuration |
+| --- | --- |
+| Project | b73b1b1e-810b-4c3d-af03-6136244852c0 |
+| Environment | production: 7b4a6831-62f8-4dda-a2e1-773542c266fb |
+| API service | gappd-cloud-api: 7407bf7c-600e-4a4c-928d-bf4c02747463 |
+| Database service | Postgres: 1e6d7e2d-b50a-4685-ab97-cacc4557aeae |
+| Database image | ghcr.io/railwayapp-templates/postgres-ssl:18 |
+| Database volume | postgres-volume: 09e2971f-5fba-4cc9-8d60-729a27812e94 |
+| Volume mount | /var/lib/postgresql/data |
+| Region | europe-west4-drams3a (EU West) |
+| GitHub source | gosvig123/gappd, beta branch |
+| API root / watched paths | /cloud / ["/cloud/**"] |
+| API DATABASE_URL | ${{Postgres.DATABASE_URL}} (private-network reference) |
+
+PostgreSQL was verified running with its volume ready and no public TCP proxy.
+No public API domain was created. No user Meeting data was uploaded.
+The GitHub connection triggered an initial repository build; its deployment was removed and
+pending deployment cancelled. The cloud service is a reserved target, not a working backend.
+The /cloud directory does not exist yet. Do not manually deploy until implementation and
+build configuration exist. Verify GitHub push/CI gating end-to-end with the first cloud change.
+The environment name production is Railway's default, not approval to serve production users.
+Before launch, add an isolated staging environment and choose the production release branch;
+beta is the current development branch, not a permanent production-branch decision.
+
+Reconnect the CLI explicitly before any future infrastructure change:
+
+```sh
+railway link --project b73b1b1e-810b-4c3d-af03-6136244852c0 \
+  --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb \
+  --service 7407bf7c-600e-4a4c-928d-bf4c02747463
+railway service list --json
+```
+
+CLI note: this installed version's environment edit reads piped stdin before configuration
+flags. In non-interactive automation, supply a JSON patch on stdin and verify persisted config.
+Never print resolved service variables; inspect names or unresolved references only.
+
+## Implementation sequence and acceptance
+
+1. Prove OAuth + one read-only tool with synthetic data in hosted ChatGPT and a desktop client.
+   Record client versions, account/plan restrictions, login/revocation results, and limitations.
+2. Implement the smallest /cloud service, schema migrations, account isolation, health checks,
+   deployment configuration, and CI checks. Validate the GitHub deployment path in staging.
+3. Add the OFF-by-default Settings toggle and persistent one-way sync, then MCP read tools.
+4. Test fresh installs/upgrades/sign-in stay OFF; local MCP is unchanged; OFF causes no Meeting
+   upload; local recording works offline; consent is required for historical uploads.
+5. Test retries/restarts, reordered revisions, edits during upload, toggling OFF, account
+   switches, deletions, stale-device resurrection prevention, and unauthorized cross-account
+   reads/writes. Verify remote reads while the recording Mac is asleep.
+6. Validate real client compatibility, privacy controls, limits, backup restore, and rollout
+   before adding a public production endpoint or accepting real user data.
+
+## Repository starting points
+
+- CONTEXT.md: current domain terms and local-first boundaries; planned cloud behavior is here.
+- cmd/gappd/mcp.go, mcp_protocol.go, mcp_query.go: existing local MCP contract.
+- internal/db/: local schema, Meeting mutation/deletion paths, and search.
+- internal/config/, cmd/gappd/app_config.go: persisted settings and app configuration.
+- desktop/src/renderer/routes/settings-view.tsx: inspect current Settings composition.
+- desktop/src/main/: inspect identity, credential storage, and lifecycle integration.
+- .github/workflows/ci.yml, Makefile, package.json: reuse relevant checks; do not invent CI.
+
+Run relevant tests/build checks for implementation changes, commit only owned changes, and
+push the current branch after validation. Preserve unrelated work already in CONTEXT.md.

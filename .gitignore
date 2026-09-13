@@ -11,6 +11,7 @@ node_modules/
 !/docs/desktop-macos-release.md
 !/docs/speaker-labeling.md
 !/docs/slack-integration.md
+!/docs/cloud-mcp-handover.md
 # Go
 vendor/
 
