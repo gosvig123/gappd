@@ -66,6 +66,22 @@ decoded document is always valid UTF-8.
    used in version 1.
 4. A deleted or expired cloud copy rejects later writes even when their revision is higher.
 
+## Local producer
+
+`gappd meeting-document export <meeting-id> <revision>` prints these exact bytes for one local
+Meeting. It opens the normal local store and never contacts the network. The sync queue owns the
+revision: it starts at 1 and increases by one for each change it sends, so ordering never depends
+on a local counter or the device clock.
+
+Meeting speaker labels are part of the document. An unconfirmed speaker keeps its generic key
+("You", "Other"), but a speaker assigned to a saved Person uploads that assigned name. That is a
+Meeting speaker label, and it is the one place a person's name can reach the cloud, so the upload
+consent must say so.
+
+`internal/meetingdocument` is the local builder and `cloud/internal/service/document.go` is the
+cloud validator. The two modules cannot share a type, so both tests pin the same literal bytes:
+a contract change on either side fails its own test instead of silently breaking uploads.
+
 ## Storage
 
 Migration 004 puts a real copy in its own `cloud_meetings` table with 1 MiB `transcript`,
