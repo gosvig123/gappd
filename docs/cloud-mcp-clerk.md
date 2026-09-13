@@ -4,7 +4,8 @@
 
 Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.
 Automated tests and a user-completed live development Settings login passed on 2026-09-13.
-No cloud backend, upload, device registration, or remote MCP is implemented.
+`/cloud` now implements synthetic-only read MCP; live deployment/auth checks are pending.
+No upload or device registration exists. See the [service runbook](../cloud/README.md).
 The existing local MCP remains the default. No Meetings are uploaded.
 
 This extends [the cloud MCP handover](cloud-mcp-handover.md). Reuse the existing Clerk
@@ -21,6 +22,7 @@ application; do not create a second Gappd identity system or reuse Google Calend
 | Desktop OAuth application | Gappd Desktop: oa_3Id5BEBuhYLGvg5TbwfX8b5QUb8 |
 | Desktop public client ID | iFaeusoYBwClQRoP |
 | Existing redirect URI | http://127.0.0.1/callback |
+| Pi public read client | TWKqKO5MnYvt8bAL; oa_3JGyOCPDXsq5Lxhib8jLTpHfVbd |
 
 The desktop client already used public-client PKCE and an enabled consent screen.
 Its original scopes were email, profile, and offline_access. These were preserved.
@@ -42,6 +44,14 @@ Not advertising a scope is NOT an authorization boundary. The cloud upload API m
 only the approved desktop client, the sync scope, a registered device, and the correct owner.
 Adding an allowed scope does not grant it to existing tokens or enable application sync.
 
+## Read-only client setup
+
+Pi has a separate public client, `Gappd MCP - Pi (development)`, with consent enabled.
+Its only allowed scopes are `meetings:read offline_access`; callback is
+`http://127.0.0.1/callback`. Desktop registration and DCR remain unchanged.
+Pi live authorization is pending. ChatGPT Developer mode was OFF during inspection;
+the user must enable it before its exact connection callback can be obtained.
+
 ## Railway configuration
 
 Added these non-secret values to `gappd-cloud-api` in the reserved Railway environment:
@@ -51,8 +61,8 @@ CLERK_ISSUER_URL=https://learning-mutt-4805.clerk.accounts.dev
 GAPPD_DESKTOP_OAUTH_CLIENT_ID=iFaeusoYBwClQRoP
 ```
 
-Variables were set with deployment disabled. There is no consumer for them until the cloud
-backend is implemented. The environment is named production by Railway but currently points
+Variables were set with deployment disabled. The cloud backend now consumes CLERK_ISSUER_URL;
+MCP_RESOURCE_URL and a private reader DATABASE_URL are also required. The environment is named production by Railway but currently points
 to Clerk DEVELOPMENT; it must not accept production users or Meeting data in this state.
 No Clerk secret key was copied into Railway or Git. JWT signature verification can use the
 public signing-key endpoint; administrative operations may need separately provisioned keys.
@@ -133,7 +143,8 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
   grants, meetings:read advertised, meetings:sync absent, registration endpoint absent.
 - Live Settings login verified token exchange and verified account display. The encrypted file
   was owner-only (0600); OFF removed it. All 258 desktop tests, typecheck, and builds passed.
-- No device upload or remote MCP request is implemented or claimed. No Meetings were uploaded.
+- Synthetic remote MCP has automated local coverage, not live Clerk/client proof.
+  No device upload is implemented. No Meetings were uploaded.
 - Application-wide PKCE enforcement affects future logins for every OAuth client in this
   development instance. Only the existing public Gappd Desktop client was listed during setup.
 
@@ -142,3 +153,7 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
 - [Live authorization server metadata](https://learning-mutt-4805.clerk.accounts.dev/.well-known/oauth-authorization-server)
 - [Clerk OAuth behavior, scopes, PKCE, and token lifetime](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth)
 - [Clerk MCP support](https://clerk.com/docs/guides/ai/overview)
+
+Raw JWT claim references used by `/cloud` (no live tokens retained):
+- [Clerk OAuthJwtPayload scp/scope](https://github.com/clerk/javascript/blob/main/packages/backend/src/api/resources/IdPOAuthAccessToken.ts)
+- [Clerk OAuth at+jwt discriminator](https://github.com/clerk/javascript/blob/main/packages/backend/src/tokens/machine.ts)

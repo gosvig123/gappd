@@ -2,8 +2,8 @@
 
 ## Status and approved scope
 
-The desktop now implements a development auth-only preview. Cloud sync and remote MCP
-remain approved directions, not implemented features. Infrastructure is reserved below.
+The desktop now implements a development auth-only preview. Cloud sync remains unimplemented. `/cloud` now implements a synthetic-only read MCP
+service; deployment and live client authorization remain pending. See [runbook](../cloud/README.md).
 Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
 Client compatibility must be proved with real authorization and tool calls, not assumed.
 
@@ -16,7 +16,8 @@ and without a Gappd identity. Remote MCP is an additional connection that users 
 
 Settings → Connections → Cloud sync defaults OFF and opens Clerk only after explicit ON.
 Only a verified account and protected credentials enable the auth-only preview. No Meetings
-are uploaded. No cloud API, sync, schema, device registration, or public MCP is implemented.
+are uploaded. The independent cloud slice has synthetic schema and read MCP only;
+no upload, sync, or device registration exists.
 This preview consent is authentication only: a future upgrade MUST ask for new explicit upload
 consent. It must never interpret this credential or enabled state as upload permission.
 
@@ -91,7 +92,7 @@ See [Clerk setup and remaining integration gates](cloud-mcp-clerk.md) before imp
 Do not reuse Google Calendar tokens, distribute shared credentials, or expose upload scopes
 through an MCP read grant. Users must be able to revoke individual clients and devices.
 
-Proposed bounded tools:
+Only get_meeting is implemented, bounded to synthetic data. Future proposed tools:
 - list_meetings: date filters and pagination.
 - search_meetings: matching transcript/summary passages with source references.
 - get_meeting: one owned Meeting, with paginated transcript access.
@@ -133,14 +134,16 @@ This is separate from the existing site/auth project. PostgreSQL incurs ongoing 
 | Region | europe-west4-drams3a (EU West) |
 | GitHub source | gosvig123/gappd, beta branch |
 | API root / watched paths | /cloud / ["/cloud/**"] |
-| API DATABASE_URL | ${{Postgres.DATABASE_URL}} (private-network reference) |
+| API DATABASE_URL | Private-network URL for gappd_reader; no administrator credentials |
+| Public MCP URL | https://gappd-cloud-api-production.up.railway.app/mcp |
 
-PostgreSQL was verified running with its volume ready and no public TCP proxy.
-No public API domain was created. No user Meeting data was uploaded.
-The GitHub connection triggered an initial repository build; its deployment was removed and
-pending deployment cancelled. The cloud service is a reserved target, not a working backend.
-The /cloud directory does not exist yet. Do not manually deploy until implementation and
-build configuration exist. Verify GitHub push/CI gating end-to-end with the first cloud change.
+PostgreSQL is private, with no public TCP proxy. Migration, reader-role provisioning, and
+one explicit synthetic seed completed through SSH. No user Meeting data was uploaded.
+The original administrator DATABASE_URL reference was replaced and verified as gappd_reader.
+Independent review, Go 1.25.13 race tests against PostgreSQL 18, and Docker build passed.
+`/cloud` contains the service, admin commands, Docker and Railway configuration.
+Parent owns first deployment and live client verification; those remain pending.
+Verify GitHub push/CI gating end-to-end with the first cloud change.
 The environment name production is Railway's default, not approval to serve production users.
 Before launch, add an isolated staging environment and choose the production release branch;
 beta is the current development branch, not a permanent production-branch decision.
