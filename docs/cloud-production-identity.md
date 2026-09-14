@@ -51,92 +51,43 @@ registration_endpoint: absent
 `meetings:read` is advertised, `meetings:sync` is absent, and there is no registration endpoint, which
 is the contract this project requires.
 
+## Production OAuth clients
+
+The Desktop client is created. The read client is not.
+
+| Client | Client ID | Type | Scopes | State |
+| --- | --- | --- | --- | --- |
+| `Gappd Desktop` | `t3RzfAuaxamgqOQV` | public, consent on | `email`, `profile`, `offline_access`, `meetings:sync` | **created** |
+| `Gappd MCP - Pi` | — | public, consent on | `meetings:read`, `offline_access` | **to create** |
+
+The application's own panel reports the endpoints, which match the issuer:
+
+```
+discovery:  https://clerk.getgappd.com/.well-known/openid-configuration
+authorize:  https://clerk.getgappd.com/oauth/authorize
+token:      https://clerk.getgappd.com/oauth/token
+```
+
+Clerk shows a client secret for every application, including a public one. It was not copied or
+stored: the desktop is a public client that uses PKCE and must never hold a secret. Confirm the
+redirect URI is `http://127.0.0.1/callback` on this client, because the desktop's loopback callback
+is checked against it.
+
 ## Remaining steps
 
-1. **Create the two OAuth applications** in the production instance. They do not migrate. The
-   dashboard's create dialog did not expose its fields to automation, so this is a manual step:
-   - `Gappd Desktop`, public client, PKCE required, redirect `http://127.0.0.1/callback`, allowed
-     scopes `email`, `profile`, `offline_access`, `meetings:sync`.
-   - One read-only client per MCP client, public, PKCE required, redirect
-     `http://127.0.0.1/callback`, allowed scopes `meetings:read`, `offline_access` only.
-2. **Then switch the server**, in this order: `CLERK_ISSUER_URL=https://clerk.getgappd.com`, then
-   `GAPPD_PRODUCTION_MODE=true`, then deploy.
-3. **Then set the two repository variables** so the beta build bakes the production identity.
+1. **Create the read client** `Gappd MCP - Pi`: public, consent on, scopes `meetings:read` and
+   `offline_access` only. Then re-authorize Pi against it.
+2. **Record the redirect URI** on both clients as `http://127.0.0.1/callback`.
+3. **Then switch the server**, in this order:
+   ```
+   CLERK_ISSUER_URL=https://clerk.getgappd.com
+   GAPPD_DESKTOP_OAUTH_CLIENT_ID=t3RzfAuaxamgqOQV
+   GAPPD_PRODUCTION_MODE=true
+   ```
+   then deploy. The service refuses to start if the issuer is not a production host.
+4. **Then set the two repository variables** `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID`
+   so the beta build bakes the production identity.
 
-Do not do step 2 before step 1. Switching first makes the server reject the development tokens that
-Pi and the desktop currently hold, and no production client exists yet to re-authorize with, so the
-live read path would stop until step 1 is finished.
-
-## What is in place
-
-| Piece | State |
-| --- | --- |
-| Server issuer | `CLERK_ISSUER_URL`, validated as an HTTPS URL with no path, query or fragment |
-| Server production guard | `GAPPD_PRODUCTION_MODE=true` refuses any issuer containing `.clerk.accounts.dev` at startup |
-| Desktop identity | `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID`, or the matching build variables, defaulting to the development instance |
-| Cloud resource | `GAPPD_CLOUD_RESOURCE_URL` on the desktop, `MCP_RESOURCE_URL` on the server; both must name the same `/mcp` URL |
-| Scopes | `meetings:read` for read clients, `meetings:sync` for the Desktop client, neither advertised to sync |
-
-## Order of work
-
-1. **Create the Clerk production instance** in the same application, and add the Gappd domain. Clerk
-   requires DNS records for the domain; the desktop and the server both need the resulting issuer.
-   Do not delete the development instance: existing development credentials keep working until they
-   expire, and the beta build still points at it.
-2. **Recreate the two OAuth clients** in the production instance, because clients do not migrate:
-   - `Gappd Desktop`, public client, PKCE required, redirect `http://127.0.0.1/callback`, allowed
-     scopes `email`, `profile`, `offline_access`, `meetings:sync`. Keep its client id private to the
-     product; it is a public client, so the id is not a secret, but only it may request the sync
-     scope.
-   - `Gappd MCP - <client>`, one per read client, public, PKCE required, redirect
-     `http://127.0.0.1/callback`, allowed scopes `meetings:read` and `offline_access` only.
-   - Recreate the custom scopes `meetings:read` and `meetings:sync` first: scopes do not migrate
-     either.
-3. **Enable audience inclusion** on the production instance and **keep Dynamic Client Registration
-   off**. DCR is an unauthenticated registration endpoint; enabling it would let any caller register
-   a client and ask for the read scope.
-4. **Point the server at production**, in this order, and nothing else at the same time:
-   `CLERK_ISSUER_URL` to the production issuer, then `GAPPD_PRODUCTION_MODE=true`, then deploy.
-   Setting the flag before the issuer is correct and safe: the service refuses to start and says so,
-   rather than serving development tokens.
-5. **Build the desktop against production.** The release workflow already reads
-   `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID` from repository variables, so setting those
-   two is the whole step. A packaged build cannot read a runtime environment variable, which is why
-   these are build variables and not settings.
-6. **Re-authorize every client.** A production token is a different token: Pi and ChatGPT need a
-   fresh authorization, and the desktop needs a fresh sign-in. Old development tokens do not become
-   production tokens.
-7. **Re-register the device.** A device key registered under the development instance is
-   re-registered automatically on the first write after sign-in, because registration is per
-   credential. Nothing to do by hand; verify the first upload still succeeds.
-
-## Checks that must pass
-
-| Check | How | Fail closed if |
-| --- | --- | --- |
-| The issuer is production | `GET /health` is 200 after deploy | The service refuses to start when `GAPPD_PRODUCTION_MODE=true` and the issuer is a development host |
-| The audience is the cloud resource | A read client authorizes, then `GET /mcp` with its token | The verifier requires exactly one audience equal to `MCP_RESOURCE_URL` |
-| The read scope is read-only | `POST /meeting` with a read token | The write route requires `meetings:sync` and the exact signed desktop client id |
-| The device gate is live | `POST /meeting` with no device headers | Refused with 403 |
-| Account isolation survives | Two accounts, one upload, one read | RLS and the owner filter are unchanged by identity |
-| Revocation works | `POST /revoke`, then the revoked client's next call | The check runs on every request, cached for at most 30 seconds |
-| The old development issuer is not trusted | A development token against production `/mcp` | The issuer is pinned; a development `iss` fails signature and issuer validation |
-
-## What must be true before step 4
-
-- Backup restore is proven in an isolated target, and point-in-time recovery is enabled.
-- A monitor polls `GET /status` and alerts on `cleanup.behind`.
-- Log retention has a decision, or a forwarder with its own retention.
-- A second account has been tested end to end, and hosted ChatGPT has been tested or explicitly
-  deferred.
-
-## Cost and rollback
-
-Reverting is configuration: set `CLERK_ISSUER_URL` back and remove `GAPPD_PRODUCTION_MODE`. That
-does **not** revoke production grants or delete production cloud copies, because the issuer is only
-one end of the trust. Deleting cloud copies is `POST /delete-all`, and revoking a client is
-`POST /revoke`.
-
-The production instance changes the cost profile: Clerk bills per monthly active user above its free
-tier, and Railway bills for the PITR archive bucket plus the volume. Check both before opening
-sign-ups.
+Do not do step 3 before step 1. Switching first makes the server reject the development tokens that
+Pi and the desktop currently hold, and there is no production read client yet to re-authorize with,
+so the live read path stops until step 1 is done.
