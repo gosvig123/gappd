@@ -6,6 +6,40 @@ the order of work, with the checks that fail closed if a step is skipped.
 
 Nothing here changes code. Every value is configuration.
 
+## Live state (2026-09-14)
+
+A production instance was created by cloning the development instance, because the identity work
+cannot be finished without it and the cloning is what preserves the authentication and theme
+settings.
+
+| Item | Value |
+| --- | --- |
+| Application | `Gappd`, id `app_3Id4GHzrmEco43rxk3si2knnZAZ` |
+| Production instance | `ins_3JJlwm8pUSkAERBSaRo0Ii5ue6X` |
+| Application domain | `app.getgappd.com` |
+| **Issuer (Frontend API)** | **`https://clerk.getgappd.com`** |
+| Account portal | `accounts.getgappd.com` |
+| Domain record | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, status **Unverified** |
+| Plan | Hobby. OAuth applications and custom scopes are **not** plan-gated, so no upgrade is needed |
+| Scopes | `meetings:read` (advertised) and `meetings:sync` (not advertised) recreated |
+| OAuth applications | **Not yet created.** They do not migrate and must be recreated |
+
+`clerk.` and `accounts.` are reserved by Clerk as *application* subdomains. `clerk.getgappd.com` is
+still the Frontend API host, which is why it is the issuer.
+
+## DNS records still to add
+
+Five CNAME records at Namecheap, where `getgappd.com` is registered. Clerk verifies the domain only
+after they resolve.
+
+| Type | Name | Value | Purpose |
+| --- | --- | --- | --- |
+| CNAME | `clerk` | `frontend-api.clerk.services` | Frontend API: the issuer host |
+| CNAME | `accounts` | `accounts.clerk.services` | Account portal |
+| CNAME | `clkmail` | `mail.xk2n1iwgxvot.clerk.services` | Email sending |
+| CNAME | `clk._domainkey` | `dkim1.xk2n1iwgxvot.clerk.services` | DKIM |
+| CNAME | `clk2._domainkey` | `dkim2.xk2n1iwgxvot.clerk.services` | DKIM |
+
 ## What is in place
 
 | Piece | State |
