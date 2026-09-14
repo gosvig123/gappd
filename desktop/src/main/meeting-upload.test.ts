@@ -1,59 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { MeetingSyncQueue } from './meeting-sync-queue.ts'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { MeetingUpload } from './meeting-upload.ts'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { SecureJsonStore, type StoreCipher } from './secure-json-store.ts'
-import type { CloudCredential } from './cloud-auth'
-import type { MeetingSyncDocument } from '../shared/meeting-sync-contract'
-
-const cipher: StoreCipher = {
-  encrypt: (value) => Buffer.from(Buffer.from(value).toString('base64url')),
-  decrypt: (value) => Buffer.from(value.toString(), 'base64url').toString(),
-}
-
-class FakeStore extends SecureJsonStore<MeetingSyncDocument> {
-  override async read(): Promise<MeetingSyncDocument | null> { return this.stored }
-  override async write(value: MeetingSyncDocument): Promise<void> { this.stored = structuredClone(value) }
-  stored: MeetingSyncDocument | null = null
-}
-
-const MEETING = '72619a1d-f713-4f46-a2b8-c74e568726b1'
-const OTHER = '11111111-1111-5111-8111-111111111111'
-const credential = (subject = 'user_a', token = `token-${subject}`): CloudCredential => ({
-  version: 1, issuer: 'https://issuer.test', clientId: 'desktop', subject, email: `${subject}@example.test`,
-  tokens: { accessToken: token, expiresAt: Date.now() + 3600000, tokenType: 'Bearer' },
-})
-
-function harness(options: { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null } = {}) {
-  let saved: CloudCredential | null = options.saved === undefined ? credential() : options.saved
-  let requests: { url: string; method: string; body: string | undefined; authorization: string | null }[] = []
-  const auth = {
-    status: async () => ({ enabled: Boolean(saved), pending: false, subject: saved?.subject ?? null, email: saved?.email ?? null, error: null }),
-    credential: async () => saved,
-    setEnabled: async (enabled: unknown) => { saved = enabled ? credential() : null; return auth.status() },
-  }
-  const queue = new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher))
-  const fetcher: typeof fetch = async (input, init) => {
-    requests.push({
-      url: String(input), method: init?.method ?? 'GET',
-      body: typeof init?.body === 'string' ? init.body : undefined,
-      authorization: new Headers(init?.headers).get('Authorization'),
-    })
-    return options.fetcher ? options.fetcher(input, init) : accepted(1)
-  }
-  const upload = new MeetingUpload(auth, 'https://example.test/mcp', options.available ?? true, queue,
-    async (_localId, revision) => `{"version":1,"revision":${revision}}`, fetcher)
-  return {
-    upload, queue, auth, requests, sends: () => requests.length,
-    switch: (value: CloudCredential | null) => { saved = value },
-  }
-}
-
-const accepted = (revision: number, subject = 'user_a') => Response.json(
-  { status: 'accepted', subject, id: '11111111-1111-5111-8111-111111111111', revision, expires_at: '2026-10-13T12:00:00Z' })
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { harness, credential, accepted, MEETING, OTHER, type Harness } from './meeting-upload-harness.ts'
 
 test('signing in never permits an upload; the capability gate blocks everything', async () => {
   const h = harness()
@@ -98,6 +46,31 @@ test('a consent for another account, or a changed token, sends nothing', async (
   await h.upload.enqueue(MEETING)
   await h.upload.sync()
   assert.equal(h.sends(), 0)
+})
+
+test('every write registers once and carries a device signature', async () => {
+  const h = harness()
+  await h.upload.setConsent('user_a', true)
+  await h.upload.enqueue(MEETING)
+  await h.upload.sync()
+  await h.upload.enqueue(OTHER)
+  await h.upload.sync()
+  assert.equal(h.registrations.length, 1, 'registration happens once per credential')
+  assert.match(h.registrations[0], /"public_key":"[A-Za-z0-9+/]+"/)
+  for (const request of h.requests) {
+    assert.equal(request.device?.length, 64)
+    assert.ok((request.signature || '').length > 0, 'every write is signed')
+  }
+})
+
+test('a Mac that cannot register sends nothing', async () => {
+  const h = harness({ deviceStatus: 403 })
+  await h.upload.setConsent('user_a', true)
+  await h.upload.enqueue(MEETING)
+  const status = await h.upload.sync()
+  assert.equal(h.sends(), 0)
+  assert.equal(h.registrations.length, 1)
+  assert.match(status.result || '', /could not register/)
 })
 
 test('a refused document stops retrying but leaves other Meetings queued', async () => {

@@ -13,11 +13,11 @@ const TIMEOUT_MS = 15_000
  * decides what an outcome means for the queue.
  */
 export async function sendDocument(fetcher: typeof fetch, resource: string, credential: CloudCredential,
-  work: MeetingSyncWork, signal: AbortSignal): Promise<SendOutcome> {
+  signatures: Record<string, string>, work: MeetingSyncWork, signal: AbortSignal): Promise<SendOutcome> {
   try {
     const response = await fetcher(new URL('/meeting', resource), {
       method: 'POST', body: work.document, redirect: 'error',
-      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
       signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
     })
     // A refusal is about this document, so retrying it can never help.
@@ -30,13 +30,29 @@ export async function sendDocument(fetcher: typeof fetch, resource: string, cred
   }
 }
 
+/** Registers this device's public key. It is the one write that carries no signature. */
+export async function sendRegistration(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  body: string, signal: AbortSignal): Promise<boolean> {
+  try {
+    const response = await fetcher(new URL('/device', resource), {
+      method: 'POST', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
 /** Deletes one cloud copy. Absent and other-owner copies answer the same way. */
 export async function sendDelete(fetcher: typeof fetch, resource: string, credential: CloudCredential,
-  localId: string, signal: AbortSignal): Promise<boolean> {
+  localId: string, signatures: Record<string, string>, signal: AbortSignal): Promise<boolean> {
+  const body = JSON.stringify({ meeting_id: localId })
   try {
     const response = await fetcher(new URL('/meeting', resource), {
-      method: 'DELETE', body: JSON.stringify({ meeting_id: localId }), redirect: 'error',
-      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json' },
+      method: 'DELETE', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
       signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
     })
     const value: unknown = await response.json()
