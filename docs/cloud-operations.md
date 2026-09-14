@@ -186,3 +186,37 @@ setting would not remove Railway's own captured logs.
 - [Backup schedules and retention](https://docs.railway.com/volumes/backups)
 - [Plan-based log retention](https://docs.railway.com/observability/logs#log-retention)
 - [Approved lifecycle contract](cloud-data-lifecycle.md)
+
+
+## Why a re-upload of a deleted Meeting fails with 503
+
+Three deliberate rules meet here, and together they produce a confusing error.
+
+1. The cloud copy id is derived, not random: `meeting_copy_id(owner_id, local_id)`.
+   The same local Meeting always maps to the same cloud id.
+2. Deletion is permanent. `meeting_lifecycle` keeps `deleted_at` and the DELETE path only sets it.
+3. `guard_cloud_meeting_insert` requires a live accepted lifecycle row, so a deleted or expired copy
+   never returns.
+
+A re-upload therefore reaches `verifyStored`, finds no live lifecycle row, and fails. That failure has
+no sentinel of its own, so `writeUploadRefusal` falls through to its default and answers
+`503 cloud copy unavailable`. A 503 reads as retryable and names nothing, so it looks like an
+outage rather than a permanent refusal of that one Meeting. The desktop queue does stop after
+`MAX_SYNC_ATTEMPTS`, so it is a diagnosability problem, not a retry loop. Giving this case its own
+sentinel and a permanent status is worth doing.
+
+To see which local Meetings are spent for an account, read the lifecycle table over the private
+tunnel:
+
+```sh
+printf "SELECT owner_id, left(id::text,8), left(local_id,8), deleted_at IS NOT NULL AS deleted FROM meeting_lifecycle ORDER BY 1;\n" \
+  | railway connect Postgres --ssh --project b73b1b1e-810b-4c3d-af03-6136244852c0 \
+      --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb
+```
+
+Never reach for this to revive a copy. The permanence is the guarantee, and clearing `deleted_at`
+would break it.
+
+`cloud:proof` used to hit this on its second run in an account, because it reused the one pinned
+synthetic fixture identity. It now creates and exports its own Meeting with a fresh id, so each run
+gets its own cloud copy and `--delete` no longer consumes the proof for the whole account.
