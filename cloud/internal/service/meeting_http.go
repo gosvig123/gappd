@@ -40,6 +40,10 @@ func acknowledgeMeetingUpload(w http.ResponseWriter, r *http.Request, pool *pgxp
 		http.Error(w, "invalid document", http.StatusBadRequest)
 		return
 	}
+	if errors.Is(err, errStorageFull) {
+		http.Error(w, "account storage limit reached", http.StatusRequestEntityTooLarge)
+		return
+	}
 	if err != nil {
 		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
 		return

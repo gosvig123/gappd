@@ -37,6 +37,9 @@ func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document Meetin
 		id, owner, document.MeetingID); err != nil {
 		return errors.New("cloud copy unavailable")
 	}
+	if err := checkCapacity(ctx, tx, owner, id, len(data)); err != nil {
+		return err
+	}
 	if err := writeCopy(ctx, tx, owner, id, document, data); err != nil {
 		return err
 	}

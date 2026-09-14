@@ -17,6 +17,8 @@ type Auth struct {
 	Issuer, Resource        string
 	Keys                    *Keys
 	RequiredScope, ClientID string
+	// Limits is installed by the server entrypoint. A nil limiter disables request budgets.
+	Limits *Limiter
 }
 
 var errScope = errors.New("insufficient scope")
@@ -91,6 +93,23 @@ func (a *Auth) protect(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, owner)))
+	})
+}
+
+// limited applies the per-account request budget for one class of route. It must wrap the
+// protected handler, so it can key on the verified account rather than on the caller's header.
+func (a *Auth) limited(class string, next http.Handler) http.Handler {
+	if a.Limits == nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		owner, _ := r.Context().Value(ownerKey{}).(string)
+		if !a.Limits.allow(class, owner) {
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

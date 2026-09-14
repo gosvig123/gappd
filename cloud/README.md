@@ -76,6 +76,26 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Request and storage limits
+
+One account cannot exhaust the service or its cost, and one runaway client cannot spend the
+owner's budget alone.
+
+| Limit | Value |
+| --- | --- |
+| Read requests to `/mcp` | 60 per minute per account |
+| Write requests to `/meeting` | 12 per minute per account |
+| Stored copies | 500 per account |
+| Stored bytes (title + summary + transcript) | 64 MiB per account |
+
+Each account gets its own token bucket per class, so reads and writes do not consume each
+other, and a refusal answers 429 with `Retry-After: 60`. The storage cap answers 413 and
+excludes the copy being written, so a revision update still passes when the account is full.
+
+The buckets live in the process: a restart clears them and a second instance would count
+separately. They are installed by the server entrypoint, so a different entrypoint would run
+unlimited. Move them to a shared store before running more than one instance.
+
 ## Real copy cleanup
 
 Real Meeting copies are swept by the same `/cleanup` process, in addition to the synthetic slice.

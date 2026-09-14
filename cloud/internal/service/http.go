@@ -43,7 +43,7 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 		uploadAuth := *a
 		uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
 		protect := func(h http.Handler) http.Handler {
-			return uploadAuth.protect(http.NewCrossOriginProtection().Handler(h))
+			return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
 		}
 		if uploads.Demo != nil {
 			mux.Handle("POST /selected-demo-meeting", protect(selectedDemoHandler(uploads.Demo)))
@@ -56,7 +56,7 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 			mux.Handle("DELETE /meeting", protect(meetingHandler(uploads.Meeting)))
 		}
 	}
-	mux.Handle("/mcp", a.protect(http.NewCrossOriginProtection().Handler(meetingTransport(pool))))
+	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(meetingTransport(pool)))))
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.metadata)
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", a.metadata)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
