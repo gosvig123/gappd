@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gosvig123/gappd/cloud/internal/service"
@@ -23,6 +24,9 @@ func run() error {
 	issuer, resource := os.Getenv("CLERK_ISSUER_URL"), os.Getenv("MCP_RESOURCE_URL")
 	if !validURL(issuer, "") || !validURL(resource, "/mcp") || os.Getenv("DATABASE_URL") == "" {
 		return errors.New("invalid configuration")
+	}
+	if err := productionIdentity(issuer); err != nil {
+		return err
 	}
 	pool, err := service.OpenPool(context.Background(), os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -75,6 +79,18 @@ func meetingPool(demo *pgxpool.Pool) (service.Uploads, error) {
 	pool, err := service.OpenMeetingPool(context.Background(), os.Getenv("MEETING_STORAGE_DATABASE_URL"))
 	uploads.Meeting = pool
 	return uploads, err
+}
+
+// A production deployment must not accept the shared development identity, which cannot verify
+// domains or issue credentials that a real account can be revoked from.
+func productionIdentity(issuer string) error {
+	if os.Getenv("GAPPD_PRODUCTION_MODE") != "true" {
+		return nil
+	}
+	if strings.Contains(issuer, ".clerk.accounts.dev") {
+		return errors.New("production requires a production identity issuer")
+	}
+	return nil
 }
 
 func validURL(raw, path string) bool {

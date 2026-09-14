@@ -6,7 +6,7 @@ import { meetingDocumentLoader } from './meeting-document-loader'
 import { resolveGappdBinary } from './native-runtime'
 import { MeetingSyncQueue } from './meeting-sync-queue'
 import { MeetingUpload } from './meeting-upload'
-import { cloudAuthDevelopmentConfig, cloudResource } from './service-config'
+import { cloudAuthConfig, cloudResource } from './service-config'
 
 /**
  * Cloud Meeting upload is a separate capability from the authentication-only preview, with its
@@ -19,7 +19,7 @@ let instance: MeetingUpload | null = null
 let authorization: CloudAuth | null = null
 
 export function meetingUploadAuthorization(): CloudAuth {
-  authorization ||= new CloudAuth({ ...cloudAuthDevelopmentConfig(), resource: cloudResource() },
+  authorization ||= new CloudAuth({ ...cloudAuthConfig(), resource: cloudResource() },
     createSecureStore<CloudCredential>('cloud-upload-development.enc'), {
       openExternal: (url) => shell.openExternal(url), requireSecureStorage: requireEncryption,
     })

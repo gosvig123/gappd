@@ -101,13 +101,25 @@ Verified on the deployed service on 2026-09-14, in this order.
   and the marker kept.
 - The upload route answers 401 unauthenticated, and the retired synthetic routes answer 404.
 
+Request and storage limits are live: 60 reads and 12 writes per minute per account, 500 copies
+and 64 MiB per account, all in-process and therefore per-instance.
+
 Real-user onboarding is still gated. The beta release workflow does not set
-`GAPPD_MEETING_UPLOAD_ENABLED`, so a released beta build has no upload panel, and these remain
-open: production Clerk instance and verified domain (the desktop still uses the development
-issuer), grant and device revocation, rate and cost limits, backup restore proof, Railway's 30-day
-logs against the approved 14-day cap, device registration and account generations. Enabling upload
-in the beta channel is the switch that starts real user data flowing into this environment, so it
-is a deliberate owner decision rather than a build default.
+`GAPPD_MEETING_UPLOAD_ENABLED`, so a released beta build has no upload panel. Enabling it is the
+switch that starts real user data flowing into this environment, so it is a deliberate owner
+decision rather than a build default.
+
+What still blocks that switch:
+
+| Item | State |
+| --- | --- |
+| Production Clerk instance and verified domain | Not created. The identity is configurable now (`GAPPD_CLERK_ISSUER_URL`, `GAPPD_CLERK_CLIENT_ID`, or the matching build variables) and the server refuses the development issuer when `GAPPD_PRODUCTION_MODE=true`, so this is a configuration and dashboard task. |
+| Grant revocation | No code. A signed token stays valid until it expires, and this is documented rather than promised. Needs a revocation record checked on every request. |
+| Device registration | No code. A supplied device id is not authentication, so this needs a device key, not an id. |
+| Account generations | Partial. A deleted copy's identity is barred permanently, but an account-wide deletion cannot yet block a future upload of a new Meeting. |
+| Backup restore | Unproven. Daily 6-day volume backups are configured and never restored. |
+| Log retention | Blocked. Railway documents 30 days on this plan against the approved 14-day cap. |
+| Second account and hosted ChatGPT | Deferred. Needs a second real account and ChatGPT developer mode. |
 
 ## Data and ownership
 
