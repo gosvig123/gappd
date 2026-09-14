@@ -110,6 +110,45 @@ restart Pi keeps the old client ID in memory and the production issuer rejects i
 
 `~/.pi/agent/mcp.json` already points at `WFvlqsHImvP7f14t`.
 
+## Why production sign-in returned 400
+
+Two separate faults, both found in the instance log rather than by guessing.
+
+**1. Google sign-in cannot work on a production instance without your own credentials.**
+The SSO connection page says it plainly: "This provider is enabled but won't work until you add custom
+credentials" and "You must provide your own credentials on production instances". A development
+instance runs on Clerk's shared OAuth application; a production instance does not. The instance log
+shows the owner's two attempts as `sign_in.created` with `strategy: oauth_google` at 14:56 and 15:00,
+which is the round trip that cannot finish.
+
+If you want Google sign-in, create a Google Cloud OAuth client of type Web application with the
+authorized redirect URI Clerk shows on that page:
+
+```
+https://clerk.getgappd.com/v1/oauth_callback
+```
+
+Then paste its client ID and secret into the same page. Clerk's redirect URI must be entered exactly.
+
+Email address with password already works on production. The sign-up page offers it, and production
+has **no users yet**, so the owner must sign up there before any sign-in can succeed.
+
+**2. The Google enable toggle does not persist.** The "Enable for sign-up and sign-in" switch returns
+to on after Save and after a reload, tried twice, by clicking both the hidden input and the visible
+control. Do not spend time on it; either supply credentials or leave it alone.
+
+**3. A separate log entry explains the earlier Pi failure**, and is not a Google problem:
+
+```
+oauth_authorization.failed  14:50:56  oauth_client_id: "TWKqKO5MnYvt8bAL"
+redirect_uri: "http://localhost:19876/callback"
+reason: "oauth2idp_patch_fosite_state_non_invalid_state_error"
+```
+
+`TWKqKO5MnYvt8bAL` is the obsolete development Pi client. That attempt failed because Pi still held
+that client ID in memory when it ran against the production issuer, which is the fault the restart
+note above addresses.
+
 ## Remaining steps
 
 1. **Sign in to the production instance once.** The production instance has no session for this
