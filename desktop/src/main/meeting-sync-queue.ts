@@ -82,6 +82,18 @@ export class MeetingSyncQueue {
   }
 
   /**
+   * Drops every queued entry. An account-wide deletion bars the identities those entries belong
+   * to, so keeping them would only queue work that can never succeed. Accepted revisions stay.
+   */
+  clear(): Promise<void> {
+    return this.serialize(async () => {
+      const state = await this.load()
+      state.entries = {}
+      await this.persist(state)
+    })
+  }
+
+  /**
    * Marks one revision as permanently unacceptable. A document the server refuses for its
    * own content will never become acceptable, so it must not consume retries.
    */

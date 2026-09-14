@@ -10,6 +10,8 @@ export type MeetingUploadStatus = {
   account: CloudAuthStatus
   consent: boolean
   deleteConsent: boolean
+  accountDeleteConsent: boolean
+  revokeConsent: boolean
   sending: boolean
   result: string | null
   queue: MeetingSyncStatus

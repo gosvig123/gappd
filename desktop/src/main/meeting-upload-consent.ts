@@ -6,19 +6,24 @@ export type Authorization = Pick<CloudAuth, 'status' | 'setEnabled' | 'credentia
 /** Consent is bound to the verified account and the exact token observed when it was given. */
 export type Consent = { subject: string; token: string }
 export type DeleteConsent = Consent & { localId: string }
+export type RevokeConsent = Consent & { clientId: string }
 
 export type StoredConsent = {
   upload: Consent | null
   deletion: DeleteConsent | null
+  account: Consent | null
+  revocation: RevokeConsent | null
 }
 
 export function newStoredConsent(): StoredConsent {
-  return { upload: null, deletion: null }
+  return { upload: null, deletion: null, account: null, revocation: null }
 }
 
 export function revokeConsent(stored: StoredConsent): void {
   stored.upload = null
   stored.deletion = null
+  stored.account = null
+  stored.revocation = null
 }
 
 /**
@@ -30,8 +35,10 @@ export function reconcileConsent(stored: StoredConsent, account: { enabled: bool
     revokeConsent(stored)
     return
   }
-  if (stored.upload && stored.upload.subject !== account.subject) stored.upload = null
-  if (stored.deletion && stored.deletion.subject !== account.subject) stored.deletion = null
+  for (const key of ['upload', 'deletion', 'account', 'revocation'] as const) {
+    const held = stored[key]
+    if (held && held.subject !== account.subject) stored[key] = null
+  }
 }
 
 export function grantedConsent(credential: CloudCredential | null): Consent | null {

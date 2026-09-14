@@ -46,6 +46,7 @@ export type RecordedRequest = {
   authorization: string | null
   device: string | null
   signature: string | null
+  generation: string | null
 }
 
 export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number }
@@ -89,7 +90,8 @@ export function recordingFetcher(options: HarnessOptions, requests: RecordedRequ
     requests.push({
       url: String(input), method: init?.method ?? 'GET',
       body: typeof init?.body === 'string' ? init.body : undefined,
-      authorization: header.get('Authorization'), device: header.get('X-Gappd-Device'), signature: header.get('X-Gappd-Signature'),
+      authorization: header.get('Authorization'), device: header.get('X-Gappd-Device'),
+      signature: header.get('X-Gappd-Signature'), generation: header.get('X-Gappd-Generation'),
     })
     return options.fetcher ? options.fetcher(input, init) : accepted(1)
   }

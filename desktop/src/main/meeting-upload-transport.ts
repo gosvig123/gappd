@@ -45,6 +45,22 @@ export async function sendRegistration(fetcher: typeof fetch, resource: string, 
   }
 }
 
+/** Sends one account-wide action. The caller decides what a failure means. */
+export async function sendAccountAction(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  path: string, body: string, signatures: Record<string, string>, signal: AbortSignal): Promise<{ ok: boolean; value: unknown }> {
+  try {
+    const response = await fetcher(new URL(path, resource), {
+      method: 'POST', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    const value: unknown = await response.json().catch(() => null)
+    return { ok: response.ok, value }
+  } catch {
+    return { ok: false, value: null }
+  }
+}
+
 /** Deletes one cloud copy. Absent and other-owner copies answer the same way. */
 export async function sendDelete(fetcher: typeof fetch, resource: string, credential: CloudCredential,
   localId: string, signatures: Record<string, string>, signal: AbortSignal): Promise<boolean> {

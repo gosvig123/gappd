@@ -1,29 +1,19 @@
-import type { CloudCredential } from './cloud-auth'
-import type { MeetingDevice } from './meeting-device'
+import type { UploadContext } from './meeting-upload-context'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { sendDelete } from './meeting-upload-transport.ts'
-
-/** What one deletion needs from the upload service, without handing over the whole instance. */
-export type DeleteContext = {
-  resource: string
-  device: MeetingDevice
-  fetcher: typeof fetch
-  consented(): Promise<CloudCredential | null>
-  ensureRegistered(credential: CloudCredential, signal: AbortSignal): Promise<boolean>
-  setPending(controller: AbortController | null): void
-  setResult(message: string): void
-}
+import { ensureRegistered } from './meeting-upload-context.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { sendDelete } from './meeting-upload-transport.ts' 
 
 /**
  * Deletes one cloud copy through its own one-use confirmation. Nothing is retried: a lost
  * acknowledgment is reported as uncertain rather than repeated.
  */
-export async function deleteCloudCopy(context: DeleteContext, subject: string, localId: string): Promise<void> {
+export async function deleteCloudCopy(context: UploadContext, subject: string, localId: string): Promise<void> {
   const credential = await context.consented()
   if (!credential || credential.subject !== subject) return
   const controller = new AbortController()
   context.setPending(controller)
-  if (!await context.ensureRegistered(credential, controller.signal)) {
+  if (!await ensureRegistered(context, credential, controller.signal)) {
     context.setResult('This Mac is not registered for uploads, so nothing was deleted.')
     context.setPending(null)
     return

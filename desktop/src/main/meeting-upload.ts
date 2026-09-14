@@ -1,13 +1,9 @@
 import type { MeetingUploadStatus } from '../shared/meeting-upload-contract'
-import type { MeetingSyncWork } from '../shared/meeting-sync-contract'
 import type { CloudAuth, CloudCredential } from './cloud-auth'
 import type { MeetingDevice } from './meeting-device'
 import type { MeetingSyncQueue } from './meeting-sync-queue'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { consentedCredential, grantedConsent, newStoredConsent, reconcileConsent, revokeConsent, type Authorization, type DeleteConsent, type StoredConsent } from './meeting-upload-consent.ts'
-
-/** One sync call sends at most this many Meetings, so a call cannot loop without end. */
-const MAX_SENDS_PER_SYNC = 5
 
 /**
  * Sends queued Meeting copies to Gappd Cloud.
@@ -47,7 +43,9 @@ export class MeetingUpload {
     reconcileConsent(this.stored, account)
     return {
       available: this.available, account, consent: Boolean(this.stored.upload),
-      deleteConsent: Boolean(this.stored.deletion), sending: Boolean(this.pending), result: this.result, queue: await this.queue.status(),
+      deleteConsent: Boolean(this.stored.deletion), accountDeleteConsent: Boolean(this.stored.account),
+      revokeConsent: Boolean(this.stored.revocation), sending: Boolean(this.pending), result: this.result,
+      queue: await this.queue.status(),
     }
   }
 
@@ -84,77 +82,76 @@ export class MeetingUpload {
   /** Sends queued copies while consent, the account and the capability all still hold. */
   async sync(): Promise<MeetingUploadStatus> {
     if (!this.available || this.pending) return this.status()
-    const credential = await this.consented()
-    if (!credential) return this.status()
-    const controller = new AbortController()
-    this.pending = controller
-    const generation = ++this.generation
-    try {
-      if (!await this.ensureRegistered(credential, controller.signal)) return this.status()
-      await this.drain(credential, controller, generation)
-    } finally {
-      if (generation === this.generation) this.pending = null
-    }
+    await syncUploads(this.context())
     return this.status()
   }
 
   async deleteCopy(subject: unknown, localId: unknown): Promise<MeetingUploadStatus> {
-    if (!this.available || this.pending || typeof subject !== 'string' || typeof localId !== 'string') {
-      throw new Error('Cloud copy unavailable.')
-    }
-    const consent: DeleteConsent | null = this.stored.deletion
+    const held = this.stored.deletion
+    if (!this.writable() || typeof subject !== 'string' || typeof localId !== 'string') throw new Error('Cloud copy unavailable.')
     // A confirmation for another Meeting, or for another account, is not consumed by this call.
-    if (!consent || consent.subject !== subject || consent.localId !== localId) return this.status()
+    if (!held || held.subject !== subject || held.localId !== localId) return this.status()
     this.stored.deletion = null
-    await deleteCloudCopy({
-      resource: this.resource, device: this.device, fetcher: this.fetcher,
-      consented: () => this.consented(),
-      ensureRegistered: (credential, signal) => this.ensureRegistered(credential, signal),
-      setPending: (controller) => { this.pending = controller },
-      setResult: (message) => { this.result = message },
-    }, subject, localId)
+    await deleteCloudCopy(this.context(), subject, localId)
     return this.status()
   }
 
-  /**
-   * Registers this Mac's device once per credential. Every write needs the signature it makes
-   * possible, so an unregistered device can never write.
-   */
-  private async ensureRegistered(credential: CloudCredential, signal: AbortSignal): Promise<boolean> {
-    if (this.device.isRegistered()) return true
-    const body = await this.device.registrationBody()
-    if (!await sendRegistration(this.fetcher, this.resource, credential, body, signal)) {
-      this.result = 'This Mac could not register for uploads, so nothing was sent.'
-      return false
-    }
-    this.device.markRegistered()
-    return true
+  /** Erasing every copy is destructive, so it keeps its own one-use confirmation. */
+  async setAccountDeleteConsent(subject: unknown, enabled: unknown): Promise<MeetingUploadStatus> {
+    this.stored.account = grantedConsent(await this.verified(subject, enabled))
+    return this.status()
   }
 
-  private async drain(credential: CloudCredential, controller: AbortController, generation: number): Promise<void> {
-    for (let sent = 0; sent < MAX_SENDS_PER_SYNC; sent++) {
-      const work = await this.queue.pending()
-      if (!work || generation !== this.generation) return
-      if (!await this.sendOne(credential, controller, work)) return
+  /** Revoking a client is destructive, so it names that client in its own confirmation. */
+  async setRevokeConsent(subject: unknown, enabled: unknown, clientId: unknown): Promise<MeetingUploadStatus> {
+    if (typeof clientId !== 'string' || clientId.trim() !== clientId || clientId.length === 0 || clientId.length > 256) {
+      throw new Error('Invalid client.')
+    }
+    const credential = await this.verified(subject, enabled)
+    this.stored.revocation = credential ? { subject: credential.subject, token: credential.tokens.accessToken, clientId } : null
+    return this.status()
+  }
+
+  /** Erases every cloud copy of this account and closes uploads until a new consent. */
+  async deleteAll(): Promise<MeetingUploadStatus> {
+    const held = this.stored.account
+    if (!this.writable() || !held) return this.status()
+    this.stored.account = null
+    await deleteAllCloudData(this.context(), held.subject)
+    return this.status()
+  }
+
+  /** Opens uploads again and remembers the generation only this Mac will know. */
+  async allowUploads(): Promise<MeetingUploadStatus> {
+    const credential = await this.consented()
+    if (!this.writable() || !credential) return this.status()
+    await allowUploadsAgain(this.context(), credential.subject)
+    return this.status()
+  }
+
+  /** Cuts one client's access to this account. Stored copies are not touched. */
+  async revokeClient(subject: unknown, clientId: unknown): Promise<MeetingUploadStatus> {
+    const held = this.stored.revocation
+    if (!this.writable() || typeof subject !== 'string' || typeof clientId !== 'string') throw new Error('Revocation unavailable.')
+    if (!held || held.subject !== subject || held.clientId !== clientId) return this.status()
+    this.stored.revocation = null
+    await revokeClientAccess(this.context(), subject, clientId)
+    return this.status()
+  }
+
+  /** Everything the wire modules need, without giving them the consent state. */
+  private context(): UploadContext {
+    return {
+      resource: this.resource, device: this.device, queue: this.queue, fetcher: this.fetcher,
+      consented: () => this.consented(),
+      setPending: (controller) => { this.pending = controller },
+      setResult: (message) => { this.result = message },
+      rememberGeneration: (generation) => this.device.rememberGeneration(generation),
     }
   }
 
-  private async sendOne(credential: CloudCredential, controller: AbortController, work: MeetingSyncWork): Promise<boolean> {
-    const signatures = await this.device.signatures('POST', '/meeting', work.document)
-    const outcome = await sendDocument(this.fetcher, this.resource, credential, signatures, work, controller.signal)
-    if (outcome.kind === 'accepted') {
-      await this.queue.succeed(work.localId, work.revision)
-      this.result = acceptedMessage(credential, work, outcome.expiresAt)
-      return true
-    }
-    if (outcome.kind === 'refused') {
-      await this.queue.reject(work.localId, work.revision, 'The server refused this Meeting document. Recording it again will not help.')
-      this.result = 'The server refused one Meeting document. Other queued Meetings are unaffected.'
-      return true
-    }
-    await this.queue.fail(work.localId, work.revision, 'No acknowledgment from Gappd Cloud.')
-    this.result = 'No acknowledgment. The server may have accepted the copy; it will be retried. A cloud copy is never deleted by turning sync off.'
-    return false
+  private writable(): boolean {
+    return this.available && !this.pending
   }
 
   private async verified(subject: unknown, enabled: unknown): Promise<CloudCredential | null> {
@@ -187,6 +184,10 @@ export class MeetingUpload {
 import { acceptedMessage } from './meeting-upload-ack.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { allowUploadsAgain, deleteAllCloudData, revokeClientAccess } from './meeting-upload-actions.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { deleteCloudCopy } from './meeting-upload-delete.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { sendDocument, sendRegistration } from './meeting-upload-transport.ts'
+import { syncUploads } from './meeting-upload-sync.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import type { UploadContext } from './meeting-upload-context.ts'

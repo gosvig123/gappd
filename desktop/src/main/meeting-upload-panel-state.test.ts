@@ -10,7 +10,7 @@ function status(overrides: Partial<MeetingUploadStatus> = {}): MeetingUploadStat
   return {
     available: true,
     account: { enabled: true, pending: false, email: 'a@example.test', subject: 'user_a', error: null },
-    consent: false, deleteConsent: false, sending: false, result: null,
+    consent: false, deleteConsent: false, accountDeleteConsent: false, revokeConsent: false, sending: false, result: null,
     queue: { pending: 0, failed: 0, entries: [] },
     ...overrides,
   }
@@ -27,6 +27,11 @@ function harness(t: { after(fn: () => void): void }) {
     sync: async () => status(),
     setDeleteConsent: async () => status({ deleteConsent: true }),
     deleteCopy: async () => status(),
+    setAccountDeleteConsent: async () => status({ accountDeleteConsent: true }),
+    deleteAll: async () => status(),
+    allowUploads: async () => status({ result: 'allowed' }),
+    setRevokeConsent: async () => status({ revokeConsent: true }),
+    revokeClient: async () => status(),
   }
   const state = new MeetingUploadPanelState(api, (value, error) => { published.push(value); if (error) errors.push(error) })
   // Polling keeps a timer alive, so every test must release its own state.

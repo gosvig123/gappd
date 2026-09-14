@@ -8,6 +8,11 @@ export type MeetingUploadApi = {
   sync(): Promise<MeetingUploadStatus>
   setDeleteConsent(subject: string, enabled: boolean, localId: string): Promise<MeetingUploadStatus>
   deleteCopy(subject: string, localId: string): Promise<MeetingUploadStatus>
+  setAccountDeleteConsent(subject: string, enabled: boolean): Promise<MeetingUploadStatus>
+  deleteAll(): Promise<MeetingUploadStatus>
+  allowUploads(): Promise<MeetingUploadStatus>
+  setRevokeConsent(subject: string, enabled: boolean, clientId: string): Promise<MeetingUploadStatus>
+  revokeClient(subject: string, clientId: string): Promise<MeetingUploadStatus>
 }
 
 const REFRESH_MS = 2000
