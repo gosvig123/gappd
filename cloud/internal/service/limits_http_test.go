@@ -56,7 +56,7 @@ func TestWriteBudgetReturnsTooManyRequests(t *testing.T) {
 	reader, writer := meetingDatabase(t)
 	auth, sign := signerScopes(t, "meetings:sync", "desktop")
 	auth.Limits = service.NewLimiter()
-	auth.Limits.ReadBurst, auth.Limits.WriteBurst = 5, 1
+	auth.Limits.ReadBurst, auth.Limits.WriteBurst = 5, 2
 	host := httptest.NewServer(service.HandlerWithUploads(auth, reader, service.Uploads{Meeting: writer, ClientID: "desktop"}))
 	t.Cleanup(host.Close)
 	token := sign(copyOwner("limit-write"))

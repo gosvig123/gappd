@@ -36,11 +36,23 @@ func uploadHost(t *testing.T) (*httptest.Server, *pgxpool.Pool, func(string) str
 
 func meetingRequest(t *testing.T, host, token, method, body string) (int, map[string]any) {
 	t.Helper()
+	return meetingRequestWith(t, host, token, method, body, "")
+}
+
+// meetingRequestWith also carries an account generation in the signed message.
+func meetingRequestWith(t *testing.T, host, token, method, body, generation string) (int, map[string]any) {
+	t.Helper()
+	testDevice.register(t, host, token)
 	request, err := http.NewRequest(method, host+"/meeting", strings.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	for name, values := range testDevice.sign(method, "/meeting", generation, []byte(body)) {
+		if values[0] != "" {
+			request.Header.Set(name, values[0])
+		}
+	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		t.Fatal(err)
@@ -138,16 +150,21 @@ func TestMeetingUploadRejectsBadRequests(t *testing.T) {
 		meetingDoc(localMeeting, 0, "x"),
 		strings.Repeat("x", service.MaxDocumentBytes+1),
 	}
-	for index, body := range invalid {
+	// The last body is over the document bound, which the device gate refuses with 413 first.
+	for index, body := range invalid[:len(invalid)-1] {
 		if code, _ := meetingRequest(t, host.URL, sign(owner), "POST", body); code != 400 {
 			t.Fatalf("invalid body %d accepted: %d", index, code)
 		}
 	}
+	if code, _ := meetingRequest(t, host.URL, sign(owner), "POST", invalid[len(invalid)-1]); code != 413 {
+		t.Fatalf("an oversize body returned %d", code)
+	}
 	valid := meetingDoc(localMeeting, 1, "x")
-	if code, _ := meetingRequest(t, host.URL, readSign(owner), "POST", valid); code == 200 {
+	// These tokens cannot register a device, so they are sent unsigned.
+	if code, _ := postRaw(t, host.URL+"/meeting", readSign(owner), valid, nil); code == 200 {
 		t.Fatal("read scope uploaded")
 	}
-	if code, _ := meetingRequest(t, host.URL, "invalid", "POST", valid); code != 401 {
+	if code, _ := postRaw(t, host.URL+"/meeting", "invalid", valid, nil); code != 401 {
 		t.Fatalf("invalid token: %d", code)
 	}
 }
@@ -157,7 +174,7 @@ func TestMeetingUploadNeedsTheDesktopClient(t *testing.T) {
 	a, sign := signerScopes(t, "meetings:sync", "other-client")
 	host := httptest.NewServer(service.HandlerWithUploads(a, reader, service.Uploads{Meeting: writer, ClientID: "desktop"}))
 	defer host.Close()
-	if code, _ := meetingRequest(t, host.URL, sign(copyOwner("wrong-client")), "POST", meetingDoc(localMeeting, 1, "x")); code == 200 {
+	if code, _ := postRaw(t, host.URL+"/meeting", sign(copyOwner("wrong-client")), meetingDoc(localMeeting, 1, "x"), nil); code == 200 {
 		t.Fatal("wrong client uploaded")
 	}
 }

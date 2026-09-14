@@ -78,28 +78,6 @@ func mcpStatus(t *testing.T, host, token string) int {
 	return response.StatusCode
 }
 
-func postRevoke(t *testing.T, host, syncToken, body string) int {
-	t.Helper()
-	request, err := http.NewRequest("POST", host+"/revoke", strings.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if syncToken != "" {
-		request.Header.Set("Authorization", "Bearer "+syncToken)
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body.Close()
-	return response.StatusCode
-}
-
-func revokeClient(t *testing.T, host, syncToken, client string) int {
-	t.Helper()
-	return postRevoke(t, host, syncToken, `{"client_id":"`+client+`"}`)
-}
-
 func TestRevokedClientIsRefused(t *testing.T) {
 	host, _, _, mint := revokeHost(t, 0)
 	owner := copyOwner("revoke")
@@ -156,7 +134,7 @@ func TestRevokeRouteNeedsTheDesktopClientAndSyncScope(t *testing.T) {
 		{"no token", ""},
 	}
 	for _, test := range cases {
-		if status := postRevoke(t, host.URL, test.token, body); status == 200 {
+		if status := postRevokeUnsigned(t, host.URL, test.token, body); status == 200 {
 			t.Fatalf("%s was allowed to revoke", test.name)
 		}
 	}

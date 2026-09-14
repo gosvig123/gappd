@@ -68,8 +68,13 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 // registerMeetingUploads keeps the write routes in one place, so a new route cannot be added
 // without the same authenticated wrapper as the others.
 func registerMeetingUploads(mux *http.ServeMux, protect func(http.Handler) http.Handler, pool *pgxpool.Pool) {
+	// Registration is how a signature becomes possible, so it carries no signature itself.
+	// protect already applies the write budget and cross-origin protection.
+	mux.Handle("POST /device", protect(deviceHandler(pool)))
+	// Every other write needs a registered device, and its signature covers this exact request.
+	signed := func(handler http.Handler) http.Handler { return protect(deviceGate(pool, handler)) }
 	for _, route := range []string{"POST /meeting", "DELETE /meeting", "POST /revoke", "POST /delete-all", "POST /consent"} {
-		mux.Handle(route, protect(routeHandler(route, pool)))
+		mux.Handle(route, signed(routeHandler(route, pool)))
 	}
 }
 

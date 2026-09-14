@@ -1,11 +1,8 @@
 package service_test
 
 import (
-	"encoding/json"
-	"net/http"
 	"net/http/httptest"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/gosvig123/gappd/cloud/internal/service"
@@ -28,47 +25,28 @@ func accountHost(t *testing.T) (*httptest.Server, *pgxpool.Pool, func(string) st
 // postUpload sends one document with an optional account generation header.
 func postUpload(t *testing.T, host, token, body string, generation int) (int, map[string]any) {
 	t.Helper()
-	request, err := http.NewRequest("POST", host+"/meeting", strings.NewReader(body))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Authorization", "Bearer "+token)
-	if generation > 0 {
-		request.Header.Set(service.GenerationHeader, strconv.Itoa(generation))
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer response.Body.Close()
-	value := map[string]any{}
-	if response.StatusCode == 200 {
-		if err = json.NewDecoder(response.Body).Decode(&value); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return response.StatusCode, value
+	testDevice.register(t, host, token)
+	return postRaw(t, host+"/meeting", token, body, testDevice.sign("POST", "/meeting", generationValue(generation), []byte(body)))
 }
 
+func generationValue(generation int) string {
+	if generation == 0 {
+		return ""
+	}
+	return strconv.Itoa(generation)
+}
+
+// postAccount registers, signs and sends one account action.
 func postAccount(t *testing.T, host, token, path string) (int, map[string]any) {
 	t.Helper()
-	request, err := http.NewRequest("POST", host+path, strings.NewReader(""))
-	if err != nil {
-		t.Fatal(err)
-	}
-	request.Header.Set("Authorization", "Bearer "+token)
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer response.Body.Close()
-	value := map[string]any{}
-	if response.StatusCode == 200 {
-		if err = json.NewDecoder(response.Body).Decode(&value); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return response.StatusCode, value
+	testDevice.register(t, host, token)
+	return postRaw(t, host+path, token, "", testDevice.sign("POST", path, "", []byte("")))
+}
+
+// postAccountUnsigned sends one account action with no device, for the refusal cases.
+func postAccountUnsigned(t *testing.T, host, token, path string) (int, map[string]any) {
+	t.Helper()
+	return postRaw(t, host+path, token, "", nil)
 }
 
 func TestDeleteAllRemovesEveryCopyAndBlocksUploads(t *testing.T) {
@@ -113,11 +91,16 @@ func TestConsentIssuesAGenerationAndStaleDevicesCannotWrite(t *testing.T) {
 	}
 	generation := consent(t, host.URL, sign(owner))
 	assertStaleGenerationsRefused(t, host.URL, sign(owner), generation)
-	// Consent reopens uploads, and an erased identity stays erased for good.
-	if code, _ := postUpload(t, host.URL, sign(owner), meetingDoc(localMeeting, 1, "Mine"), generation); code == 200 {
+	assertConsentReopensNewMeetingsOnly(t, reader, host.URL, sign(owner), owner, generation)
+}
+
+// Consent reopens uploads for new Meetings; an erased identity stays erased for good.
+func assertConsentReopensNewMeetingsOnly(t *testing.T, reader *pgxpool.Pool, host, token, owner string, generation int) {
+	t.Helper()
+	if code, _ := postUpload(t, host, token, meetingDoc(localMeeting, 1, "Mine"), generation); code == 200 {
 		t.Fatal("an erased identity was restored")
 	}
-	if code, _ := postUpload(t, host.URL, sign(owner), meetingDoc(newMeeting, 1, "Later"), generation); code != 200 {
+	if code, _ := postUpload(t, host, token, meetingDoc(newMeeting, 1, "Later"), generation); code != 200 {
 		t.Fatal("the issued generation was refused")
 	}
 	if count, _, _ := copyRow(t, reader, owner, service.MeetingCopyID(owner, newMeeting)); count != 1 {
@@ -152,21 +135,12 @@ func TestAccountRoutesNeedTheDesktopClientAndAnEmptyBody(t *testing.T) {
 	owner := copyOwner("account-auth")
 	_, readSign := signerScopes(t, service.Scope, "desktop")
 	for _, path := range []string{"/delete-all", "/consent"} {
-		if code, _ := postAccount(t, host.URL, readSign(owner), path); code == 200 {
+		if code, _ := postAccountUnsigned(t, host.URL, readSign(owner), path); code == 200 {
 			t.Fatalf("%s accepted the read scope", path)
 		}
-		request, err := http.NewRequest("POST", host.URL+path, strings.NewReader("{}"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		request.Header.Set("Authorization", "Bearer "+sign(owner))
-		response, err := http.DefaultClient.Do(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-		response.Body.Close()
-		if response.StatusCode != 400 {
-			t.Fatalf("%s accepted a body: %d", path, response.StatusCode)
+		testDevice.register(t, host.URL, sign(owner))
+		if code, _ := postRaw(t, host.URL+path, sign(owner), "{}", testDevice.sign("POST", path, "", []byte("{}"))); code != 400 {
+			t.Fatalf("%s accepted a body: %d", path, code)
 		}
 	}
 }
