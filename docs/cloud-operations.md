@@ -107,10 +107,43 @@ macOS notification when it can. `cloud:status:install` writes a LaunchAgent that
 logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it. A breach
 is an exit code and a notification, so any scheduler treats it as a failure.
 
+### Backup restore drill (2026-09-14)
+
+Attempted and incomplete. What the attempt established:
+
+- **No automatic backup had ever been taken.** The daily schedule was enabled and reported a
+  6-day retention, but `volumeInstanceBackupList` returned zero backups, so the runbook's
+  "backups configured" line was hollow until this drill. The first scheduled backup is due at the
+  next daily trigger; verify it exists afterwards rather than trusting the schedule.
+- **Manual backup creation works**: `Mutation.volumeInstanceBackupCreate`, and "New backup" in the
+  dashboard's Backups tab. One was created and shown as 1.1 GB.
+- **A manual backup has no expiry** (`expiresAt: null`), so it is not covered by the 6-day policy.
+  The earlier warning against indefinite manual backups is correct; the drill backup was deleted.
+- **Point-in-time recovery is OFF.** Railway offers continuous backups and WAL archiving, and
+  enabling it redeploys the service once. For a database that will hold user data this is a
+  stronger control than daily snapshots and it is currently unconfigured. Recommended before real
+  uploads.
+- **Restore is dashboard-only.** `Mutation.volumeInstanceBackupRestore` answers `Not Authorized`
+  to the CLI token. In the dashboard the `Restore` button sits on the service that owns the volume,
+  and per the documentation it stages a replacement volume for that same service, for review
+  followed by `Deploy`.
+
+That last point is why the drill stopped. The runbook requires restoring "in an isolated target",
+but the tooling restores into the owning service. Clicking `Restore` on the live Postgres service
+would stage replacing the live volume, which this runbook forbids. Either the owner accepts a
+staged in-place drill on the live service, or Railway support must be asked whether a backup can be
+restored into a separate service. Until then the restore remains unproven, and the honest reason is
+recorded here rather than the gap being papered over.
+
 ### Log-retention blocker
 
-The workspace API reports plan PRO. Railway documents 30-day log retention for Pro, not
-our approved 14-day maximum. No supported per-service 14-day control was identified.
+The workspace API reports plan **PRO**. Railway documents 30-day log retention for Pro, and the
+documentation is now explicit that **there is no log drain setting and no per-service retention
+control**: the plan fixes the window, and an upgrade "immediately restore[s] logs that were
+previously outside of the retention period". So the 14-day cap cannot be enforced by configuration.
+The only options are a third-party log forwarder with its own 14-day retention, or an owner-approved
+exception. Either way the window holds content-free operational logs only: the service never logs
+tokens, account ids or Meeting text.
 Its documentation also says a plan upgrade can restore logs outside the previous retention
 window, so a visibility window alone is not proof of physical deletion.
 
@@ -124,7 +157,9 @@ setting would not remove Railway's own captured logs.
 1. Observe a completed daily backup and verify its expiry metadata.
 2. Point an external monitor at `GET /status` and alert when `cleanup.behind` is true. The endpoint
    is public and content free; a missed run with nothing expired has no user impact, so the backlog
-   is the signal. Configuring the monitor itself is still outstanding.
+   is the signal. Done on the development Mac: `npm run cloud:status:install` writes a LaunchAgent
+   that runs hourly and notifies on a breach. A second monitor on the deployed side is still
+   outstanding.
 3. Test restore in an isolated target with current deletion evidence; do not serve it publicly.
 4. Verify aged backup removal and resolve the log-retention blocker before real uploads.
 
