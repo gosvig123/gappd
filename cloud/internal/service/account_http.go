@@ -21,6 +21,15 @@ func deleteAllHandler(pool *pgxpool.Pool) http.Handler {
 	})
 }
 
+// clientsHandler lists the clients that have used this account, so a revocation can offer a
+// choice. It is a read, but it needs the writer pool, so it carries a device signature too.
+func clientsHandler(pool *pgxpool.Pool) http.Handler {
+	return accountAction(pool, func(ctx context.Context, owner string) (map[string]any, error) {
+		clients, err := NewClientDirectory(pool).Clients(ctx, owner)
+		return map[string]any{"status": "listed", "subject": owner, "clients": clients}, err
+	})
+}
+
 // consentHandler opens uploads again and returns the new generation the caller must present.
 func consentHandler(pool *pgxpool.Pool) http.Handler {
 	return accountAction(pool, func(ctx context.Context, owner string) (map[string]any, error) {

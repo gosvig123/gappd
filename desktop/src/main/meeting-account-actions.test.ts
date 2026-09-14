@@ -69,3 +69,15 @@ test('the account actions need consent and a registered device', async () => {
   await h.upload.setConsent('user_a', true)
   assert.equal((await h.upload.allowUploads()).result?.includes('could not register'), true)
 })
+
+test('the client list comes from the account, and a failure is an empty list', async () => {
+  const h = harness({ fetcher: async (input) => input.toString().endsWith('/clients')
+    ? Response.json({ status: 'listed', subject: 'user_a', clients: [{ client_id: 'pi' }, { client_id: 'chatgpt' }] })
+    : accepted(1) })
+  await h.upload.setConsent('user_a', true)
+  assert.deepEqual(await h.upload.knownClients(), ['pi', 'chatgpt'])
+  // A read that fails leaves the user able to type an id instead of picking one.
+  const broken = harness({ fetcher: async () => new Response('no', { status: 503 }) })
+  await broken.upload.setConsent('user_a', true)
+  assert.deepEqual(await broken.upload.knownClients(), [])
+})

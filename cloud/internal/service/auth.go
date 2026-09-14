@@ -29,6 +29,8 @@ type Auth struct {
 	Limits *Limiter
 	// Revocations is installed by the server entrypoint. Nil disables the revocation check.
 	Revocations *Revocations
+	// Clients keeps the list of clients that have used each account. Nil disables recording.
+	Clients *ClientDirectory
 }
 
 var errScope = errors.New("insufficient scope")
@@ -111,6 +113,8 @@ func (a *Auth) protect(next http.Handler) http.Handler {
 		if !a.grantAllowed(w, r, id) {
 			return
 		}
+		// Best effort and off the hot path: a missed entry only means the id must be typed.
+		a.Clients.Record(id.owner, id.client)
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, id.owner)))
 	})
 }

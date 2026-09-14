@@ -32,6 +32,7 @@ function harness(t: { after(fn: () => void): void }) {
     allowUploads: async () => status({ result: 'allowed' }),
     setRevokeConsent: async () => status({ revokeConsent: true }),
     revokeClient: async () => status(),
+    knownClients: async () => ['pi', 'chatgpt'],
   }
   const state = new MeetingUploadPanelState(api, (value, error) => { published.push(value); if (error) errors.push(error) })
   // Polling keeps a timer alive, so every test must release its own state.

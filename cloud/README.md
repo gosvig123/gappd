@@ -76,6 +76,20 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Client inventory
+
+Revocation is keyed on a client id, so the service keeps the clients it has seen for each account.
+A client is recorded on its first authenticated request in a process, in the background, so the hot
+path pays one small insert per client rather than one per request. A recording failure is ignored
+and retried on a later request: a missed entry only means the user types an id instead of picking one.
+
+The write uses the writer pool, because the reader pool is deliberately unable to write anything.
+Without the meeting writer pool there is nothing to record, and recording is a no-op.
+
+`POST /clients` lists them, most recently used first, bounded to 50. It is a read, but it needs the
+writer pool, so it carries a device signature like the other writer-pool actions. The list is
+bounded account data: no lifecycle metadata and no read content is exposed.
+
 ## Device registration
 
 A bearer token alone must not be enough to write. Every write route except registration needs a

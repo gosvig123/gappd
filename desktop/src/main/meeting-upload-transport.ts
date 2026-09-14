@@ -45,6 +45,26 @@ export async function sendRegistration(fetcher: typeof fetch, resource: string, 
   }
 }
 
+/** Reads the clients that have used this account, which the Settings panel offers to revoke. */
+export async function sendClientList(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  signatures: Record<string, string>, signal: AbortSignal): Promise<string[]> {
+  try {
+    const response = await fetcher(new URL('/clients', resource), {
+      method: 'POST', body: '', redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    const value: unknown = await response.json()
+    if (!response.ok || typeof value !== 'object' || value === null) return []
+    const clients = (value as { clients?: unknown }).clients
+    if (!Array.isArray(clients)) return []
+    return clients.flatMap((entry) => typeof entry === 'object' && entry !== null && typeof (entry as { client_id?: unknown }).client_id === 'string'
+      ? [(entry as { client_id: string }).client_id] : [])
+  } catch {
+    return []
+  }
+}
+
 /** Sends one account-wide action. The caller decides what a failure means. */
 export async function sendAccountAction(fetcher: typeof fetch, resource: string, credential: CloudCredential,
   path: string, body: string, signatures: Record<string, string>, signal: AbortSignal): Promise<{ ok: boolean; value: unknown }> {

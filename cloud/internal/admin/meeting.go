@@ -36,6 +36,7 @@ const meetingPolicy = `
  GRANT SELECT, INSERT ON revoked_grants TO gappd_meeting_writer;
  GRANT SELECT, INSERT, UPDATE ON account_state TO gappd_meeting_writer;
  GRANT SELECT, INSERT, UPDATE ON account_devices TO gappd_meeting_writer;
+ GRANT SELECT, INSERT, UPDATE ON account_clients TO gappd_meeting_writer;
  GRANT UPDATE(deleted_at) ON meeting_lifecycle TO gappd_meeting_writer;
  ALTER ROLE gappd_meeting_writer SET statement_timeout='3s';
  DROP POLICY IF EXISTS cloud_meeting_writer_read ON cloud_meetings;

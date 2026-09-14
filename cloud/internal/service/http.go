@@ -73,7 +73,7 @@ func registerMeetingUploads(mux *http.ServeMux, protect func(http.Handler) http.
 	mux.Handle("POST /device", protect(deviceHandler(pool)))
 	// Every other write needs a registered device, and its signature covers this exact request.
 	signed := func(handler http.Handler) http.Handler { return protect(deviceGate(pool, handler)) }
-	for _, route := range []string{"POST /meeting", "DELETE /meeting", "POST /revoke", "POST /delete-all", "POST /consent"} {
+	for _, route := range []string{"POST /meeting", "DELETE /meeting", "POST /revoke", "POST /delete-all", "POST /consent", "POST /clients"} {
 		mux.Handle(route, signed(routeHandler(route, pool)))
 	}
 }
@@ -86,6 +86,8 @@ func routeHandler(route string, pool *pgxpool.Pool) http.Handler {
 		return deleteAllHandler(pool)
 	case route == "POST /consent":
 		return consentHandler(pool)
+	case route == "POST /clients":
+		return clientsHandler(pool)
 	default:
 		return meetingHandler(pool)
 	}

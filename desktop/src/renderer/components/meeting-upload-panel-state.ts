@@ -13,6 +13,7 @@ export type MeetingUploadApi = {
   allowUploads(): Promise<MeetingUploadStatus>
   setRevokeConsent(subject: string, enabled: boolean, clientId: string): Promise<MeetingUploadStatus>
   revokeClient(subject: string, clientId: string): Promise<MeetingUploadStatus>
+  knownClients(): Promise<string[]>
 }
 
 const REFRESH_MS = 2000

@@ -129,6 +129,12 @@ export class MeetingUpload {
     return this.status()
   }
 
+  /** The clients that have used this account, so revocation offers a choice instead of a guess. */
+  async knownClients(): Promise<string[]> {
+    if (!this.available) return []
+    return listKnownClients(this.context())
+  }
+
   /** Cuts one client's access to this account. Stored copies are not touched. */
   async revokeClient(subject: unknown, clientId: unknown): Promise<MeetingUploadStatus> {
     const held = this.stored.revocation
@@ -184,7 +190,7 @@ export class MeetingUpload {
 import { acceptedMessage } from './meeting-upload-ack.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { allowUploadsAgain, deleteAllCloudData, revokeClientAccess } from './meeting-upload-actions.ts'
+import { allowUploadsAgain, deleteAllCloudData, listKnownClients, revokeClientAccess } from './meeting-upload-actions.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { deleteCloudCopy } from './meeting-upload-delete.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.

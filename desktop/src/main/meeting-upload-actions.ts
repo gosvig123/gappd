@@ -2,7 +2,7 @@ import type { UploadContext } from './meeting-upload-context'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { ensureRegistered } from './meeting-upload-context.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { sendAccountAction } from './meeting-upload-transport.ts'
+import { sendAccountAction, sendClientList } from './meeting-upload-transport.ts'
 
 /**
  * The account-wide actions. Each one needs a registered device, and each is reported as uncertain
@@ -33,6 +33,23 @@ export async function allowUploadsAgain(context: UploadContext, subject: string)
 export async function revokeClientAccess(context: UploadContext, subject: string, clientId: string): Promise<void> {
   await runAccountAction(context, subject, '/revoke', JSON.stringify({ client_id: clientId }), 'Revoking that client.', () =>
     `Revoked ${clientId}. Its tokens stop working within 30 seconds. Stored cloud copies are unchanged until you delete them or they expire.`)
+}
+
+/**
+ * Reads the clients that have used this account, so revocation can offer a choice. A failure is
+ * an empty list rather than an error: the user can still type an id.
+ */
+export async function listKnownClients(context: UploadContext): Promise<string[]> {
+  const credential = await context.consented()
+  if (!credential) return []
+  const controller = new AbortController()
+  try {
+    if (!await ensureRegistered(context, credential, controller.signal)) return []
+    const signatures = await context.device.signatures('POST', '/clients', '')
+    return await sendClientList(context.fetcher, context.resource, credential, signatures, controller.signal)
+  } finally {
+    controller.abort()
+  }
 }
 
 /** Shared shape: authorize, register, sign, send, and report one outcome either way. */

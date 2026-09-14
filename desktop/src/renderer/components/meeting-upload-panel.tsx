@@ -6,7 +6,7 @@ import { MeetingUploadPanelState } from './meeting-upload-panel-state'
 import { Button, Card } from './ui'
 
 export function MeetingUploadPanel() {
-  const { status, error, meetings, run } = useMeetingUploadPanel()
+  const { status, error, meetings, clients, run } = useMeetingUploadPanel()
   const [selected, setSelected] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [revokedClient, setRevokedClient] = useState('')
@@ -16,7 +16,7 @@ export function MeetingUploadPanel() {
   return <Card className="settings-section">
     {renderControls({ status, subject, account: status.account, busy, run })}
     {renderQueue(status, busy)}
-    {renderAccount({ status, subject, busy, run, client: revokedClient, setClient: setRevokedClient })}
+    {renderAccount({ status, subject, busy, run, client: revokedClient, setClient: setRevokedClient, clients })}
     {renderMeetings({ meetings, selected, setSelected, confirmed, setConfirmed, status, subject, busy, run })}
     {status.result ? <p>{status.result}</p> : null}
     {error ? <p role="alert">{error}</p> : null}
@@ -28,6 +28,7 @@ function useMeetingUploadPanel() {
   const [status, setStatus] = useState<MeetingUploadStatus | null>(null)
   const [error, setError] = useState('')
   const [meetings, setMeetings] = useState<MeetingListItem[]>([])
+  const [clients, setClients] = useState<string[]>([])
   const controller = useRef<MeetingUploadPanelState | null>(null)
   useEffect(() => {
     const state = new MeetingUploadPanelState(window.gappd.meetingUpload,
@@ -35,13 +36,14 @@ function useMeetingUploadPanel() {
     controller.current = state
     void state.refresh()
     void window.gappd.meetings.list().then(setMeetings).catch(() => setMeetings([]))
+    void window.gappd.meetingUpload.knownClients().then(setClients).catch(() => setClients([]))
     return () => state.dispose()
   }, [])
   const run = (action: (api: typeof window.gappd.meetingUpload) => Promise<MeetingUploadStatus>) => {
     setError('')
     return controller.current?.run(action)
   }
-  return { status, error, meetings, run }
+  return { status, error, meetings, clients, run }
 }
 
 type Controls = {
@@ -84,11 +86,12 @@ type Account = {
   run: (action: (api: typeof window.gappd.meetingUpload) => Promise<MeetingUploadStatus>) => void
   client: string
   setClient: (value: string) => void
+  clients: string[]
 }
 
 // The account-wide actions. Erasing every copy is destructive, and it closes uploads until the
 // user allows them again, so both halves are here next to each other.
-function renderAccount({ status, subject, busy, run, client, setClient }: Account) {
+function renderAccount({ status, subject, busy, run, client, setClient, clients }: Account) {
   return <>
     <h3>This account</h3>
     <div className="actions-row">
@@ -105,7 +108,11 @@ function renderAccount({ status, subject, busy, run, client, setClient }: Accoun
     <div className="actions-row">
       <Button disabled={!status.revokeConsent || busy}
         onClick={() => void run((api) => api.revokeClient(subject, client))}>Revoke client access</Button>
-      <input className="text-input" value={client} disabled={busy} placeholder="client id"
+      <select value={client} disabled={busy} onChange={event => { setClient(event.target.value); void run((api) => api.setRevokeConsent(subject, false, event.target.value)) }}>
+        <option value="">Choose a client</option>
+        {clients.map(id => <option key={id} value={id}>{id}</option>)}
+      </select>
+      <input className="text-input" value={client} disabled={busy} placeholder="or type a client id"
         onChange={event => { setClient(event.target.value); void run((api) => api.setRevokeConsent(subject, false, event.target.value)) }} />
     </div>
     <label><input type="checkbox" checked={status.revokeConsent} disabled={!status.consent || busy}
