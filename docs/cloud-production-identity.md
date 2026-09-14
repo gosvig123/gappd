@@ -51,43 +51,78 @@ registration_endpoint: absent
 `meetings:read` is advertised, `meetings:sync` is absent, and there is no registration endpoint, which
 is the contract this project requires.
 
+## Switch state
+
+The server runs on the production identity. `/.well-known/oauth-protected-resource/mcp` returns:
+
+```
+resource: https://gappd-cloud-api-production.up.railway.app/mcp
+authorization_servers: ['https://clerk.getgappd.com']
+scopes_supported: ['meetings:read']
+```
+
+Railway variables now set on `gappd-cloud-api`:
+
+```
+CLERK_ISSUER_URL=https://clerk.getgappd.com
+GAPPD_DESKTOP_OAUTH_CLIENT_ID=t3RzfAuaxamgqOQV
+GAPPD_PRODUCTION_MODE=true
+```
+
 ## Production OAuth clients
 
-The Desktop client is created. The read client is not.
+Both are public with a consent screen and the same redirect rule. Clerk shows a client secret for
+every application, public included; none was copied or stored, because both clients use PKCE.
 
-| Client | Client ID | Type | Scopes | State |
-| --- | --- | --- | --- | --- |
-| `Gappd Desktop` | `t3RzfAuaxamgqOQV` | public, consent on | `email`, `profile`, `offline_access`, `meetings:sync` | **created** |
-| `Gappd MCP - Pi` | — | public, consent on | `meetings:read`, `offline_access` | **to create** |
+| Client | Client ID | Scopes | Redirect URIs |
+| --- | --- | --- | --- |
+| `Gappd Desktop` | `t3RzfAuaxamgqOQV` | `email`, `profile`, `offline_access`, `meetings:sync` | `http://127.0.0.1/callback` |
+| `Gappd MCP - Pi` | `WFvlqsHImvP7f14t` | `meetings:read`, `offline_access` | `http://localhost:19876/callback`, `http://127.0.0.1/callback` |
 
-The application's own panel reports the endpoints, which match the issuer:
+The desktop asks for `email profile meetings:sync` and lets the server add the rest. The bare
+`http://127.0.0.1/callback` is deliberate: the desktop binds a random loopback port, so the
+registered URI carries no port and Clerk accepts the port at request time.
 
+The development clients are obsolete. `TWKqKO5MnYvt8bAL` (Pi) and `iFaeusoYBwClQRoP` (desktop) live
+on the development instance and no longer work against this server.
+
+## Pi re-authorization
+
+Pi keeps its MCP OAuth entry in the operating system credential store, under keychain service
+`pi-mcp-adapter.oauth` and account `sha256-<sha256 of the server name>`. For `gappd-cloud` that is
+`sha256-b98d15b1fb413cb00e5e53f15bc15c0643f96e01776cc9550e7b7e7e1a3c97ce`, plus a `.chunk.*` entry
+for each segment.
+
+To clear it, use the adapter's own keyring library, because the `security` command line tool does not
+find these entries:
+
+```sh
+cd ~/.pi/agent/npm/node_modules/pi-mcp-adapter
+node -e "const {Entry}=require('@napi-rs/keyring');
+for (const a of ['sha256-b98d15b1fb413cb00e5e53f15bc15c0643f96e01776cc9550e7b7e7e1a3c97ce',
+                 'sha256-b98d15b1fb413cb00e5e53f15bc15c0643f96e01776cc9550e7b7e7e1a3c97ce.chunk.3b7188aaa8ea4a6f.0',
+                 'sha256-b98d15b1fb413cb00e5e53f15bc15c0643f96e01776cc9550e7b7e7e1a3c97ce.chunk.3b7188aaa8ea4a6f.1'])
+  new Entry('pi-mcp-adapter.oauth', a).deleteCredential();"
 ```
-discovery:  https://clerk.getgappd.com/.well-known/openid-configuration
-authorize:  https://clerk.getgappd.com/oauth/authorize
-token:      https://clerk.getgappd.com/oauth/token
-```
 
-Clerk shows a client secret for every application, including a public one. It was not copied or
-stored: the desktop is a public client that uses PKCE and must never hold a secret. Confirm the
-redirect URI is `http://127.0.0.1/callback` on this client, because the desktop's loopback callback
-is checked against it.
+Then restart Pi, because the MCP client ID is read from `mcp.json` at process start. Without the
+restart Pi keeps the old client ID in memory and the production issuer rejects it.
+
+`~/.pi/agent/mcp.json` already points at `WFvlqsHImvP7f14t`.
 
 ## Remaining steps
 
-1. **Create the read client** `Gappd MCP - Pi`: public, consent on, scopes `meetings:read` and
-   `offline_access` only. Then re-authorize Pi against it.
-2. **Record the redirect URI** on both clients as `http://127.0.0.1/callback`.
-3. **Then switch the server**, in this order:
+1. **Sign in to the production instance once.** The production instance has no session for this
+   account, so the first authorization stops at `accounts.getgappd.com/sign-in`. Only the owner can
+   enter those credentials.
+2. **Re-run the upload proof against production** to prove sign-in, device registration, upload,
+   read-back and delete on the production clients:
+   ```sh
+   GAPPD_CLERK_ISSUER_URL=https://clerk.getgappd.com \
+   GAPPD_CLERK_CLIENT_ID=t3RzfAuaxamgqOQV npm run cloud:proof -- --delete
    ```
-   CLERK_ISSUER_URL=https://clerk.getgappd.com
-   GAPPD_DESKTOP_OAUTH_CLIENT_ID=t3RzfAuaxamgqOQV
-   GAPPD_PRODUCTION_MODE=true
-   ```
-   then deploy. The service refuses to start if the issuer is not a production host.
-4. **Then set the two repository variables** `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID`
-   so the beta build bakes the production identity.
+3. **Restart Pi and authorize** the read client, then read a Meeting back.
+4. **Set the two repository variables** `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID` so the
+   beta build bakes the production identity.
 
-Do not do step 3 before step 1. Switching first makes the server reject the development tokens that
-Pi and the desktop currently hold, and there is no production read client yet to re-authorize with,
-so the live read path stops until step 1 is done.
+Do not cut a beta build before step 4; a build made now would carry the development identity.
