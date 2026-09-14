@@ -46,15 +46,15 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 			return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
 		}
 		if uploads.Demo != nil {
-			mux.Handle("POST /selected-demo-meeting", protect(selectedDemoHandler(uploads.Demo)))
-			mux.Handle("DELETE /selected-demo-meeting", protect(selectedDemoHandler(uploads.Demo)))
-			mux.Handle("POST /demo-meeting", protect(demoHandler(uploads.Demo)))
-			mux.Handle("DELETE /demo-meeting", protect(demoHandler(uploads.Demo)))
+			for _, route := range []string{"POST /selected-demo-meeting", "DELETE /selected-demo-meeting"} {
+				mux.Handle(route, protect(selectedDemoHandler(uploads.Demo)))
+			}
+			for _, route := range []string{"POST /demo-meeting", "DELETE /demo-meeting"} {
+				mux.Handle(route, protect(demoHandler(uploads.Demo)))
+			}
 		}
 		if uploads.Meeting != nil {
-			mux.Handle("POST /meeting", protect(meetingHandler(uploads.Meeting)))
-			mux.Handle("DELETE /meeting", protect(meetingHandler(uploads.Meeting)))
-			mux.Handle("POST /revoke", protect(revokeHandler(uploads.Meeting)))
+			registerMeetingUploads(mux, protect, uploads.Meeting)
 		}
 	}
 	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(meetingTransport(pool)))))
@@ -63,6 +63,27 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /ready", readiness(pool))
 	return bounded(mux)
+}
+
+// registerMeetingUploads keeps the write routes in one place, so a new route cannot be added
+// without the same authenticated wrapper as the others.
+func registerMeetingUploads(mux *http.ServeMux, protect func(http.Handler) http.Handler, pool *pgxpool.Pool) {
+	for _, route := range []string{"POST /meeting", "DELETE /meeting", "POST /revoke", "POST /delete-all", "POST /consent"} {
+		mux.Handle(route, protect(routeHandler(route, pool)))
+	}
+}
+
+func routeHandler(route string, pool *pgxpool.Pool) http.Handler {
+	switch {
+	case route == "POST /revoke":
+		return revokeHandler(pool)
+	case route == "POST /delete-all":
+		return deleteAllHandler(pool)
+	case route == "POST /consent":
+		return consentHandler(pool)
+	default:
+		return meetingHandler(pool)
+	}
 }
 
 func (a *Auth) metadata(w http.ResponseWriter, r *http.Request) {

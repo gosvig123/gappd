@@ -12,14 +12,14 @@ import (
 // UploadMeeting stores one validated document as this account's cloud copy. A retry never
 // extends the fixed expiry, an older revision never replaces a newer one, and a copy that is
 // deleted or expired is never written again.
-func UploadMeeting(ctx context.Context, pool *pgxpool.Pool, owner string, data []byte) (string, error) {
+func UploadMeeting(ctx context.Context, pool *pgxpool.Pool, owner string, generation int, data []byte) (string, error) {
 	document, err := ParseMeetingDocument(data)
 	if err != nil || owner == "" {
 		return "", errDocument
 	}
 	id := MeetingCopyID(owner, document.MeetingID)
 	err = inMeetingTx(ctx, pool, owner, func(tx pgx.Tx) error {
-		return storeCopy(ctx, tx, owner, id, document, data)
+		return storeCopy(ctx, tx, owner, id, document, data, generation)
 	})
 	if err != nil {
 		return "", err
@@ -27,8 +27,12 @@ func UploadMeeting(ctx context.Context, pool *pgxpool.Pool, owner string, data [
 	return id, nil
 }
 
-func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document MeetingDocument, data []byte) error {
+func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document MeetingDocument, data []byte, generation int) error {
 	if err := lockOwner(ctx, tx, owner); err != nil {
+		return err
+	}
+	// The account gate is read under the same lock as the write, so a delete-all cannot race it.
+	if err := checkAccountUploads(ctx, tx, owner, generation); err != nil {
 		return err
 	}
 	// An existing acceptance is left alone, so a retry cannot move the fixed expiry.

@@ -28,6 +28,9 @@ var readSurfaceMigration string
 //go:embed 006.sql
 var revocationMigration string
 
+//go:embed 007.sql
+var accountStateMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -101,7 +104,8 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 	if _, err := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS cloud_migrations (version integer PRIMARY KEY)`); err != nil {
 		return err
 	}
-	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration, readSurfaceMigration, revocationMigration} {
+	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration, readSurfaceMigration, revocationMigration,
+		accountStateMigration} {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err

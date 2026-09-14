@@ -7,6 +7,8 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -17,6 +19,10 @@ const MaxDeleteBody = 256
 type deleteInput struct {
 	MeetingID string `json:"meeting_id"`
 }
+
+// GenerationHeader carries the account generation the caller was issued, so a device that only
+// holds an older one cannot write after a delete-all.
+const GenerationHeader = "X-Gappd-Generation"
 
 func meetingHandler(pool *pgxpool.Pool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -35,20 +41,34 @@ func acknowledgeMeetingUpload(w http.ResponseWriter, r *http.Request, pool *pgxp
 		http.Error(w, "invalid document", http.StatusBadRequest)
 		return
 	}
-	id, err := UploadMeeting(r.Context(), pool, owner, body)
-	if errors.Is(err, errDocument) {
-		http.Error(w, "invalid document", http.StatusBadRequest)
-		return
-	}
-	if errors.Is(err, errStorageFull) {
-		http.Error(w, "account storage limit reached", http.StatusRequestEntityTooLarge)
-		return
-	}
+	generation, err := requestGeneration(r)
 	if err != nil {
-		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
+		http.Error(w, "invalid generation", http.StatusBadRequest)
+		return
+	}
+	id, err := UploadMeeting(r.Context(), pool, owner, generation, body)
+	if err != nil {
+		writeUploadRefusal(w, err)
 		return
 	}
 	acknowledgeMeeting(w, r, pool, owner, "accepted", id)
+}
+
+// writeUploadRefusal maps one upload failure to one status, so an absent copy and another
+// account's copy can never be told apart by a different message.
+func writeUploadRefusal(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errDocument):
+		http.Error(w, "invalid document", http.StatusBadRequest)
+	case errors.Is(err, errStorageFull):
+		http.Error(w, "account storage limit reached", http.StatusRequestEntityTooLarge)
+	case errors.Is(err, errUploadsBlocked):
+		http.Error(w, "uploads are off for this account", http.StatusForbidden)
+	case errors.Is(err, errGenerationMismatch):
+		http.Error(w, "stale account generation", http.StatusConflict)
+	default:
+		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
+	}
 }
 
 func acknowledgeMeetingDelete(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool, owner string) {
@@ -67,6 +87,20 @@ func acknowledgeMeetingDelete(w http.ResponseWriter, r *http.Request, pool *pgxp
 		return
 	}
 	acknowledgeMeeting(w, r, pool, owner, "deleted", "")
+}
+
+// requestGeneration reads the optional generation header. Absent means zero, which matches an
+// account that has no state row.
+func requestGeneration(r *http.Request) (int, error) {
+	raw := strings.TrimSpace(r.Header.Get(GenerationHeader))
+	if raw == "" {
+		return 0, nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < 0 || value > 1<<31 {
+		return 0, errors.New("invalid generation")
+	}
+	return value, nil
 }
 
 func parseDeleteInput(body []byte) (string, error) {
