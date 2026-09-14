@@ -86,8 +86,9 @@ func TestTheDirectoryIsPerAccountAndOrderedByRecentUse(t *testing.T) {
 	if clients[0].ClientID != "pi" {
 		t.Fatalf("order: %+v", clients)
 	}
-	if mine, err := directory.Clients(context.Background(), other); err != nil || len(mine) != 1 || mine[0].ClientID != "desktop" {
-		t.Fatalf("another account: %+v %v", mine, err)
+	// The other account's write is also asynchronous, so wait for it rather than reading once.
+	if mine := waitForClients(t, directory, other, 1); mine[0].ClientID != "desktop" {
+		t.Fatalf("another account: %+v", mine)
 	}
 }
 
