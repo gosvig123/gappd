@@ -26,9 +26,17 @@ export function meetingUploadAuthorization(): CloudAuth {
   return authorization
 }
 
+declare const __GAPPD_MEETING_UPLOAD_ENABLED__: string
+
+/** A packaged build carries the capability; a development run can still turn it on per shell. */
+function uploadCapability(): boolean {
+  if (typeof __GAPPD_MEETING_UPLOAD_ENABLED__ === 'string' && __GAPPD_MEETING_UPLOAD_ENABLED__.trim() === 'true') return true
+  return process.env[capabilityFlag] === 'true'
+}
+
 export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
-    process.env[capabilityFlag] === 'true',
+    uploadCapability(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentLoader(resolveGappdBinary))
   return instance

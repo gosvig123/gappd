@@ -31,7 +31,7 @@ func mutationRole(ctx context.Context, tx pgx.Tx, role, password string) error {
 	if len(password) < 24 || strings.ContainsAny(password, "\x00\r\n") {
 		return errors.New("invalid password")
 	}
-	if role != "gappd_demo_writer" && role != "gappd_demo_cleanup" && role != "gappd_meeting_writer" {
+	if role != "gappd_demo_writer" && role != "gappd_demo_cleanup" && role != "gappd_meeting_writer" && role != "gappd_meeting_cleanup" {
 		return errors.New("invalid role")
 	}
 	_, err := tx.Exec(ctx, `SET LOCAL log_statement='none'; SET LOCAL log_min_error_statement='panic';

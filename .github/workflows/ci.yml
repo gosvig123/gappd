@@ -76,6 +76,7 @@ jobs:
       TEST_CLEANUP_DATABASE_URL: postgres://gappd_demo_cleanup:synthetic-test-password-only@localhost:5432/cloud_test?sslmode=disable
       TEST_DEMO_DATABASE_URL: postgres://gappd_demo_writer:synthetic-test-password-only@localhost:5432/cloud_test?sslmode=disable
       TEST_MEETING_DATABASE_URL: postgres://gappd_meeting_writer:synthetic-test-password-only@localhost:5432/cloud_test?sslmode=disable
+      TEST_MEETING_CLEANUP_DATABASE_URL: postgres://gappd_meeting_cleanup:synthetic-test-password-only@localhost:5432/cloud_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

@@ -17,20 +17,37 @@ func main() {
 }
 
 func run() error {
-	url := os.Getenv("SYNTHETIC_CLEANUP_DATABASE_URL")
-	if url == "" {
+	synthetic := os.Getenv("SYNTHETIC_CLEANUP_DATABASE_URL")
+	meeting := os.Getenv("MEETING_CLEANUP_DATABASE_URL")
+	if synthetic == "" && meeting == "" {
 		return errors.New("cleanup configuration required")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	conn, err := pgx.Connect(ctx, url)
-	if err != nil {
-		return err
-	}
-	defer conn.Close(ctx)
-	count, err := service.CleanupDemo(ctx, conn)
-	if err == nil {
+	if synthetic != "" {
+		count, err := sweep(ctx, synthetic, service.CleanupDemo)
+		if err != nil {
+			return err
+		}
 		log.Printf("expired synthetic copies removed: %d", count)
 	}
-	return err
+	if meeting != "" {
+		count, err := sweep(ctx, meeting, service.CleanupMeeting)
+		if err != nil {
+			return err
+		}
+		log.Printf("expired Meeting copies removed: %d", count)
+	}
+	return nil
+}
+
+type sweepFunc func(context.Context, *pgx.Conn) (int64, error)
+
+func sweep(ctx context.Context, url string, run sweepFunc) (int64, error) {
+	conn, err := pgx.Connect(ctx, url)
+	if err != nil {
+		return 0, err
+	}
+	defer conn.Close(ctx)
+	return run(ctx, conn)
 }

@@ -76,6 +76,22 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Real copy cleanup
+
+Real Meeting copies are swept by the same `/cleanup` process, in addition to the synthetic slice.
+It needs `MEETING_CLEANUP_DATABASE_URL` for a separate non-owner **gappd_meeting_cleanup** role;
+without that variable it sweeps only the synthetic slice.
+
+Run `provision-meeting-cleanup` with a separate 24+ character `MEETING_CLEANUP_DB_PASSWORD` in the
+private admin session. The role can read expired copies, mark them deleted and remove their content.
+It cannot insert, cannot remove or clear a lifecycle marker, cannot move an acceptance or expiry,
+and cannot see a live copy. The lifecycle trigger refuses a marker change for every role, including
+an administrator.
+
+Each run removes at most 100 expired copies, marks them first and deletes the content in the same
+transaction. A capped batch cannot starve the next one, because the sweep selects only rows that
+still have content.
+
 ## Private administrator setup
 
 Use a trusted private Railway shell with Go source or the image's `/admin` binary.
@@ -125,9 +141,10 @@ Original seed: `b47c5e70-8030-4b9e-bb5a-146d17c68731`; never reused by the demo 
 Tests create only synthetic data. Use an isolated disposable PostgreSQL database.
 Set `TEST_ADMIN_DATABASE_URL` to its administrator URL and `TEST_DATABASE_URL` to its
 reader URL with password `synthetic-test-password-only`; the tests provision that role.
-Also set `TEST_DEMO_DATABASE_URL` (`gappd_demo_writer`) and `TEST_CLEANUP_DATABASE_URL`
-(`gappd_demo_cleanup`), plus `TEST_MEETING_DATABASE_URL` (`gappd_meeting_writer`) for the
-real-copy isolation tests, using that same synthetic-only test password. CI supplies all five URLs.
+Also set `TEST_DEMO_DATABASE_URL` (`gappd_demo_writer`), `TEST_CLEANUP_DATABASE_URL`
+(`gappd_demo_cleanup`), `TEST_MEETING_DATABASE_URL` (`gappd_meeting_writer`) and
+`TEST_MEETING_CLEANUP_DATABASE_URL` (`gappd_meeting_cleanup`) for the real-copy isolation tests,
+using that same synthetic-only test password. CI supplies all six URLs.
 Never point these variables at a deployed or real Meeting database.
 
 ```sh
@@ -190,9 +207,16 @@ Absent/other-owner copies are indistinguishable. Deleted/expired IDs cannot be r
    Supply `ADMIN_DATABASE_URL` and a securely generated `DEMO_WRITER_DB_PASSWORD`
    (24+ characters). Confirm no external auditing captures role/password DDL.
 3. Run `go run ./cmd/admin migrate` then `go run ./cmd/admin provision`,
-   `go run ./cmd/admin provision-demo` and `go run ./cmd/admin provision-meeting` (or `/admin`).
+   `go run ./cmd/admin provision-demo`, `go run ./cmd/admin provision-meeting` and
+   `go run ./cmd/admin provision-meeting-cleanup` (or `/admin`).
    `provision-meeting` creates the separate `gappd_meeting_writer` role and its owner-scoped
-   policies on `cloud_meetings` and `meeting_lifecycle`; the synthetic roles keep no access there.
+   policies on `cloud_meetings` and `meeting_lifecycle`; `provision-meeting-cleanup` creates the
+   separate `gappd_meeting_cleanup` role for expired copies only. The synthetic roles keep no
+   access to the real tables, and the real roles keep no access to the synthetic table.
+
+   Do NOT re-run plain `provision` on a working deployment: it resets the `gappd_reader` password,
+   which the API's `DATABASE_URL` already holds. Migrations 004 and 005 grant the reader its new
+   SELECT privileges themselves when the role already exists.
    The latter creates the separate non-owner role and fixed-payload INSERT RLS policy;
    grants fixed-identity SELECT/INSERT/marked DELETE on content and SELECT/INSERT/
    UPDATE(deleted_at) on lifecycle. No content UPDATE or marker deletion is allowed.

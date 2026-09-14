@@ -14,6 +14,11 @@ The existing API and local MCP are unchanged by this operations setup.
 
 ### Hourly expiry cleanup
 
+The cleanup service sweeps two slices in one run, because real copies need the same 30-day
+retention. It handles the synthetic slice with `SYNTHETIC_CLEANUP_DATABASE_URL` and real copies with
+`MEETING_CLEANUP_DATABASE_URL`, each under its own restricted non-owner role (`gappd_demo_cleanup`
+and `gappd_meeting_cleanup`). A missing variable simply skips that slice.
+
 - Railway service: `gappd-cloud-cleanup`, ID `0d10a939-a74c-463f-b1cf-211e15bc230c`.
 - Project: `b73b1b1e-810b-4c3d-af03-6136244852c0`.
 - Environment: `7b4a6831-62f8-4dda-a2e1-773542c266fb` (development despite its production label).
@@ -33,6 +38,7 @@ This proves scheduled execution, authentication and clean exit, not deletion und
 Local PostgreSQL tests already cover expiry removal and the 100-copy batch boundary.
 
 Each run handles at most 100 expired deterministic demo copies and retains deletion markers.
+The real-copy sweep is bounded the same way and keeps its own markers.
 At hourly frequency, nominal capacity is 2,400 copies per day without failures; this is not
 an SLA. Railway can delay ticks and skips a tick while its prior execution is still active.
 Before real data, configure failure/missed-run alerts, backlog-age monitoring and enough
