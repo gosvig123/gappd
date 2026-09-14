@@ -37,6 +37,9 @@ var deviceMigration string
 //go:embed 009.sql
 var clientDirectoryMigration string
 
+//go:embed 010.sql
+var backlogMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -71,6 +74,7 @@ func Provision(ctx context.Context, conn *pgx.Conn, password string) error {
 		return err
 	}
 	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, demo_lifecycle, cloud_meetings, meeting_lifecycle, cloud_read_meetings, revoked_grants TO gappd_reader;
+ GRANT EXECUTE ON FUNCTION cleanup_backlog() TO gappd_reader;
  ALTER ROLE gappd_reader SET default_transaction_read_only=on; ALTER ROLE gappd_reader SET statement_timeout='3s'`)
 	if err != nil {
 		return err
@@ -111,7 +115,7 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration, readSurfaceMigration, revocationMigration,
-		accountStateMigration, deviceMigration, clientDirectoryMigration} {
+		accountStateMigration, deviceMigration, clientDirectoryMigration, backlogMigration} {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err

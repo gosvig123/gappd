@@ -39,30 +39,42 @@ func HandlerWithDemo(a *Auth, pool, writer *pgxpool.Pool, clientID string) http.
 
 func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handler {
 	mux := http.NewServeMux()
-	if uploads.ClientID != "" {
-		uploadAuth := *a
-		uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
-		protect := func(h http.Handler) http.Handler {
-			return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
+	registerWriteRoutes(mux, a, uploads)
+	registerPublicRoutes(mux, a, pool)
+	return bounded(mux)
+}
+
+// registerWriteRoutes installs the authenticated write surface, and only when the deployment has
+// the client identity it needs to verify those requests.
+func registerWriteRoutes(mux *http.ServeMux, a *Auth, uploads Uploads) {
+	if uploads.ClientID == "" {
+		return
+	}
+	uploadAuth := *a
+	uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
+	protect := func(h http.Handler) http.Handler {
+		return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
+	}
+	if uploads.Demo != nil {
+		for _, route := range []string{"POST /selected-demo-meeting", "DELETE /selected-demo-meeting"} {
+			mux.Handle(route, protect(selectedDemoHandler(uploads.Demo)))
 		}
-		if uploads.Demo != nil {
-			for _, route := range []string{"POST /selected-demo-meeting", "DELETE /selected-demo-meeting"} {
-				mux.Handle(route, protect(selectedDemoHandler(uploads.Demo)))
-			}
-			for _, route := range []string{"POST /demo-meeting", "DELETE /demo-meeting"} {
-				mux.Handle(route, protect(demoHandler(uploads.Demo)))
-			}
-		}
-		if uploads.Meeting != nil {
-			registerMeetingUploads(mux, protect, uploads.Meeting)
+		for _, route := range []string{"POST /demo-meeting", "DELETE /demo-meeting"} {
+			mux.Handle(route, protect(demoHandler(uploads.Demo)))
 		}
 	}
+	if uploads.Meeting != nil {
+		registerMeetingUploads(mux, protect, uploads.Meeting)
+	}
+}
+
+func registerPublicRoutes(mux *http.ServeMux, a *Auth, pool *pgxpool.Pool) {
 	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(meetingTransport(pool)))))
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.metadata)
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", a.metadata)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /ready", readiness(pool))
-	return bounded(mux)
+	mux.HandleFunc("GET /status", status(pool))
 }
 
 // registerMeetingUploads keeps the write routes in one place, so a new route cannot be added
@@ -109,6 +121,21 @@ func readiness(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 		w.Write([]byte("ready\n"))
+	}
+}
+
+// status publishes the cleanup backlog so an external monitor can alert on it. It is public like
+// liveness, carries no account and no content, and never fails the request for being behind: the
+// caller watches the field, so a policy breach does not look like an outage.
+func status(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		backlog, err := ReadBacklog(r.Context(), pool)
+		if err != nil {
+			http.Error(w, "status unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok", "cleanup": backlog})
 	}
 }
 

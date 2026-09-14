@@ -76,6 +76,25 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Cleanup backlog monitoring
+
+The 24-hour physical cleanup deadline was unobservable: the reader cannot see an expired row and
+every runtime read is owner scoped. `GET /status` publishes it as two aggregate numbers.
+
+```json
+{"status":"ok","cleanup":{"expired_copies":0,"oldest_expired_seconds":0,"target_seconds":86400,"behind":false}}
+```
+
+`cleanup_backlog()` is a `SECURITY DEFINER` aggregate owned by the administrator. It returns counts
+and nothing else, so it is not a way to read a row or another account, and the reader gains only
+`EXECUTE`. The endpoint is public like liveness and carries no account and no content.
+
+`behind` is true when the oldest unremoved expired copy is older than the target. It is never a
+non-200, because a policy breach must not look like an outage: **the monitor alerts on the field.**
+An external check should poll `/status` and alert when `behind` is true, which covers both a failed
+sweep and a missed run. A missed run with nothing expired has no user impact, so the backlog is the
+signal that matters.
+
 ## Client inventory
 
 Revocation is keyed on a client id, so the service keeps the clients it has seen for each account.

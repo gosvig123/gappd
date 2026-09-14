@@ -99,7 +99,9 @@ setting would not remove Railway's own captured logs.
 ## Next verification
 
 1. Observe a completed daily backup and verify its expiry metadata.
-2. Configure cleanup failure/missed-run and backlog-age alerts.
+2. Point an external monitor at `GET /status` and alert when `cleanup.behind` is true. The endpoint
+   is public and content free; a missed run with nothing expired has no user impact, so the backlog
+   is the signal. Configuring the monitor itself is still outstanding.
 3. Test restore in an isolated target with current deletion evidence; do not serve it publicly.
 4. Verify aged backup removal and resolve the log-retention blocker before real uploads.
 
