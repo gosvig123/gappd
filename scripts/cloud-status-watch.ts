@@ -65,6 +65,7 @@ function install(): void {
   <key>ProgramArguments</key><array>
     <string>${process.execPath}</string>
     <string>--experimental-strip-types</string>
+    <string>--disable-warning=MODULE_TYPELESS_PACKAGE_JSON</string>
     <string>${SCRIPT}</string>
   </array>
   <key>StartInterval</key><integer>3600</integer>
