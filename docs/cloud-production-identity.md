@@ -19,7 +19,7 @@ settings.
 | Application domain | `app.getgappd.com` |
 | **Issuer (Frontend API)** | **`https://clerk.getgappd.com`** |
 | Account portal | `accounts.getgappd.com` |
-| Domain record | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, status **Unverified** |
+| Domain record | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, **Verified** (API, portal and 3/3 email) |
 | Plan | Hobby. OAuth applications and custom scopes are **not** plan-gated, so no upgrade is needed |
 | Scopes | `meetings:read` (advertised) and `meetings:sync` (not advertised) recreated |
 | OAuth applications | **Not yet created.** They do not migrate and must be recreated |
@@ -27,10 +27,10 @@ settings.
 `clerk.` and `accounts.` are reserved by Clerk as *application* subdomains. `clerk.getgappd.com` is
 still the Frontend API host, which is why it is the issuer.
 
-## DNS records still to add
+## DNS records (added and verified)
 
-Five CNAME records at Namecheap, where `getgappd.com` is registered. Clerk verifies the domain only
-after they resolve.
+Five CNAME records were added at Namecheap and verified by Clerk on 2026-09-14. All five now resolve
+at Namecheap's nameservers.
 
 | Type | Name | Value | Purpose |
 | --- | --- | --- | --- |
@@ -39,6 +39,33 @@ after they resolve.
 | CNAME | `clkmail` | `mail.xk2n1iwgxvot.clerk.services` | Email sending |
 | CNAME | `clk._domainkey` | `dkim1.xk2n1iwgxvot.clerk.services` | DKIM |
 | CNAME | `clk2._domainkey` | `dkim2.xk2n1iwgxvot.clerk.services` | DKIM |
+
+The live authorization-server metadata confirms the instance is correct:
+
+```
+issuer: https://clerk.getgappd.com
+scopes_supported: openid profile email public_metadata private_metadata offline_access meetings:read
+registration_endpoint: absent
+```
+
+`meetings:read` is advertised, `meetings:sync` is absent, and there is no registration endpoint, which
+is the contract this project requires.
+
+## Remaining steps
+
+1. **Create the two OAuth applications** in the production instance. They do not migrate. The
+   dashboard's create dialog did not expose its fields to automation, so this is a manual step:
+   - `Gappd Desktop`, public client, PKCE required, redirect `http://127.0.0.1/callback`, allowed
+     scopes `email`, `profile`, `offline_access`, `meetings:sync`.
+   - One read-only client per MCP client, public, PKCE required, redirect
+     `http://127.0.0.1/callback`, allowed scopes `meetings:read`, `offline_access` only.
+2. **Then switch the server**, in this order: `CLERK_ISSUER_URL=https://clerk.getgappd.com`, then
+   `GAPPD_PRODUCTION_MODE=true`, then deploy.
+3. **Then set the two repository variables** so the beta build bakes the production identity.
+
+Do not do step 2 before step 1. Switching first makes the server reject the development tokens that
+Pi and the desktop currently hold, and no production client exists yet to re-authorize with, so the
+live read path would stop until step 1 is finished.
 
 ## What is in place
 
