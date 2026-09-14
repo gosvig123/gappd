@@ -132,11 +132,24 @@ has no expiry (`expiresAt: null`), so it falls outside the 6-day policy and must
 the drill backup and every throwaway volume were deleted, and Railway completes volume deletion
 within 48 hours.
 
-### Point-in-time recovery is off
+### Point-in-time recovery enabled and proven (2026-09-14)
 
-Railway offers continuous backups and WAL archiving, and the Backups tab shows it disabled. Enabling
-it redeploys the service once and turns a recovery point measured in a day into one measured in
-seconds. Recommended before any real upload, and independent of the daily snapshots.
+PITR was off. It is now on: `WAL_ARCHIVE_*` variables point at a new `Postgres-PITR` archive bucket,
+and the service redeployed once.
+
+Enabling is staged like a restore, so it is reviewable before it applies. The drill then restored a
+known point: a sentinel row was written at 13:37:25 and the restore target was 13:35, chosen from
+the window. The recovered service `Postgres-restored-20260914-1135` reported migrations
+`1 2 3 4 5 6 7 8 9 10`, one cloud copy, two deletion markers, all five `gappd%` roles, and **zero
+sentinel rows** — genuine point-in-time recovery, not a snapshot.
+
+Two properties worth knowing. A PITR restore **creates a new standalone Postgres service and leaves
+the current one running**, so it is the isolated target this runbook wanted, and unlike a volume
+restore it never swaps the live volume. And the restorable window starts when PITR is enabled, so
+until archiving has run for a while the earliest target is the enablement moment.
+
+The drill service and its volume were deleted, and the live service was verified healthy with its own
+volume still mounted throughout.
 
 ### Log-retention blocker### Log-retention blocker
 

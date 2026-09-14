@@ -13,6 +13,7 @@ node_modules/
 !/docs/slack-integration.md
 !/docs/cloud-mcp-handover.md
 !/docs/cloud-meeting-document.md
+!/docs/cloud-production-identity.md
 !/docs/cloud-mcp-clerk.md
 !/docs/cloud-data-lifecycle.md
 !/docs/cloud-operations.md
