@@ -83,6 +83,32 @@ automatic backups, or recovery. Configure and test those operational controls be
 - Resolve pending deletions and re-enable behavior before shipping; OFF must not leak uploads.
 - No cloud read failure may trigger local recording failure or silently switch MCP sources.
 
+## Live beta status
+
+Verified on the deployed service on 2026-09-14, in this order.
+
+- Migrations 004 and 005, `provision-meeting` and `provision-meeting-cleanup` ran through a private
+  SSH-tunnelled session; no public database proxy was opened. The synthetic seed, its two markers
+  and the verified reader role were unchanged by the migration.
+- The reader holds SELECT on all five objects and `cloud_read_meetings` reports
+  `security_invoker=true`.
+- The writer role inserted a copy through the live policies, saw its own rows, saw zero rows for
+  another owner and zero with no owner set, and was refused access to the synthetic table. A stale
+  revision was refused by the trigger.
+- `list_meetings`, `get_meeting` and `search_meetings` returned a real copy beside the synthetic
+  fixture, and stopped returning it once the content was removed.
+- The hourly cleanup swept a planted expired copy: `expired Meeting copies removed: 1`, content gone
+  and the marker kept.
+- The upload route answers 401 unauthenticated, and the retired synthetic routes answer 404.
+
+Real-user onboarding is still gated. The beta release workflow does not set
+`GAPPD_MEETING_UPLOAD_ENABLED`, so a released beta build has no upload panel, and these remain
+open: production Clerk instance and verified domain (the desktop still uses the development
+issuer), grant and device revocation, rate and cost limits, backup restore proof, Railway's 30-day
+logs against the approved 14-day cap, device registration and account generations. Enabling upload
+in the beta channel is the switch that starts real user data flowing into this environment, so it
+is a deliberate owner decision rather than a build default.
+
 ## Data and ownership
 
 Export a versioned, explicit Meeting document, not a copy of the entire local SQLite database.
