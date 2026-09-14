@@ -107,35 +107,38 @@ macOS notification when it can. `cloud:status:install` writes a LaunchAgent that
 logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it. A breach
 is an exit code and a notification, so any scheduler treats it as a failure.
 
-### Backup restore drill (2026-09-14)
+### Backup restore drill (2026-09-14) — PASSED, in an isolated target
 
-Attempted and incomplete. What the attempt established:
+The drill ran under explicit owner approval, and it did **not** touch the live volume.
 
-- **No automatic backup had ever been taken.** The daily schedule was enabled and reported a
-  6-day retention, but `volumeInstanceBackupList` returned zero backups, so the runbook's
-  "backups configured" line was hollow until this drill. The first scheduled backup is due at the
-  next daily trigger; verify it exists afterwards rather than trusting the schedule.
-- **Manual backup creation works**: `Mutation.volumeInstanceBackupCreate`, and "New backup" in the
-  dashboard's Backups tab. One was created and shown as 1.1 GB.
-- **A manual backup has no expiry** (`expiresAt: null`), so it is not covered by the 6-day policy.
-  The earlier warning against indefinite manual backups is correct; the drill backup was deleted.
-- **Point-in-time recovery is OFF.** Railway offers continuous backups and WAL archiving, and
-  enabling it redeploys the service once. For a database that will hold user data this is a
-  stronger control than daily snapshots and it is currently unconfigured. Recommended before real
-  uploads.
-- **Restore is dashboard-only.** `Mutation.volumeInstanceBackupRestore` answers `Not Authorized`
-  to the CLI token. In the dashboard the `Restore` button sits on the service that owns the volume,
-  and per the documentation it stages a replacement volume for that same service, for review
-  followed by `Deploy`.
+Method. A manual backup was taken, a sentinel row was written to the live database *after* the
+backup, and the backup was then restored. The dashboard stages the restore: it creates the restored
+volume **unmounted** and shows three changes (unmount the old volume, mount the new, redeploy), with
+`Discard` and `Deploy`. Instead of deploying onto live, the restored volume was attached to a
+throwaway Postgres service in the same project and environment, and the staged change on live was
+discarded. The live service kept running on its own volume throughout.
 
-That last point is why the drill stopped. The runbook requires restoring "in an isolated target",
-but the tooling restores into the owning service. Clicking `Restore` on the live Postgres service
-would stage replacing the live volume, which this runbook forbids. Either the owner accepts a
-staged in-place drill on the live service, or Railway support must be asked whether a backup can be
-restored into a separate service. Until then the restore remains unproven, and the honest reason is
-recorded here rather than the gap being papered over.
+Evidence. The restored cluster reported migrations `1 2 3 4 5 6 7 8 9 10`, one cloud copy, two
+deletion markers, and **zero sentinel rows** — the row written after the backup was gone, so the
+restore really rolled the cluster back rather than being a no-op. It also carried all five `gappd%`
+roles, so a restored database is immediately usable. The live database still held its sentinel while
+this was true, which is what proves live was never rolled back. The restored cluster rejected the
+service's own generated password and accepted the live cluster's credentials, which is further
+evidence that the restore is a faithful cluster copy.
 
-### Log-retention blocker
+Two operational facts worth keeping. A restore creates and stages a volume; the current volume is
+preserved and nothing happens until `Deploy`, so a staged restore is discardable. And a manual backup
+has no expiry (`expiresAt: null`), so it falls outside the 6-day policy and must be deleted by hand —
+the drill backup and every throwaway volume were deleted, and Railway completes volume deletion
+within 48 hours.
+
+### Point-in-time recovery is off
+
+Railway offers continuous backups and WAL archiving, and the Backups tab shows it disabled. Enabling
+it redeploys the service once and turns a recovery point measured in a day into one measured in
+seconds. Recommended before any real upload, and independent of the daily snapshots.
+
+### Log-retention blocker### Log-retention blocker
 
 The workspace API reports plan **PRO**. Railway documents 30-day log retention for Pro, and the
 documentation is now explicit that **there is no log drain setting and no per-service retention
