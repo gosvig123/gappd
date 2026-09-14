@@ -84,6 +84,29 @@ Do not restore over the live volume. A restore must remain offline until current
 control records and expiry rules are applied; a snapshot alone cannot supply later deletions.
 Provider snapshot scheduling is not proof of application-consistent PostgreSQL recovery.
 
+### Operational scripts
+
+Two scripts cover the verification and monitoring the runbook needed by hand.
+
+**`npm run cloud:proof`** proves the whole upload path against the deployed service. It signs in
+with the Desktop public client, registers a device, adds one recorded turn to an isolated fixture,
+exports the document with the real exporter, signs the upload and sends it. It imports the app's
+own device module, so the signing format is not reimplemented.
+
+`--dry-run` stops before any network call, which is the check to run when only the exporter is in
+question. `--revision=N` raises the revision: a changed document needs a higher revision, because
+one revision means one document, and the identity is deterministic, so re-running at the same
+revision with the same bytes is a harmless retry.
+
+The sign-in is the one step no script can do alone: the browser it opens must already hold a Clerk
+session. Verified on 2026-09-14 with a revision-2 update, the returned transcript intact
+(`[0:00] You: ...`) and the fixed expiry unchanged between revisions.
+
+**`npm run cloud:status`** reads `GET /status` and fails when `cleanup.behind` is true, with a
+macOS notification when it can. `cloud:status:install` writes a LaunchAgent that runs it hourly and
+logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it. A breach
+is an exit code and a notification, so any scheduler treats it as a failure.
+
 ### Log-retention blocker
 
 The workspace API reports plan PRO. Railway documents 30-day log retention for Pro, not
