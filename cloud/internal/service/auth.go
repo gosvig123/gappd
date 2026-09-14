@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -114,7 +115,7 @@ func (a *Auth) protect(next http.Handler) http.Handler {
 			return
 		}
 		// Best effort and off the hot path: a missed entry only means the id must be typed.
-		a.Clients.Record(id.owner, id.client)
+		a.Clients.Record(id.owner, id.client, time.Now())
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, id.owner)))
 	})
 }

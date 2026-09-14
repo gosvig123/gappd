@@ -95,7 +95,7 @@ func TestTheClientsRouteListsAndNeedsADevice(t *testing.T) {
 	host, _, directory, mint := clientHost(t)
 	owner := copyOwner("directory-route")
 	// Record one client directly, then read it back through the route.
-	directory.Record(owner, "pi")
+	directory.Record(owner, "pi", time.Now())
 	waitForClients(t, directory, owner, 1)
 	token := mint("meetings:sync", "desktop", owner)
 	testDevice.register(t, host.URL, token)

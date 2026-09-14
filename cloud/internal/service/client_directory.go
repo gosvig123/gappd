@@ -36,9 +36,12 @@ func NewClientDirectory(pool *pgxpool.Pool) *ClientDirectory {
 	return &ClientDirectory{pool: pool, inflight: map[string]bool{}}
 }
 
-// Record notes that this client used this account. It never blocks the request and never reports
-// a failure: a missed entry only means the id has to be typed instead of picked.
-func (d *ClientDirectory) Record(owner, client string) {
+// Record notes that this client used this account at this time. It never blocks the request and
+// never reports a failure: a missed entry only means the id has to be typed instead of picked.
+//
+// The time is the request time, not the write time. The write is asynchronous, so stamping it on
+// arrival would order two clients by whichever write happened to land first.
+func (d *ClientDirectory) Record(owner, client string, at time.Time) {
 	if d == nil || d.pool == nil || owner == "" || !validClientID(client) || client == AnyClient {
 		return
 	}
@@ -50,15 +53,18 @@ func (d *ClientDirectory) Record(owner, client string) {
 	}
 	d.inflight[key] = true
 	d.mu.Unlock()
-	go d.write(owner, client, key)
+	go d.write(owner, client, at, key)
 }
 
-func (d *ClientDirectory) write(owner, client, key string) {
+func (d *ClientDirectory) write(owner, client string, at time.Time, key string) {
 	ctx, cancel := context.WithTimeout(context.Background(), recordTimeout)
 	defer cancel()
 	err := inMeetingTx(ctx, d.pool, owner, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO account_clients(owner_id,client_id) VALUES($1,$2)
- ON CONFLICT (owner_id,client_id) DO UPDATE SET last_seen_at=statement_timestamp()`, owner, client)
+		// GREATEST keeps a later use from being overwritten by a retry that started earlier.
+		_, err := tx.Exec(ctx, `INSERT INTO account_clients(owner_id,client_id,first_seen_at,last_seen_at)
+ VALUES($1,$2,$3,$3)
+ ON CONFLICT (owner_id,client_id) DO UPDATE SET last_seen_at=GREATEST(excluded.last_seen_at,account_clients.last_seen_at)`,
+			owner, client, at.UTC())
 		return err
 	})
 	if err != nil {
