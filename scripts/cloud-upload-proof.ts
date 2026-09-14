@@ -14,7 +14,7 @@
  * Clerk session, or you complete the sign-in once. Nothing else needs a human.
  */
 import { execFileSync } from 'node:child_process'
-import { createHash, createPrivateKey, randomBytes } from 'node:crypto'
+import { createHash, createPrivateKey, randomBytes, randomUUID } from 'node:crypto'
 import { realpathSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { createServer } from 'node:http'
@@ -27,7 +27,9 @@ const RESOURCE = process.env.GAPPD_CLOUD_RESOURCE_URL?.trim() || 'https://gappd-
 const ISSUER = process.env.GAPPD_CLERK_ISSUER_URL?.trim() || 'https://learning-mutt-4805.clerk.accounts.dev'
 const CLIENT_ID = process.env.GAPPD_CLERK_CLIENT_ID?.trim() || 'iFaeusoYBwClQRoP'
 const SCOPES = 'email profile meetings:sync'
-const LOCAL_MEETING = '72619a1d-f713-4f46-a2b8-c74e568726b1'
+// The cloud copy id is derived from the owner and this local id, and a deleted copy never returns.
+// A fixed id would therefore let one --delete run consume the proof for a whole account forever.
+const LOCAL_MEETING = randomUUID()
 const BINARY = 'build/gappd'
 
 type Tokens = { accessToken: string; email: string; subject: string }
@@ -48,12 +50,17 @@ function buildBinary(): string {
 }
 
 /**
- * Adds one recorded turn to the fixture. Without it the Meeting has no segments, so the document
- * carries no transcript and the proof would skip the part a citation depends on.
+ * Adds this run's Meeting and one recorded turn to the fixture profile. Without the turn the
+ * Meeting has no segments, so the document carries no transcript and the proof would skip the
+ * part a citation depends on.
  */
 function addTurn(profile: string): void {
   const database = new DatabaseSync(path.join(profile, 'backend-home', '.gappd', 'db.sqlite'))
   try {
+    database.prepare(`INSERT INTO meetings (id,title,started_at,ended_at,transcript,summary)
+      VALUES (?,?,?,?,?,?)`).run(LOCAL_MEETING, 'SYNTHETIC: cloud upload proof',
+      '2026-09-14T12:00:00Z', '2026-09-14T12:31:00Z', '',
+      'Fabricated Meeting used to prove the cloud upload path.')
     database.prepare(`INSERT INTO segments (id,meeting_id,start_sec,end_sec,text,speaker)
       VALUES (?,?,?,?,?,?)`).run('proof-turn-1', LOCAL_MEETING, 0, 4.5,
       'Proof: the transcript, its timestamps and its speaker label reach the cloud.', 'You')
