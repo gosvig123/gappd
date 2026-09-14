@@ -116,7 +116,7 @@ What still blocks that switch:
 | Production Clerk instance and verified domain | Not created. The identity is configurable now (`GAPPD_CLERK_ISSUER_URL`, `GAPPD_CLERK_CLIENT_ID`, or the matching build variables) and the server refuses the development issuer when `GAPPD_PRODUCTION_MODE=true`, so this is a configuration and dashboard task. |
 | Grant revocation | Implemented. `POST /revoke` cuts one client, or every client with `*`, on the sync scope and the signed Desktop client. The check runs on every request with a 30-second in-process cache, so a revoked client can work for up to 30 seconds. A revocation is permanent and there is no client inventory, so the caller must name the client id. |
 | Device registration | No code. A supplied device id is not authentication, so this needs a device key, not an id. |
-| Account generations | Partial. A deleted copy's identity is barred permanently, but an account-wide deletion cannot yet block a future upload of a new Meeting. |
+| Account generations | Implemented. `POST /delete-all` erases every copy, bars each identity and closes uploads under a new generation; `POST /consent` reopens them and issues a generation the client must present. |
 | Backup restore | Unproven. Daily 6-day volume backups are configured and never restored. |
 | Log retention | Blocked. Railway documents 30 days on this plan against the approved 14-day cap. |
 | Second account and hosted ChatGPT | Deferred. Needs a second real account and ChatGPT developer mode. |

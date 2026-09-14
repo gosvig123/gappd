@@ -76,6 +76,25 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Account deletion and generations
+
+`POST /delete-all` erases every cloud copy of the calling account in one transaction: it marks each
+identity deleted, removes the content, and closes uploads under a new generation. All three happen
+under the same account lock as an upload, so a write cannot race the deletion. The response reports
+how many copies were removed.
+
+Uploads then stay closed until an explicit `POST /consent`, which opens them again and issues a new
+generation. An upload must present that generation in `X-Gappd-Generation`; a device that never
+learned it is refused with 409. A blocked account is refused with 403. An account with no state row,
+which is every account before its first deletion, has uploads open and nothing to match.
+
+Two properties to keep in mind:
+
+- A deletion is permanent per identity. Consent reopens uploads for **new** Meetings only; an erased
+  Meeting cannot be uploaded again at any revision.
+- The generation is not a token claim, so the client must carry it. A client that ignores it can
+  still not upload while the account is blocked.
+
 ## Grant revocation
 
 A signed token otherwise stays valid until it expires. `POST /revoke` cuts a client off before
