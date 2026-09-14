@@ -24,6 +24,11 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       GAPPD_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GAPPD_GOOGLE_OAUTH_CLIENT_ID }}
+      # The cloud identity is baked in, because a packaged build cannot read a runtime
+      # environment variable. Setting these two repository variables switches the beta build
+      # from the shared development instance to production, with no code change.
+      GAPPD_CLERK_ISSUER_URL: ${{ vars.GAPPD_CLERK_ISSUER_URL }}
+      GAPPD_CLERK_CLIENT_ID: ${{ vars.GAPPD_CLERK_CLIENT_ID }}
 
     steps:
       - name: Check out repository

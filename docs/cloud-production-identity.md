@@ -38,9 +38,10 @@ Nothing here changes code. Every value is configuration.
    `CLERK_ISSUER_URL` to the production issuer, then `GAPPD_PRODUCTION_MODE=true`, then deploy.
    Setting the flag before the issuer is correct and safe: the service refuses to start and says so,
    rather than serving development tokens.
-5. **Build the desktop against production** with `GAPPD_CLERK_ISSUER_URL` and
-   `GAPPD_CLERK_CLIENT_ID`, which `tsup` bakes in. A packaged build cannot read a runtime
-   environment variable, which is why these are build variables and not settings.
+5. **Build the desktop against production.** The release workflow already reads
+   `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID` from repository variables, so setting those
+   two is the whole step. A packaged build cannot read a runtime environment variable, which is why
+   these are build variables and not settings.
 6. **Re-authorize every client.** A production token is a different token: Pi and ChatGPT need a
    fresh authorization, and the desktop needs a fresh sign-in. Old development tokens do not become
    production tokens.
