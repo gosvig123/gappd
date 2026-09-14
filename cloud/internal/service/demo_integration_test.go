@@ -21,14 +21,9 @@ func demoDatabase(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool) {
 	if os.Getenv("TEST_DEMO_DATABASE_URL") == "" {
 		t.Skip("requires TEST_DEMO_DATABASE_URL")
 	}
-	conn, err := pgx.Connect(context.Background(), os.Getenv("TEST_ADMIN_DATABASE_URL"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.Close(context.Background())
-	if err = admin.ProvisionDemo(context.Background(), conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
+	provisionRole(t, &demoOnce, func(ctx context.Context, conn *pgx.Conn) error {
+		return admin.ProvisionDemo(ctx, conn, "synthetic-test-password-only")
+	})
 	writer, err := service.OpenDemoPool(context.Background(), os.Getenv("TEST_DEMO_DATABASE_URL"))
 	if err != nil {
 		t.Fatal(err)

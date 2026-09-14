@@ -32,10 +32,9 @@ func meetingDatabase(t *testing.T) (*pgxpool.Pool, *pgxpool.Pool) {
 	if os.Getenv("TEST_MEETING_DATABASE_URL") == "" {
 		t.Skip("requires TEST_MEETING_DATABASE_URL")
 	}
-	conn := lifecycleAdmin(t)
-	if err := admin.ProvisionMeeting(context.Background(), conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
+	provisionRole(t, &meetingOnce, func(ctx context.Context, conn *pgx.Conn) error {
+		return admin.ProvisionMeeting(ctx, conn, "synthetic-test-password-only")
+	})
 	writer, err := service.OpenMeetingPool(context.Background(), os.Getenv("TEST_MEETING_DATABASE_URL"))
 	if err != nil {
 		t.Fatal(err)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gosvig123/gappd/cloud/internal/service"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -90,13 +91,22 @@ func TestAccountStorageLimitIsReported(t *testing.T) {
 func fillAccount(t *testing.T, owner string) {
 	t.Helper()
 	conn := lifecycleAdmin(t)
-	mustExec(t, conn, `ALTER TABLE cloud_meetings DISABLE TRIGGER guard_cloud_meeting_insert`)
-	defer mustExec(t, conn, `ALTER TABLE cloud_meetings ENABLE TRIGGER guard_cloud_meeting_insert`)
-	mustExec(t, conn, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
+	fixtureTx(t, conn, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `ALTER TABLE cloud_meetings DISABLE TRIGGER guard_cloud_meeting_insert`); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
  SELECT meeting_copy_id($1,'f1111111-0000-4000-8000-'||lpad(n::text,12,'0')),$1,
- 'f1111111-0000-4000-8000-'||lpad(n::text,12,'0'),now(),now()+interval '720 hours' FROM generate_series(1,500) n`, owner)
-	mustExec(t, conn, `INSERT INTO cloud_meetings(id,owner_id,title,summary,transcript,started_at,updated_at,revision,document)
- SELECT id,owner_id,'filler','','',now(),now(),1,'{"version":1}'::jsonb FROM meeting_lifecycle WHERE owner_id=$1`, owner)
+ 'f1111111-0000-4000-8000-'||lpad(n::text,12,'0'),now(),now()+interval '720 hours' FROM generate_series(1,500) n`, owner); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO cloud_meetings(id,owner_id,title,summary,transcript,started_at,updated_at,revision,document)
+ SELECT id,owner_id,'filler','','',now(),now(),1,'{"version":1}'::jsonb FROM meeting_lifecycle WHERE owner_id=$1`, owner); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `ALTER TABLE cloud_meetings ENABLE TRIGGER guard_cloud_meeting_insert`)
+		return err
+	})
 }
 
 func assertAccountFilled(t *testing.T, owner, filler string) {

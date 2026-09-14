@@ -36,9 +36,18 @@ func TestCleanupBatchLimitAndRemainingBacklog(t *testing.T) {
 func insertExpiredBatch(t *testing.T, conn *pgx.Conn, prefix string) {
 	t.Helper()
 	// Synthetic pre-migration fixtures. No real database is used by these tests.
-	mustExec(t, conn, `ALTER TABLE meetings DISABLE TRIGGER guard_demo_content`)
-	defer mustExec(t, conn, `ALTER TABLE meetings ENABLE TRIGGER guard_demo_content`)
-	mustExec(t, conn, `INSERT INTO meetings SELECT demo_meeting_id($1||n),$1||n,'SYNTHETIC cleanup','','',now(),now(),true FROM generate_series(1,101) n`, prefix)
-	mustExec(t, conn, `INSERT INTO demo_lifecycle(id,owner_id,accepted_at,expires_at)
- SELECT id,owner_id,now()-interval '744 hours',now()-interval '24 hours' FROM meetings WHERE owner_id LIKE $1`, prefix+"%")
+	fixtureTx(t, conn, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `ALTER TABLE meetings DISABLE TRIGGER guard_demo_content`); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO meetings SELECT demo_meeting_id($1||n),$1||n,'SYNTHETIC cleanup','','',now(),now(),true FROM generate_series(1,101) n`, prefix); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO demo_lifecycle(id,owner_id,accepted_at,expires_at)
+ SELECT id,owner_id,now()-interval '744 hours',now()-interval '24 hours' FROM meetings WHERE owner_id LIKE $1`, prefix+"%"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `ALTER TABLE meetings ENABLE TRIGGER guard_demo_content`)
+		return err
+	})
 }

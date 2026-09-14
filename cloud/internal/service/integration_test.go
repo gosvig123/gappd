@@ -152,9 +152,9 @@ func prepareDatabase(t *testing.T, conn *pgx.Conn) {
 			t.Fatal(err)
 		}
 	}
-	if err := admin.Provision(context.Background(), conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
+	provisionRole(t, &readerOnce, func(ctx context.Context, conn *pgx.Conn) error {
+		return admin.Provision(ctx, conn, "synthetic-test-password-only")
+	})
 	if err := admin.Seed(context.Background(), conn, "user_synthetic"); err != nil {
 		t.Fatal(err)
 	}

@@ -17,14 +17,13 @@ func meetingCleanupPool(t *testing.T) *pgx.Conn {
 	if os.Getenv("TEST_MEETING_CLEANUP_DATABASE_URL") == "" {
 		t.Skip("requires TEST_MEETING_CLEANUP_DATABASE_URL")
 	}
-	conn := lifecycleAdmin(t)
 	ctx := context.Background()
-	if err := admin.ProvisionMeeting(context.Background(), conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
-	if err := admin.ProvisionMeetingCleanup(ctx, conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
+	provisionRole(t, &meetingOnce, func(ctx context.Context, conn *pgx.Conn) error {
+		return admin.ProvisionMeeting(ctx, conn, "synthetic-test-password-only")
+	})
+	provisionRole(t, &cleanupOnce, func(ctx context.Context, conn *pgx.Conn) error {
+		return admin.ProvisionMeetingCleanup(ctx, conn, "synthetic-test-password-only")
+	})
 	cleanup, err := pgx.Connect(ctx, os.Getenv("TEST_MEETING_CLEANUP_DATABASE_URL"))
 	if err != nil {
 		t.Fatal(err)
@@ -37,14 +36,23 @@ func meetingCleanupPool(t *testing.T) *pgx.Conn {
 // through the API, so the tests build the state the same way the synthetic tests do.
 func insertExpiredCopies(t *testing.T, conn *pgx.Conn, prefix string, count int) {
 	t.Helper()
-	mustExec(t, conn, `ALTER TABLE cloud_meetings DISABLE TRIGGER guard_cloud_meeting_insert`)
-	defer mustExec(t, conn, `ALTER TABLE cloud_meetings ENABLE TRIGGER guard_cloud_meeting_insert`)
-	mustExec(t, conn, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
+	fixtureTx(t, conn, func(ctx context.Context, tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `ALTER TABLE cloud_meetings DISABLE TRIGGER guard_cloud_meeting_insert`); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
  SELECT meeting_copy_id($1||n,$1||n),$1||n,$1||n,now()-interval '744 hours',now()-interval '24 hours'
- FROM generate_series(1,$2) n`, prefix, count)
-	mustExec(t, conn, `INSERT INTO cloud_meetings(id,owner_id,title,summary,transcript,started_at,updated_at,revision,document)
+ FROM generate_series(1,$2) n`, prefix, count); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO cloud_meetings(id,owner_id,title,summary,transcript,started_at,updated_at,revision,document)
  SELECT meeting_copy_id(owner_id,local_id),owner_id,'expired','','',now(),now(),1,'{"version":1}'::jsonb
- FROM meeting_lifecycle WHERE owner_id LIKE $1`, prefix+"%")
+ FROM meeting_lifecycle WHERE owner_id LIKE $1`, prefix+"%"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, `ALTER TABLE cloud_meetings ENABLE TRIGGER guard_cloud_meeting_insert`)
+		return err
+	})
 }
 
 func TestMeetingCleanupRemovesExpiredCopiesAndKeepsMarkers(t *testing.T) {
