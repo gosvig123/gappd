@@ -76,6 +76,41 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Device registration
+
+A bearer token alone must not be enough to write. Every write route except registration needs a
+registered device and a signature over the exact request.
+
+| Header | Value |
+| --- | --- |
+| `X-Gappd-Device` | The device id: the SHA-256 of the raw Ed25519 public key, hex |
+| `X-Gappd-Signature` | Base64url, no padding, of the Ed25519 signature |
+| `X-Gappd-Generation` | The account generation, when the account has one |
+
+`POST /device` registers a 32-byte Ed25519 public key as `{"public_key":"<base64url>"}`. It is the
+one write that needs no signature, because it is how a signature becomes possible, and it stays on
+the sync scope and the signed Desktop client. Registration is idempotent for the same key. A revoked
+device can never register again.
+
+The signed message is, joined by newlines:
+
+```
+gappd-write-v1
+<METHOD>
+<PATH>
+<device id>
+<generation, or 0>
+<hex SHA-256 of the body>
+```
+
+It binds the request to the device, to the account generation and to the body, so a signature cannot
+be moved to another request, device, generation or body. A missing, unknown or revoked device and a
+bad signature are all refused with 403, with no way to tell them apart.
+
+The gate buffers the body to sign over it and hands the same bytes to the handler, so an oversize
+body is refused with 413 before the handler sees it. When the meeting writer pool is absent the write
+routes are absent too, so a deployment cannot expose an unprotected write.
+
 ## Account deletion and generations
 
 `POST /delete-all` erases every cloud copy of the calling account in one transaction: it marks each
