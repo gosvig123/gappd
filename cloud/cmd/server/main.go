@@ -60,7 +60,7 @@ func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
 	if err := service.SetRealCopies(context.Background(), pool, uploads.Meeting != nil); err != nil {
 		return err
 	}
-	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer), Limits: service.NewLimiter()}
+	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer), Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool)}
 	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}

@@ -13,17 +13,28 @@ import (
 const Scope = "meetings:read"
 
 type ownerKey struct{}
+
+// caller is the verified identity behind one request: the account and the client that was issued
+// the token. A revocation is keyed on both, so one client can be cut off without the others.
+type caller struct {
+	owner  string
+	client string
+}
+
 type Auth struct {
 	Issuer, Resource        string
 	Keys                    *Keys
 	RequiredScope, ClientID string
 	// Limits is installed by the server entrypoint. A nil limiter disables request budgets.
 	Limits *Limiter
+	// Revocations is installed by the server entrypoint. Nil disables the revocation check.
+	Revocations *Revocations
 }
 
 var errScope = errors.New("insufficient scope")
+var errRevoked = errors.New("revoked grant")
 
-func (a *Auth) verify(ctx context.Context, raw string) (string, error) {
+func (a *Auth) verify(ctx context.Context, raw string) (caller, error) {
 	claims := jwt.MapClaims{}
 	token, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (any, error) {
 		typ, _ := t.Header["typ"].(string)
@@ -35,24 +46,29 @@ func (a *Auth) verify(ctx context.Context, raw string) (string, error) {
 	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithIssuer(a.Issuer),
 		jwt.WithAudience(a.Resource), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
 	if err != nil || !token.Valid {
-		return "", errors.New("invalid token")
+		return caller{}, errors.New("invalid token")
 	}
 	return a.identity(claims)
 }
 
-func (a *Auth) identity(claims jwt.MapClaims) (string, error) {
+func (a *Auth) identity(claims jwt.MapClaims) (caller, error) {
 	aud, _ := claims.GetAudience()
 	sub, _ := claims.GetSubject()
 	if len(aud) != 1 || aud[0] != a.Resource || strings.TrimSpace(sub) != sub || sub == "" || len(sub) > 256 {
-		return "", errors.New("invalid identity")
+		return caller{}, errors.New("invalid identity")
 	}
 	if a.ClientID != "" && claims["client_id"] != a.ClientID {
-		return "", errors.New("invalid client")
+		return caller{}, errors.New("invalid client")
 	}
 	if !hasRequiredScope(claims, a.scope()) {
-		return "", errScope
+		return caller{}, errScope
 	}
-	return sub, nil
+	// A token without a client claim is still covered by an account-wide revocation.
+	client, _ := claims["client_id"].(string)
+	if len(client) > 256 || strings.TrimSpace(client) != client {
+		client = ""
+	}
+	return caller{owner: sub, client: client}, nil
 }
 
 // Clerk OAuthJwtPayload uses scp, or space-delimited scope when scp is absent.
@@ -81,10 +97,10 @@ func hasRequiredScope(c jwt.MapClaims, required string) bool {
 func (a *Auth) protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fields := strings.Fields(r.Header.Get("Authorization"))
-		var owner string
+		var id caller
 		var err error
 		if len(fields) == 2 && strings.EqualFold(fields[0], "Bearer") && len(fields[1]) <= 16384 {
-			owner, err = a.verify(r.Context(), fields[1])
+			id, err = a.verify(r.Context(), fields[1])
 		} else {
 			err = errors.New("missing token")
 		}
@@ -92,7 +108,10 @@ func (a *Auth) protect(next http.Handler) http.Handler {
 			a.reject(w, err)
 			return
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, owner)))
+		if !a.grantAllowed(w, r, id) {
+			return
+		}
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ownerKey{}, id.owner)))
 	})
 }
 
@@ -111,6 +130,24 @@ func (a *Auth) limited(class string, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// grantAllowed refuses a token whose client the account revoked. A lookup failure fails closed
+// with 503, because the service cannot claim the token is bad when it cannot tell.
+func (a *Auth) grantAllowed(w http.ResponseWriter, r *http.Request, id caller) bool {
+	if a.Revocations == nil {
+		return true
+	}
+	revoked, err := a.Revocations.Revoked(r.Context(), id.owner, id.client)
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		return false
+	}
+	if revoked {
+		a.reject(w, errRevoked)
+		return false
+	}
+	return true
 }
 
 func (a *Auth) reject(w http.ResponseWriter, err error) {

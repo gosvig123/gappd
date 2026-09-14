@@ -114,7 +114,7 @@ What still blocks that switch:
 | Item | State |
 | --- | --- |
 | Production Clerk instance and verified domain | Not created. The identity is configurable now (`GAPPD_CLERK_ISSUER_URL`, `GAPPD_CLERK_CLIENT_ID`, or the matching build variables) and the server refuses the development issuer when `GAPPD_PRODUCTION_MODE=true`, so this is a configuration and dashboard task. |
-| Grant revocation | No code. A signed token stays valid until it expires, and this is documented rather than promised. Needs a revocation record checked on every request. |
+| Grant revocation | Implemented. `POST /revoke` cuts one client, or every client with `*`, on the sync scope and the signed Desktop client. The check runs on every request with a 30-second in-process cache, so a revoked client can work for up to 30 seconds. A revocation is permanent and there is no client inventory, so the caller must name the client id. |
 | Device registration | No code. A supplied device id is not authentication, so this needs a device key, not an id. |
 | Account generations | Partial. A deleted copy's identity is barred permanently, but an account-wide deletion cannot yet block a future upload of a new Meeting. |
 | Backup restore | Unproven. Daily 6-day volume backups are configured and never restored. |

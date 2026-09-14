@@ -76,6 +76,22 @@ migration-005 union view of synthetic rows and owned cloud copies. The switch fa
 startup when that view is absent, so a deployment cannot serve real reads before migration 005.
 Order of work: apply migrations 004 and 005, run `provision-meeting`, then enable the flag.
 
+## Grant revocation
+
+A signed token otherwise stays valid until it expires. `POST /revoke` cuts a client off before
+that, on the sync scope and the exact signed Desktop client, with a 256-byte
+`{"client_id":"<id>"}` body. The literal `*` revokes every client of the account, which also
+covers a token that carries no client claim.
+
+Revocations live in `revoked_grants` and are permanent: there is no un-revoke path and a row is
+never deleted. The check runs on every authenticated request, and its answer is cached for up to
+30 seconds in the process, so a revoked client can keep working for that long and the cache is a
+per-instance ceiling rather than a shared one. A lookup failure answers 503 and serves nothing,
+because the service must not claim a token is good when it cannot tell.
+
+The runtime role only needs SELECT on `revoked_grants`; the Meeting writer inserts the rows. An
+admin can also revoke directly with SQL if the API is unreachable.
+
 ## Request and storage limits
 
 One account cannot exhaust the service or its cost, and one runaway client cannot spend the

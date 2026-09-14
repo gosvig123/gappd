@@ -33,6 +33,7 @@ const meetingPolicy = `
  GRANT USAGE ON SCHEMA public TO gappd_meeting_writer;
  GRANT SELECT, INSERT, UPDATE, DELETE ON cloud_meetings TO gappd_meeting_writer;
  GRANT SELECT, INSERT ON meeting_lifecycle TO gappd_meeting_writer;
+ GRANT SELECT, INSERT ON revoked_grants TO gappd_meeting_writer;
  GRANT UPDATE(deleted_at) ON meeting_lifecycle TO gappd_meeting_writer;
  ALTER ROLE gappd_meeting_writer SET statement_timeout='3s';
  DROP POLICY IF EXISTS cloud_meeting_writer_read ON cloud_meetings;

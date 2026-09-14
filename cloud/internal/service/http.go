@@ -54,6 +54,7 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 		if uploads.Meeting != nil {
 			mux.Handle("POST /meeting", protect(meetingHandler(uploads.Meeting)))
 			mux.Handle("DELETE /meeting", protect(meetingHandler(uploads.Meeting)))
+			mux.Handle("POST /revoke", protect(revokeHandler(uploads.Meeting)))
 		}
 	}
 	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(meetingTransport(pool)))))
