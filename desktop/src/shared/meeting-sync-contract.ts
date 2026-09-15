@@ -25,6 +25,8 @@ export type MeetingSyncWork = MeetingSyncEntry & { document: string }
 
 export type MeetingSyncDocument = {
   version: number
+  /** The account that owns this queue. Null means no account has used this Mac yet. */
+  subject: string | null
   /** Highest revision accepted by the server for each local Meeting. */
   accepted: Record<string, number>
   /** Pending work, newest revision per local Meeting. */
@@ -32,7 +34,7 @@ export type MeetingSyncDocument = {
 }
 
 export function emptyMeetingSyncDocument(): MeetingSyncDocument {
-  return { version: MEETING_SYNC_VERSION, accepted: {}, entries: {} }
+  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, entries: {} }
 }
 
 /**
@@ -44,6 +46,9 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
   if (!stored || typeof stored !== 'object') return null
   const candidate = stored as Partial<MeetingSyncDocument>
   if (candidate.version !== MEETING_SYNC_VERSION || !candidate.accepted || !candidate.entries) return null
+  // A document written before the queue belonged to an account has no subject and is adopted
+  // by the first account that claims it.
+  if (candidate.subject !== undefined && !(candidate.subject === null || (typeof candidate.subject === 'string' && candidate.subject.length > 0 && candidate.subject.length <= 320))) return null
   const accepted: Record<string, number> = {}
   for (const [localId, revision] of Object.entries(candidate.accepted)) {
     if (!revisionOf(revision)) return null
@@ -54,7 +59,7 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
     if (!validEntry(entry)) return null
     entries[localId] = entry
   }
-  return { version: MEETING_SYNC_VERSION, accepted, entries }
+  return { version: MEETING_SYNC_VERSION, subject: candidate.subject ?? null, accepted, entries }
 }
 
 function revisionOf(value: unknown): value is number {

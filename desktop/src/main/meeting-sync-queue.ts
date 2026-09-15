@@ -37,6 +37,26 @@ export class MeetingSyncQueue {
   }
 
   /**
+   * Makes this queue belong to one account. Memory never crosses accounts: a second account drops
+   * the first account's watermark and its queued work, because neither was ever accepted for it.
+   * A queue that no account has claimed adopts the first one that claims it, so a document written
+   * before queues were owned keeps the watermark of the only account this Mac has used.
+   */
+  claim(subject: string): Promise<void> {
+    return this.serialize(async () => {
+      if (typeof subject !== 'string' || subject.length === 0) throw new Error('A cloud account is required.')
+      const state = await this.load()
+      if (state.subject === subject) return
+      if (state.subject !== null) {
+        state.accepted = {}
+        state.entries = {}
+      }
+      state.subject = subject
+      await this.persist(state)
+    })
+  }
+
+  /**
    * Queues every local Meeting the server has not accepted yet, so turning sync on uploads the
    * Meetings that already exist. Whole batches run under one lock, and a Meeting whose document
    * cannot be read is skipped rather than left to fail the rest.

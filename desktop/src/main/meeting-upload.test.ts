@@ -180,6 +180,27 @@ test('a Meeting whose document cannot be read is reported and does not block the
   assert.match(status.result || '', /1 could not be read yet/)
 })
 
+test('a second account receives the Meetings the first account already uploaded', async () => {
+  const h = harness({ meetings: [meetingItem(MEETING)] })
+  await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 1)
+  h.switch(credential('user_b'))
+  await h.upload.setConsent('user_b', true)
+  assert.equal(h.sends(), 2, 'the watermark of one account never hides another account\'s history')
+})
+
+test('queued work for one account never drains to another', async () => {
+  const h = harness({ meetings: [], fetcher: async () => new Response('unavailable', { status: 503 }) })
+  await h.upload.setConsent('user_a', true)
+  await h.upload.enqueue(MEETING)
+  await h.upload.sync()
+  assert.equal((await h.upload.status()).queue.pending, 1)
+  h.switch(credential('user_b'))
+  const status = await h.upload.setConsent('user_b', true)
+  assert.equal(status.queue.pending, 0, 'the first account\'s queued work is dropped')
+  assert.equal(h.sends(), 1, 'nothing was sent to the second account')
+})
+
 test('nothing is queued when this Mac has no Meetings yet', async () => {
   const status = await harness({ meetings: [] }).upload.setConsent('user_a', true)
   assert.equal(status.queue.entries.length, 0)

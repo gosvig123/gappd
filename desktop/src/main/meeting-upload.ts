@@ -11,7 +11,8 @@ import { consentedCredential, grantedConsent, newStoredConsent, reconcileConsent
  *
  * Signing in never permits an upload: a separate, explicit consent is required, it is bound to
  * the account, and it is dropped when the account or its token changes or when sync is turned
- * off. The queue owns the revision and the exact accepted bytes.
+ * off. The queue owns the revision, the exact accepted bytes, and the account it belongs to, so
+ * neither queued work nor an acceptance ever crosses accounts.
  */
 export class MeetingUpload {
   private readonly auth: Authorization
@@ -62,8 +63,9 @@ export class MeetingUpload {
   }
 
   async setConsent(subject: unknown, enabled: unknown): Promise<MeetingUploadStatus> {
-    this.stored.upload = grantedConsent(await this.verified(subject, enabled))
-    if (this.stored.upload) await this.backfill()
+    const credential = await this.verified(subject, enabled)
+    this.stored.upload = grantedConsent(credential)
+    if (credential) await this.backfill(credential)
     return this.status()
   }
 
@@ -154,8 +156,8 @@ export class MeetingUpload {
    * where uploads first become permitted: a Meeting the server already accepted is skipped, and
    * one that cannot be read yet is reported instead of blocking the rest.
    */
-  private async backfill(): Promise<void> {
-    const { queued, unreadable } = await this.enqueueMissing()
+  private async backfill(credential: CloudCredential): Promise<void> {
+    const { queued, unreadable } = await this.enqueueMissing(credential)
     if (queued === 0 && unreadable === 0) return
     await this.sync()
     this.result = backfillMessage(queued, unreadable, (await this.queue.status()))
@@ -166,16 +168,21 @@ export class MeetingUpload {
    * without a button press. It queues nothing without consent and stays silent when nothing is new.
    */
   async syncNew(): Promise<void> {
-    if (!this.available || !await this.consented()) return
-    if ((await this.enqueueMissing()).queued === 0) return
+    if (!this.available) return
+    const credential = await this.consented()
+    if (!credential) return
+    if ((await this.enqueueMissing(credential)).queued === 0) return
     await this.sync()
   }
 
   /**
-   * Queues every finished record the server has not accepted yet. A Meeting that is still
-   * recording or still processing is not a finished record, so it stays out of the queue.
+   * Queues every finished record this account has not accepted yet. Naming the account first is
+   * what makes the queue safe to reuse: another account's watermark and queued work are dropped
+   * before this one's history is read, so no Meeting is skipped and none is sent to the wrong
+   * account. A Meeting that is still recording or still processing is not a finished record.
    */
-  private async enqueueMissing(): Promise<{ queued: number; unreadable: number }> {
+  private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
+    await this.queue.claim(credential.subject)
     const meetings = await this.localMeetings()
     const finished = meetings.filter((meeting) => meeting.status.state === 'completed').map((meeting) => meeting.id)
     return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))

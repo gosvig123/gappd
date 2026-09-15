@@ -28,6 +28,29 @@ function queue(clock?: () => Date) {
   return { store, queue: new MeetingSyncQueue(store, clock) }
 }
 
+test('claiming a queue for another account drops the watermark and the queued work', async () => {
+  const { store, queue: sync } = queue()
+  await sync.claim('user_a')
+  await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')
+  await sync.succeed(MEETING, 1)
+  assert.equal(store.stored?.accepted[MEETING], 1)
+  await sync.claim('user_a')
+  assert.equal(store.stored?.accepted[MEETING], 1, 'the same account keeps its watermark')
+  await sync.claim('user_b')
+  assert.deepEqual(store.stored?.accepted, {})
+  assert.equal(store.stored?.subject, 'user_b')
+  assert.equal((await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')).revision, 1)
+})
+
+test('a queue written before queues were owned is adopted, not wiped', async () => {
+  const { store, queue: sync } = queue()
+  // The shape a version-1 document on disk has: a watermark and no account.
+  store.stored = { version: 1, accepted: { [MEETING]: 3 }, entries: {} } as unknown as MeetingSyncDocument
+  await sync.claim('user_a')
+  assert.equal(store.stored?.accepted[MEETING], 3, 'the only account this Mac has used keeps its history')
+  assert.equal(store.stored?.subject, 'user_a')
+})
+
 test('enqueue assigns increasing revisions and replaces the older pending copy', async () => {
   const { queue: sync } = queue()
   assert.equal((await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')).revision, 1)
@@ -140,7 +163,7 @@ test('a damaged or unsupported queue file is refused whole', async () => {
   const damaged = { ...store.stored, version: 99 }
   store.stored = damaged as MeetingSyncDocument
   await assert.rejects(new MeetingSyncQueue(store).status())
-  store.stored = { version: 1, accepted: {}, entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
+  store.stored = { version: 1, subject: null, accepted: {}, entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
   await assert.rejects(new MeetingSyncQueue(store).status())
 })
 
