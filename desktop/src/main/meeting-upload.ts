@@ -180,6 +180,9 @@ export class MeetingUpload {
    * what makes the queue safe to reuse: another account's watermark and queued work are dropped
    * before this one's history is read, so no Meeting is skipped and none is sent to the wrong
    * account. A Meeting that is still recording or still processing is not a finished record.
+   *
+   * An accepted Meeting is deliberately not queued again. A local edit or an expired cloud copy is
+   * therefore not repaired here; the per-Meeting upload is the way to send a Meeting again.
    */
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
