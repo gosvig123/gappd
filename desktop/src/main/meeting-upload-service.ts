@@ -4,6 +4,7 @@ import { CloudAuth, type CloudCredential } from './cloud-auth'
 import { createSecureStore, requireEncryption } from './electron-secure-store'
 import { MeetingDevice, type DeviceCredential } from './meeting-device'
 import { meetingDocumentLoader } from './meeting-document-loader'
+import { listMeetings } from './meetings'
 import { resolveGappdBinary } from './native-runtime'
 import { MeetingSyncQueue } from './meeting-sync-queue'
 import { MeetingUpload } from './meeting-upload'
@@ -40,6 +41,7 @@ export function meetingUpload(): MeetingUpload {
     uploadCapability(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentLoader(resolveGappdBinary),
+    async () => (await listMeetings()).map((meeting) => meeting.id),
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
 }

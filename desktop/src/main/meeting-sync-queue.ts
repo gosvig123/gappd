@@ -29,16 +29,34 @@ export class MeetingSyncQueue {
    */
   enqueue(localId: string, load: (revision: number) => Promise<string>): Promise<MeetingSyncEntry> {
     return this.serialize(async () => {
-      if (typeof localId !== 'string' || localId.length === 0 || typeof load !== 'function') {
-        throw new Error('A Meeting and a document loader are required.')
-      }
       const state = await this.load()
-      const revision = nextRevision(state, localId)
-      const document = await load(revision)
-      if (typeof document !== 'string' || document.length === 0) throw new Error('The Meeting document is unavailable.')
-      state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null }
+      await this.queueOne(state, localId, load)
       await this.persist(state)
       return entryOf(localId, state)
+    })
+  }
+
+  /**
+   * Queues every local Meeting the server has not accepted yet, so turning sync on uploads the
+   * Meetings that already exist. Whole batches run under one lock, and a Meeting whose document
+   * cannot be read is skipped rather than left to fail the rest.
+   */
+  backfill(localIds: string[], load: (localId: string, revision: number) => Promise<string>): Promise<{ queued: number; unreadable: number }> {
+    return this.serialize(async () => {
+      const state = await this.load()
+      let queued = 0
+      let unreadable = 0
+      for (const localId of localIds) {
+        if (state.accepted[localId] !== undefined || state.entries[localId] !== undefined) continue
+        try {
+          await this.queueOne(state, localId, (revision) => load(localId, revision))
+          queued += 1
+        } catch {
+          unreadable += 1
+        }
+      }
+      if (queued > 0) await this.persist(state)
+      return { queued, unreadable }
     })
   }
 
@@ -120,6 +138,16 @@ export class MeetingSyncQueue {
         entries,
       }
     })
+  }
+
+  private async queueOne(state: MeetingSyncDocument, localId: string, load: (revision: number) => Promise<string>): Promise<void> {
+    if (typeof localId !== 'string' || localId.length === 0 || typeof load !== 'function') {
+      throw new Error('A Meeting and a document loader are required.')
+    }
+    const revision = nextRevision(state, localId)
+    const document = await load(revision)
+    if (typeof document !== 'string' || document.length === 0) throw new Error('The Meeting document is unavailable.')
+    state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null }
   }
 
   private async load(): Promise<MeetingSyncDocument> {

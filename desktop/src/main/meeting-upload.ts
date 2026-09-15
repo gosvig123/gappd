@@ -18,6 +18,7 @@ export class MeetingUpload {
   private readonly available: boolean
   private readonly queue: MeetingSyncQueue
   private readonly loadDocument: (localId: string, revision: number) => Promise<string>
+  private readonly localIds: () => Promise<string[]>
   private readonly device: MeetingDevice
   private readonly fetcher: typeof fetch
   private generation = 0
@@ -26,13 +27,14 @@ export class MeetingUpload {
   private result: string | null = null
 
   constructor(auth: Authorization, resource: string, available: boolean, queue: MeetingSyncQueue,
-    loadDocument: (localId: string, revision: number) => Promise<string>, device: MeetingDevice,
-    fetcher: typeof fetch = fetch) {
+    loadDocument: (localId: string, revision: number) => Promise<string>, localIds: () => Promise<string[]>,
+    device: MeetingDevice, fetcher: typeof fetch = fetch) {
     this.auth = auth
     this.resource = resource
     this.available = available
     this.queue = queue
     this.loadDocument = loadDocument
+    this.localIds = localIds
     this.device = device
     this.fetcher = fetcher
     auth.observeAuthorization?.(() => this.revokeAll())
@@ -60,6 +62,7 @@ export class MeetingUpload {
 
   async setConsent(subject: unknown, enabled: unknown): Promise<MeetingUploadStatus> {
     this.stored.upload = grantedConsent(await this.verified(subject, enabled))
+    if (this.stored.upload) await this.backfill()
     return this.status()
   }
 
@@ -145,6 +148,19 @@ export class MeetingUpload {
     return this.status()
   }
 
+  /**
+   * Uploads the Meetings that already exist on this Mac. Consent is granted once, so this runs
+   * where uploads first become permitted: a Meeting the server already accepted is skipped, and
+   * one that cannot be read yet is reported instead of blocking the rest.
+   */
+  private async backfill(): Promise<void> {
+    const { queued, unreadable } = await this.queue.backfill(await this.localIds(),
+      (localId, revision) => this.loadDocument(localId, revision))
+    if (queued === 0 && unreadable === 0) return
+    await this.sync()
+    this.result = backfillMessage(queued, unreadable, (await this.queue.status()))
+  }
+
   /** Everything the wire modules need, without giving them the consent state. */
   private context(): UploadContext {
     return {
@@ -185,6 +201,14 @@ export class MeetingUpload {
     this.cancelPending()
     revokeConsent(this.stored)
   }
+}
+
+function backfillMessage(queued: number, unreadable: number, queue: MeetingUploadStatus['queue']): string {
+  const parts = [`Queued ${queued} existing ${queued === 1 ? 'Meeting' : 'Meetings'} for upload.`]
+  if (unreadable > 0) parts.push(`${unreadable} could not be read yet and stay on this Mac.`)
+  if (queue.pending > 0) parts.push(`${queue.pending} still queued; press Upload queued Meetings to send them.`)
+  if (queue.failed > 0) parts.push(`${queue.failed} failed and will not retry.`)
+  return parts.join(' ')
 }
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { acceptedMessage } from './meeting-upload-ack.ts'

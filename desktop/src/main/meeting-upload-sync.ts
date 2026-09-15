@@ -8,10 +8,14 @@ import { acceptedMessage } from './meeting-upload-ack.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { sendDocument } from './meeting-upload-transport.ts'
 
-/** One sync call sends at most this many Meetings, so a call cannot loop without end. */
-const MAX_SENDS_PER_SYNC = 5
+/** One pass sends at most this many Meetings, so no pass can run without end. */
+const MAX_SENDS_PER_PASS = 5
 
-/** Sends queued copies while consent and the account still hold, and stops the moment they do not. */
+/**
+ * Sends queued copies while consent and the account still hold, in passes of
+ * MAX_SENDS_PER_PASS. A pass that accepts nothing ends the call, because the server is
+ * unavailable rather than slow, and the queue keeps the rest for the next attempt.
+ */
 export async function syncUploads(context: UploadContext): Promise<void> {
   const credential = await context.consented()
   if (!credential) return
@@ -19,14 +23,23 @@ export async function syncUploads(context: UploadContext): Promise<void> {
   context.setPending(controller)
   try {
     if (!await ensureRegistered(context, credential, controller.signal)) return
-    for (let sent = 0; sent < MAX_SENDS_PER_SYNC; sent++) {
-      if (controller.signal.aborted) return
-      const work = await context.queue.pending()
-      if (!work) return
-      if (!await sendOne(context, credential, controller, work)) return
+    while (!controller.signal.aborted) {
+      const remaining = (await context.queue.status()).pending
+      if (remaining === 0) return
+      await runPass(context, credential, controller)
+      if ((await context.queue.status()).pending >= remaining) return
     }
   } finally {
     context.setPending(null)
+  }
+}
+
+async function runPass(context: UploadContext, credential: CloudCredential, controller: AbortController): Promise<void> {
+  for (let sent = 0; sent < MAX_SENDS_PER_PASS; sent++) {
+    if (controller.signal.aborted) return
+    const work = await context.queue.pending()
+    if (!work) return
+    if (!await sendOne(context, credential, controller, work)) return
   }
 }
 

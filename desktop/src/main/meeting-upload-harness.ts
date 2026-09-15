@@ -49,7 +49,7 @@ export type RecordedRequest = {
   generation: string | null
 }
 
-export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number }
+export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; localIds?: string[]; load?: (localId: string, revision: number) => Promise<string> }
 
 export function harness(options: HarnessOptions = {}) {
   let saved: CloudCredential | null = options.saved === undefined ? credential() : options.saved
@@ -58,7 +58,8 @@ export function harness(options: HarnessOptions = {}) {
   const auth = buildAuth(() => saved, (next) => { saved = next })
   const upload = new MeetingUpload(auth, 'https://example.test/mcp', options.available ?? true,
     new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
-    async (_localId, revision) => `{"version":1,"revision":${revision}}`,
+    options.load ?? (async (_localId, revision) => `{"version":1,"revision":${revision}}`),
+    async () => options.localIds ?? [],
     new MeetingDevice(new DeviceStore('/tmp/unused.enc', cipher)),
     recordingFetcher(options, requests, registrations))
   return {

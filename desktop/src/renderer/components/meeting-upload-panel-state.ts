@@ -48,8 +48,10 @@ export class MeetingUploadPanelState {
 
   async run(action: (api: MeetingUploadApi) => Promise<MeetingUploadStatus>): Promise<void> {
     if (this.disposed) return
-    clearTimeout(this.timer)
     const id = ++this.generation
+    // A backfill can send for a while, so polling continues during the action and its own
+    // results report progress instead of leaving the panel silent until the action ends.
+    this.schedule()
     try {
       this.show(id, await action(this.api))
     } catch {

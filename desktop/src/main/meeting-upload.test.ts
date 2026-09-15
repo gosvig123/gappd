@@ -134,3 +134,51 @@ test('a deletion without a confirmation sends nothing', async () => {
   await h.upload.deleteCopy('user_a', MEETING)
   assert.equal(h.sends(), 0)
 })
+
+test('turning sync on backfills the Meetings that already exist on this Mac', async () => {
+  const h = harness({ localIds: [MEETING, OTHER] })
+  const status = await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 2)
+  assert.equal(status.queue.pending, 0)
+  assert.match(status.result || '', /Queued 2 existing Meetings for upload/)
+})
+
+test('one backfill sends more than a single pass of Meetings', async () => {
+  const h = harness({ localIds: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'] })
+  const status = await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 7)
+  assert.equal(status.queue.pending, 0)
+})
+
+test('a backfill stops when the server accepts nothing and keeps the rest queued', async () => {
+  const h = harness({ localIds: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], fetcher: async () => new Response('unavailable', { status: 503 }) })
+  const status = await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 1, 'a pass stops at the first missing acknowledgment')
+  assert.equal(status.queue.pending, 7)
+  assert.match(status.result || '', /7 still queued/)
+})
+
+test('a second enable does not upload an accepted Meeting again', async () => {
+  const h = harness({ localIds: [MEETING] })
+  await h.upload.setConsent('user_a', true)
+  await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 1)
+})
+
+test('a Meeting whose document cannot be read is reported and does not block the rest', async () => {
+  const h = harness({
+    localIds: [MEETING, OTHER],
+    load: async (localId, revision) => localId === OTHER ? '' : `{"version":1,"revision":${revision}}`,
+  })
+  const status = await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 1)
+  assert.equal(status.queue.pending, 0)
+  assert.match(status.result || '', /Queued 1 existing Meeting for upload/)
+  assert.match(status.result || '', /1 could not be read yet/)
+})
+
+test('nothing is queued when this Mac has no Meetings yet', async () => {
+  const status = await harness({ localIds: [] }).upload.setConsent('user_a', true)
+  assert.equal(status.queue.entries.length, 0)
+  assert.equal(status.result, null)
+})
