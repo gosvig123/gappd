@@ -20,10 +20,17 @@ var codexRequiredFlags = []string{"--ephemeral", "--sandbox", "--skip-git-repo-c
 type CodexExecProvider struct {
 	executable string
 	model      string
+	effort     string
 }
 
-func NewCodexExec(executable, model string) *CodexExecProvider {
-	return &CodexExecProvider{executable: executable, model: strings.TrimSpace(model)}
+func NewCodexExec(executable, model, reasoningEffort string) *CodexExecProvider {
+	return &CodexExecProvider{executable: executable, model: strings.TrimSpace(model), effort: strings.TrimSpace(reasoningEffort)}
+}
+
+// CodexSelection reports the resolved Installed Codex model and reasoning effort
+// this provider will use for every completion.
+func (p *CodexExecProvider) CodexSelection() CodexSelection {
+	return CodexSelection{Model: p.model, Effort: p.effort}
 }
 
 func (p *CodexExecProvider) Complete(ctx context.Context, req CompletionRequest) (string, error) {
@@ -88,6 +95,12 @@ func validateCodexHelp(rootHelp, execHelp, model string) error {
 	return nil
 }
 
+// ValidateCodexExecutable reports whether path is an executable file a Codex
+// provider can start.
+func ValidateCodexExecutable(path string) error {
+	return validateCodexExecutable(path)
+}
+
 func validateCodexExecutable(path string) error {
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("Codex executable path must be absolute")
@@ -147,7 +160,7 @@ func createCodexOutput(path string) error {
 }
 
 func (p *CodexExecProvider) completionArgs(dir, outputPath, instructionsPath string, schema json.RawMessage) ([]string, error) {
-	args := codexConfigArgs(instructionsPath)
+	args := codexConfigArgs(instructionsPath, p.effort)
 	args = append(args, "exec", "--ephemeral", "--sandbox", "read-only", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules", "--output-last-message", outputPath)
 	if len(schema) > 0 {
 		path := filepath.Join(dir, "schema.json")
@@ -162,10 +175,14 @@ func (p *CodexExecProvider) completionArgs(dir, outputPath, instructionsPath str
 	return append(args, "-"), nil
 }
 
-func codexConfigArgs(instructionsPath string) []string {
-	return []string{
+func codexConfigArgs(instructionsPath, reasoningEffort string) []string {
+	args := []string{
 		"--config", "model_instructions_file=" + strconv.Quote(instructionsPath),
 		"--config", "features.shell_tool=false",
 		"--config", `web_search="disabled"`,
 	}
+	if reasoningEffort != "" {
+		args = append(args, "--config", "model_reasoning_effort="+strconv.Quote(reasoningEffort))
+	}
+	return args
 }

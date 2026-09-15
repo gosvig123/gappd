@@ -1,4 +1,4 @@
-import type { AIProviderStatus, CodexConfigurationInput } from '../shared/ipc-contract'
+import type { AIProviderStatus, CodexConfigurationInput, CodexModelCatalog } from '../shared/ipc-contract'
 import type { AIConfig, CodexStatusResponse } from '../shared/generated/contracts'
 import { requestCommand } from './app-protocol'
 
@@ -12,8 +12,12 @@ export async function providerStatus(): Promise<AIProviderResult> {
   return resultFor(health)
 }
 
+export async function providerModels(executable?: string): Promise<CodexModelCatalog> {
+  return requestCommand('config.codexModels', { executable: executable ?? '' })
+}
+
 export async function configureCodex(input: CodexConfigurationInput): Promise<AIProviderResult> {
-  const response = await requestCommand('config.useCodex', { executable: input.executable.trim(), model: input.model.trim() })
+  const response = await requestCommand('config.useCodex', { executable: input.executable.trim(), model: input.model.trim(), reasoningEffort: input.reasoningEffort.trim() })
   return resultFor(healthyConfig(response.ai))
 }
 
@@ -33,7 +37,7 @@ function resultFor(health: CodexStatusResponse): AIProviderResult {
     health,
     status: {
       provider: config.provider === CODEX_PROVIDER ? CODEX_PROVIDER : LOCAL_PROVIDER,
-      codexExecutable: config.codexExecutable, codexModel: config.codexModel,
+      codexExecutable: config.codexExecutable, codexModel: config.codexModel, codexReasoningEffort: config.codexReasoningEffort,
       available: health.available, ...(health.error ? { error: health.error } : {}),
     },
   }

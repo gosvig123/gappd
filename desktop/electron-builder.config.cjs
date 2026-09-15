@@ -35,6 +35,10 @@ module.exports = {
     identity: MAC_SIGNING_IDENTITY,
     hardenedRuntime: true,
     gatekeeperAssess: false,
+    // notarize-mac-build.cjs owns notarization in the afterSign hook. Disable the built-in
+    // @electron/notarize step so each app is notarized and stapled once, and so local builds
+    // never submit to Apple just because Apple credentials are present in the environment.
+    notarize: false,
     extendInfo: {
       NSAudioCaptureUsageDescription: 'Gappd captures system audio to transcribe your meetings.',
       NSMicrophoneUsageDescription: 'Gappd captures your microphone to transcribe your voice.',

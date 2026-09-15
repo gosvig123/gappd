@@ -12,7 +12,7 @@ import (
 
 func TestCodexExecSeparatesInstructionsAndUserPrompt(t *testing.T) {
 	executable := fakeCodex(t)
-	provider := NewCodexExec(executable, "")
+	provider := NewCodexExec(executable, "", "")
 	result, err := provider.Complete(context.Background(), CompletionRequest{System: "be brief", User: "hello"})
 	if err != nil || result != "plain result" {
 		t.Fatalf("Complete() = %q, %v", result, err)
@@ -27,14 +27,14 @@ func TestCodexExecSeparatesInstructionsAndUserPrompt(t *testing.T) {
 
 func TestCodexExecUsesRestrictedConfigAndSchema(t *testing.T) {
 	executable := fakeCodex(t)
-	provider := NewCodexExec(executable, "gpt-5")
+	provider := NewCodexExec(executable, "gpt-5", "medium")
 	schema := json.RawMessage(`{"type":"object"}`)
 	result, err := provider.CompleteJSON(context.Background(), CompletionRequest{User: "json", JSONSchema: schema})
 	if err != nil || string(result) != `{"ok":true}` {
 		t.Fatalf("CompleteJSON() = %s, %v", result, err)
 	}
 	args, _ := os.ReadFile(executable + ".args")
-	required := []string{"--config model_instructions_file=", "--config features.shell_tool=false", `--config web_search="disabled"`, "--output-schema", "--model gpt-5", "--sandbox read-only", "--ignore-user-config", "--ignore-rules", " -"}
+	required := []string{"--config model_instructions_file=", "--config features.shell_tool=false", `--config web_search="disabled"`, `--config model_reasoning_effort="medium"`, "--output-schema", "--model gpt-5", "--sandbox read-only", "--ignore-user-config", "--ignore-rules", " -"}
 	for _, value := range required {
 		if !strings.Contains(string(args), value) {
 			t.Errorf("args missing %q: %s", value, args)
@@ -53,9 +53,9 @@ func TestCodexExecRejectsEmptyAndInvalidResultsPrivately(t *testing.T) {
 			writeMarker(t, executable+test.marker)
 			var err error
 			if test.marker == ".empty" {
-				_, err = NewCodexExec(executable, "").Complete(context.Background(), CompletionRequest{})
+				_, err = NewCodexExec(executable, "", "").Complete(context.Background(), CompletionRequest{})
 			} else {
-				_, err = NewCodexExec(executable, "").CompleteJSON(context.Background(), CompletionRequest{JSONSchema: json.RawMessage(`{}`)})
+				_, err = NewCodexExec(executable, "", "").CompleteJSON(context.Background(), CompletionRequest{JSONSchema: json.RawMessage(`{}`)})
 			}
 			if err == nil || !strings.Contains(err.Error(), test.want) || test.hidden != "" && strings.Contains(err.Error(), test.hidden) {
 				t.Fatalf("completion error = %v", err)
@@ -72,7 +72,7 @@ func TestCodexExecUsesMinimalEnvironment(t *testing.T) {
 	t.Setenv("CODEX_HOME", "/tmp/codex-home")
 	t.Setenv("HTTPS_PROXY", "http://proxy.test")
 	executable := fakeCodex(t)
-	_, err := NewCodexExec(executable, "").Complete(context.Background(), CompletionRequest{User: "env"})
+	_, err := NewCodexExec(executable, "", "").Complete(context.Background(), CompletionRequest{User: "env"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestCodexExecAvailabilityFailures(t *testing.T) {
 	t.Run("capability", func(t *testing.T) {
 		executable := fakeCodex(t)
 		writeMarker(t, executable+".missing")
-		err := NewCodexExec(executable, "").Available()
+		err := NewCodexExec(executable, "", "").Available()
 		if err == nil || !strings.Contains(err.Error(), "current Codex CLI/update required") {
 			t.Fatalf("Available() error = %v", err)
 		}
@@ -102,7 +102,7 @@ func TestCodexExecAvailabilityFailures(t *testing.T) {
 	t.Run("login", func(t *testing.T) {
 		executable := fakeCodex(t)
 		writeMarker(t, executable+".auth")
-		err := NewCodexExec(executable, "").Available()
+		err := NewCodexExec(executable, "", "").Available()
 		if err == nil || !strings.Contains(err.Error(), "run `") {
 			t.Fatalf("Available() error = %v", err)
 		}
@@ -115,7 +115,7 @@ func TestCodexExecCompletionHasDefaultTimeout(t *testing.T) {
 	previous := codexCompletionTimeout
 	codexCompletionTimeout = 100 * time.Millisecond
 	t.Cleanup(func() { codexCompletionTimeout = previous })
-	_, err := NewCodexExec(executable, "").Complete(context.Background(), CompletionRequest{User: "wait"})
+	_, err := NewCodexExec(executable, "", "").Complete(context.Background(), CompletionRequest{User: "wait"})
 	if err == nil || !strings.Contains(err.Error(), context.DeadlineExceeded.Error()) {
 		t.Fatalf("Complete() error=%v", err)
 	}
@@ -128,7 +128,7 @@ func TestCodexExecProbeAndCompletionTimeouts(t *testing.T) {
 	codexProbeTimeout = 100 * time.Millisecond
 	t.Cleanup(func() { codexProbeTimeout = previous })
 	started := time.Now()
-	if err := NewCodexExec(executable, "").Available(); err == nil || time.Since(started) > codexKillGrace+time.Second {
+	if err := NewCodexExec(executable, "", "").Available(); err == nil || time.Since(started) > codexKillGrace+time.Second {
 		t.Fatalf("Available() error=%v duration=%s", err, time.Since(started))
 	}
 	os.Remove(executable + ".probe-slow")
@@ -136,7 +136,7 @@ func TestCodexExecProbeAndCompletionTimeouts(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	started = time.Now()
-	_, err := NewCodexExec(executable, "").Complete(ctx, CompletionRequest{User: "wait"})
+	_, err := NewCodexExec(executable, "", "").Complete(ctx, CompletionRequest{User: "wait"})
 	if err == nil || !strings.Contains(err.Error(), context.DeadlineExceeded.Error()) || time.Since(started) > codexKillGrace+time.Second {
 		t.Fatalf("Complete() error=%v duration=%s", err, time.Since(started))
 	}

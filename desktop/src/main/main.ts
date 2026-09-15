@@ -1,8 +1,10 @@
+import { initializeSelectedFixtureProfile } from './selected-fixture-profile'
 import path from 'node:path'
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor } from 'electron'
 import { registerIpc } from './ipc'
-import { pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
+import { onMeetingProcessingFinished, pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
 import { logMainProcessMemory } from './memory'
+import { meetingUpload } from './meeting-upload-service'
 import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
 import { stopActiveRecordingForQuit } from './recording-process'
@@ -10,6 +12,8 @@ import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
+
+initializeSelectedFixtureProfile()
 
 const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
 
@@ -77,6 +81,8 @@ app.whenReady().then(async () => {
   createWindow(!startHidden)
   await bootstrapManagedRuntime()
   startDrainCoordinator()
+  // A finished record joins the cloud queue on its own; without consent it stays local.
+  onMeetingProcessingFinished(() => { void meetingUpload().syncNew().catch((error) => console.error('Meeting upload after processing failed', error)) })
   startMeetingPresence(showMainWindow)
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
