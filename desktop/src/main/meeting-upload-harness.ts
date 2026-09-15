@@ -9,6 +9,8 @@ import { MeetingUpload } from './meeting-upload.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { SecureJsonStore, type StoreCipher } from './secure-json-store.ts'
 import type { MeetingSyncDocument } from '../shared/meeting-sync-contract'
+import type { MeetingListItem } from '../shared/contracts'
+import type { MeetingState } from '../shared/generated/protocol'
 
 export const cipher: StoreCipher = {
   encrypt: (value) => Buffer.from(Buffer.from(value).toString('base64url')),
@@ -49,7 +51,22 @@ export type RecordedRequest = {
   generation: string | null
 }
 
-export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; localIds?: string[]; load?: (localId: string, revision: number) => Promise<string> }
+export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
+
+/**
+ * One Meeting list row, shaped as the app protocol sends it. Capture and processing statuses
+ * follow the lifecycle mapping, so a fake never claims a state the app cannot produce.
+ */
+export function meetingItem(id: string, state: MeetingState = 'completed'): MeetingListItem {
+  const capture = state === 'recording' ? 'recording' : 'captured'
+  const processing = state === 'processing' ? 'processing' : state === 'completed' ? 'completed'
+    : state === 'failed' ? 'failed' : 'pending'
+  return {
+    id, title: id, startedAt: '2026-09-01T10:00:00Z',
+    status: { state, updatedAt: '2026-09-01T10:05:00Z', capture: { state: capture, updatedAt: '' }, processing: { state: processing, updatedAt: '' } },
+    hasTranscript: state === 'completed', hasSummary: state === 'completed',
+  }
+}
 
 export function harness(options: HarnessOptions = {}) {
   let saved: CloudCredential | null = options.saved === undefined ? credential() : options.saved
@@ -59,7 +76,7 @@ export function harness(options: HarnessOptions = {}) {
   const upload = new MeetingUpload(auth, 'https://example.test/mcp', options.available ?? true,
     new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
     options.load ?? (async (_localId, revision) => `{"version":1,"revision":${revision}}`),
-    async () => options.localIds ?? [],
+    async () => options.meetings ?? [],
     new MeetingDevice(new DeviceStore('/tmp/unused.enc', cipher)),
     recordingFetcher(options, requests, registrations))
   return {

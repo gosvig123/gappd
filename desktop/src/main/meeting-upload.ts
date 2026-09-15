@@ -1,4 +1,5 @@
 import type { MeetingUploadStatus } from '../shared/meeting-upload-contract'
+import type { MeetingListItem } from '../shared/contracts'
 import type { CloudAuth, CloudCredential } from './cloud-auth'
 import type { MeetingDevice } from './meeting-device'
 import type { MeetingSyncQueue } from './meeting-sync-queue'
@@ -18,7 +19,7 @@ export class MeetingUpload {
   private readonly available: boolean
   private readonly queue: MeetingSyncQueue
   private readonly loadDocument: (localId: string, revision: number) => Promise<string>
-  private readonly localIds: () => Promise<string[]>
+  private readonly localMeetings: () => Promise<MeetingListItem[]>
   private readonly device: MeetingDevice
   private readonly fetcher: typeof fetch
   private generation = 0
@@ -27,14 +28,14 @@ export class MeetingUpload {
   private result: string | null = null
 
   constructor(auth: Authorization, resource: string, available: boolean, queue: MeetingSyncQueue,
-    loadDocument: (localId: string, revision: number) => Promise<string>, localIds: () => Promise<string[]>,
+    loadDocument: (localId: string, revision: number) => Promise<string>, localMeetings: () => Promise<MeetingListItem[]>,
     device: MeetingDevice, fetcher: typeof fetch = fetch) {
     this.auth = auth
     this.resource = resource
     this.available = available
     this.queue = queue
     this.loadDocument = loadDocument
-    this.localIds = localIds
+    this.localMeetings = localMeetings
     this.device = device
     this.fetcher = fetcher
     auth.observeAuthorization?.(() => this.revokeAll())
@@ -154,11 +155,30 @@ export class MeetingUpload {
    * one that cannot be read yet is reported instead of blocking the rest.
    */
   private async backfill(): Promise<void> {
-    const { queued, unreadable } = await this.queue.backfill(await this.localIds(),
-      (localId, revision) => this.loadDocument(localId, revision))
+    const { queued, unreadable } = await this.enqueueMissing()
     if (queued === 0 && unreadable === 0) return
     await this.sync()
     this.result = backfillMessage(queued, unreadable, (await this.queue.status()))
+  }
+
+  /**
+   * A record whose processing just finished joins the queue on its own, so sync stays current
+   * without a button press. It queues nothing without consent and stays silent when nothing is new.
+   */
+  async syncNew(): Promise<void> {
+    if (!this.available || !await this.consented()) return
+    if ((await this.enqueueMissing()).queued === 0) return
+    await this.sync()
+  }
+
+  /**
+   * Queues every finished record the server has not accepted yet. A Meeting that is still
+   * recording or still processing is not a finished record, so it stays out of the queue.
+   */
+  private async enqueueMissing(): Promise<{ queued: number; unreadable: number }> {
+    const meetings = await this.localMeetings()
+    const finished = meetings.filter((meeting) => meeting.status.state === 'completed').map((meeting) => meeting.id)
+    return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))
   }
 
   /** Everything the wire modules need, without giving them the consent state. */

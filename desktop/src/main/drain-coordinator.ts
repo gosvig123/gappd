@@ -9,6 +9,7 @@ const DRAIN_RETRY_INTERVAL_MS = 60_000
 export type DrainPauseReason = 'recording' | 'sleep'
 type Flight = { capability: ManagedRuntimeCapability; controller: AbortController; done?: Promise<void> }
 const pending = new Set<ManagedRuntimeCapability>()
+const observers = new Set<() => void>()
 const pauseCounts = new Map<DrainPauseReason, number>()
 let flight: Flight | null = null
 let pendingCheckRunning = false
@@ -16,6 +17,14 @@ let retryTimer: NodeJS.Timeout | null = null
 let stopObserving: (() => void) | null = null
 let readinessKey = ''
 let stopped = true
+
+/**
+ * Registers a listener for Meetings whose processing just finished. It is notified once per drain
+ * that completed work, so a finished record can be picked up without polling.
+ */
+export function onMeetingProcessingFinished(observer: () => void): void {
+  observers.add(observer)
+}
 
 export function startDrainCoordinator(): void {
   if (stopObserving) return
@@ -109,6 +118,7 @@ function startNextFlight(): void {
 async function runDrain(current: Flight): Promise<void> {
   try {
     const result = await drainCapability(current)
+    if (result.completed > 0) for (const observer of observers) observer()
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
   } catch (error) {

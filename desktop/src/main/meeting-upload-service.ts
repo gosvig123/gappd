@@ -41,7 +41,7 @@ export function meetingUpload(): MeetingUpload {
     uploadCapability(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentLoader(resolveGappdBinary),
-    async () => (await listMeetings()).map((meeting) => meeting.id),
+    listMeetings,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
 }

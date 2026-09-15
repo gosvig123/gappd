@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { harness, credential, accepted, MEETING, OTHER, type Harness } from './meeting-upload-harness.ts'
+import { harness, credential, accepted, meetingItem, MEETING, OTHER, type Harness } from './meeting-upload-harness.ts'
+import type { MeetingListItem } from '../shared/contracts'
+
+const ids = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7']
 
 test('signing in never permits an upload; the capability gate blocks everything', async () => {
   const h = harness()
@@ -136,7 +139,7 @@ test('a deletion without a confirmation sends nothing', async () => {
 })
 
 test('turning sync on backfills the Meetings that already exist on this Mac', async () => {
-  const h = harness({ localIds: [MEETING, OTHER] })
+  const h = harness({ meetings: [meetingItem(MEETING), meetingItem(OTHER)] })
   const status = await h.upload.setConsent('user_a', true)
   assert.equal(h.sends(), 2)
   assert.equal(status.queue.pending, 0)
@@ -144,14 +147,14 @@ test('turning sync on backfills the Meetings that already exist on this Mac', as
 })
 
 test('one backfill sends more than a single pass of Meetings', async () => {
-  const h = harness({ localIds: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'] })
+  const h = harness({ meetings: ids.map((id) => meetingItem(id)) })
   const status = await h.upload.setConsent('user_a', true)
   assert.equal(h.sends(), 7)
   assert.equal(status.queue.pending, 0)
 })
 
 test('a backfill stops when the server accepts nothing and keeps the rest queued', async () => {
-  const h = harness({ localIds: ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7'], fetcher: async () => new Response('unavailable', { status: 503 }) })
+  const h = harness({ meetings: ids.map((id) => meetingItem(id)), fetcher: async () => new Response('unavailable', { status: 503 }) })
   const status = await h.upload.setConsent('user_a', true)
   assert.equal(h.sends(), 1, 'a pass stops at the first missing acknowledgment')
   assert.equal(status.queue.pending, 7)
@@ -159,7 +162,7 @@ test('a backfill stops when the server accepts nothing and keeps the rest queued
 })
 
 test('a second enable does not upload an accepted Meeting again', async () => {
-  const h = harness({ localIds: [MEETING] })
+  const h = harness({ meetings: [meetingItem(MEETING)] })
   await h.upload.setConsent('user_a', true)
   await h.upload.setConsent('user_a', true)
   assert.equal(h.sends(), 1)
@@ -167,7 +170,7 @@ test('a second enable does not upload an accepted Meeting again', async () => {
 
 test('a Meeting whose document cannot be read is reported and does not block the rest', async () => {
   const h = harness({
-    localIds: [MEETING, OTHER],
+    meetings: [meetingItem(MEETING), meetingItem(OTHER)],
     load: async (localId, revision) => localId === OTHER ? '' : `{"version":1,"revision":${revision}}`,
   })
   const status = await h.upload.setConsent('user_a', true)
@@ -178,7 +181,43 @@ test('a Meeting whose document cannot be read is reported and does not block the
 })
 
 test('nothing is queued when this Mac has no Meetings yet', async () => {
-  const status = await harness({ localIds: [] }).upload.setConsent('user_a', true)
+  const status = await harness({ meetings: [] }).upload.setConsent('user_a', true)
   assert.equal(status.queue.entries.length, 0)
   assert.equal(status.result, null)
+})
+
+test('a record that finishes later queues and sends itself', async () => {
+  const meetings: MeetingListItem[] = []
+  const h = harness({ meetings })
+  await h.upload.setConsent('user_a', true)
+  assert.equal(h.sends(), 0)
+  meetings.push(meetingItem(MEETING))
+  await h.upload.syncNew()
+  assert.equal(h.sends(), 1)
+  assert.match((await h.upload.status()).result || '', /Uploaded a Meeting copy/)
+  await h.upload.syncNew()
+  assert.equal(h.sends(), 1, 'an accepted Meeting is not sent a second time')
+})
+
+test('a Meeting still recording or still processing never joins the queue', async () => {
+  const h = harness({ meetings: [meetingItem(MEETING, 'recording'), meetingItem(OTHER, 'processing'), meetingItem('m3', 'pending'), meetingItem('m4', 'failed')] })
+  await h.upload.setConsent('user_a', true)
+  await h.upload.syncNew()
+  assert.equal(h.sends(), 0)
+  assert.equal((await h.upload.status()).queue.entries.length, 0)
+})
+
+test('the automatic path queues nothing without consent', async () => {
+  const h = harness({ meetings: [meetingItem(MEETING)] })
+  await h.upload.syncNew()
+  assert.equal(h.sends(), 0)
+  assert.equal((await h.upload.status()).queue.entries.length, 0)
+})
+
+test('the automatic path sends nothing the server already accepted', async () => {
+  const meetings: MeetingListItem[] = [meetingItem(MEETING)]
+  const h = harness({ meetings })
+  await h.upload.setConsent('user_a', true)
+  await h.upload.syncNew()
+  assert.equal(h.sends(), 1)
 })
