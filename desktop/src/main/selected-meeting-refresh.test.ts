@@ -59,6 +59,28 @@ test('navigation rejects a previous Meeting response and an older list refresh t
   assert.equal(f.state().selectedMeeting.id, 'b')
 })
 
+test('background polling does not reopen the last recording after selecting an Agenda draft', async () => {
+  const f = dashboardFixture()
+  await f.actions.loadMeeting('a')
+  f.actions.clearSelectedMeeting()
+  let tick: () => Promise<void> = async () => {}
+  const refresh = loadSourceModule(new URL('../renderer/hooks/use-dynamic-refresh.ts', import.meta.url), {
+    react: { useMemo: (fn: () => unknown) => fn(), useEffect: (fn: () => unknown) => fn() },
+    '../../shared/meeting-recording-workflow': { needsRecordingRefresh: () => false },
+  }, {
+    window: { addEventListener() {}, setInterval(fn: typeof tick) { tick = fn; return 1 } },
+    document: { addEventListener() {} }, console,
+  })
+  refresh.useDynamicRefresh(true, [{ status: { state: 'pending' } }], { status: 'idle', meetingId: 'a' }, f.actions.refreshMeetings)
+  await tick()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.state().selectedMeetingId, null)
+  await f.actions.loadMeeting('b')
+  await tick()
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(f.state().selectedMeetingId, 'b')
+})
+
 test('unmount invalidates reads; remount reads the stored replacement', async () => {
   const first = dashboardFixture(), old = deferred<any>()
   first.read(() => old.promise)
