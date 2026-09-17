@@ -27,6 +27,9 @@ export class MeetingUpload {
   private readonly stored: StoredConsent = newStoredConsent()
   private pending: AbortController | null = null
   private result: string | null = null
+  private retryTimer: ReturnType<typeof setInterval> | null = null
+  private refreshing: Promise<void> | null = null
+  private syncing: Promise<void> | null = null
 
   constructor(auth: Authorization, resource: string, available: boolean, queue: MeetingSyncQueue,
     loadDocument: (localId: string, revision: number) => Promise<string>, localMeetings: () => Promise<MeetingListItem[]>,
@@ -45,6 +48,7 @@ export class MeetingUpload {
   async status(): Promise<MeetingUploadStatus> {
     const account = await this.auth.status()
     reconcileConsent(this.stored, account)
+    if (!this.stored.upload) this.stopRetryTimer()
     return {
       available: this.available, account, consent: Boolean(this.stored.upload),
       deleteConsent: Boolean(this.stored.deletion), accountDeleteConsent: Boolean(this.stored.account),
@@ -65,7 +69,15 @@ export class MeetingUpload {
   async setConsent(subject: unknown, enabled: unknown): Promise<MeetingUploadStatus> {
     const credential = await this.verified(subject, enabled)
     this.stored.upload = grantedConsent(credential)
-    if (credential) await this.backfill(credential)
+    this.stopRetryTimer()
+    if (credential) {
+      // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
+      this.retryTimer = setInterval(() => {
+        void this.syncNew().catch((error) => console.error('Automatic Meeting sync failed; retrying next minute', error))
+      }, 60_000)
+      this.retryTimer.unref()
+      await this.refresh(true)
+    }
     return this.status()
   }
 
@@ -87,8 +99,11 @@ export class MeetingUpload {
 
   /** Sends queued copies while consent, the account and the capability all still hold. */
   async sync(): Promise<MeetingUploadStatus> {
-    if (!this.available || this.pending) return this.status()
-    await syncUploads(this.context())
+    if (this.syncing) await this.syncing
+    else if (this.available && !this.pending) {
+      this.syncing = syncUploads(this.context())
+      try { await this.syncing } finally { this.syncing = null }
+    }
     return this.status()
   }
 
@@ -151,38 +166,37 @@ export class MeetingUpload {
     return this.status()
   }
 
-  /**
-   * Uploads the Meetings that already exist on this Mac. Consent is granted once, so this runs
-   * where uploads first become permitted: a Meeting the server already accepted is skipped, and
-   * one that cannot be read yet is reported instead of blocking the rest.
-   */
-  private async backfill(credential: CloudCredential): Promise<void> {
-    const { queued, unreadable } = await this.enqueueMissing(credential)
-    if (queued === 0 && unreadable === 0) return
-    await this.sync()
-    this.result = backfillMessage(queued, unreadable, (await this.queue.status()))
+  /** Processing events and the background timer share one discovery pass. */
+  syncNew(): Promise<void> {
+    return this.refresh(false)
   }
 
-  /**
-   * A record whose processing just finished joins the queue on its own, so sync stays current
-   * without a button press. It queues nothing without consent and stays silent when nothing is new.
-   */
-  async syncNew(): Promise<void> {
+  private refresh(announce: boolean): Promise<void> {
+    if (this.refreshing) return this.refreshing
+    this.refreshing = this.refreshMeetings(announce).finally(() => { this.refreshing = null })
+    return this.refreshing
+  }
+
+  private async refreshMeetings(announce: boolean): Promise<void> {
     if (!this.available) return
+    const generation = this.generation
     const credential = await this.consented()
-    if (!credential) return
-    if ((await this.enqueueMissing(credential)).queued === 0) return
-    await this.sync()
+    if (!credential || generation !== this.generation) return
+    const { queued, unreadable } = await this.enqueueMissing(credential)
+    if (generation !== this.generation || !await this.consented()) return
+    // Retry durable pending work even when discovery found no new Meeting.
+    if ((await this.queue.status()).pending > 0) await this.sync()
+    if (announce && (queued > 0 || unreadable > 0) && generation === this.generation) {
+      this.result = backfillMessage(queued, unreadable, await this.queue.status())
+    }
   }
 
   /**
-   * Queues every finished record this account has not accepted yet. Naming the account first is
+   * Queues every new or changed finished record. Naming the account first is
    * what makes the queue safe to reuse: another account's watermark and queued work are dropped
    * before this one's history is read, so no Meeting is skipped and none is sent to the wrong
    * account. A Meeting that is still recording or still processing is not a finished record.
-   *
-   * An accepted Meeting is deliberately not queued again. A local edit or an expired cloud copy is
-   * therefore not repaired here; the per-Meeting upload is the way to send a Meeting again.
+   * Expired or deleted cloud copies are never recreated; the server rejects those identities.
    */
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
@@ -203,15 +217,16 @@ export class MeetingUpload {
   }
 
   private writable(): boolean {
-    return this.available && !this.pending
+    return this.available && !this.pending && !this.syncing
   }
 
   private async verified(subject: unknown, enabled: unknown): Promise<CloudCredential | null> {
     if (typeof enabled !== 'boolean' || typeof subject !== 'string') throw new Error('Invalid consent.')
     this.cancelPending()
     if (!enabled || !this.available) return null
+    const generation = this.generation
     const credential = await this.auth.credential()
-    return credential?.subject === subject ? credential : null
+    return generation === this.generation && credential?.subject === subject ? credential : null
   }
 
   private consented(): Promise<CloudCredential | null> {
@@ -229,14 +244,20 @@ export class MeetingUpload {
   // Turning sync off or changing the account revokes every consent.
   private revokeAll(): void {
     this.cancelPending()
+    this.stopRetryTimer()
     revokeConsent(this.stored)
+  }
+
+  private stopRetryTimer(): void {
+    if (this.retryTimer) clearInterval(this.retryTimer)
+    this.retryTimer = null
   }
 }
 
 function backfillMessage(queued: number, unreadable: number, queue: MeetingUploadStatus['queue']): string {
   const parts = [`Queued ${queued} existing ${queued === 1 ? 'Meeting' : 'Meetings'} for upload.`]
   if (unreadable > 0) parts.push(`${unreadable} could not be read yet and stay on this Mac.`)
-  if (queue.pending > 0) parts.push(`${queue.pending} still queued; press Upload queued Meetings to send them.`)
+  if (queue.pending > 0) parts.push(`${queue.pending} still queued; sync retries automatically while consent remains active.`)
   if (queue.failed > 0) parts.push(`${queue.failed} failed and will not retry.`)
   return parts.join(' ')
 }

@@ -1,8 +1,9 @@
 # Cloud Meeting document — version 1
 
-This is the contract only. No upload is implemented and every upload capability is OFF.
-Real Meeting uploads stay gated by [the cloud handover](cloud-mcp-handover.md) and
-[the lifecycle contract](cloud-data-lifecycle.md).
+This is the Meeting text document contract. Desktop uploads require the
+`GAPPD_MEETING_UPLOAD_ENABLED` build/runtime capability, a connected upload account, and
+separate explicit upload consent. See [the cloud handover](cloud-mcp-handover.md) and
+[the lifecycle contract](cloud-data-lifecycle.md) for rollout and retention constraints.
 
 One document is the complete uploaded text of one Meeting. It is not a copy of the local
 SQLite database. `ParseMeetingDocument` in `cloud/internal/service/document.go` is the
@@ -81,6 +82,25 @@ consent must say so.
 `internal/meetingdocument` is the local builder and `cloud/internal/service/document.go` is the
 cloud validator. The two modules cannot share a type, so both tests pin the same literal bytes:
 a contract change on either side fails its own test instead of silently breaking uploads.
+
+## Automatic desktop sync
+
+Upload consent starts an immediate scan of completed Meetings, then a background check every
+minute while the app is running. Processing completion also requests a scan. New and changed
+documents join the existing durable queue; unchanged text does not create another revision.
+Pending sends retry without requiring a new Meeting or an open Settings panel. An unchanged
+document stops after five failed attempts; a server-refused document stops immediately.
+Failed entries require an explicit per-Meeting upload to try again.
+
+The encrypted queue stores a SHA-256 content hash for each accepted Meeting, excluding its
+revision. Older queues without hashes send one new revision on the next consented scan to
+establish a baseline. Hashes and queued work remain scoped to the upload account. Deleted and
+expired cloud identities remain blocked by the server; edits never extend retention.
+
+Turning sync off or removing consent stops the background timer and cancels the current send
+locally. It does not delete cloud copies. Signing in alone, restarting the app, or replacing
+credentials never grants upload consent. Consent and valid credentials must remain active;
+this change does not add token refresh or consent persistence across app restarts.
 
 ## Storage
 

@@ -29,6 +29,8 @@ export type MeetingSyncDocument = {
   subject: string | null
   /** Highest revision accepted by the server for each local Meeting. */
   accepted: Record<string, number>
+  /** Content hashes exclude the revision. Older queues acquire them on their next upload. */
+  acceptedContent?: Record<string, string>
   /** Pending work, newest revision per local Meeting. */
   entries: Record<string, { revision: number; document: string; state: MeetingSyncState; attempts: number; updatedAt: string; error: string | null }>
 }
@@ -54,12 +56,20 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
     if (!revisionOf(revision)) return null
     accepted[localId] = revision
   }
+  const acceptedContent: Record<string, string> = {}
+  if (candidate.acceptedContent !== undefined) {
+    if (!candidate.acceptedContent || typeof candidate.acceptedContent !== 'object' || Array.isArray(candidate.acceptedContent)) return null
+    for (const [localId, hash] of Object.entries(candidate.acceptedContent)) {
+      if (typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash) || accepted[localId] === undefined) return null
+      acceptedContent[localId] = hash
+    }
+  }
   const entries: MeetingSyncDocument['entries'] = {}
   for (const [localId, entry] of Object.entries(candidate.entries)) {
     if (!validEntry(entry)) return null
     entries[localId] = entry
   }
-  return { version: MEETING_SYNC_VERSION, subject: candidate.subject ?? null, accepted, entries }
+  return { version: MEETING_SYNC_VERSION, subject: candidate.subject ?? null, accepted, acceptedContent, entries }
 }
 
 function revisionOf(value: unknown): value is number {

@@ -167,6 +167,44 @@ test('a damaged or unsupported queue file is refused whole', async () => {
   await assert.rejects(new MeetingSyncQueue(store).status())
 })
 
+test('accepted content survives restart; unchanged pending text preserves its retry budget', async () => {
+  const { store, queue: sync } = queue()
+  let title = 'Original'
+  const load = async (_id: string, revision: number) => JSON.stringify({ version: 1, revision, title })
+  await sync.claim('user_a')
+  await sync.backfill([MEETING], load)
+  await sync.succeed(MEETING, 1)
+  const restarted = new MeetingSyncQueue(store)
+  assert.deepEqual(await restarted.backfill([MEETING], load), { queued: 0, unreadable: 0 })
+  title = 'Edited'
+  assert.equal((await restarted.backfill([MEETING], load)).queued, 1)
+  await restarted.fail(MEETING, 2, 'offline')
+  assert.equal((await restarted.backfill([MEETING], load)).queued, 0)
+  assert.equal((await restarted.pending())?.attempts, 1)
+  title = 'Newest'
+  await restarted.backfill([MEETING], load)
+  assert.equal((await restarted.pending())?.revision, 3)
+  await restarted.succeed(MEETING, 2)
+  assert.equal((await restarted.pending())?.revision, 3)
+  await restarted.succeed(MEETING, 3)
+  assert.equal((await new MeetingSyncQueue(store).backfill([MEETING], load)).queued, 0)
+  await restarted.claim('user_b')
+  assert.deepEqual(store.stored?.acceptedContent, {})
+  assert.equal((await restarted.backfill([MEETING], load)).queued, 1)
+})
+
+test('an old accepted record gains a content hash at a new revision, and a damaged hash is refused', async () => {
+  const { store, queue: sync } = queue()
+  store.stored = { version: 1, subject: 'user_a', accepted: { [MEETING]: 3 }, entries: {} }
+  const load = async (_id: string, revision: number) => JSON.stringify({ revision, title: 'Existing' })
+  await sync.backfill([MEETING], load)
+  assert.equal((await sync.pending())?.revision, 4)
+  await sync.succeed(MEETING, 4)
+  assert.equal((await new MeetingSyncQueue(store).backfill([MEETING], load)).queued, 0)
+  store.stored!.acceptedContent![MEETING] = 'broken'
+  await assert.rejects(new MeetingSyncQueue(store).status(), /damaged/)
+})
+
 test('status never returns document text', async () => {
   const { queue: sync } = queue()
   await sync.enqueue(MEETING, async () => 'secret transcript')

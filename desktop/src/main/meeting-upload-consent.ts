@@ -52,6 +52,6 @@ export async function consentedCredential(auth: Authorization, stored: StoredCon
   const account = await auth.status()
   if (!account.enabled || consent.subject !== account.subject) return null
   const credential = await auth.credential()
-  if (!credential || credential.subject !== consent.subject || credential.tokens.accessToken !== consent.token) return null
+  if (stored.upload !== consent || !credential || credential.subject !== consent.subject || credential.tokens.accessToken !== consent.token) return null
   return credential
 }

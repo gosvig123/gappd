@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { MeetingSyncDocument, MeetingSyncEntry, MeetingSyncStatus, MeetingSyncWork } from '../shared/meeting-sync-contract'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { MAX_SYNC_ATTEMPTS, emptyMeetingSyncDocument, validatedMeetingSyncDocument } from '../shared/meeting-sync-contract.ts'
@@ -49,6 +50,7 @@ export class MeetingSyncQueue {
       if (state.subject === subject) return
       if (state.subject !== null) {
         state.accepted = {}
+        state.acceptedContent = {}
         state.entries = {}
       }
       state.subject = subject
@@ -57,9 +59,9 @@ export class MeetingSyncQueue {
   }
 
   /**
-   * Queues every local Meeting the server has not accepted yet, so turning sync on uploads the
-   * Meetings that already exist. Whole batches run under one lock, and a Meeting whose document
-   * cannot be read is skipped rather than left to fail the rest.
+   * Queues new or changed Meeting text. Unchanged pending work keeps its revision and retry
+   * count; failed work requires a manual retry. Whole batches run under one lock, and an
+   * unreadable Meeting does not block the rest.
    */
   backfill(localIds: string[], load: (localId: string, revision: number) => Promise<string>): Promise<{ queued: number; unreadable: number }> {
     return this.serialize(async () => {
@@ -67,9 +69,14 @@ export class MeetingSyncQueue {
       let queued = 0
       let unreadable = 0
       for (const localId of localIds) {
-        if (state.accepted[localId] !== undefined || state.entries[localId] !== undefined) continue
+        const entry = state.entries[localId]
+        if (entry?.state === 'failed') continue
         try {
-          await this.queueOne(state, localId, (revision) => load(localId, revision))
+          const document = await load(localId, nextRevision(state, localId))
+          if (!document) throw new Error('The Meeting document is unavailable.')
+          const previous = entry ? contentHash(entry.document) : state.acceptedContent?.[localId]
+          if (contentHash(document) === previous) continue
+          await this.queueOne(state, localId, async () => document)
           queued += 1
         } catch {
           unreadable += 1
@@ -100,7 +107,11 @@ export class MeetingSyncQueue {
     return this.serialize(async () => {
       const state = await this.load()
       state.accepted[localId] = Math.max(state.accepted[localId] ?? 0, revision)
-      if (state.entries[localId]?.revision === revision) delete state.entries[localId]
+      if (state.entries[localId]?.revision === revision) {
+        state.acceptedContent ??= {}
+        state.acceptedContent[localId] = contentHash(state.entries[localId].document)
+        delete state.entries[localId]
+      }
       await this.persist(state)
     })
   }
@@ -190,6 +201,12 @@ export class MeetingSyncQueue {
     this.queue = run.then(() => undefined, () => undefined)
     return run
   }
+}
+
+function contentHash(document: string): string {
+  // The producer emits stable JSON; revision alone is not a content change.
+  try { document = JSON.stringify({ ...JSON.parse(document), revision: 0 }) } catch { /* Preserve opaque queued bytes. */ }
+  return createHash('sha256').update(document).digest('hex')
 }
 
 function requireDocument(stored: unknown): MeetingSyncDocument {

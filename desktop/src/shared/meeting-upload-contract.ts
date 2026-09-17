@@ -18,7 +18,9 @@ export type MeetingUploadStatus = {
 }
 
 export const MEETING_UPLOAD_CONSENT_TEXT =
-  'Upload Meeting text to Gappd Cloud. Gappd Cloud and any AI client you authorize can read it. ' +
+  'Upload Meeting text to Gappd Cloud. With this consent active, completed Meetings and text edits ' +
+  'sync automatically, with a background check each minute. Consent must be given again after ' +
+  'restarting the app or reconnecting the upload account. Gappd Cloud and any AI client you authorize can read it. ' +
   'It includes the title, summary, transcript turns with timestamps, and Meeting speaker labels, ' +
   'which are a person\'s name when you labeled that speaker. Audio, voice samples, saved agendas ' +
   'and the people directory stay on this Mac. Cloud copies expire 30 days after upload, and turning ' +
