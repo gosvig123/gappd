@@ -41,7 +41,7 @@ function connectionNote(slack: SlackConnectionController, expired: boolean): str
   if (!slack.status?.configured) return 'Slack is not configured for this build.'
   if (!slack.status.connected) return 'Gappd opens Slack in your browser and requests the chat:write scope. Tokens are encrypted on this Mac; no client secret is used.'
   if (expired) return 'The Slack authorization expired. Reconnect Slack to continue.'
-  return 'Slack is connected. Gappd sends a message only after you review it and confirm it.'
+  return `Connected to ${slack.status.teamName || slack.status.teamId}. Gappd sends a message only after you review it and confirm it.`
 }
 
 function connectLabel(slack: SlackConnectionController, connected: boolean): string {

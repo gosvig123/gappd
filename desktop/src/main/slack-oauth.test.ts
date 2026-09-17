@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { authorizeSlack, parseSlackTokens, refreshSlackTokens, SlackReconnectError, SLACK_REDIRECT_URI, SLACK_USER_SCOPES } from './slack-oauth.ts'
+import { authorizeSlack, completeSlackAuthorization, parseSlackTokens, refreshSlackTokens, SlackReconnectError, SLACK_REDIRECT_URI, SLACK_USER_SCOPES } from './slack-oauth.ts'
 
 const CLIENT_ID = '1234567890.1234567890'
 const NOW = 1_788_000_000_000
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 
-test('runs the PKCE loopback flow without a client secret', async () => {
+test('runs the desktop PKCE flow without a fixed workspace or client secret', async () => {
   let tokenBody = ''
   const tokens = await authorizeSlack(CLIENT_ID, {
     openExternal: async (url) => {
@@ -18,7 +18,8 @@ test('runs the PKCE loopback flow without a client secret', async () => {
       assert.equal(authorization.searchParams.get('scope'), '')
       assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256')
       assert.match(authorization.searchParams.get('code_challenge') || '', /^[A-Za-z0-9_-]{43}$/)
-      assert.equal(authorization.searchParams.get('redirect_uri'), SLACK_REDIRECT_URI)
+      assert.equal(authorization.searchParams.get('redirect_uri'), 'gappd://slack/oauth/callback')
+      assert.equal(authorization.searchParams.has('team'), false)
       assert.equal(authorization.searchParams.get('client_secret'), null)
       await completeCallback(authorization)
     },
@@ -31,21 +32,59 @@ test('runs the PKCE loopback flow without a client secret', async () => {
   assert.equal(tokens.expiresAt, NOW + 43_200_000)
   assert.equal(tokens.refreshExpiresAt, NOW + THIRTY_DAYS_MS)
   assert.equal(tokens.teamId, 'T0C19BLLJBX')
+  assert.equal(tokens.teamName, 'gappd')
   assert.equal(tokens.userId, 'U00000001')
   assert.match(tokenBody, /code_verifier=/)
+  assert.equal(new URLSearchParams(tokenBody).get('redirect_uri'), SLACK_REDIRECT_URI)
   assert.doesNotMatch(tokenBody, /client_secret=/)
 })
 
-test('rejects a callback whose state does not match', async () => {
-  await assert.rejects(authorizeSlack(CLIENT_ID, {
-    openExternal: async (url) => {
-      const callback = new URL(new URL(url).searchParams.get('redirect_uri') || '')
-      callback.searchParams.set('code', 'slack-code')
+test('ignores unsolicited, wrong-state and wrong-target callbacks without cancelling the real flow', async () => {
+  assert.equal(completeSlackAuthorization(`${SLACK_REDIRECT_URI}?code=unsolicited`), false)
+  await authorizeSlack(CLIENT_ID, {
+    openExternal: async (input) => {
+      const authorization = new URL(input)
+      const callback = callbackUrl(authorization)
+      for (const invalid of ['not a URL', callback.href.replace('gappd:', 'https:'), callback.href.replace('/oauth/callback', '/other'), callback.href.replace('//slack', '//attacker@slack'), `${callback.href}#fragment`]) {
+        assert.equal(completeSlackAuthorization(invalid), false)
+      }
       callback.searchParams.set('state', 'wrong')
-      await fetch(callback)
+      assert.equal(completeSlackAuthorization(callback.href), false)
+      completeCallback(authorization)
     },
-    timeoutMs: 500,
-  }), /state did not match/)
+    fetcher: async () => slackUserPayload(),
+  })
+})
+
+test('rejects duplicate parameters, denied consent and invalid codes before token exchange', async () => {
+  for (const suffix of ['&state=duplicate', '&code=duplicate', '&error=access_denied', '&error=a&error=b']) {
+    await assert.rejects(authorizeSlack(CLIENT_ID, {
+      openExternal: async (input) => { assert.equal(completeSlackAuthorization(callbackUrl(new URL(input)).href + suffix), true) },
+      fetcher: async () => { assert.fail('invalid callback must not exchange a code') },
+    }), /callback|not completed/)
+  }
+  for (const code of ['', 'bad code', 'x'.repeat(4097)]) {
+    await assert.rejects(authorizeSlack(CLIENT_ID, {
+      openExternal: async (input) => {
+        const callback = callbackUrl(new URL(input))
+        callback.searchParams.set('code', code)
+        assert.equal(completeSlackAuthorization(callback.href), true)
+      },
+      fetcher: async () => { assert.fail('invalid code must not be exchanged') },
+    }), /missing or invalid/)
+  }
+})
+
+test('timeout and browser failures release pending authorization and reject late callbacks', async () => {
+  let lateCallback = ''
+  await assert.rejects(authorizeSlack(CLIENT_ID, {
+    openExternal: async (input) => { lateCallback = callbackUrl(new URL(input)).href }, timeoutMs: 1,
+  }), /timed out/)
+  assert.equal(completeSlackAuthorization(lateCallback), false)
+  await assert.rejects(authorizeSlack(CLIENT_ID, {
+    openExternal: async (input) => { lateCallback = callbackUrl(new URL(input)).href; throw new Error('browser unavailable') },
+  }), /browser unavailable/)
+  assert.equal(completeSlackAuthorization(lateCallback), false)
 })
 
 test('requires a configured client ID', async () => {
@@ -95,12 +134,17 @@ test('maps Slack errors and invalid responses to safe messages', async () => {
   await assert.rejects(failing(async () => { throw new Error('offline') }), /could not be reached/)
 })
 
-async function completeCallback(authorization: URL): Promise<void> {
+function completeCallback(authorization: URL): void {
+  const callback = callbackUrl(authorization)
+  assert.equal(completeSlackAuthorization(callback.href), true)
+  assert.equal(completeSlackAuthorization(callback.href), false, 'a callback can be consumed only once')
+}
+
+function callbackUrl(authorization: URL): URL {
   const callback = new URL(authorization.searchParams.get('redirect_uri') || '')
   callback.searchParams.set('code', 'slack-code')
   callback.searchParams.set('state', authorization.searchParams.get('state') || '')
-  const response = await fetch(callback)
-  assert.equal(response.status, 200)
+  return callback
 }
 
 function slackUserPayload(overrides: Record<string, unknown> = {}): Response {

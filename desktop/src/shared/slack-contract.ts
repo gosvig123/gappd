@@ -4,6 +4,7 @@ export type SlackConnectionStatus = {
   configured: boolean
   connected: boolean
   teamId: string
+  teamName: string
   userId: string
   refreshExpiresAt: number | null
 }

@@ -9,6 +9,7 @@ const MAC_BUILD_VERSION = process.env.GAPPD_BUILD_VERSION
 module.exports = {
   appId: 'dev.gappd.desktop',
   productName: 'Gappd',
+  protocols: [{ name: 'Gappd', schemes: ['gappd'] }],
   buildVersion: MAC_BUILD_VERSION,
   directories: {
     output: 'release',

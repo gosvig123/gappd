@@ -2,7 +2,8 @@
 import { SlackConnection } from './slack-connection.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { SlackSendService, type SlackSendConfirmation, type SlackSendDependencies } from './slack-send.ts'
-import type { SlackTokenSet } from './slack-oauth'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { completeSlackAuthorization, type SlackTokenSet } from './slack-oauth.ts'
 
 export const CLIENT_ID = '1234567890.1234567890'
 export const NOW = 1_788_000_000_000
@@ -29,7 +30,6 @@ export function createHarness(options: HarnessOptions = {}) {
     openExternal: completeBrowserAuthorization,
     fetcher: tokenFetcher(options),
     now: options.now || (() => NOW),
-    callbackPort: 0,
   })
   return { service: new SlackSendService(connection, sendDependencies(options, calls)), connection, store, calls }
 }
@@ -110,5 +110,5 @@ async function completeBrowserAuthorization(url: string): Promise<void> {
   const callback = new URL(authorization.searchParams.get('redirect_uri') || '')
   callback.searchParams.set('code', 'slack-code')
   callback.searchParams.set('state', authorization.searchParams.get('state') || '')
-  await fetch(callback)
+  if (!completeSlackAuthorization(callback.href)) throw new Error('Slack callback was not accepted')
 }

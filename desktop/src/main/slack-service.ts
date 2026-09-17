@@ -42,12 +42,13 @@ function slackSendService(): SlackSendService {
 }
 
 async function describeSlackConnection(connection: SlackConnection | null): Promise<SlackConnectionStatus> {
-  if (!connection) return { configured: false, connected: false, teamId: '', userId: '', refreshExpiresAt: null }
+  if (!connection) return { configured: false, connected: false, teamId: '', teamName: '', userId: '', refreshExpiresAt: null }
   const tokens = await connection.tokens()
   return {
     configured: true,
     connected: Boolean(tokens),
     teamId: tokens?.teamId ?? '',
+    teamName: tokens?.teamName ?? '',
     userId: tokens?.userId ?? '',
     refreshExpiresAt: tokens?.refreshExpiresAt ?? null,
   }

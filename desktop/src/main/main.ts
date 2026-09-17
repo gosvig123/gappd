@@ -10,10 +10,16 @@ import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
+import { completeSlackAuthorization } from './slack-oauth'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 initializeSelectedFixtureProfile()
+
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  if (completeSlackAuthorization(url) && app.isReady()) showMainWindow()
+})
 
 const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
 

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { SlackConnection } from './slack-connection.ts'
-import type { SlackTokenSet } from './slack-oauth.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { completeSlackAuthorization, type SlackTokenSet } from './slack-oauth.ts'
 
 const CLIENT_ID = '1234567890.1234567890'
 const NOW = 1_788_000_000_000
@@ -20,7 +21,6 @@ test('a connect that finishes after disconnect does not store tokens', async () 
     },
     fetcher: async () => slackUserPayload(),
     now: () => NOW,
-    callbackPort: 0,
   })
   const connecting = connection.connect()
   await authorizationStarted.promise
@@ -37,7 +37,6 @@ test('a disconnect during the connect write is not undone by the write', async (
     openExternal: completeBrowserAuthorization,
     fetcher: async () => slackUserPayload(),
     now: () => NOW,
-    callbackPort: 0,
   })
   const connecting = connection.connect()
   await store.started.promise
@@ -58,7 +57,6 @@ test('a stale rotation does not clear the refresh of a newer connection', async 
     openExternal: completeBrowserAuthorization,
     fetcher: gates.fetcher,
     now: () => currentNow,
-    callbackPort: 0,
   })
   const stale = connection.accessToken()
   await gates.staleStarted.promise
@@ -86,7 +84,6 @@ test('a request from the previous connection cannot clear the new connection', a
       return Response.json({ ok: false, error: 'invalid_refresh_token' })
     },
     now: () => NOW,
-    callbackPort: 0,
   })
   const stale = connection.accessToken()
   await store.started.promise
@@ -162,7 +159,7 @@ async function completeBrowserAuthorization(url: string): Promise<void> {
   const callback = new URL(authorization.searchParams.get('redirect_uri') || '')
   callback.searchParams.set('code', 'slack-code')
   callback.searchParams.set('state', authorization.searchParams.get('state') || '')
-  await fetch(callback)
+  assert.equal(completeSlackAuthorization(callback.href), true)
 }
 
 function parseBody(init?: RequestInit): URLSearchParams {

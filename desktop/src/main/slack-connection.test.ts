@@ -3,7 +3,7 @@ import test from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { SlackConnection } from './slack-connection.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { SlackReconnectError, type SlackTokenSet } from './slack-oauth.ts'
+import { completeSlackAuthorization, SlackReconnectError, type SlackTokenSet } from './slack-oauth.ts'
 
 const CLIENT_ID = '1234567890.1234567890'
 const NOW = 1_788_000_000_000
@@ -15,7 +15,6 @@ test('connect stores the authorized token set', async () => {
     openExternal: completeBrowserAuthorization,
     fetcher: async () => slackUserPayload(),
     now: () => NOW,
-    callbackPort: 0,
   })
   const connected = await connection.connect()
   assert.equal(connected.refreshToken, 'xoxe-1-new')
@@ -40,6 +39,21 @@ test('refreshes an expiring token and persists the rotated pair before use', asy
   assert.equal(store.state.writes[0]?.refreshToken, 'xoxe-1-new')
   assert.equal(store.state.value?.accessToken, 'xoxe.xoxp-1-new')
   assert.equal(store.state.value?.expiresAt, NOW + 43_200_000)
+})
+
+test('refresh preserves the reviewed workspace and user when Slack omits identity', async () => {
+  const store = memoryStore(tokens({ expiresAt: NOW, teamName: 'Selected workspace' }))
+  const connection = new SlackConnection(CLIENT_ID, store, {
+    openExternal: async () => undefined,
+    fetcher: async () => Response.json({ ok: true, access_token: 'rotated-access', refresh_token: 'rotated-refresh', expires_in: 43_200, scope: 'chat:write', token_type: 'user' }),
+    now: () => NOW,
+  })
+  const identity = await connection.identity()
+  assert.ok(identity)
+  assert.equal(await connection.withAccessToken(identity, async token => token), 'rotated-access')
+  assert.equal(store.state.value?.teamName, 'Selected workspace')
+  assert.equal(store.state.value?.teamId, identity.teamId)
+  assert.equal(store.state.value?.userId, identity.userId)
 })
 
 test('serializes concurrent refreshes into one rotation', async () => {
@@ -101,7 +115,7 @@ test('identity is bound to the connected account and forgotten on disconnect', a
 
 test('a reviewed identity is refused after the account changes or reconnects', async () => {
   const store = memoryStore(tokens())
-  const connection = new SlackConnection(CLIENT_ID, store, { openExternal: completeBrowserAuthorization, fetcher: async () => slackUserPayload(), now: () => NOW, callbackPort: 0 })
+  const connection = new SlackConnection(CLIENT_ID, store, { openExternal: completeBrowserAuthorization, fetcher: async () => slackUserPayload(), now: () => NOW })
   const identity = await connection.identity()
   assert.ok(identity)
   store.state.value = tokens({ teamId: 'T0OTHER0000', userId: 'U00000002' })
@@ -139,7 +153,7 @@ async function completeBrowserAuthorization(url: string): Promise<void> {
   const callback = new URL(authorization.searchParams.get('redirect_uri') || '')
   callback.searchParams.set('code', 'slack-code')
   callback.searchParams.set('state', authorization.searchParams.get('state') || '')
-  await fetch(callback)
+  assert.equal(completeSlackAuthorization(callback.href), true)
 }
 
 function slackUserPayload(): Response {

@@ -20,6 +20,8 @@ test('a pending old refresh cannot overwrite direct reconnect tokens', async () 
 import { SlackConnection } from './slack-connection.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { CLIENT_ID, tokens } from './slack-send-harness.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { completeSlackAuthorization } from './slack-oauth.ts'
 
 test('an older pending connect cannot overwrite the newer account', async () => {
   const gate = deferred<Response>()
@@ -28,7 +30,7 @@ test('an older pending connect cannot overwrite the newer account', async () => 
   let requests = 0
   const store = { read: async () => value, write: async (next: typeof value) => { value = next }, clear: async () => {} }
   const connection = new SlackConnection(CLIENT_ID, store, {
-    callbackPort: 0, now: () => NOW, openExternal: finishAuthorization,
+    now: () => NOW, openExternal: finishAuthorization,
     fetcher: async () => { if (++requests === 1) { started.resolve(); return gate.promise }; return tokenPayload({ userId: 'U00000002' }) },
   })
   const oldConnect = connection.connect()
@@ -44,5 +46,5 @@ async function finishAuthorization(input: string): Promise<void> {
   const callback = new URL(url.searchParams.get('redirect_uri')!)
   callback.searchParams.set('code', 'test-code')
   callback.searchParams.set('state', url.searchParams.get('state')!)
-  await fetch(callback)
+  assert.equal(completeSlackAuthorization(callback.href), true)
 }

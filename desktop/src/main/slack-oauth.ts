@@ -1,15 +1,14 @@
+import { timingSafeEqual } from 'node:crypto'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { buildAuthorizationUrl, createPkce, startLoopback, type OAuthConfig } from './oauth.ts'
+import { buildAuthorizationUrl, createPkce, type OAuthConfig } from './oauth.ts'
 
 export const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
 export const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access'
 export const SLACK_USER_SCOPES = ['chat:write']
 export const SLACK_REFRESH_SKEW_MS = 5 * 60 * 1000
 
-const SLACK_CALLBACK_PATH = '/slack/oauth/callback'
-const SLACK_CALLBACK_HOST = 'localhost'
-const SLACK_CALLBACK_PORT = 45874
-export const SLACK_REDIRECT_URI = `http://${SLACK_CALLBACK_HOST}:${SLACK_CALLBACK_PORT}${SLACK_CALLBACK_PATH}`
+export const SLACK_REDIRECT_URI = 'gappd://slack/oauth/callback'
+let pendingAuthorization: { state: string; finish(code: string | null, error?: Error): void } | null = null
 const REFRESH_TOKEN_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
 const REQUEST_TIMEOUT_MS = 10_000
 const SAFE_ERROR = /^[a-z_]{1,60}$/
@@ -30,6 +29,7 @@ export type SlackTokenSet = {
   refreshExpiresAt: number
   scope: string
   teamId: string
+  teamName?: string
   userId: string
 }
 
@@ -41,8 +41,6 @@ export type SlackTokenDependencies = {
 export type SlackOAuthDependencies = SlackTokenDependencies & {
   openExternal(url: string): Promise<unknown>
   timeoutMs?: number
-  /** Tests use an ephemeral loopback port; the shipped app uses the registered port. */
-  callbackPort?: number
 }
 
 type SlackCodeExchange = { code: string; redirectUri: string; codeVerifier: string }
@@ -53,7 +51,7 @@ export function slackOAuthConfig(clientId: string): OAuthConfig {
     authorizeUrl: SLACK_AUTHORIZE_URL,
     tokenUrl: SLACK_TOKEN_URL,
     scopes: [],
-    callbackPath: SLACK_CALLBACK_PATH,
+    callbackPath: '/oauth/callback',
     authorizeParams: { user_scope: SLACK_USER_SCOPES.join(',') },
   }
 }
@@ -62,19 +60,56 @@ export async function authorizeSlack(clientId: string, dependencies: SlackOAuthD
   if (!clientId) throw new Error('Slack is not configured for this build.')
   const config = slackOAuthConfig(clientId)
   const pkce = createPkce()
-  const loopback = await startLoopback(config.callbackPath, pkce.state, {
-    timeoutMs: dependencies.timeoutMs,
-    callbackHost: SLACK_CALLBACK_HOST,
-    callbackPort: dependencies.callbackPort ?? SLACK_CALLBACK_PORT,
-  })
-  void loopback.code.catch(() => undefined)
+  const callback = waitForSlackCode(pkce.state, dependencies.timeoutMs ?? 5 * 60 * 1000)
   try {
-    await dependencies.openExternal(buildAuthorizationUrl(config, loopback.redirectUri, pkce.challenge, pkce.state))
-    const code = await loopback.code
-    return await exchangeSlackCode(config, { code, redirectUri: loopback.redirectUri, codeVerifier: pkce.verifier }, dependencies)
+    await dependencies.openExternal(buildAuthorizationUrl(config, SLACK_REDIRECT_URI, pkce.challenge, pkce.state))
+    const code = await callback.code
+    return await exchangeSlackCode(config, { code, redirectUri: SLACK_REDIRECT_URI, codeVerifier: pkce.verifier }, dependencies)
   } finally {
-    loopback.close()
+    callback.close()
   }
+}
+
+/** Called only by Electron's main-process open-url handler. Unsolicited links are ignored. */
+export function completeSlackAuthorization(input: string): boolean {
+  const pending = pendingAuthorization
+  if (!pending) return false
+  let url: URL
+  try { url = new URL(input) } catch { return false }
+  if (`${url.protocol}//${url.host}${url.pathname}` !== SLACK_REDIRECT_URI || url.username || url.password || url.hash) return false
+  const state = Buffer.from(url.searchParams.get('state') || '')
+  const expected = Buffer.from(pending.state)
+  if (state.length !== expected.length || !timingSafeEqual(state, expected)) return false
+  const code = url.searchParams.get('code')
+  if (['state', 'code', 'error'].some(key => url.searchParams.getAll(key).length > 1)) {
+    pending.finish(null, new Error('Invalid Slack authorization callback. Try again.'))
+  } else if (url.searchParams.has('error')) {
+    pending.finish(null, new Error('Slack authorization was not completed. Try again.'))
+  } else if (!code || code.length > 4096 || /[\x00-\x20\x7f]/.test(code)) {
+    pending.finish(null, new Error('Slack authorization code was missing or invalid. Try again.'))
+  } else {
+    pending.finish(code)
+  }
+  return true
+}
+
+function waitForSlackCode(state: string, timeoutMs: number) {
+  pendingAuthorization?.finish(null, new Error('Slack authorization was replaced by a new connection.'))
+  let finish!: (code: string | null, error?: Error) => void
+  const code = new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => finish(null, new Error('Slack authorization timed out. Try again.')), timeoutMs)
+    const pending = { state, finish: (value: string | null, error?: Error) => {
+      clearTimeout(timer)
+      if (pendingAuthorization !== pending) return
+      pendingAuthorization = null
+      if (value !== null) resolve(value)
+      else reject(error)
+    } }
+    finish = pending.finish
+    pendingAuthorization = pending
+  })
+  void code.catch(() => undefined)
+  return { code, close: () => finish(null, new Error('Slack authorization cancelled.')) }
 }
 
 export function exchangeSlackCode(config: OAuthConfig, exchange: SlackCodeExchange, dependencies: SlackTokenDependencies): Promise<SlackTokenSet> {
@@ -106,6 +141,7 @@ export function parseSlackTokens(value: Record<string, unknown>, now: number): S
     refreshExpiresAt: now + REFRESH_TOKEN_LIFETIME_MS,
     scope: stringValue(user.scope) ?? stringValue(value.scope) ?? '',
     teamId: stringValue(recordValue(value.team).id) ?? '',
+    teamName: stringValue(recordValue(value.team).name) ?? '',
     userId: stringValue(user.id) ?? '',
   }
 }

@@ -62,7 +62,7 @@ export class SlackConnection {
     this.requireCurrent(generation, 'refresh')
     if (!tokens) throw new Error('Slack is not connected.')
     if (tokens.expiresAt > this.now() + SLACK_REFRESH_SKEW_MS) return tokens.accessToken
-    return (await this.rotate(tokens.refreshToken)).accessToken
+    return (await this.rotate(tokens)).accessToken
   }
 
   async identity(): Promise<SlackAccountIdentity | null> {
@@ -85,7 +85,7 @@ export class SlackConnection {
     const tokens = await this.tokens()
     if (!tokens) throw new SlackAccountChangedError()
     this.requireAccount(identity, generation, tokens)
-    const active = tokens.expiresAt > this.now() + SLACK_REFRESH_SKEW_MS ? tokens : await this.rotate(tokens.refreshToken)
+    const active = tokens.expiresAt > this.now() + SLACK_REFRESH_SKEW_MS ? tokens : await this.rotate(tokens)
     this.requireAccount(identity, generation, active)
     return operation(active.accessToken, () => this.requireAccount(identity, this.generation, active))
   }
@@ -96,9 +96,9 @@ export class SlackConnection {
     await this.serialize(() => this.store.clear())
   }
 
-  private rotate(refreshToken: string): Promise<SlackTokenSet> {
+  private rotate(previous: SlackTokenSet): Promise<SlackTokenSet> {
     if (!this.refresh) {
-      const rotation = this.rotateTokens(refreshToken).finally(() => {
+      const rotation = this.rotateTokens(previous).finally(() => {
         if (this.refresh === rotation) this.refresh = null
       })
       this.refresh = rotation
@@ -106,11 +106,14 @@ export class SlackConnection {
     return this.refresh
   }
 
-  private async rotateTokens(refreshToken: string): Promise<SlackTokenSet> {
+  private async rotateTokens(previous: SlackTokenSet): Promise<SlackTokenSet> {
     const generation = this.generation
     try {
-      const tokens = await refreshSlackTokens(this.clientId, refreshToken, this.dependencies)
+      const tokens = await refreshSlackTokens(this.clientId, previous.refreshToken, this.dependencies)
       this.requireCurrent(generation, 'refresh')
+      tokens.teamId ||= previous.teamId
+      tokens.userId ||= previous.userId
+      if (tokens.teamId === previous.teamId) tokens.teamName ||= previous.teamName
       await this.writeTokens(generation, tokens)
       this.requireCurrent(generation, 'refresh')
       return tokens
