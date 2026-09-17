@@ -1,0 +1,29 @@
+{
+  "display_information": {
+    "name": "Gappd",
+    "description": "Send meeting notes you confirm from Gappd to Slack.",
+    "background_color": "#1d1c1d"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "Gappd",
+      "always_online": false
+    }
+  },
+  "oauth_config": {
+    "redirect_urls": [
+      "gappd://slack/oauth/callback"
+    ],
+    "scopes": {
+      "user": [
+        "chat:write"
+      ]
+    },
+    "pkce_enabled": true
+  },
+  "settings": {
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": true
+  }
+}

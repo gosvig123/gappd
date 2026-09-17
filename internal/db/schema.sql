@@ -72,9 +72,60 @@ CREATE TRIGGER IF NOT EXISTS meetings_ad AFTER DELETE ON meetings BEGIN
     VALUES ('delete', old.rowid, old.title, old.transcript, old.summary);
 END;
 
-CREATE TRIGGER IF NOT EXISTS meetings_au AFTER UPDATE ON meetings BEGIN
+CREATE TRIGGER IF NOT EXISTS meetings_au AFTER UPDATE ON meetings
+WHEN old.rowid IS NOT new.rowid
+    OR old.title IS NOT new.title
+    OR old.transcript IS NOT new.transcript
+    OR old.summary IS NOT new.summary
+BEGIN
     INSERT INTO meetings_fts(meetings_fts, rowid, title, transcript, summary)
     VALUES ('delete', old.rowid, old.title, old.transcript, old.summary);
     INSERT INTO meetings_fts(rowid, title, transcript, summary)
     VALUES (new.rowid, new.title, new.transcript, new.summary);
+END;
+
+CREATE TABLE IF NOT EXISTS people (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_people_email ON people(email) WHERE email <> '';
+CREATE TABLE IF NOT EXISTS meeting_speakers (
+    meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key TEXT NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id),
+    PRIMARY KEY (meeting_id, speaker_key)
+);
+CREATE TABLE IF NOT EXISTS meeting_speaker_embeddings (
+    meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key TEXT NOT NULL,
+    centroid TEXT NOT NULL,
+    model TEXT NOT NULL,
+    source TEXT NOT NULL,
+    PRIMARY KEY (meeting_id, speaker_key)
+);
+CREATE TABLE IF NOT EXISTS speaker_identity_state (
+    meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key TEXT NOT NULL,
+    origin TEXT NOT NULL CHECK(origin IN ('manual','automatic','cleared')),
+    PRIMARY KEY(meeting_id,speaker_key)
+);
+CREATE TABLE IF NOT EXISTS voice_samples (
+    meeting_id TEXT NOT NULL,
+    speaker_key TEXT NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    PRIMARY KEY(meeting_id,speaker_key),
+    FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speakers(meeting_id,speaker_key) ON DELETE CASCADE,
+    FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speaker_embeddings(meeting_id,speaker_key) ON DELETE CASCADE
+);
+CREATE TRIGGER IF NOT EXISTS retract_voice_assignment AFTER UPDATE OF person_id ON meeting_speakers
+WHEN old.person_id IS NOT new.person_id BEGIN
+    DELETE FROM voice_samples WHERE meeting_id=old.meeting_id AND speaker_key=old.speaker_key;
+END;
+CREATE TRIGGER IF NOT EXISTS retract_voice_segments AFTER DELETE ON segments BEGIN
+    DELETE FROM meeting_speaker_embeddings WHERE meeting_id=old.meeting_id;
+END;
+CREATE TRIGGER IF NOT EXISTS retract_voice_retry AFTER UPDATE OF diarization_state ON meetings
+WHEN new.diarization_state='pending' AND old.diarization_state<>'pending' BEGIN
+    DELETE FROM meeting_speaker_embeddings WHERE meeting_id=new.id;
 END;

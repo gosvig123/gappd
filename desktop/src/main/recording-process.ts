@@ -9,16 +9,16 @@ import { getRecordingState, setRecordingState } from './state'
 
 type RecordingChild = ReturnType<typeof spawn>
 const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
-const LIVE_TRANSCRIPT_CHUNK_SECONDS = '300'
+const LIVE_TRANSCRIPT_CHUNK_SECONDS = '120'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }, onStarted?: (meetingId: string) => void): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const snapshot = managedRuntime.status()
   const liveTranscript = snapshot.capabilities.transcription.readiness === 'ready'
   logMainProcessMemory('recording:start')
-  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title), {
+  recordingChild = streamCommand('record.start', input, recordingHandlers(input.title, onStarted), {
     GAPPD_CAPTURE_CHUNK_SECONDS: liveTranscript ? LIVE_TRANSCRIPT_CHUNK_SECONDS : '',
     GAPPD_CAPTURE_CHUNK_OVERLAP_SECONDS: liveTranscript ? LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS : '',
   })
@@ -33,6 +33,7 @@ export function stopRecording(): void {
 export async function stopActiveRecordingForQuit(): Promise<void> {
   const child = recordingChild
   if (!child) return
+  setRecordingState({ ...getRecordingState(), status: RECORDING_STATUS_STOPPING })
   child.kill('SIGINT')
   await waitForRecordingExit(child)
 }
@@ -49,10 +50,11 @@ function childExited(child: RecordingChild): boolean {
   return child.exitCode !== null || child.signalCode !== null
 }
 
-function recordingHandlers(title: string) {
+function recordingHandlers(title: string, onStarted?: (meetingId: string) => void) {
   return {
     onEvent(event: RecordingEvent) {
       setRecordingState(recordingEventOutcome(event).state)
+      if (event.type === 'recording.started') onStarted?.(event.meetingId)
       if (event.type === 'recording.captured') requestDrains()
       if (event.type === 'recording.captured' || event.type === 'recording.failed') finishRecording()
     },

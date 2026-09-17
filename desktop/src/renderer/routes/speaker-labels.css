@@ -1,0 +1,16 @@
+.speaker-labels { border: 1px solid var(--color-border); border-radius: 12px; background: var(--surface-panel); }
+.speaker-labels > summary { cursor: pointer; padding: 13px 16px; font-weight: 600; }
+.speaker-labels > summary > span { color: var(--color-text-muted); font-size: 12px; font-weight: 400; margin-left: 10px; }
+.speaker-label-content { padding: 0 16px 16px; display: grid; gap: 12px; }
+.speaker-label-hint { color: var(--color-text-muted); font-size: 12px; margin: 0; }
+.speaker-label-row { display: grid; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 12px; }
+.speaker-label-heading, .speaker-clip-actions { display: flex; align-items: center; gap: 8px; }
+.speaker-label-heading { justify-content: space-between; flex-wrap: wrap; }
+.speaker-label-row select, .speaker-calendar-source select { width: 100%; min-width: 0; }
+.speaker-calendar-source, .speaker-calendar-source label { display: grid; gap: 6px; }
+.speaker-calendar-source label { font-size: 12px; font-weight: 600; }
+.speaker-new-person { display: flex; gap: 8px; flex-wrap: wrap; }
+.speaker-new-person input { flex: 1; min-width: 140px; }
+.summary-updating { font-size: 12px; color: var(--color-text-muted); padding: 0 4px; }
+
+.speaker-clip-excerpt { margin: 0; padding: 8px 10px; border-left: 2px solid var(--color-border-strong); font-size: 12px; color: var(--color-text-muted); overflow-wrap: anywhere; }

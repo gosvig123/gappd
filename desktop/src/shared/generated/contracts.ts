@@ -5,6 +5,128 @@ import type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapabilit
 
 export type EmptyInput = Record<string, never>
 
+export type AgendaHistoryResponse = {
+  meetings: AgendaHistoryMeeting[]
+}
+
+export type AgendaHistoryMeeting = {
+  id: string
+  title: string
+  startedAt: string
+  endedAt: string
+  emails: string[]
+}
+
+export type AgendaInput = {
+  title: string
+  meetingIds: string
+}
+
+export type AgendaResponse = {
+  items: AgendaItem[]
+  generation: AgendaGeneration
+}
+
+export type AgendaItem = {
+  topic: string
+  sourceId: string
+  quote: string
+}
+
+export type AgendaGeneration = {
+  model?: string
+  reasoningEffort?: string
+}
+
+export type PeopleResponse = {
+  people: Person[]
+}
+
+export type Person = {
+  id: string
+  name: string
+  email?: string
+}
+
+export type AssignSpeakerInput = {
+  id: string
+  speakerKey: string
+  personId?: string
+  name?: string
+  email?: string
+}
+
+export type MeetingResponse = {
+  meeting: MeetingDetail
+}
+export type MeetingDetail = {
+  id: string
+  title: string
+  startedAt: string
+  endedAt?: string
+  status: MeetingStatus
+  transcriptText?: string
+  transcriptProvisional: boolean
+  summary?: string
+  speakers: MeetingSpeaker[]
+  summaryUpdating: boolean
+  segments: MeetingSegment[]
+  diarization: DiarizationInfo
+}
+export type MeetingStatus = {
+  state: MeetingState
+  updatedAt: string
+  capture: CaptureStatusInfo
+  processing: ProcessingStatusInfo
+}
+
+export type CaptureStatusInfo = {
+  state: CaptureStatus
+  updatedAt: string
+  failureMessage?: string
+}
+
+export type ProcessingStatusInfo = {
+  state: ProcessingStatus
+  updatedAt: string
+  failureMessage?: string
+}
+
+export type MeetingSpeaker = {
+  identityOrigin?: string
+  key: string
+  name: string
+  personId?: string
+}
+
+export type MeetingSegment = {
+  id: string
+  startSec: number
+  endSec: number
+  speaker: string
+  speakerKey: string
+  text: string
+}
+
+export type DiarizationInfo = {
+  state: DiarizationState
+  error?: string
+  speakerCount?: number
+}
+
+export type SpeakerClipInput = {
+  id: string
+  speakerKey: string
+  index?: number
+}
+
+export type SpeakerClipResponse = {
+  text: string
+  startSec: number
+  audioBase64: string
+  mimeType: string
+}
+
 export type DevicesResponse = {
   devices: Device[]
 }
@@ -29,58 +151,8 @@ export type MeetingListItem = {
   searchText?: string
 }
 
-export type MeetingStatus = {
-  state: MeetingState
-  updatedAt: string
-  capture: CaptureStatusInfo
-  processing: ProcessingStatusInfo
-}
-
-export type CaptureStatusInfo = {
-  state: CaptureStatus
-  updatedAt: string
-  failureMessage?: string
-}
-
-export type ProcessingStatusInfo = {
-  state: ProcessingStatus
-  updatedAt: string
-  failureMessage?: string
-}
-
 export type MeetingShowInput = {
   id: string
-}
-
-export type MeetingResponse = {
-  meeting: MeetingDetail
-}
-
-export type MeetingDetail = {
-  id: string
-  title: string
-  startedAt: string
-  endedAt?: string
-  status: MeetingStatus
-  transcriptText?: string
-  transcriptProvisional: boolean
-  summary?: string
-  segments: MeetingSegment[]
-  diarization: DiarizationInfo
-}
-
-export type MeetingSegment = {
-  id: string
-  startSec: number
-  endSec: number
-  speaker: string
-  text: string
-}
-
-export type DiarizationInfo = {
-  state: DiarizationState
-  error?: string
-  speakerCount?: number
 }
 
 export type MeetingDeleteInput = {
@@ -104,12 +176,31 @@ export type AIConfig = {
   managed: boolean
   codexExecutable: string
   codexModel: string
+  codexReasoningEffort: string
 }
 
 export type CodexStatusResponse = {
   ai: AIConfig
   available: boolean
   error?: string
+}
+
+export type ConfigCodexModelsInput = {
+  executable: string
+}
+
+export type CodexModelsResponse = {
+  models: CodexModelInfo[]
+  defaultModel: string
+  defaultReasoningEffort: string
+}
+
+export type CodexModelInfo = {
+  id: string
+  displayName: string
+  defaultReasoningEffort: string
+  reasoningEfforts: string[]
+  isDefault: boolean
 }
 
 export type ConfigUseManagedLocalAIInput = {
@@ -121,6 +212,7 @@ export type ConfigUseManagedLocalAIInput = {
 export type ConfigUseCodexInput = {
   executable: string
   model: string
+  reasoningEffort: string
 }
 
 export type ProcessingPendingResponse = {
@@ -157,4 +249,24 @@ export type RecordingEvent = {
   title: string
   status: MeetingStatus
   error?: string
+}
+
+export type VoiceTargetsInput = {
+  after: string
+}
+
+export type VoiceTargetsResponse = {
+  targets: VoiceTarget[]
+}
+
+export type VoiceTarget = {
+  id: string
+  revision: number
+}
+
+export type RecognizeSpeakersInput = {
+  id: string
+  revision: number
+  emails: string
+  calendar: boolean
 }

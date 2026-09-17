@@ -1,0 +1,99 @@
+import type { MeetingSyncWork } from '../shared/meeting-sync-contract'
+import type { CloudCredential } from './cloud-auth'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { accepted, deletedAcknowledged } from './meeting-upload-ack.ts'
+
+/** The outcome of one upload attempt. Only `unavailable` is worth retrying. */
+export type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'unavailable' }
+
+const TIMEOUT_MS = 15_000
+
+/**
+ * Uploads one queued document. Nothing is retried here and no state is changed: the caller
+ * decides what an outcome means for the queue.
+ */
+export async function sendDocument(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  signatures: Record<string, string>, work: MeetingSyncWork, signal: AbortSignal): Promise<SendOutcome> {
+  try {
+    const response = await fetcher(new URL('/meeting', resource), {
+      method: 'POST', body: work.document, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    // A refusal is about this document, so retrying it can never help.
+    if (response.status === 400) return { kind: 'refused' }
+    const value: unknown = await response.json()
+    if (!response.ok || !accepted(value, credential, work.revision)) return { kind: 'unavailable' }
+    return { kind: 'accepted', expiresAt: value.expires_at }
+  } catch {
+    return { kind: 'unavailable' }
+  }
+}
+
+/** Registers this device's public key. It is the one write that carries no signature. */
+export async function sendRegistration(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  body: string, signal: AbortSignal): Promise<boolean> {
+  try {
+    const response = await fetcher(new URL('/device', resource), {
+      method: 'POST', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/** Reads the clients that have used this account, which the Settings panel offers to revoke. */
+export async function sendClientList(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  signatures: Record<string, string>, signal: AbortSignal): Promise<string[]> {
+  try {
+    const response = await fetcher(new URL('/clients', resource), {
+      method: 'POST', body: '', redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    const value: unknown = await response.json()
+    if (!response.ok || typeof value !== 'object' || value === null) return []
+    const clients = (value as { clients?: unknown }).clients
+    if (!Array.isArray(clients)) return []
+    return clients.flatMap((entry) => typeof entry === 'object' && entry !== null && typeof (entry as { client_id?: unknown }).client_id === 'string'
+      ? [(entry as { client_id: string }).client_id] : [])
+  } catch {
+    return []
+  }
+}
+
+/** Sends one account-wide action. The caller decides what a failure means. */
+export async function sendAccountAction(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  path: string, body: string, signatures: Record<string, string>, signal: AbortSignal): Promise<{ ok: boolean; value: unknown }> {
+  try {
+    const response = await fetcher(new URL(path, resource), {
+      method: 'POST', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    const value: unknown = await response.json().catch(() => null)
+    return { ok: response.ok, value }
+  } catch {
+    return { ok: false, value: null }
+  }
+}
+
+/** Deletes one cloud copy. Absent and other-owner copies answer the same way. */
+export async function sendDelete(fetcher: typeof fetch, resource: string, credential: CloudCredential,
+  localId: string, signatures: Record<string, string>, signal: AbortSignal): Promise<boolean> {
+  const body = JSON.stringify({ meeting_id: localId })
+  try {
+    const response = await fetcher(new URL('/meeting', resource), {
+      method: 'DELETE', body, redirect: 'error',
+      headers: { Authorization: `Bearer ${credential.tokens.accessToken}`, 'Content-Type': 'application/json', ...signatures },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]),
+    })
+    const value: unknown = await response.json()
+    return response.ok && deletedAcknowledged(value, credential)
+  } catch {
+    return false
+  }
+}

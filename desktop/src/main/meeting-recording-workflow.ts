@@ -7,6 +7,7 @@ import { getDevices } from './meetings'
 import { startRecording, stopRecording } from './recording-process'
 import { getRecordingState } from './state'
 import { getStartupSettings } from './startup-settings'
+import { recordingCalendarContext, rememberRecordingCalendar } from './participant-calendar'
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
@@ -16,14 +17,25 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   if (selectedDevice === null) throw new Error(NO_INPUT_DEVICE_ERROR)
   const permissionError = capturePermissionError(await requestCapturePermissions())
   if (permissionError) throw new Error(permissionError)
+  const calendar = await prepareCalendar(input.eventSourceId)
   await pauseDrains('recording')
   try {
     await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
-      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled })
+      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled },
+    (id) => { if (calendar) void rememberRecordingCalendar(id, calendar).catch((error) => console.warn('Save recording calendar context:', error)) })
     return getRecordingState()
   } catch (error) {
     resumeDrains('recording')
     throw error
+  }
+}
+
+async function prepareCalendar(eventSourceId?: string) {
+  try { return await recordingCalendarContext(eventSourceId) }
+  catch (error) {
+    if (eventSourceId) throw error
+    console.warn('Read optional recording calendar context:', error)
+    return undefined
   }
 }
 

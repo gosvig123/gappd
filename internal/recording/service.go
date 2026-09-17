@@ -131,6 +131,9 @@ func (w meetingRecordingWorkflow) record(ctx context.Context, req Request, sessi
 		Mode: req.Mode, OutputDir: sessionDir, DeviceIndex: req.DeviceIdx,
 	}, observe)
 	stopHeartbeat()
+	if live != nil {
+		live.Drain(context.Background())
+	}
 	if result.StopWarning != nil && w.errOut != nil {
 		fmt.Fprintf(w.errOut, "warning: capture helper did not exit cleanly: %v\n", result.StopWarning)
 		fmt.Fprintln(w.errOut, "  requested audio was preserved")

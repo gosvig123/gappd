@@ -19,7 +19,7 @@ export function PageSearch() {
   useEffect(() => updateSearch(open, query, setActiveIndex, setResult), [open, query])
   useEffect(() => { if (open) focusSearchInput(inputRef) }, [open])
   if (!open) return null
-  return <div className="page-search" role="search"><SearchIcon className="page-search-icon" aria-hidden="true" /><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => handleInputKey(event, result, activeIndex, search, setActiveIndex, setOpen)} placeholder="Find on screen" aria-label="Find on screen" /><span className={cx('page-search-count', result.matches === 0 && query.trim() && 'empty')}>{searchStatus(query, result)}</span><button type="button" onClick={() => moveSearch(false, result, activeIndex, search, setActiveIndex)} disabled={!result.matches} aria-label="Previous match">↑</button><button type="button" onClick={() => moveSearch(true, result, activeIndex, search, setActiveIndex)} disabled={!result.matches} aria-label="Next match">↓</button><button type="button" onClick={() => closeSearch(setOpen)} aria-label="Close search"><CloseIcon aria-hidden="true" /></button></div>
+  return <div className="page-search" role="search"><SearchIcon className="page-search-icon" aria-hidden="true" /><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => handleInputKey(event, result, activeIndex, search, setActiveIndex, setOpen)} placeholder="Find on screen" aria-label="Find on screen, Command Shift F" /><span className={cx('page-search-count', result.matches === 0 && query.trim() && 'empty')}>{searchStatus(query, result)}</span><button type="button" onClick={() => moveSearch(false, result, activeIndex, search, setActiveIndex)} disabled={!result.matches} aria-label="Previous match">↑</button><button type="button" onClick={() => moveSearch(true, result, activeIndex, search, setActiveIndex)} disabled={!result.matches} aria-label="Next match">↓</button><button type="button" onClick={() => closeSearch(setOpen)} aria-label="Close search"><CloseIcon aria-hidden="true" /></button></div>
 }
 
 function updateSearch(open: boolean, query: string, setActiveIndex: (index: number) => void, setResult: (result: PageSearchResult) => void): void {
@@ -43,8 +43,9 @@ function useSearchShortcut(setOpen: (open: boolean) => void, inputRef: RefObject
   }, [inputRef, setOpen])
 }
 
+/** Cmd/Ctrl+Shift+F. Plain Cmd/Ctrl+F belongs to Meeting search now. */
 function handleShortcut(event: globalThis.KeyboardEvent, setOpen: (open: boolean) => void, inputRef: RefObject<HTMLInputElement | null>): void {
-  if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== SEARCH_SHORTCUT_KEY) return
+  if (!(event.metaKey || event.ctrlKey) || !event.shiftKey || event.key.toLowerCase() !== SEARCH_SHORTCUT_KEY) return
   event.preventDefault()
   setOpen(true)
   focusSearchInput(inputRef)

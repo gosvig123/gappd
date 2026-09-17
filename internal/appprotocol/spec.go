@@ -31,10 +31,28 @@ type ConfigUseManagedLocalAIInput struct {
 }
 
 type ConfigUseCodexInput struct {
-	Executable string `json:"executable"`
-	Model      string `json:"model"`
+	Executable      string `json:"executable"`
+	Model           string `json:"model"`
+	ReasoningEffort string `json:"reasoningEffort"`
 }
 
+type ConfigCodexModelsInput struct {
+	Executable string `json:"executable"`
+}
+
+type CodexModelInfo struct {
+	ID                     string   `json:"id"`
+	DisplayName            string   `json:"displayName"`
+	DefaultReasoningEffort string   `json:"defaultReasoningEffort"`
+	ReasoningEfforts       []string `json:"reasoningEfforts"`
+	IsDefault              bool     `json:"isDefault"`
+}
+
+type CodexModelsResponse struct {
+	Models                 []CodexModelInfo `json:"models"`
+	DefaultModel           string           `json:"defaultModel"`
+	DefaultReasoningEffort string           `json:"defaultReasoningEffort"`
+}
 type ProcessingDrainInput struct {
 	Capability meetingprocessing.Capability `json:"capability"`
 }
@@ -66,6 +84,11 @@ type CommandSpec struct {
 }
 
 var Commands = []CommandSpec{
+	{ID: "meetings.agendaHistory", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AgendaHistoryResponse](), Args: literalArgs("app", "meetings", "agenda-history", "--json")},
+	{ID: "meetings.agenda", Mode: CommandModeRequest, Input: typeOf[AgendaInput](), Output: typeOf[AgendaResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("agenda"), flag("title", "title", false), flag("meeting-ids", "meetingIds", false), lit("--json")}},
+	{ID: "meetings.people", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[PeopleResponse](), Args: literalArgs("app", "meetings", "people", "--json")},
+	{ID: "meetings.assignSpeaker", Mode: CommandModeRequest, Input: typeOf[AssignSpeakerInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("assign-speaker"), field("id"), flag("speaker-key", "speakerKey", false), flag("person-id", "personId", true), flag("name", "name", true), flag("email", "email", true), lit("--json")}},
+	{ID: "meetings.speakerClip", Mode: CommandModeRequest, Input: typeOf[SpeakerClipInput](), Output: typeOf[SpeakerClipResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("speaker-clip"), field("id"), flag("speaker-key", "speakerKey", false), flag("index", "index", true), lit("--json")}},
 	{ID: "devices.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[DevicesResponse](), Args: literalArgs("app", "devices", "--json")},
 	{ID: "meetings.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingsResponse](), Args: literalArgs("app", "meetings", "list", "--json")},
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},
@@ -73,12 +96,15 @@ var Commands = []CommandSpec{
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.codexStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[CodexStatusResponse](), Args: literalArgs("app", "config", "codex-status", "--json")},
+	{ID: "config.codexModels", Mode: CommandModeRequest, Input: typeOf[ConfigCodexModelsInput](), Output: typeOf[CodexModelsResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("codex-models"), flag("executable", "executable", true), lit("--json")}},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
-	{ID: "config.useCodex", Mode: CommandModeRequest, Input: typeOf[ConfigUseCodexInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-codex"), flag("executable", "executable", false), flag("model", "model", false)}},
+	{ID: "config.useCodex", Mode: CommandModeRequest, Input: typeOf[ConfigUseCodexInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-codex"), flag("executable", "executable", false), flag("model", "model", false), flag("reasoning-effort", "reasoningEffort", false)}},
 	{ID: "processing.pending", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ProcessingPendingResponse](), Args: literalArgs("app", "processing", "pending", "--json")},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
 	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
+	{ID: "meetings.voiceTargets", Mode: CommandModeRequest, Input: typeOf[VoiceTargetsInput](), Output: typeOf[VoiceTargetsResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("voice-targets"), flag("after", "after", false), lit("--json")}},
+	{ID: "meetings.recognizeSpeakers", Mode: CommandModeRequest, Input: typeOf[RecognizeSpeakersInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("recognize-speakers"), field("id"), flag("revision", "revision", false), flag("emails", "emails", false), flag("calendar", "calendar", false), lit("--json")}},
 }
 
 func StreamCommands() []CommandSpec {

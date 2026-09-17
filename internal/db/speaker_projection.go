@@ -41,6 +41,7 @@ type SpeakerProjectionCommit struct {
 	ClaimToken                 string
 	CapturedTranscriptRevision int
 	Assignments                []SpeakerProjectionAssignment
+	Embeddings                 []SpeakerEmbedding
 	ProvenanceJSON             string
 	CompletedAt                time.Time
 }
@@ -56,52 +57,9 @@ func (d *DB) CommitSpeakerProjection(ctx context.Context, input SpeakerProjectio
 	}
 	defer tx.Rollback()
 
-	meeting, err := getMeetingTx(ctx, tx, input.MeetingID)
-	if err != nil {
-		return nil, false, err
-	}
-	if meeting.ProcessingStatus != ProcessingStatusProcessing || meeting.ProcessingClaimToken == nil ||
-		*meeting.ProcessingClaimToken != input.ClaimToken || meeting.DiarizationState != DiarizationStateProcessing ||
-		meeting.TranscriptRevision != input.CapturedTranscriptRevision {
-		return meeting, false, nil
-	}
-	rows, err := tx.QueryContext(ctx, selectSegmentsSQL, input.MeetingID)
-	if err != nil {
-		return nil, false, err
-	}
-	segments, err := scanSegments(rows)
-	rows.Close()
-	if err != nil {
-		return nil, false, err
-	}
-	changed, exact, err := updateProjectedSegments(ctx, tx, segments, assignments)
-	if err != nil {
-		return nil, false, err
-	}
-	if !exact {
-		return meeting, false, nil
-	}
-	transcript := FormatTranscript(segments)
-	result, err := tx.ExecContext(ctx, `UPDATE meetings SET
-		transcript=?, transcript_revision=transcript_revision+?,
-		diarization_state=?, diarization_error=NULL, diarization_json=?,
-		processing_status=CASE WHEN ? OR NOT (`+ProcessingArtifactsCurrentSQL("?", "transcript_revision+?")+`)
-			THEN ? ELSE ? END,
-		processing_status_updated_at=?, processing_failure_message=NULL,
-		processing_claim_token=NULL, processing_claim_expires_at=NULL
-		WHERE id=? AND processing_status=? AND processing_claim_token=?
-		AND diarization_state=? AND transcript_revision=?`,
-		transcript, changed, DiarizationStateCompleted, provenanceJSON,
-		changed, transcript, changed, ProcessingStatusPending, ProcessingStatusCompleted, stamp(input.CompletedAt),
-		input.MeetingID, ProcessingStatusProcessing, input.ClaimToken, DiarizationStateProcessing,
-		input.CapturedTranscriptRevision)
-	applied, err := rowsChanged(result, err, "commit speaker projection")
+	meeting, applied, err := applySpeakerProjection(ctx, tx, input, assignments, provenanceJSON)
 	if err != nil || !applied {
 		return meeting, false, err
-	}
-	meeting, err = getMeetingTx(ctx, tx, input.MeetingID)
-	if err != nil {
-		return nil, false, err
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, false, fmt.Errorf("commit speaker projection: %w", err)
@@ -146,25 +104,11 @@ func updateProjectedSegments(ctx context.Context, tx *sql.Tx, segments []Segment
 			return false, false, nil
 		}
 		matched++
-		speaker := string(assignment.Speaker)
-		if segments[i].Speaker == speaker && equalFloat(segments[i].SpeakerConfidence, assignment.Confidence) &&
-			segments[i].SpeakerAssignmentReason != nil && *segments[i].SpeakerAssignmentReason == assignment.Reason {
-			continue
-		}
-		result, err := tx.ExecContext(ctx, `UPDATE segments SET speaker=?,speaker_confidence=?,speaker_assignment_reason=?
-			WHERE id=? AND meeting_id=? AND speaker_source=?`, speaker, assignment.Confidence, assignment.Reason,
-			segments[i].ID, segments[i].MeetingID, SegmentSourceSystem)
-		updated, err := rowsChanged(result, err, "update projected segment")
+		updated, err := applyProjectedSegment(ctx, tx, &segments[i], assignment)
 		if err != nil {
 			return false, false, err
 		}
-		if !updated {
-			return false, false, fmt.Errorf("system segment %s changed during projection", segments[i].ID)
-		}
-		segments[i].Speaker = speaker
-		segments[i].SpeakerConfidence = assignment.Confidence
-		segments[i].SpeakerAssignmentReason = &assignment.Reason
-		changed = true
+		changed = changed || updated
 	}
 	return changed, matched == len(assignments), nil
 }
@@ -176,4 +120,34 @@ func getMeetingTx(ctx context.Context, tx *sql.Tx, id string) (*Meeting, error) 
 
 func equalFloat(left, right *float64) bool {
 	return left == nil && right == nil || left != nil && right != nil && *left == *right
+}
+
+func writeProjectedSegment(ctx context.Context, tx *sql.Tx, segment Segment, assignment SpeakerProjectionAssignment) error {
+	result, err := tx.ExecContext(ctx, `UPDATE segments SET speaker=?,speaker_confidence=?,speaker_assignment_reason=?
+ WHERE id=? AND meeting_id=? AND speaker_source=?`, string(assignment.Speaker), assignment.Confidence, assignment.Reason,
+		segment.ID, segment.MeetingID, SegmentSourceSystem)
+	updated, err := rowsChanged(result, err, "update projected segment")
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return fmt.Errorf("system segment %s changed during projection", segment.ID)
+	}
+	return nil
+}
+
+func applyProjectedSegment(ctx context.Context, tx *sql.Tx, segment *Segment, assignment SpeakerProjectionAssignment) (bool, error) {
+	if segment.PersonID != nil {
+		return false, nil
+	}
+	speaker := string(assignment.Speaker)
+	if segment.Speaker == speaker && equalFloat(segment.SpeakerConfidence, assignment.Confidence) &&
+		segment.SpeakerAssignmentReason != nil && *segment.SpeakerAssignmentReason == assignment.Reason {
+		return false, nil
+	}
+	if err := writeProjectedSegment(ctx, tx, *segment, assignment); err != nil {
+		return false, err
+	}
+	segment.Speaker, segment.SpeakerConfidence, segment.SpeakerAssignmentReason = speaker, assignment.Confidence, &assignment.Reason
+	return true, nil
 }
