@@ -23,6 +23,8 @@ jobs:
     runs-on: macos-26
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      # Expose Meeting sync controls; account connection and upload consent remain separate.
+      GAPPD_MEETING_UPLOAD_ENABLED: 'true'
       GAPPD_GOOGLE_OAUTH_CLIENT_ID: ${{ vars.GAPPD_GOOGLE_OAUTH_CLIENT_ID }}
       # The cloud identity is baked in, because a packaged build cannot read a runtime
       # environment variable. Setting these two repository variables switches the beta build
