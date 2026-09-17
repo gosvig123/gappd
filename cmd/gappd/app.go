@@ -131,7 +131,7 @@ func appMeetingsListCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		entries, err := store.ListMeetingEntries(50)
+		entries, err := store.ListMeetingEntries(-1) // Complete history also feeds consented cloud sync.
 		if err != nil {
 			return err
 		}

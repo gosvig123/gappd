@@ -46,12 +46,12 @@ recording device; it never uses a wall clock, and a lower revision never replace
 | `version` | exactly 1 |
 | `revision` | 1 to 2^31, monotonic per Meeting |
 | `title` | 1 to 512 bytes |
-| `summary` | 0 to 4096 bytes |
+| `summary` | 0 to 65536 bytes |
 | `language` | 0 to 32 bytes |
 | `speakers` | 0 to 32, `key` unique and 1 to 128 bytes, `label` 0 to 128 bytes |
 | `turns` | 0 to 5000, `text` 0 to 4096 bytes each |
 | Transcript total | 0 to 1 MiB of turn text |
-| Turn offsets | `0 <= start_sec <= end_sec <= 86400`, ordered and non-overlapping |
+| Turn offsets | `0 <= start_sec <= end_sec <= 86400`, ordered by start time; overlap preserves simultaneous speech |
 
 Lengths are UTF-8 bytes. `encoding/json` replaces invalid UTF-8 bytes with U+FFFD, so a
 decoded document is always valid UTF-8.
@@ -85,7 +85,7 @@ a contract change on either side fails its own test instead of silently breaking
 
 ## Automatic desktop sync
 
-Upload consent starts an immediate scan of completed Meetings, then a background check every
+Upload consent starts an immediate scan of all completed Meetings (not only the newest 50), then a background check every
 minute while the app is running. Processing completion also requests a scan. New and changed
 documents join the existing durable queue; unchanged text does not create another revision.
 Pending sends retry without requiring a new Meeting or an open Settings panel. An unchanged
@@ -105,7 +105,8 @@ this change does not add token refresh or consent persistence across app restart
 ## Storage
 
 Migration 004 puts a real copy in its own `cloud_meetings` table with 1 MiB `transcript`,
-512-byte `title`, 4096-byte `summary` and 2 MiB `document` bounds. The synthetic `meetings`
+512-byte `title`, 4096-byte `summary` and 2 MiB `document` bounds. Migration 011 raises only
+the real-copy summary limit to 65536 bytes; deploy it before enabling longer summaries. The synthetic `meetings`
 table keeps its 16384-byte transcript cap, its constraints and its policies untouched, so a
 real copy and a demo row never share a table or a policy.
 

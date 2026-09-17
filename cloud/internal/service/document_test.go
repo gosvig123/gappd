@@ -92,6 +92,7 @@ func TestParseMeetingDocumentRejectsBadEnvelopes(t *testing.T) {
 		{"empty title", func(d *MeetingDocument) { d.Title = "" }, false},
 		{"long title", func(d *MeetingDocument) { d.Title = strings.Repeat("a", MaxTitleBytes+1) }, false},
 		{"long summary", func(d *MeetingDocument) { d.Summary = strings.Repeat("a", MaxSummaryBytes+1) }, false},
+		{"64 KiB summary", func(d *MeetingDocument) { d.Summary = strings.Repeat("é", 32768) }, true},
 		{"long language", func(d *MeetingDocument) { d.Language = strings.Repeat("a", MaxLanguageBytes+1) }, false},
 		{"no start", func(d *MeetingDocument) { d.StartedAt = "" }, false},
 		{"date only", func(d *MeetingDocument) { d.StartedAt = "2026-09-14" }, false},
@@ -116,8 +117,9 @@ func TestParseMeetingDocumentRejectsBadSpeakers(t *testing.T) {
 
 func TestParseMeetingDocumentRejectsBadTurns(t *testing.T) {
 	checkDocuments(t, []documentCheck{
-		{"out of order", func(d *MeetingDocument) { d.Turns[1].StartSec, d.Turns[1].EndSec = 1, 2 }, false},
-		{"overlap", func(d *MeetingDocument) { d.Turns[1].StartSec = 4 }, false},
+		{"out of order", func(d *MeetingDocument) { d.Turns[0], d.Turns[1] = d.Turns[1], d.Turns[0] }, false},
+		{"overlap", func(d *MeetingDocument) { d.Turns[1].StartSec = 4 }, true},
+		{"nested speech", func(d *MeetingDocument) { d.Turns[1].StartSec, d.Turns[1].EndSec = 1, 2 }, true},
 		{"negative start", func(d *MeetingDocument) { d.Turns[0].StartSec = -1 }, false},
 		{"end before start", func(d *MeetingDocument) { d.Turns[0].EndSec = -2 }, false},
 		{"unknown speaker", func(d *MeetingDocument) { d.Turns[0].SpeakerKey = "Nobody" }, false},

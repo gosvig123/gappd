@@ -112,6 +112,33 @@ func TestMeetingUploadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestMeetingUploadPreservesLongSummaryAndOverlappingSpeech(t *testing.T) {
+	host, reader, sign := uploadHost(t)
+	owner := copyOwner("overlap-summary")
+	summary := strings.Repeat("é", 32768)
+	document, err := service.ParseMeetingDocument([]byte(meetingDoc(localMeeting, 1, "Overlapping speech")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	document.Summary = summary
+	document.Turns = append(document.Turns, service.DocumentTurn{StartSec: 1, EndSec: 2, SpeakerKey: "You", Text: "Simultaneous turn."})
+	body, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := meetingRequest(t, host.URL, sign(owner), "POST", string(body)); code != 200 {
+		t.Fatalf("upload: %d", code)
+	}
+	realReads(t, reader)
+	copy, err := service.Read(context.Background(), reader, owner, service.MeetingCopyID(owner, localMeeting))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if copy.Summary != summary || copy.Transcript != document.Transcript() {
+		t.Fatal("uploaded content changed")
+	}
+}
+
 func TestMeetingUploadRevisionRules(t *testing.T) {
 	host, reader, sign := uploadHost(t)
 	owner := copyOwner("upload-revision")

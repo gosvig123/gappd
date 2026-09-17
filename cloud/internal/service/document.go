@@ -17,7 +17,7 @@ const (
 	MaxDocumentBytes   = 2 << 20
 	MaxTranscriptBytes = 1 << 20
 	MaxTitleBytes      = 512
-	MaxSummaryBytes    = 4096
+	MaxSummaryBytes    = 64 << 10
 	MaxLanguageBytes   = 32
 	MaxSpeakerBytes    = 128
 	MaxTurnBytes       = 4096
@@ -149,20 +149,20 @@ func (d MeetingDocument) speakerKeys() (map[string]string, error) {
 	return keys, nil
 }
 
-// Turns must be ordered, non-overlapping and inside the recorded Meeting window.
+// Turns must be ordered by start time and bounded. Overlap preserves simultaneous speech.
 func (d MeetingDocument) validateTurns(keys map[string]string) error {
 	if len(d.Turns) > MaxTurns {
 		return errDocument
 	}
-	previousEnd := 0.0
+	previousStart := 0.0
 	for _, turn := range d.Turns {
-		if turn.StartSec < previousEnd || turn.EndSec < turn.StartSec || turn.EndSec > MaxMeetingSeconds {
+		if turn.StartSec < previousStart || turn.EndSec < turn.StartSec || turn.EndSec > MaxMeetingSeconds {
 			return errDocument
 		}
 		if _, ok := keys[turn.SpeakerKey]; !ok || len(turn.Text) > MaxTurnBytes {
 			return errDocument
 		}
-		previousEnd = turn.EndSec
+		previousStart = turn.StartSec
 	}
 	return nil
 }

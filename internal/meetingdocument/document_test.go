@@ -103,13 +103,27 @@ func TestBuildRejectsUnusableMeetings(t *testing.T) {
 	}
 }
 
+func TestBuildPreservesOverlappingSpeechAndLongSummary(t *testing.T) {
+	summary := strings.Repeat("é", 32768)
+	data, err := Build(withSummary(meeting(), summary), overlapping(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document Document
+	if err := json.Unmarshal(data, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.Summary != summary || document.Turns[1].StartSec != overlapping()[1].Start || document.Turns[0].EndSec != overlapping()[0].End {
+		t.Fatal("summary or original overlapping timestamps changed")
+	}
+}
+
 func TestBuildRejectsUnusableTurns(t *testing.T) {
 	cases := []struct {
 		name     string
 		segments []db.Segment
 	}{
 		{"unsorted segments", unsorted()},
-		{"overlapping segments", overlapping()},
 		{"long turn", longTurn()},
 		{"no speaker", noSpeaker()},
 		{"long speaker", longSpeaker()},

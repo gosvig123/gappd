@@ -17,7 +17,7 @@ const (
 	Version           = 1
 	MaxDocumentBytes  = 2 << 20
 	MaxTitleBytes     = 512
-	MaxSummaryBytes   = 4096
+	MaxSummaryBytes   = 64 << 10
 	MaxLanguageBytes  = 32
 	MaxSpeakerBytes   = 128
 	MaxTurnBytes      = 4096
@@ -138,15 +138,15 @@ func (d Document) validateTurns() error {
 	if len(d.Turns) > MaxTurns {
 		return errors.New("Meeting document unavailable")
 	}
-	previousEnd := 0.0
+	previousStart := 0.0
 	for _, turn := range d.Turns {
-		if turn.StartSec < previousEnd || turn.EndSec < turn.StartSec || turn.EndSec > MaxMeetingSeconds {
+		if turn.StartSec < previousStart || turn.EndSec < turn.StartSec || turn.EndSec > MaxMeetingSeconds {
 			return errors.New("Meeting document unavailable")
 		}
 		if strings.TrimSpace(turn.Text) == "" {
 			return errors.New("Meeting document unavailable")
 		}
-		previousEnd = turn.EndSec
+		previousStart = turn.StartSec
 	}
 	return nil
 }
