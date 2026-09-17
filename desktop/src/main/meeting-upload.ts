@@ -10,8 +10,8 @@ import { consentedCredential, grantedConsent, newStoredConsent, reconcileConsent
  * Sends queued Meeting copies to Gappd Cloud.
  *
  * Signing in never permits an upload: a separate, explicit consent is required, it is bound to
- * the account, and it is dropped when the account or its token changes or when sync is turned
- * off. The queue owns the revision, the exact accepted bytes, and the account it belongs to, so
+ * the account's saved authorization, survives restart and token refresh, and is dropped when
+ * that authorization changes or sync is turned off. The queue owns the revision, the exact accepted bytes, and the account it belongs to, so
  * neither queued work nor an acceptance ever crosses accounts.
  */
 export class MeetingUpload {
@@ -30,6 +30,8 @@ export class MeetingUpload {
   private retryTimer: ReturnType<typeof setInterval> | null = null
   private refreshing: Promise<void> | null = null
   private syncing: Promise<void> | null = null
+  private restored = false
+  private restoring: Promise<void> | null = null
 
   constructor(auth: Authorization, resource: string, available: boolean, queue: MeetingSyncQueue,
     loadDocument: (localId: string, revision: number) => Promise<string>, localMeetings: () => Promise<MeetingListItem[]>,
@@ -46,6 +48,7 @@ export class MeetingUpload {
   }
 
   async status(): Promise<MeetingUploadStatus> {
+    await this.restoreConsent()
     const account = await this.auth.status()
     reconcileConsent(this.stored, account)
     if (!this.stored.upload) this.stopRetryTimer()
@@ -67,15 +70,17 @@ export class MeetingUpload {
   }
 
   async setConsent(subject: unknown, enabled: unknown): Promise<MeetingUploadStatus> {
+    const generation = this.generation + 1
     const credential = await this.verified(subject, enabled)
-    this.stored.upload = grantedConsent(credential)
+    if (generation !== this.generation) return this.status()
+    this.restored = true
+    this.stored.upload = null
     this.stopRetryTimer()
-    if (credential) {
-      // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
-      this.retryTimer = setInterval(() => {
-        void this.syncNew().catch((error) => console.error('Automatic Meeting sync failed; retrying next minute', error))
-      }, 60_000)
-      this.retryTimer.unref()
+    const saved = this.auth.setUploadConsent ? await this.auth.setUploadConsent(credential) : credential
+    if (generation !== this.generation) return this.status()
+    this.stored.upload = grantedConsent(saved)
+    if (saved) {
+      this.startRetryTimer()
       await this.refresh(true)
     }
     return this.status()
@@ -179,6 +184,7 @@ export class MeetingUpload {
 
   private async refreshMeetings(announce: boolean): Promise<void> {
     if (!this.available) return
+    await this.restoreConsent()
     const generation = this.generation
     const credential = await this.consented()
     if (!credential || generation !== this.generation) return
@@ -244,8 +250,38 @@ export class MeetingUpload {
   // Turning sync off or changing the account revokes every consent.
   private revokeAll(): void {
     this.cancelPending()
+    this.restored = true
     this.stopRetryTimer()
     revokeConsent(this.stored)
+  }
+
+  private restoreConsent(): Promise<void> {
+    if (this.restored || !this.available) return Promise.resolve()
+    if (this.restoring) return this.restoring
+    const generation = this.generation
+    this.restoring = (async () => {
+      const credential = await this.auth.savedUploadCredential?.()
+      if (generation !== this.generation) return
+      this.restored = true
+      if (credential) {
+        this.stored.upload = grantedConsent(credential)
+        this.startRetryTimer()
+      }
+    })().catch(error => {
+      // Retry after this Mac is unlocked; never treat an unreadable store as new consent.
+      if (generation === this.generation) this.startRetryTimer()
+      throw error
+    }).finally(() => { this.restoring = null })
+    return this.restoring
+  }
+
+  private startRetryTimer(): void {
+    if (this.retryTimer) return
+    // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
+    this.retryTimer = setInterval(() => {
+      void this.syncNew().catch(() => console.error('Automatic Meeting sync failed. Unlock this Mac and check the connection; retrying next minute.'))
+    }, 60_000)
+    this.retryTimer.unref()
   }
 
   private stopRetryTimer(): void {

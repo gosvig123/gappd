@@ -85,6 +85,7 @@ app.whenReady().then(async () => {
   const startHidden = shouldStartHidden()
   initializeStartupSettings()
   createWindow(!startHidden)
+  void meetingUpload().syncNew().catch(() => console.error('Saved Meeting sync could not start. Unlock this Mac; sync will retry automatically.'))
   await bootstrapManagedRuntime()
   startDrainCoordinator()
   // A finished record joins the cloud queue on its own; without consent it stays local.

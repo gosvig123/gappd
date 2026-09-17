@@ -1,4 +1,5 @@
 import type { CloudCredential } from './cloud-auth'
+import type { Authorization } from './meeting-upload-consent'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { MeetingDevice } from './meeting-device.ts'
 import type { DeviceCredential } from './meeting-device'
@@ -51,7 +52,7 @@ export type RecordedRequest = {
   generation: string | null
 }
 
-export type HarnessOptions = { available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
+export type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
 
 /**
  * One Meeting list row, shaped as the app protocol sends it. Capture and processing statuses
@@ -72,9 +73,9 @@ export function harness(options: HarnessOptions = {}) {
   let saved: CloudCredential | null = options.saved === undefined ? credential() : options.saved
   const requests: RecordedRequest[] = []
   const registrations: string[] = []
-  const auth = buildAuth(() => saved, (next) => { saved = next })
+  const auth = options.auth ?? buildAuth(() => saved, (next) => { saved = next })
   const upload = new MeetingUpload(auth, 'https://example.test/mcp', options.available ?? true,
-    new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
+    options.queue ?? new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
     options.load ?? (async (_localId, revision) => `{"version":1,"revision":${revision}}`),
     async () => options.meetings ?? [],
     new MeetingDevice(new DeviceStore('/tmp/unused.enc', cipher)),

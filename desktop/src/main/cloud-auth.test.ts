@@ -4,7 +4,7 @@ import test from 'node:test'
 import { CloudAuth, type CloudCredential } from './cloud-auth.ts'
 const config = { issuer: 'https://issuer.example', clientId: 'desktop' }
 
-function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; timeoutMs?: number; invalidUser?: boolean; resource?: string } = {}) {
+function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; timeoutMs?: number; invalidUser?: boolean; resource?: string; refreshTokens?: boolean } = {}) {
   let saved: CloudCredential | null = null
   let browserUrl = ''
   let opened!: () => void
@@ -15,11 +15,11 @@ function harness(options: { fail?: boolean; secure?: boolean; pause?: boolean; t
     openExternal: async (url: string) => { browserUrl = url; opened(); if (!options.pause) await callback(url) },
     fetcher: async (url: string | URL | Request) => {
       if (options.fail) throw new Error('provider secret must not escape')
-      return String(url).endsWith('/userinfo') ? Response.json({ sub: 'user_1', email: 'test@example.com', email_verified: !options.invalidUser }) : Response.json({ access_token: 'synthetic-access', token_type: 'Bearer', expires_in: 3600 })
+      return String(url).endsWith('/userinfo') ? Response.json({ sub: 'user_1', email: 'test@example.com', email_verified: !options.invalidUser }) : Response.json({ access_token: 'synthetic-access', token_type: 'Bearer', expires_in: 3600, refresh_token: 'synthetic-refresh' })
     },
     timeoutMs: options.timeoutMs ?? 500,
   }
-  return { auth: new CloudAuth({ ...config, ...(options.resource ? { resource: options.resource } : {}) }, store, dependencies), store, dependencies, browser, url: () => browserUrl }
+  return { auth: new CloudAuth({ ...config, refreshTokens: options.refreshTokens, ...(options.resource ? { resource: options.resource } : {}) }, store, dependencies), store, dependencies, browser, url: () => browserUrl }
 }
 
 async function callback(url: string, overrides: Record<string, string> = {}) {
@@ -145,6 +145,23 @@ test('malformed token lifetime or type cannot be persisted', async () => {
   }
 })
 
+
+test('persistent sync requests offline access; reconnect creates a new authorization without upload consent', async () => {
+  const h = harness({ resource: 'https://example.test/mcp', refreshTokens: true })
+  await h.auth.setEnabled(true)
+  assert.equal(new URL(h.url()).searchParams.get('scope'), 'email profile meetings:sync offline_access')
+  const first = await h.auth.credential()
+  assert.ok(first?.authorizationId)
+  assert.equal(first.tokens.refreshToken, 'synthetic-refresh')
+  await h.auth.setUploadConsent(first)
+  assert.equal((await h.auth.savedUploadCredential())?.uploadConsent, true)
+  await h.auth.setEnabled(true)
+  assert.notEqual((await h.auth.credential())?.authorizationId, first.authorizationId)
+  assert.equal(await h.auth.savedUploadCredential(), null)
+  const preview = harness()
+  await preview.auth.setEnabled(true)
+  assert.equal((await preview.auth.credential())?.tokens.refreshToken, undefined)
+})
 
 test('demo authorization explicitly requests sync resource and binds protected credentials', async () => {
   const h = harness({ resource: 'https://example.test/mcp' })

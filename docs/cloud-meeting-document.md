@@ -97,10 +97,23 @@ revision. Older queues without hashes send one new revision on the next consente
 establish a baseline. Hashes and queued work remain scoped to the upload account. Deleted and
 expired cloud identities remain blocked by the server; edits never extend retention.
 
+Upload consent is stored in the same encrypted on-device record as the upload account's
+credentials. Startup restores only an explicitly saved opt-in for that authorization; signing
+in alone never grants upload consent. Background sync resumes without opening Settings.
+Destructive confirmations are one-use and are never restored.
+
+Upload sign-in requests `offline_access` and retains the refresh token. Before an access token
+expires, Gappd refreshes it and verifies that the account is unchanged. Refresh preserves
+upload consent; a temporary connection failure pauses sending and retries without erasing
+consent. Rotated tokens remain encrypted and unusable until identity verification succeeds.
+An invalid or revoked refresh grant requires an explicit reconnect. Older connections that
+discarded their refresh tokens need one reconnect to obtain offline access.
+
 Turning sync off or removing consent stops the background timer and cancels the current send
-locally. It does not delete cloud copies. Signing in alone, restarting the app, or replacing
-credentials never grants upload consent. Consent and valid credentials must remain active;
-this change does not add token refresh or consent persistence across app restarts.
+locally. It does not delete cloud copies. Disconnecting or reconnecting the upload account
+clears its saved upload consent; a new authorization never inherits a previous opt-in.
+
+Provider contract: [Clerk OAuth and offline access](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth).
 
 ## Storage
 

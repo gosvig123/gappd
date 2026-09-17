@@ -64,6 +64,7 @@ function renderControls({ status, subject, account, busy, run }: Controls) {
       <Button disabled={!status.consent || busy || status.queue.pending === 0} onClick={() => void run((api) => api.sync())}>Upload queued Meetings</Button>
     </div>
     <p>{account.enabled ? `Upload account: ${account.email} (${subject})` : 'Upload OFF. Connect explicitly; a signed-in account is not upload consent.'}</p>
+    {account.error ? <p role="alert">{account.error}</p> : null}
     <label><input type="checkbox" checked={status.consent} disabled={!account.enabled || busy}
       onChange={event => void run((api) => api.setConsent(subject, event.target.checked))} /> {MEETING_UPLOAD_CONSENT_TEXT}</label>
   </>
