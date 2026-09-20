@@ -19,7 +19,7 @@ export function SlackPanel({ slack }: { slack: SlackConnectionController }) {
         <Button variant="primary" disabled={!status?.configured || slack.loading || busy} onClick={() => void slack.connect()}>{connectLabel(slack, connected)}</Button>
         {connected ? <Button disabled={busy} onClick={disconnect}>{slack.busy === 'disconnect' ? 'Disconnecting…' : 'Disconnect'}</Button> : null}
       </div>
-      {connected ? <SlackComposer accountKey={`${status?.teamId ?? ''}:${status?.userId ?? ''}`} /> : null}
+      {connected && !busy && !expired ? <SlackComposer key={`${status?.teamId}:${status?.userId}`} accountKey={`${status?.teamId ?? ''}:${status?.userId ?? ''}`} /> : null}
     </Card>
   )
 }
@@ -39,7 +39,7 @@ function statusTone(slack: SlackConnectionController, expired: boolean): string 
 
 function connectionNote(slack: SlackConnectionController, expired: boolean): string {
   if (!slack.status?.configured) return 'Slack is not configured for this build.'
-  if (!slack.status.connected) return 'Gappd opens Slack in your browser and requests the chat:write scope. Tokens are encrypted on this Mac; no client secret is used.'
+  if (!slack.status.connected) return 'Gappd opens Slack in your browser to request permission to send confirmed messages and list channels, conversations, and member names. Message history is not read. Tokens are encrypted on this Mac.'
   if (expired) return 'The Slack authorization expired. Reconnect Slack to continue.'
   return `Connected to ${slack.status.teamName || slack.status.teamId}. Gappd sends a message only after you review it and confirm it.`
 }

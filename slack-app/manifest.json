@@ -16,7 +16,12 @@
     ],
     "scopes": {
       "user": [
-        "chat:write"
+        "chat:write",
+        "channels:read",
+        "groups:read",
+        "im:read",
+        "mpim:read",
+        "users:read"
       ]
     },
     "pkce_enabled": true

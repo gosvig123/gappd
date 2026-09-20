@@ -1,6 +1,6 @@
 # Slack integration
 
-Status: direct desktop sign-in with confirmed message sending. Gappd uses Slack's PKCE public-client flow from the Electron main process with a registered macOS `gappd://` callback. There is no server, no client secret, and no proxy. The user can send one plain-text message at a time to a validated destination after reviewing it and confirming it in a local scrolling confirmation window. A live Slack send has not been run yet (see Open items).
+Status: direct desktop sign-in, a destination picker, and confirmed message sending. Gappd uses Slack's PKCE public-client flow from the Electron main process with a registered macOS `gappd://` callback. There is no server, no client secret, and no proxy. The user can send one plain-text message at a time to a validated destination after reviewing it and confirming it in a local scrolling confirmation window. A live Slack send has not been run yet (see Open items).
 
 ## Components
 
@@ -8,6 +8,8 @@ Status: direct desktop sign-in with confirmed message sending. Gappd uses Slack'
 - `desktop/src/main/slack-oauth.ts`: PKCE authorization, code exchange, token refresh, token parsing.
 - `desktop/src/main/slack-connection.ts`: serialized refresh, atomic token persistence, reviewed-account binding.
 - `desktop/src/main/slack-destination.ts`: validation of channel IDs and Slack channel or thread links.
+- `desktop/src/main/slack-destinations.ts`: paginated joined-channel and existing-conversation reads, with member names for DMs.
+- `desktop/src/renderer/components/slack-destination-picker.tsx`: filter loaded destinations, load more, or keep a pasted link.
 - `desktop/src/main/slack-message.ts`: message length validation, control-syntax escaping, `chat.postMessage` payload.
 - `desktop/src/main/slack-send.ts`: reviewed message store, confirmation boundary, fixed Slack request, error mapping.
 - `desktop/src/main/slack-service.ts`: Electron composition (secure store, shell, client ID, local scrolling confirmation window).
@@ -20,7 +22,7 @@ Status: direct desktop sign-in with confirmed message sending. Gappd uses Slack'
 | App | `A0C1C2FVC78` in workspace `T0C19BLLJBX` (gappd) |
 | Client ID | `12043394698405.12046083998246` (public; app-owned default in `service-config.ts`, overridable with `GAPPD_SLACK_OAUTH_CLIENT_ID`) |
 | Redirect URL | `gappd://slack/oauth/callback` (exact match; registered in the macOS app bundle) |
-| User scopes | `chat:write` only |
+| User scopes | `chat:write`, `channels:read`, `groups:read`, `im:read`, `mpim:read`, `users:read` |
 | Bot scopes | none; Slack rejects bot scopes for desktop redirects |
 | PKCE | enabled |
 | Token rotation | enabled; custom desktop redirects always receive rotating tokens |
@@ -64,7 +66,7 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 
 1. Settings calls `slack:connect`. The main process creates a 32-byte `code_verifier`, its SHA-256 `code_challenge`, and a random `state`.
 2. The main process starts a five-minute callback wait. The packaged app registers the `gappd` URL scheme. Electron's `open-url` handler accepts only the exact Slack callback target and compares `state` with a timing-safe comparison. Wrong-target, unsolicited, wrong-state, and replayed links are ignored.
-3. The main process opens `https://slack.com/oauth/v2/authorize` with `client_id`, `user_scope=chat:write`, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`, and `state`.
+3. The main process opens `https://slack.com/oauth/v2/authorize` with `client_id`, the user scopes listed above, `redirect_uri`, `code_challenge`, `code_challenge_method=S256`, and `state`.
 4. The user chooses a workspace and approves. Slack opens the desktop callback with `code` and `state`; Gappd returns its window to the foreground. The callback is consumed once. Duplicate parameters, denied consent, and invalid codes fail before token exchange.
 5. The main process calls `https://slack.com/api/oauth.v2.access` with `grant_type=authorization_code`, `client_id`, `code`, `redirect_uri`, and `code_verifier`. No `client_secret`.
 6. The rotating user token is read from `authed_user` (top-level as fallback), then written to `slack-connection.enc` in Electron `safeStorage` before it is used.
@@ -86,11 +88,12 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 - The desktop callback requires an active authorization attempt, the exact scheme/host/path, and matching state. No callback codes or tokens are logged. PKCE protects the code exchange if another application intercepts a custom-scheme link.
 - Tokens are stored with Electron `safeStorage` encryption and never appear in URLs, logs, errors, or the renderer.
 - No Slack API proxy exists. The main process calls Slack directly with the stored token.
+- The picker uses fixed `users.conversations` and `users.info` endpoints. It reads metadata, not messages; it does not join channels or open DMs. Responses from an old connection are discarded.
 - Sending uses the fixed endpoint `https://slack.com/api/chat.postMessage`. Gappd never fetches a user-supplied URL.
 
 ## Sending a message
 
-1. The composer takes a destination and message. `slack:review` validates both in the main process and stores one pending message with the connected `teamId` and `userId`.
+1. Choose a joined channel or existing conversation from the picker, or paste a destination ID or Slack link. Filtering applies to loaded destinations; use **Load more destinations** to fetch the next page. The composer takes a destination and message. `slack:review` validates both in the main process and stores one pending message with the connected `teamId` and `userId`.
 2. Accepted destinations: a channel ID (`C…`, `G…`, or `D…`), `https://<workspace>.slack.com/archives/<channel>[/p<timestamp>]`, or `https://app.slack.com/client/<teamId>/<channel>[/thread/<channel>-<timestamp>]`. Query strings are limited to `thread_ts` and `cid`.
 3. `slack:send` accepts only the review id. The main process re-checks the account, shows a local scrolling confirmation window, then retrieves or rotates the token and posts.
 4. The payload is plain text: `mrkdwn`, `unfurl_links`, and `unfurl_media` are false, and `&`, `<`, `>` are escaped so text cannot activate mentions, channel alerts, or links.
@@ -100,15 +103,17 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 
 - One pending review per connection. Editing the destination or text, disconnecting, reconnecting, or changing accounts invalidates it; a second send is rejected while one is in flight.
 - The message is at most 4000 characters, before and after escaping. Slack shows the text literally.
-- No channel names, no directory listing, no bot impersonation, and no search. The user supplies a channel ID or a link copied from Slack.
+- The picker lists joined public/private channels and existing DMs/group DMs. It does not create conversations, impersonate bots, or search messages. Pasted IDs and Slack links remain available, including thread links.
 - Gappd never retries automatically. HTTP 200 with `ok: false` is not-sent; network, timeout, 5xx, unreadable responses, and Slack `fatal_error` or `internal_error` are delivery-unknown, so the user checks Slack before sending again.
 - HTTP 429 returns guidance from `Retry-After`; the user decides when to review and send again.
 - Success requires `ok: true` plus a valid `channel` and `ts`. The result carries a best-effort `https://slack.com/app_redirect` link; opening it may pick another signed-in workspace.
 
 ## Scopes
 
-- `chat:write` (user) is the only scope. It is the smallest scope that can post a confirmed message as the authorizing user.
-- Destination listing (`channels:read`, `groups:read`, `im:read`, `mpim:read`) and `chat:write.public` are not requested because no feature uses them yet. Adding them requires the user to authorize again in Slack.
+- `chat:write` (user) posts a confirmed message as the authorizing user.
+- `channels:read`, `groups:read`, `im:read`, and `mpim:read` list joined channels and existing conversations. `users:read` supplies readable DM names; no email permission is requested.
+- Connections made by older builds must reconnect to grant the picker scopes. A missing-scope response explains this; pasted destinations still use the existing send flow.
+- No history, search, bot, or `chat:write.public` scopes are requested.
 - `search.messages` with `search:read` is legacy. Gappd does not request it and does not promise search eligibility.
 
 ## Send-confirmation boundary
@@ -124,7 +129,7 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 | --- | --- | --- |
 | 1 | Manifest, PKCE sign-in, encrypted storage, refresh, Settings connect/reconnect/disconnect | listed under Components |
 | 2 (this change) | Send one reviewed, confirmed plain-text message: destination validation, reviewed-account binding, `chat.postMessage`, local scrolling confirmation, friendly errors | `slack-destination.ts`, `slack-message.ts`, `slack-send.ts`, `slack-connection.ts`, `slack-service.ts`, IPC group, panel composer |
-| 3 | Destination-scope additions (`channels:read`, `groups:read`, `im:read`, `mpim:read`) with re-authorization | manifest, `slack-oauth.ts` scopes, panel copy |
+| 3 | Destination picker with paginated membership reads, DM names, and re-authorization for added scopes | `slack-destinations.ts`, `slack-destination-picker.tsx`, manifest, OAuth scopes, IPC |
 | 4 | Slack `auth.revoke` on disconnect and user display names (workspace names already shown) | `slack-service.ts`, manifest |
 | 5 | Optional read features with explicit scopes; no search promises | separate design |
 
@@ -138,10 +143,10 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 
 ## Open items
 
-- The Slack portal must have the exact Redirect URL `gappd://slack/oauth/callback`, user scope `chat:write`, PKCE enabled, and Token Rotation enabled. Public Distribution must be enabled to connect workspaces other than the app's development workspace.
+- Portal check for the destination-picker change: the exact `gappd://slack/oauth/callback` redirect, PKCE, Token Rotation, and Public Distribution were already enabled. The five destination/member read scopes were saved and verified on OAuth & Permissions. External-workspace installation remains a live acceptance check.
 - Slack's distribution checklist rejects HTTP redirects, including localhost. Remove the old HTTP redirect only after the desktop-callback build is available. Old builds that still use localhost will then need an update.
 - Confirm the Slack app ID in the manifest after the portal matches; the ID is not used at runtime.
 - Test desktop URL routing with an installed, packaged macOS app. An unpackaged Electron development process does not own the `gappd` URL scheme.
 - Token rotation and PKCE cannot be turned off for this app once enabled.
 - Remaining live test: send one confirmed message to a test channel in the connected workspace, then check plain-text rendering, thread reply behavior, and the `app_redirect` link. This needs explicit user authorization; no live send was run for this change.
-- DM, private-channel, and member-only destinations work only when the user's account can post there; Slack errors map to guidance, not to a destination directory.
+- DM, private-channel, and member-only destinations work only when the user's account can post there. Membership does not guarantee posting rights; Slack errors still map to guidance.

@@ -9,6 +9,17 @@ export type SlackConnectionStatus = {
   refreshExpiresAt: number | null
 }
 
+export type SlackDestinationOption = {
+  channelId: string
+  label: string
+  kind: 'channel' | 'private-channel' | 'dm' | 'group-dm'
+}
+
+export type SlackDestinationPage = {
+  destinations: SlackDestinationOption[]
+  nextCursor: string
+}
+
 export type SlackSendReviewInput = {
   destination: string
   text: string

@@ -1,6 +1,7 @@
 import { SLACK_SEND_TEXT_MAX_LENGTH, type SlackSendReview } from '../../shared/slack-contract'
 import { useSlackSend, type SlackSendController, type SlackSendNotice } from '../hooks/use-slack-send'
 import { Button } from './ui'
+import { SlackDestinationPicker } from './slack-destination-picker'
 import './slack-composer.css'
 
 /** Composer for one confirmed message. Review shows exactly what the main process holds. */
@@ -10,8 +11,9 @@ export function SlackComposer({ accountKey }: { accountKey: string }) {
   const canReview = !send.busy && !overLimit && send.destination.trim().length > 0 && send.text.trim().length > 0
   return (
     <div className="slack-composer">
+      <SlackDestinationPicker value={send.destination} onChange={send.setDestination} disabled={Boolean(send.busy)} />
       <label className="field" htmlFor="slack-destination">
-        <span>Destination</span>
+        <span>Destination ID or Slack link</span>
         <input id="slack-destination" value={send.destination} disabled={Boolean(send.busy)} placeholder="C0123ABC or a Slack message link" onChange={(event) => send.setDestination(event.target.value)} />
       </label>
       <label className="field" htmlFor="slack-message">

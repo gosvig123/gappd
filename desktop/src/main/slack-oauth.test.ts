@@ -14,7 +14,7 @@ test('runs the desktop PKCE flow without a fixed workspace or client secret', as
       const authorization = new URL(url)
       assert.equal(authorization.origin + authorization.pathname, 'https://slack.com/oauth/v2/authorize')
       assert.equal(authorization.searchParams.get('client_id'), CLIENT_ID)
-      assert.equal(authorization.searchParams.get('user_scope'), 'chat:write')
+      assert.equal(authorization.searchParams.get('user_scope'), SLACK_USER_SCOPES.join(','))
       assert.equal(authorization.searchParams.get('scope'), '')
       assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256')
       assert.match(authorization.searchParams.get('code_challenge') || '', /^[A-Za-z0-9_-]{43}$/)
@@ -26,7 +26,7 @@ test('runs the desktop PKCE flow without a fixed workspace or client secret', as
     fetcher: async (_url, init) => { tokenBody = String(init?.body); return slackUserPayload() },
     now: () => NOW,
   })
-  assert.deepEqual(SLACK_USER_SCOPES, ['chat:write'])
+  assert.deepEqual(SLACK_USER_SCOPES, ['chat:write', 'channels:read', 'groups:read', 'im:read', 'mpim:read', 'users:read'])
   assert.equal(tokens.accessToken, 'xoxe.xoxp-1-access')
   assert.equal(tokens.refreshToken, 'xoxe-1-refresh')
   assert.equal(tokens.expiresAt, NOW + 43_200_000)

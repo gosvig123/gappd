@@ -4,7 +4,7 @@ import { buildAuthorizationUrl, createPkce, type OAuthConfig } from './oauth.ts'
 
 export const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
 export const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access'
-export const SLACK_USER_SCOPES = ['chat:write']
+export const SLACK_USER_SCOPES = ['chat:write', 'channels:read', 'groups:read', 'im:read', 'mpim:read', 'users:read']
 export const SLACK_REFRESH_SKEW_MS = 5 * 60 * 1000
 
 export const SLACK_REDIRECT_URI = 'gappd://slack/oauth/callback'

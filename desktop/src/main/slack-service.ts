@@ -6,6 +6,7 @@ import { SlackConnection } from './slack-connection'
 import { confirmSlackSend } from './slack-confirmation'
 import type { SlackTokenSet } from './slack-oauth'
 import { SlackSendService } from './slack-send'
+import { listSlackDestinations } from './slack-destinations'
 
 const CONNECTION_STORE_FILE = 'slack-connection.enc'
 let instance: SlackConnection | null = null
@@ -25,6 +26,10 @@ export async function disconnectSlack(): Promise<SlackConnectionStatus> {
   const active = requireSlackConnection()
   await active.disconnect()
   return describeSlackConnection(active)
+}
+
+export function slackDestinations(cursor: unknown = '') {
+  return listSlackDestinations(requireSlackConnection(), cursor)
 }
 
 export function reviewSlackMessage(input: unknown): Promise<SlackSendReview> {
