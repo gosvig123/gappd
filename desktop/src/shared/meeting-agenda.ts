@@ -5,8 +5,8 @@ export const INFERRED_CALENDAR_PROVENANCE = 'inferred'
 export const CONFIRMED_CALENDAR_PROVENANCE = 'confirmed'
 export type CalendarProvenance = typeof INFERRED_CALENDAR_PROVENANCE | typeof CONFIRMED_CALENDAR_PROVENANCE
 
-export type AgendaSource = { id: string; title: string; startedAt: string; calendarProvenance?: CalendarProvenance; calendarTitle?: string }
-export type MeetingAgendaDraft = { items: AgendaItem[]; historyIncomplete?: boolean; historyWarning?: string; ambiguousMeetings?: AgendaSource[]; sources: AgendaSource[] }
+export type AgendaSource = { id: string; title: string; startedAt: string; kind?: 'gmail' | 'slack'; calendarProvenance?: CalendarProvenance; calendarTitle?: string }
+export type MeetingAgendaDraft = { items: AgendaItem[]; communicationWarning?: string; historyIncomplete?: boolean; historyWarning?: string; ambiguousMeetings?: AgendaSource[]; sources: AgendaSource[] }
 export type AgendaHistory = AgendaSource & { endedAt?: string; calendarReconciliationUnavailable?: boolean; calendarAmbiguous?: boolean; emails: string[]; event?: CalendarEventSummary }
 const DECLINED_STATUS = 'declined'
 const MAX_SOURCES = 12

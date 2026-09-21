@@ -31,6 +31,27 @@ test('refreshes through the relay and fetches owned primary events from local mi
   assert.match(eventsUrl.searchParams.get('fields') || '', /items/)
 })
 
+test('Gmail permission is requested only on explicit opt-in and survives refresh without returned scopes', async () => {
+  const scope = 'https://www.googleapis.com/auth/gmail.readonly'
+  for (const includeGmail of [false, true]) {
+    const api = new GoogleCalendarApi({
+      clientId: CLIENT_ID,
+      tokenRequester: async () => validTokens(),
+      fetcher: async () => Response.json({ sub: 'fixture-subject', email: 'fixture@example.com' }),
+      openExternal: async input => {
+        const url = new URL(input)
+        assert.equal(url.searchParams.get('scope')!.split(' ').includes(scope), includeGmail)
+        const callback = new URL(url.searchParams.get('redirect_uri')!)
+        callback.searchParams.set('state', url.searchParams.get('state')!)
+        callback.searchParams.set('code', 'synthetic-code')
+        await fetch(callback)
+      },
+    })
+    assert.equal((await api.authorize(includeGmail)).subject, 'fixture-subject')
+    assert.equal((await api.refresh({ ...expiredTokens(), scope })).scope, scope)
+  }
+})
+
 test('is not configured without both client ID and relay requester', () => {
   const openExternal = async () => undefined
   assert.equal(new GoogleCalendarApi({ clientId: '', openExternal }).configured(), false)

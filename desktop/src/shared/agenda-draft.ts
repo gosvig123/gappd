@@ -10,7 +10,7 @@ export const MAX_SAVED_AGENDA_DRAFTS = 100
 export const MAX_AGENDA_ITEMS = 200
 export const MAX_AGENDA_TEXT_LENGTH = 2000
 
-export type AgendaSourceRecord = Pick<AgendaSource, 'id' | 'title' | 'startedAt'> & Pick<Partial<AgendaSource>, 'calendarProvenance' | 'calendarTitle'>
+export type AgendaSourceRecord = Pick<AgendaSource, 'id' | 'title' | 'startedAt'> & Pick<Partial<AgendaSource>, 'calendarProvenance' | 'calendarTitle' | 'kind'>
 
 /** Source evidence is owned by main and never accepted from the renderer. */
 export type AgendaItemRecord = { topic: string; sourceId: string; quote: string }
@@ -30,6 +30,7 @@ export type AgendaDraftRecord = {
   sources: AgendaSourceRecord[]
   historyIncomplete: boolean
   historyWarning?: string
+  communicationWarning?: string
   ambiguousMeetings?: AgendaSourceRecord[]
   generatedAt: string
   updatedAt: string
@@ -110,6 +111,7 @@ export function agendaDraftViewOf(record: SavedAgendaDraft): AgendaDraftView {
     sources: record.sources,
     historyIncomplete: record.historyIncomplete,
     ...(record.historyWarning ? { historyWarning: record.historyWarning } : {}),
+    ...(record.communicationWarning ? { communicationWarning: record.communicationWarning } : {}),
     ...(record.ambiguousMeetings?.length ? { ambiguousMeetings: record.ambiguousMeetings } : {}),
     draftKey: record.draftKey,
     sourceId: record.sourceId,
@@ -158,7 +160,7 @@ export function savedAgendaDraftsOutsideUpcoming<T extends AgendaDraftRecord>(re
 
 /** Source Meeting ids that are no longer in local meeting history. */
 export function missingAgendaSourceIds(record: AgendaDraftRecord, knownMeetingIds: ReadonlySet<string>): string[] {
-  return record.sources.filter((source) => !knownMeetingIds.has(source.id)).map((source) => source.id)
+  return record.sources.filter((source) => !source.kind && !knownMeetingIds.has(source.id)).map((source) => source.id)
 }
 
 export function agendaItemIsValid(value: unknown): value is AgendaItem {
@@ -182,7 +184,7 @@ function textValue(value: unknown): string | null {
 export function isAgendaSourceRecord(value: unknown): value is AgendaSourceRecord {
   if (!value || typeof value !== 'object') return false
   const source = value as Record<string, unknown>
-  return nonEmptyId(source.id) && typeof source.title === 'string' && typeof source.startedAt === 'string'
+  return nonEmptyId(source.id) && typeof source.title === 'string' && typeof source.startedAt === 'string' && (source.kind === undefined || source.kind === 'gmail' || source.kind === 'slack')
 }
 
 function nonEmptyId(value: unknown): boolean {
@@ -232,6 +234,7 @@ function migratedAgendaDraftRecord(value: unknown): AgendaDraftRecord | null {
     items, sources,
     historyIncomplete: Boolean(record.historyIncomplete),
     ...(typeof record.historyWarning === 'string' ? { historyWarning: record.historyWarning } : {}),
+    ...(typeof record.communicationWarning === 'string' ? { communicationWarning: record.communicationWarning } : {}),
     ...(ambiguousMeetings ? { ambiguousMeetings } : {}),
     generatedAt: String(record.generatedAt), updatedAt: String(record.updatedAt),
     model: String(record.model), reasoningEffort: String(record.reasoningEffort), revision: record.revision as number,

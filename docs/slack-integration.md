@@ -1,6 +1,6 @@
 # Slack integration
 
-Status: direct desktop sign-in, a destination picker, and confirmed message sending. Gappd uses Slack's PKCE public-client flow from the Electron main process with a registered macOS `gappd://` callback. There is no server, no client secret, and no proxy. The user can send one plain-text message at a time to a validated destination after reviewing it and confirming it in a local scrolling confirmation window. A live Slack send has not been run yet (see Open items).
+Status: direct desktop sign-in, a destination picker, confirmed message sending, and read-only agenda context. Gappd uses Slack's PKCE public-client flow from the Electron main process with a registered macOS `gappd://` callback. There is no server, no client secret, and no proxy. The user can send one plain-text message at a time to a validated destination after reviewing it and confirming it in a local scrolling confirmation window. A live Slack send has not been run yet (see Open items).
 
 ## Components
 
@@ -22,7 +22,7 @@ Status: direct desktop sign-in, a destination picker, and confirmed message send
 | App | `A0C1C2FVC78` in workspace `T0C19BLLJBX` (gappd) |
 | Client ID | `12043394698405.12046083998246` (public; app-owned default in `service-config.ts`, overridable with `GAPPD_SLACK_OAUTH_CLIENT_ID`) |
 | Redirect URL | `gappd://slack/oauth/callback` (exact match; registered in the macOS app bundle) |
-| User scopes | `chat:write`, `channels:read`, `groups:read`, `im:read`, `mpim:read`, `users:read` |
+| User scopes | `chat:write`, `channels:read`, `groups:read`, `im:read`, `mpim:read`, `users:read`, `users:read.email`, `channels:history`, `groups:history`, `im:history` |
 | Bot scopes | none; Slack rejects bot scopes for desktop redirects |
 | PKCE | enabled |
 | Token rotation | enabled; custom desktop redirects always receive rotating tokens |
@@ -111,9 +111,9 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 ## Scopes
 
 - `chat:write` (user) posts a confirmed message as the authorizing user.
-- `channels:read`, `groups:read`, `im:read`, and `mpim:read` list joined channels and existing conversations. `users:read` supplies readable DM names; no email permission is requested.
+- `channels:read`, `groups:read`, `im:read`, and `mpim:read` list joined channels and existing conversations. `users:read` supplies readable DM names. `users:read.email` matches Calendar invitees to Slack users; history scopes read existing invitee DMs and explicitly selected joined channels for agendas.
 - Connections made by older builds must reconnect to grant the picker scopes. A missing-scope response explains this; pasted destinations still use the existing send flow.
-- No history, search, bot, or `chat:write.public` scopes are requested.
+- No search, bot, `mpim:history`, or `chat:write.public` scopes are requested.
 - `search.messages` with `search:read` is legacy. Gappd does not request it and does not promise search eligibility.
 
 ## Send-confirmation boundary
@@ -131,7 +131,7 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 | 2 (this change) | Send one reviewed, confirmed plain-text message: destination validation, reviewed-account binding, `chat.postMessage`, local scrolling confirmation, friendly errors | `slack-destination.ts`, `slack-message.ts`, `slack-send.ts`, `slack-connection.ts`, `slack-service.ts`, IPC group, panel composer |
 | 3 | Destination picker with paginated membership reads, DM names, and re-authorization for added scopes | `slack-destinations.ts`, `slack-destination-picker.tsx`, manifest, OAuth scopes, IPC |
 | 4 | Slack `auth.revoke` on disconnect and user display names (workspace names already shown) | `slack-service.ts`, manifest |
-| 5 | Optional read features with explicit scopes; no search promises | separate design |
+| 5 | Agenda context from existing invitee DMs and selected joined channels; no search promises | `slack-agenda.ts`, `agenda-communication.ts`, `meeting-agenda.ts` |
 
 ## Local testing strategy
 
@@ -141,7 +141,15 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 - Checks: `npm --prefix desktop run typecheck`, `npm --prefix desktop run build:electron`, `npm --prefix desktop run build:renderer`.
 - Live manual test: configure the app Redirect URL and scopes in the Slack portal. The client ID is already the app default; `GAPPD_SLACK_OAUTH_CLIENT_ID` only overrides it. Run the desktop app and use Settings → Slack → Connect. Sending needs a separate live test with an approved workspace and destination; none has been run yet.
 
+## Agenda reads
+
+Agenda generation uses the configured Local AI or Installed Codex provider for Meeting, Gmail, and Slack evidence. It looks back 30 days, before the event/current time. Slack resolves invitee emails with `users.lookupByEmail`, discovers existing DMs with `users.conversations`, and validates up to three selected channel IDs with `conversations.info`. It never opens DMs or joins channels. It reads up to 15 recent messages per conversation and the first 15 messages in retrieved threads, then retains the 16 newest Slack messages. Coverage warnings explicitly exclude older thread roots, older messages, and attachments; status must be confirmed. Limits and failed reads never silently produce a partial draft.
+
+Slack 429 responses allow one retry per request, honoring a valid Retry-After of at most 64 seconds, with a total wait budget of ten minutes. Missing scopes instruct the user to reconnect. Saved drafts retain source labels and exact quotes, not complete conversations. Selected message text is sent to the configured AI provider through stdin, never process arguments.
+
 ## Open items
+
+- The four agenda-read scopes must be added to the Slack app portal before users reconnect. The repository manifest is updated; the portal and production read consent have not been changed or tested by this work.
 
 - Portal check for the destination-picker change: the exact `gappd://slack/oauth/callback` redirect, PKCE, Token Rotation, and Public Distribution were already enabled. The five destination/member read scopes were saved and verified on OAuth & Permissions. External-workspace installation remains a live acceptance check.
 - Slack's distribution checklist rejects HTTP redirects, including localhost. Remove the old HTTP redirect only after the desktop-callback build is available. Old builds that still use localhost will then need an update.

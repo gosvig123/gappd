@@ -27,7 +27,7 @@ export type AgendaPort = {
   load(draftKey: string): Promise<SavedAgendaDraft | null>
   save(input: AgendaDraftSaveInput): Promise<AgendaDraftWriteResult>
   remove(draftKey: string): Promise<{ removed: boolean; error?: string }>
-  generate(input: { sourceId: string; expectedRevision: number }): Promise<GeneratedAgenda>
+  generate(input: { sourceId: string; expectedRevision: number; slackChannelIds?: string[] }): Promise<GeneratedAgenda>
   now(): string
 }
 
@@ -113,7 +113,7 @@ export class AgendaDraftSession {
     this.update({ draft: null, topics: [], saveState: 'clean', error: '', loading: false, canGenerate: false })
   }
 
-  async generate(): Promise<void> {
+  async generate(slackChannelIds?: string[]): Promise<void> {
     if (!this.loaded || this.generating || this.state.generating || this.state.saveState === 'conflict') return
     const sessionVersion = this.sessionVersion
     const generationVersion = ++this.generationVersion
@@ -121,7 +121,7 @@ export class AgendaDraftSession {
     this.generating = true
     this.update({ generating: true, error: '' })
     try {
-      const result = await this.port.generate({ sourceId: this.state.sourceId, expectedRevision: this.revision })
+      const result = await this.port.generate({ sourceId: this.state.sourceId, expectedRevision: this.revision, ...(slackChannelIds?.length ? { slackChannelIds } : {}) })
       if (this.stopped || sessionVersion !== this.sessionVersion || editVersion !== this.editVersion) return
       this.applyGeneration(result)
     } catch (cause) {

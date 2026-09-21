@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -24,6 +27,7 @@ func appAgendaCmd() *cobra.Command {
 	cmd.SilenceErrors = true
 	cmd.Flags().StringVar(&input.Title, "title", "", "Upcoming event title")
 	cmd.Flags().StringVar(&input.MeetingIDs, "meeting-ids", "", "Matched local Meeting IDs")
+	cmd.Flags().StringVar(&input.CommunicationInput, "communication-input", "", "Read communication evidence from stdin (-)")
 	return cmd
 }
 
@@ -33,11 +37,45 @@ func runAgenda(input appprotocol.AgendaInput) error {
 		return err
 	}
 	defer store.Close()
-	sources, err := agendaSources(store, strings.Split(input.MeetingIDs, ","))
-	if err != nil {
-		return err
+	var sources []ai.AgendaSource
+	if input.MeetingIDs != "" || input.CommunicationInput == "" {
+		sources, err = agendaSources(store, strings.Split(input.MeetingIDs, ","))
+		if err != nil {
+			return err
+		}
+	}
+	if input.CommunicationInput != "" {
+		if input.CommunicationInput != "-" {
+			return fmt.Errorf("agenda: communication input must be stdin (-)")
+		}
+		communication, err := readAgendaCommunication(os.Stdin)
+		if err != nil {
+			return err
+		}
+		sources = append(sources, communication...)
 	}
 	return completeAgenda(cfg.AI, input.Title, sources)
+}
+
+func readAgendaCommunication(reader io.Reader) ([]ai.AgendaSource, error) {
+	const maxJSONBytes = 4 * ai.MaxAgendaHistoryBytes
+	raw, err := io.ReadAll(io.LimitReader(reader, maxJSONBytes+1))
+	if err != nil || len(raw) > maxJSONBytes {
+		return nil, fmt.Errorf("agenda: communication input exceeds the processing limit")
+	}
+	var sources []ai.AgendaSource
+	if json.Unmarshal(raw, &sources) != nil || len(sources) > 32 {
+		return nil, fmt.Errorf("agenda: invalid communication evidence")
+	}
+	for _, source := range sources {
+		if (!strings.HasPrefix(source.ID, "gmail:") && !strings.HasPrefix(source.ID, "slack:")) || strings.TrimSpace(source.Text) == "" {
+			return nil, fmt.Errorf("agenda: invalid communication evidence")
+		}
+		if _, err := time.Parse(time.RFC3339Nano, source.StartedAt); err != nil {
+			return nil, fmt.Errorf("agenda: invalid communication date")
+		}
+	}
+	return sources, nil
 }
 
 func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource) error {

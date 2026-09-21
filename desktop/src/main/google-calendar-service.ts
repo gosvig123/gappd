@@ -1,4 +1,5 @@
 import { requestCommand } from './app-protocol'
+import { gmailAgenda } from './gmail-agenda'
 import { historicalCalendarRanges } from './calendar-history-ranges'
 import { shell } from 'electron'
 import type { CalendarSnapshot } from '../shared/calendar-contract'
@@ -19,8 +20,12 @@ export function googleCalendarSnapshot(): Promise<CalendarSnapshot> {
   return calendarService().snapshot()
 }
 
-export function connectGoogleCalendar(): Promise<CalendarSnapshot> {
-  return calendarService().connect()
+export function connectGoogleCalendar(includeGmail = false): Promise<CalendarSnapshot> {
+  return calendarService().connect(includeGmail)
+}
+
+export function googleAgendaCommunication(connectionId: string, emails: string[], before: number) {
+  return calendarService().agendaCommunication(connectionId, (token, subject) => gmailAgenda(token, subject, emails, before))
 }
 
 export function syncGoogleCalendar(connectionId: string): Promise<CalendarSnapshot> {

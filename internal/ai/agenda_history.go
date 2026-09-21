@@ -13,7 +13,7 @@ const agendaRequestBytes = 24000
 const MaxAgendaHistoryBytes = 576000
 
 func agendaLimit() error {
-	return &AgendaCapacityError{Reason: "history exceeds 576000 transcript bytes, 46 serialized sections, or 24000 model-input content bytes"}
+	return &AgendaCapacityError{Reason: "history exceeds 44 sources, 576000 evidence bytes, 46 serialized sections, or 24000 model-input content bytes"}
 }
 
 func prepareAgendaSources(sources []AgendaSource) ([]AgendaSource, error) {
@@ -29,7 +29,7 @@ func prepareAgendaSources(sources []AgendaSource) ([]AgendaSource, error) {
 		}
 		seen[source.ID] = true
 	}
-	if len(sources) == 0 || len(sources) > 12 || total > MaxAgendaHistoryBytes {
+	if len(sources) == 0 || len(sources) > 44 || total > MaxAgendaHistoryBytes {
 		return nil, agendaLimit()
 	}
 	result := append([]AgendaSource(nil), sources...)

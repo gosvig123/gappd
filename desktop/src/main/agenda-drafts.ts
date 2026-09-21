@@ -74,6 +74,7 @@ function recordFor(input: { event: CalendarEventSummary; draft: MeetingAgendaDra
     sources: draft.sources,
     historyIncomplete: Boolean(draft.historyIncomplete),
     ...(draft.historyWarning ? { historyWarning: draft.historyWarning } : {}),
+    ...(draft.communicationWarning ? { communicationWarning: draft.communicationWarning } : {}),
     ...(draft.ambiguousMeetings?.length ? { ambiguousMeetings: draft.ambiguousMeetings } : {}),
     generatedAt,
     updatedAt: generatedAt,

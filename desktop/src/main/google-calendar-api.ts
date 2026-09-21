@@ -1,4 +1,6 @@
 import type { CalendarRange } from './calendar-history-ranges'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { GMAIL_READ_SCOPE } from './agenda-communication.ts'
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { mapGoogleEvent, type GoogleEventItem } from './google-calendar-model.ts'
@@ -49,8 +51,10 @@ export class GoogleCalendarApi {
     return Boolean(this.clientId && this.tokenRequester)
   }
 
-  async authorize(): Promise<GoogleAuthorizedAccount> {
-    const tokens = await authorizeOAuth(this.oauthConfig(), {
+  async authorize(includeGmail = false): Promise<GoogleAuthorizedAccount> {
+    const config = this.oauthConfig()
+    if (includeGmail) config.scopes = [...config.scopes, GMAIL_READ_SCOPE]
+    const tokens = await authorizeOAuth(config, {
       openExternal: this.openExternal,
       tokenRequester: this.requiredTokenRequester(),
     })
@@ -58,12 +62,16 @@ export class GoogleCalendarApi {
   }
 
   async sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<GoogleSyncResult> {
-    const currentTokens = needsTokenRefresh(tokens, this.now())
-      ? await refreshOAuthToken(this.oauthConfig(), tokens, this.fetcher, this.now, this.requiredTokenRequester())
-      : tokens
+    const currentTokens = await this.refresh(tokens)
     const events = await this.fetchEvents(connectionId, email, currentTokens)
     const history = await this.fetchHistory(connectionId, email, currentTokens)
     return { tokens: currentTokens, events, ...history }
+  }
+
+  async refresh(tokens: OAuthTokenSet): Promise<OAuthTokenSet> {
+    if (!needsTokenRefresh(tokens, this.now())) return tokens
+    const refreshed = await refreshOAuthToken(this.oauthConfig(), tokens, this.fetcher, this.now, this.requiredTokenRequester())
+    return { ...refreshed, scope: refreshed.scope ?? tokens.scope }
   }
 
   async revoke(tokens: OAuthTokenSet): Promise<void> {

@@ -9,7 +9,7 @@ export type GoogleCalendarController = {
   loading: boolean
   busy: string | null
   error: string | null
-  connect(): Promise<void>
+  connect(includeGmail?: boolean): Promise<void>
   sync(connectionId: string): Promise<void>
   syncAll(): Promise<void>
   disconnect(connectionId: string): Promise<void>
@@ -31,7 +31,7 @@ export function useGoogleCalendar(): GoogleCalendarController {
     finally { setBusy(null) }
   }, [])
 
-  const connect = useCallback(() => run(CONNECT_OPERATION, () => window.gappd.googleCalendar.connect()), [run])
+  const connect = useCallback((includeGmail = false) => run(CONNECT_OPERATION, () => window.gappd.googleCalendar.connect(includeGmail)), [run])
   const sync = useCallback((id: string) => run(`sync:${id}`, () => window.gappd.googleCalendar.sync(id)), [run])
   const disconnect = useCallback((id: string) => run(`disconnect:${id}`, () => window.gappd.googleCalendar.disconnect(id)), [run])
   const syncAll = useCallback(() => run(SYNC_ALL_OPERATION, () => refreshAll(snapshot, setSnapshot)), [run, snapshot])

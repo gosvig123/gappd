@@ -71,7 +71,7 @@ const IPC_HANDLERS: MainHandlers = {
     generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
-    connect: () => connectGoogleCalendar(),
+    connect: (_event, includeGmail) => connectGoogleCalendar(includeGmail),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },

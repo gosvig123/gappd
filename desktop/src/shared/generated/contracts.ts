@@ -20,6 +20,7 @@ export type AgendaHistoryMeeting = {
 export type AgendaInput = {
   title: string
   meetingIds: string
+  communicationInput?: string
 }
 
 export type AgendaResponse = {

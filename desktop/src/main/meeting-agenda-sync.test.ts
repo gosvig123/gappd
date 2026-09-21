@@ -30,7 +30,9 @@ function fixture(service: Record<string, unknown> = {}) {
   const persistCalls: Array<{ event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }> = []
   const module = loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
     '../shared/calendar-reconciliation': reconciliation, '../shared/meeting-agenda': agenda,
-    './google-calendar-service': { googleCalendarPendingSyncIds: () => f.pending, googleCalendarSnapshot: async () => snapshot, syncGoogleCalendar: async (id: string) => { calls.push(id); await f.sync(id) }, ...service },
+    './slack-service': { slackAgendaCommunication: async () => ({ sources: [] }) },
+    './slack-agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
+    './google-calendar-service': { googleAgendaCommunication: async () => ({ sources: [] }), googleCalendarPendingSyncIds: () => f.pending, googleCalendarSnapshot: async () => snapshot, syncGoogleCalendar: async (id: string) => { calls.push(id); await f.sync(id) }, ...service },
     './participant-calendar': { savedMeetingCalendarContexts: async () => contexts },
     './app-protocol': { requestCommand: async (id: string) => id === 'meetings.agendaHistory' ? { meetings } : { items: [], generation: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' } } },
     './summary-runtime': { usingSummaryRuntime: async (work: () => Promise<unknown>) => work() },
@@ -171,7 +173,7 @@ test('generated agendas persist with the trusted event identity and generation s
   assert.equal(f.persistCalls[0].event.sourceId, 'next')
   assert.equal(f.persistCalls[0].generation?.model, 'gpt-5.6-terra')
   assert.equal(f.persistCalls[0].generation?.reasoningEffort, 'medium')
-  assert.deepEqual((f.persistCalls[0].draft as { sources: Array<{ id: string }> }).sources.map(source => source.id), ['past'])
+  assert.deepEqual(Array.from((f.persistCalls[0].draft as { sources: Array<{ id: string }> }).sources, source => source.id), ['past'])
 })
 
 test('failed generation never reaches persistence', async () => {

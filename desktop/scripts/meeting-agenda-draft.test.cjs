@@ -26,8 +26,8 @@ test('agenda shows idle, loading and recoverable model errors', () => {
   assert.match(error, /Open Settings/)
 })
 
-test('agenda distinguishes no matching Meetings from no supported topics', () => {
-  assert.match(render({ draft: { items: [], sources: [] } }), /No previous Meetings matched/)
+test('agenda distinguishes no matching evidence from no supported topics', () => {
+  assert.match(render({ draft: { items: [], sources: [] } }), /No Meeting or communication evidence matched/)
   assert.match(render({ draft: { items: [], sources: [source] } }), /No supported follow-up topics/)
 })
 
@@ -38,7 +38,7 @@ test('agenda shows editable grounded draft and source navigation without sharing
   assert.match(html, /Has the proposal been sent\?/)
   assert.match(html, /Open Meeting: Planning source/)
   assert.match(html, /Send the proposal tomorrow/)
-  assert.match(html, /Nothing is shared or added to Calendar/)
+  assert.match(html, /The draft is not sent or added to Calendar/)
   assert.match(html, /Confirm current status/)
 })
 
@@ -106,6 +106,15 @@ test('Calendar sync busy copy and distinct residual warnings retain editable top
     assert.match(render({ draft: { ...draft, sources: [], items: [] } }), new RegExp(historyWarning))
     assert.match(render({ draft: { ...draft, items: [] } }), new RegExp(historyWarning))
   }
+})
+
+test('communication citations never navigate to a missing Meeting and warnings remain visible', () => {
+  const draft = { communicationWarning: 'Some replies were not read.', sources: [{ id: 'gmail:account:aa', kind: 'gmail', title: 'Gmail: Launch', startedAt: '2026-09-09' }], items: [{ topic: 'Confirm launch?', sourceId: 'gmail:account:aa', quote: 'Please confirm the launch review date.' }] }
+  const html = render({ draft, knownMeetingIds: new Set() })
+  assert.match(html, /Source: Gmail: Launch/)
+  assert.match(html, /Some replies were not read/)
+  assert.doesNotMatch(html, /Open Meeting|Source Meeting removed/)
+  assert.match(html, /Generate again/)
 })
 
 test('saved agenda states, unavailable regeneration and removed sources stay visible', () => {

@@ -7,11 +7,12 @@ import { deferred, loadSourceModule } from './source-module-test-helper.ts'
 
 function fixture(provider: string) {
   const calls: string[] = []
+  const inputs: Array<{ input: unknown; stdin?: string }> = []
   const generation = deferred<{ items: unknown[] }>()
-  const requestCommand = async (id: string) => {
+  const requestCommand = async (id: string, input?: unknown, _env?: unknown, _signal?: unknown, stdin?: string) => {
     if (id === 'config.show') return { ai: { provider } }
     if (id === 'meetings.agendaHistory') return { meetings: [{ id: 'previous', emails: [] }] }
-    calls.push('generate'); return generation.promise
+    calls.push('generate'); inputs.push({ input, stdin }); return generation.promise
   }
   const runtime = loadSourceModule(new URL('./summary-runtime.ts', import.meta.url), {
     './app-protocol': { requestCommand },
@@ -20,17 +21,19 @@ function fixture(provider: string) {
       try { return await work() } finally { calls.push('release') }
     } } },
   })
-  return { calls, generation, requestCommand, runtime }
+  return { calls, generation, requestCommand, runtime, inputs }
 }
 
 const defaultPersist = async (input: { draft: unknown }) => ({ draft: input.draft, saved: true, revision: 1, generatedAt: '2026-01-01T00:00:00.000Z', model: 'gpt-5.6-terra', reasoningEffort: 'medium' })
 
-function loadAgenda(f: ReturnType<typeof fixture>, persistGeneratedAgenda: (input: { draft: unknown }) => Promise<unknown> = defaultPersist) {
+function loadAgenda(f: ReturnType<typeof fixture>, persistGeneratedAgenda: (input: { draft: unknown }) => Promise<unknown> = defaultPersist, communicationOnly = false) {
   return loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
     '../shared/calendar-reconciliation': calendarReconciliation,
-    '../shared/meeting-agenda': { calendarEventIsUpcoming: () => true, inviteeEmails: () => ['partner@example.com'], matchAgendaHistory: () => [{ id: 'previous' }] },
+    '../shared/meeting-agenda': { calendarEventIsUpcoming: () => true, inviteeEmails: () => ['partner@example.com'], matchAgendaHistory: () => communicationOnly ? [] : [{ id: 'previous' }] },
     './app-protocol': { requestCommand: f.requestCommand },
-    './google-calendar-service': { googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
+    './slack-service': { slackAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'slack:team:dm:123', kind: 'slack', title: 'Slack DM', startedAt: '2026-01-02T00:00:00Z', text: 'The launch review is completed.' }] : [] }) },
+    './slack-agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
+    './google-calendar-service': { googleAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'gmail:account:aa', kind: 'gmail', title: 'Gmail: Launch', startedAt: '2026-01-01T00:00:00Z', text: 'Please confirm the launch review date.' }] : [] }), googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
     './participant-calendar': { savedMeetingCalendarContexts: async () => ({}) },
     './summary-runtime': f.runtime,
     './agenda-drafts': { persistGeneratedAgenda },
@@ -72,6 +75,21 @@ test('Codex agenda failures preserve the Saved Agenda draft and model metadata',
     assert.equal(writes, 0)
     assert.deepEqual(saved, previous)
     assert.deepEqual(f.calls, ['generate'])
+  }
+})
+
+test('both providers receive Gmail and Slack over stdin without any matched Meeting', async () => {
+  for (const provider of ['llamacpp', 'codex_exec']) {
+    const f = fixture(provider)
+    f.generation.resolve({ items: [] })
+    const result = await loadAgenda(f, defaultPersist, true)({ sourceId: 'next', expectedRevision: 0 })
+    assert.equal(f.inputs.length, 1)
+    assert.equal((f.inputs[0].input as { meetingIds: string }).meetingIds, '')
+    const evidence = JSON.parse(f.inputs[0].stdin!)
+    assert.deepEqual(evidence.map((source: { kind: string }) => source.kind), ['gmail', 'slack'])
+    assert.match(evidence[1].text, /completed/)
+    assert.ok(result.draft.sources.every((source: { text?: string }) => source.text === undefined))
+    assert.deepEqual(f.calls, provider === 'llamacpp' ? ['acquire', 'generate', 'release'] : ['generate'])
   }
 })
 

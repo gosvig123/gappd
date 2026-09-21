@@ -62,7 +62,7 @@ type AppCommandDefinitions = { [K in keyof AppCommandInput]: CommandDefinition<A
 
 export const APP_COMMANDS = {
   'meetings.agendaHistory': { mode: 'request', args: (_input: EmptyInput) => ['app', 'meetings', 'agenda-history', '--json'], env: [], terminal: [] },
-  'meetings.agenda': { mode: 'request', args: (input: AgendaInput) => ['app', 'meetings', 'agenda', '--title', String(input.title), '--meeting-ids', String(input.meetingIds), '--json'], env: [], terminal: [] },
+  'meetings.agenda': { mode: 'request', args: (input: AgendaInput) => ['app', 'meetings', 'agenda', '--title', String(input.title), '--meeting-ids', String(input.meetingIds), ...(input.communicationInput === undefined ? [] : ['--communication-input', String(input.communicationInput)]), '--json'], env: [], terminal: [] },
   'meetings.people': { mode: 'request', args: (_input: EmptyInput) => ['app', 'meetings', 'people', '--json'], env: [], terminal: [] },
   'meetings.assignSpeaker': { mode: 'request', args: (input: AssignSpeakerInput) => ['app', 'meetings', 'assign-speaker', String(input.id), '--speaker-key', String(input.speakerKey), ...(input.personId === undefined ? [] : ['--person-id', String(input.personId)]), ...(input.name === undefined ? [] : ['--name', String(input.name)]), ...(input.email === undefined ? [] : ['--email', String(input.email)]), '--json'], env: [], terminal: [] },
   'meetings.speakerClip': { mode: 'request', args: (input: SpeakerClipInput) => ['app', 'meetings', 'speaker-clip', String(input.id), '--speaker-key', String(input.speakerKey), ...(input.index === undefined ? [] : ['--index', String(input.index)]), '--json'], env: [], terminal: [] },

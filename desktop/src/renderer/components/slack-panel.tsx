@@ -39,9 +39,9 @@ function statusTone(slack: SlackConnectionController, expired: boolean): string 
 
 function connectionNote(slack: SlackConnectionController, expired: boolean): string {
   if (!slack.status?.configured) return 'Slack is not configured for this build.'
-  if (!slack.status.connected) return 'Gappd opens Slack in your browser to request permission to send confirmed messages and list channels, conversations, and member names. Message history is not read. Tokens are encrypted on this Mac.'
+  if (!slack.status.connected) return 'Gappd opens Slack in your browser to request permission to send confirmed messages and list channels, conversations, and member names. Agenda generation can read existing invitee DMs and channels you select, including member emails for matching. The configured AI provider processes selected messages. Tokens are encrypted on this Mac.'
   if (expired) return 'The Slack authorization expired. Reconnect Slack to continue.'
-  return `Connected to ${slack.status.teamName || slack.status.teamId}. Gappd sends a message only after you review it and confirm it.`
+  return `Connected to ${slack.status.teamName || slack.status.teamId}. Agenda generation reads existing invitee DMs and selected channels with the configured AI provider. Reconnect to grant the new read permissions. Gappd sends a message only after you review it and confirm it.`
 }
 
 function connectLabel(slack: SlackConnectionController, connected: boolean): string {

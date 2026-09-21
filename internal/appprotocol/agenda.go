@@ -3,8 +3,9 @@ package appprotocol
 import "github.com/gappd-dev/gappd/internal/ai"
 
 type AgendaInput struct {
-	Title      string `json:"title"`
-	MeetingIDs string `json:"meetingIds"`
+	Title              string `json:"title"`
+	MeetingIDs         string `json:"meetingIds"`
+	CommunicationInput string `json:"communicationInput,omitempty"`
 }
 
 type AgendaResponse struct {

@@ -7,6 +7,8 @@ import { confirmSlackSend } from './slack-confirmation'
 import type { SlackTokenSet } from './slack-oauth'
 import { SlackSendService } from './slack-send'
 import { listSlackDestinations } from './slack-destinations'
+import { slackAgenda, agendaSlackChannels } from './slack-agenda'
+import type { AgendaCommunication } from './agenda-communication'
 
 const CONNECTION_STORE_FILE = 'slack-connection.enc'
 let instance: SlackConnection | null = null
@@ -26,6 +28,16 @@ export async function disconnectSlack(): Promise<SlackConnectionStatus> {
   const active = requireSlackConnection()
   await active.disconnect()
   return describeSlackConnection(active)
+}
+
+export async function slackAgendaCommunication(emails: string[], selected: unknown, before: number): Promise<AgendaCommunication> {
+  const channels = agendaSlackChannels(selected)
+  const active = connection()
+  if (!active) {
+    if (channels.length) throw new Error('Slack is not configured for this build.')
+    return { sources: [] }
+  }
+  return slackAgenda(active, emails, channels, before)
 }
 
 export function slackDestinations(cursor: unknown = '') {

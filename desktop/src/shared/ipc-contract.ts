@@ -21,7 +21,7 @@ export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutab
 export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
 export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
 export type CodexModelCatalog = { models: CodexModelOption[]; defaultModel: string; defaultReasoningEffort: string }
-export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
+export type GenerateAgendaInput = { sourceId: string; expectedRevision: number; slackChannelIds?: string[] }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -72,7 +72,7 @@ export type IpcInvokeContract = {
     generateAgenda: OperationSpec<[input: GenerateAgendaInput], GeneratedAgenda>
     snapshot: OperationSpec<[], CalendarSnapshot>
     contacts: OperationSpec<[], CalendarParticipant[]>
-    connect: OperationSpec<[], CalendarSnapshot>
+    connect: OperationSpec<[includeGmail?: boolean], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
   }
