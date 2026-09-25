@@ -1,4 +1,4 @@
-import type { AgendaCommunication, CommunicationSource } from './agenda-communication'
+import type { AgendaCommunication, CommunicationPeriod, CommunicationSource } from './agenda-communication'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { communicationEmails, communicationWindow, communicationJSON } from './agenda-communication.ts'
 
@@ -7,7 +7,7 @@ type Message = { id?: string; internalDate?: string; payload?: Part }
 const LIMIT = 30
 
 /** Reads messages only. No attachments, remote HTML resources, labels, or read-state changes. */
-export async function gmailAgenda(token: string, accountId: string, emails: string[], before: number, fetcher: typeof fetch = fetch): Promise<AgendaCommunication> {
+export async function gmailAgenda(token: string, accountId: string, emails: string[], before: CommunicationPeriod, fetcher: typeof fetch = fetch): Promise<AgendaCommunication> {
   const invitees = communicationEmails(emails)
   if (!invitees.length) return { sources: [] }
   const { oldest, latest } = communicationWindow(before)

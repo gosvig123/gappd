@@ -1,5 +1,6 @@
 import { requestCommand } from './app-protocol'
 import { gmailAgenda } from './gmail-agenda'
+import type { CommunicationPeriod } from './agenda-communication'
 import { historicalCalendarRanges } from './calendar-history-ranges'
 import { shell } from 'electron'
 import type { CalendarSnapshot } from '../shared/calendar-contract'
@@ -24,7 +25,7 @@ export function connectGoogleCalendar(includeGmail = false): Promise<CalendarSna
   return calendarService().connect(includeGmail)
 }
 
-export function googleAgendaCommunication(connectionId: string, emails: string[], before: number) {
+export function googleAgendaCommunication(connectionId: string, emails: string[], before: CommunicationPeriod) {
   return calendarService().agendaCommunication(connectionId, (token, subject) => gmailAgenda(token, subject, emails, before))
 }
 

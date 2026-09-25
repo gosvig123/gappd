@@ -3,6 +3,7 @@ import type { AssignSpeakerInput, SpeakerClipInput } from '../shared/participant
 import { requestCommand } from './app-protocol'
 import { requestDrains } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
+import { forgetMeetingEnrichment } from './meeting-enrichment'
 
 export async function getDevices(): Promise<Device[]> {
   const result = await requestCommand('devices.list', {})
@@ -27,7 +28,9 @@ export async function retryDiarization(id: string): Promise<MeetingDetail> {
 
 export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
   const result = await requestCommand('meetings.delete', { id })
-  await forgetMeetingCalendar(id).catch((error) => { result.artifactWarning = [result.artifactWarning, String(error)].filter(Boolean).join(' ') })
+  for (const forget of [forgetMeetingCalendar, forgetMeetingEnrichment]) {
+    await forget(id).catch((error) => { result.artifactWarning = [result.artifactWarning, String(error)].filter(Boolean).join(' ') })
+  }
   return result
 }
 

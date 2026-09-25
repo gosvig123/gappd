@@ -3,6 +3,7 @@ import type { DemoUploadStatus } from './demo-upload-contract'
 import type { CloudAuthStatus } from './cloud-auth-contract'
 import type { MeetingUploadStatus } from './meeting-upload-contract'
 import type { MeetingAgendaDraft } from './meeting-agenda'
+import type { MeetingEnrichment } from './meeting-enrichment'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
@@ -46,6 +47,8 @@ export type IpcInvokeContract = {
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
+    enrichment: OperationSpec<[id: string], MeetingEnrichment | null>
+    enrich: OperationSpec<[id: string], MeetingEnrichment>
   }
   recording: {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
@@ -121,6 +124,7 @@ export const IPC_OPERATIONS = {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
     people: 'meetings:people', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
+    enrichment: 'meetings:enrichment', enrich: 'meetings:enrich',
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },

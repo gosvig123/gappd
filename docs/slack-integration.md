@@ -147,6 +147,10 @@ Agenda generation uses the configured Local AI or Installed Codex provider for M
 
 Slack 429 responses allow one retry per request, honoring a valid Retry-After of at most 64 seconds, with a total wait budget of ten minutes. Missing scopes instruct the user to reconnect. Saved drafts retain source labels and exact quotes, not complete conversations. Selected message text is sent to the configured AI provider through stdin, never process arguments.
 
+## Meeting enrichment reads
+
+"Gmail and Slack context" on a finished Meeting reuses the agenda readers with a different window: 30 days before the Meeting starts until 7 days after it ends, capped at the current time. It uses the invitees of the Meeting's confirmed Calendar link, or of its single unambiguous overlap. It reads existing invitee DMs only, not channels, and keeps the 16 newest messages per service. `gappd app meetings enrich` receives the messages through stdin. It cuts each message to its first 3000 bytes, batches messages to fit the model input limit, and accepts only notes that cite an existing action item by number and quote a supplied message exactly. The encrypted local store keeps notes, cited source labels, and a summary fingerprint that marks the context stale when the notes change. It never keeps message bodies.
+
 ## Open items
 
 - The four agenda-read scopes must be added to the Slack app portal before users reconnect. The repository manifest is updated; the portal and production read consent have not been changed or tested by this work.

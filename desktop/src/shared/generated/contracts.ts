@@ -39,6 +39,25 @@ export type AgendaGeneration = {
   reasoningEffort?: string
 }
 
+export type EnrichInput = {
+  id: string
+  communicationInput: string
+}
+
+export type EnrichResponse = {
+  notes: EnrichmentNote[]
+  trimmed: boolean
+  generation: AgendaGeneration
+}
+
+export type EnrichmentNote = {
+  actionItem: string
+  status: string
+  note: string
+  sourceId: string
+  quote: string
+}
+
 export type PeopleResponse = {
   people: Person[]
 }

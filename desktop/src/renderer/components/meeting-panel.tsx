@@ -11,6 +11,7 @@ import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscrip
 import { artifactLine, statusLabel, type AppView } from '../lib/app-view'
 import { agendaStateForMeeting, agendaTabLabel } from '../lib/agenda-status'
 import { AgendaPane } from './agenda-tab'
+import { MeetingEnrichmentSection } from './meeting-enrichment'
 import type { MeetingTab } from './meeting-open-scope'
 import { meetingDurationLabel, meetingTimeLabel } from '../lib/meeting-grouping'
 import type { ConfirmController } from './confirm'
@@ -111,7 +112,7 @@ function copyLabelFor(tab: TabId): string {
 function SummaryPane({ view }: { view: AppView }) {
   const summary = view.selectedMeeting?.summary
   if (!summary) return <EmptyState>No notes yet. Notes are created locally after recording ends.</EmptyState>
-  return <div className="app-reading"><Markdown value={summary} /></div>
+  return <div className="app-reading"><Markdown value={summary} />{view.selectedMeeting ? <MeetingEnrichmentSection meetingId={view.selectedMeeting.id} /> : null}</div>
 }
 
 function TranscriptPane({ view, text }: { view: AppView; text: string }) {

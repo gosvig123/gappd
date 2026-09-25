@@ -8,7 +8,7 @@ import type { SlackTokenSet } from './slack-oauth'
 import { SlackSendService } from './slack-send'
 import { listSlackDestinations } from './slack-destinations'
 import { slackAgenda, agendaSlackChannels } from './slack-agenda'
-import type { AgendaCommunication } from './agenda-communication'
+import type { AgendaCommunication, CommunicationPeriod } from './agenda-communication'
 
 const CONNECTION_STORE_FILE = 'slack-connection.enc'
 let instance: SlackConnection | null = null
@@ -30,7 +30,7 @@ export async function disconnectSlack(): Promise<SlackConnectionStatus> {
   return describeSlackConnection(active)
 }
 
-export async function slackAgendaCommunication(emails: string[], selected: unknown, before: number): Promise<AgendaCommunication> {
+export async function slackAgendaCommunication(emails: string[], selected: unknown, before: CommunicationPeriod): Promise<AgendaCommunication> {
   const channels = agendaSlackChannels(selected)
   const active = connection()
   if (!active) {

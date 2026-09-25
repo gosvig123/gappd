@@ -101,3 +101,9 @@
   .app-tabs { padding-inline: var(--space-5); flex-wrap: wrap; }
   .app-panel-titles h1 { font-size: 1.3rem; }
 }
+
+.meeting-enrichment { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-border); font-size: 13px; }
+.meeting-enrichment h2 { font-size: 15px; margin: 0 0 6px; }
+.meeting-enrichment h3 { font-size: 13px; margin: 14px 0 4px; }
+.meeting-enrichment blockquote { margin: 6px 0; opacity: .75; }
+.meeting-enrichment-source { opacity: .65; font-size: 12px; }

@@ -1,6 +1,7 @@
 import { selectedFixtureUpload } from './selected-fixture-service'
 import { demoUpload } from './demo-upload-service'
 import { generateMeetingAgenda } from './meeting-agenda'
+import { enrichMeeting, loadMeetingEnrichment } from './meeting-enrichment'
 import { openPermissionsSettings } from './privacy-settings'
 import { cloudAuthStatus, setCloudAuthEnabled } from './cloud-auth-service'
 import { meetingUpload } from './meeting-upload-service'
@@ -45,6 +46,8 @@ const IPC_HANDLERS: MainHandlers = {
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
     linkCalendar: (_event, input) => linkCalendar(input),
+    enrichment: (_event, id: string) => loadMeetingEnrichment(id),
+    enrich: (_event, id: string) => enrichMeeting(id),
   },
   recording: {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),

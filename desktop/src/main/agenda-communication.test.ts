@@ -10,7 +10,9 @@ import { SlackConnection } from './slack-connection.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { GoogleCalendarServiceCore } from './google-calendar-service-core.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { GMAIL_READ_SCOPE, communicationJSON } from './agenda-communication.ts'
+import { GMAIL_READ_SCOPE, communicationJSON, communicationWindow, meetingCommunicationPeriod } from './agenda-communication.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { enrichmentEvent } from '../shared/meeting-enrichment.ts'
 import type { CalendarDocument } from './google-calendar-service-core'
 
 const now = Date.now()
@@ -144,4 +146,50 @@ test('communication errors do not expose response text; malformed addresses neve
   await assert.rejects(communicationJSON(new Response('x'.repeat(1024 * 1024 + 1))), /invalid or oversized/)
   await assert.rejects(gmailAgenda('test-token', 'account', ['guest@example.com OR anything'], now, async () => { assert.fail('must not fetch') }), /valid invitee/)
   await assert.rejects(gmailAgenda('test-token', 'account', ['guest@example.com'], now, async () => new Response('secret-token', { status: 403 })), /Gmail agenda access is unavailable/)
+})
+
+test('Meeting context reads from 30 days before the Meeting until 7 days after it, capped at now', async () => {
+  const startedAt = new Date(now - 10 * 86400_000).toISOString()
+  const endedAt = new Date(now - 10 * 86400_000 + 3600_000).toISOString()
+  const period = meetingCommunicationPeriod(startedAt, endedAt)
+  const followUp = now - 5 * 86400_000
+  await withHTTP(url => {
+    if (url.pathname.endsWith('/messages')) return { messages: [{ id: 'cc' }] }
+    return { id: 'cc', internalDate: String(followUp), payload: { mimeType: 'text/plain', headers: [{ name: 'Subject', value: 'Deck' }], body: { data: Buffer.from('I sent the deck to the client.').toString('base64url') } } }
+  }, async (fetcher, urls) => {
+    const result = await gmailAgenda('test-gmail-token', 'account', ['guest@example.com'], period, fetcher)
+    assert.equal(result.sources.length, 1, 'a follow-up after the Meeting is read')
+    const query = urls[0].searchParams.get('q')!
+    assert.match(query, new RegExp(`after:${Math.floor((Date.parse(startedAt) - 30 * 86400_000) / 1000)} `))
+    assert.match(query, new RegExp(`before:${Math.floor((Date.parse(endedAt) + 7 * 86400_000) / 1000)} `))
+  })
+  const recent = meetingCommunicationPeriod(new Date(now - 3600_000).toISOString(), new Date(now - 60_000).toISOString())
+  assert.ok(communicationWindow(recent).latest <= Math.floor(Date.now() / 1000), 'the window never reads the future')
+  assert.throws(() => meetingCommunicationPeriod('not a date'), /invalid date/)
+})
+
+test('Slack Meeting context uses the Meeting window, not the last 30 days', async () => {
+  const period = meetingCommunicationPeriod(new Date(now - 40 * 86400_000).toISOString(), new Date(now - 40 * 86400_000).toISOString())
+  await withHTTP(url => {
+    const method = url.pathname.split('/').pop()
+    if (method === 'users.lookupByEmail') return { ok: true, user: { id: 'U987654321' } }
+    if (method === 'users.conversations') return { ok: true, channels: [{ id: 'D123456789', user: 'U987654321', is_im: true }] }
+    if (method === 'conversations.history') return { ok: true, messages: [] }
+    assert.fail(`Unexpected Slack method: ${method}`)
+  }, async (fetcher, urls) => {
+    const result = await slackAgenda(slackConnection(), ['guest@example.com'], [], period, fetcher)
+    const history = urls.find(url => url.pathname.endsWith('conversations.history'))!
+    assert.equal(history.searchParams.get('oldest'), String(Math.floor(period.from / 1000)))
+    assert.equal(history.searchParams.get('latest'), String(Math.floor(period.until / 1000)))
+    assert.match(result.warning ?? '', /from the read period/)
+  })
+})
+
+test('Meeting context uses a confirmed Calendar link, or one unambiguous overlap', () => {
+  const event = (sourceId: string) => ({ sourceId, title: sourceId, start: '', end: '', connectionId: 'c', accountEmail: 'me@example.com' }) as never
+  assert.equal(enrichmentEvent({ event: event('linked'), candidates: [event('a'), event('b')] }).sourceId, 'linked')
+  assert.equal(enrichmentEvent({ candidates: [event('only')] }).sourceId, 'only')
+  assert.throws(() => enrichmentEvent({ candidates: [event('a'), event('b')] }), /several Calendar events/)
+  assert.throws(() => enrichmentEvent({ inferenceDisabled: true, candidates: [event('only')] }), /matching is off/)
+  assert.throws(() => enrichmentEvent({ candidates: [] }), /no Calendar event matches/)
 })

@@ -1,6 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import type { SlackConnection } from './slack-connection'
-import type { AgendaCommunication, CommunicationSource } from './agenda-communication'
+import type { AgendaCommunication, CommunicationPeriod, CommunicationSource } from './agenda-communication'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { communicationEmails, communicationWindow, communicationJSON } from './agenda-communication.ts'
 
@@ -17,7 +17,7 @@ export function agendaSlackChannels(value: unknown): string[] {
 }
 
 /** Reads existing DMs and selected memberships; never opens or joins a conversation. */
-export async function slackAgenda(connection: SlackConnection, emails: string[], selected: unknown, before: number, fetcher: typeof fetch = fetch): Promise<AgendaCommunication> {
+export async function slackAgenda(connection: SlackConnection, emails: string[], selected: unknown, before: CommunicationPeriod, fetcher: typeof fetch = fetch): Promise<AgendaCommunication> {
   const channels = agendaSlackChannels(selected)
   const invitees = communicationEmails(emails)
   const identity = await connection.identity()
@@ -25,9 +25,9 @@ export async function slackAgenda(connection: SlackConnection, emails: string[],
     if (channels.length) throw new Error('Connect Slack before selecting agenda channels.')
     return { sources: [] }
   }
-  const { oldest, latest } = communicationWindow(before)
+  const { oldest, latest, label } = communicationWindow(before)
   return connection.withAccessToken(identity, async (token, assertCurrent) => {
-    const warnings = new Set<string>(['Slack context uses up to 15 recent messages per conversation and 15 messages per retrieved thread from the last 30 days. Older messages, older thread roots, and attachments are not covered.'])
+    const warnings = new Set<string>([`Slack context uses up to 15 recent messages per conversation and 15 messages per retrieved thread ${label}. Older messages, older thread roots, and attachments are not covered.`])
     let waitedMs = 0
     const request = async (method: string, params: Record<string, string>, retried = false): Promise<any> => {
       assertCurrent()
