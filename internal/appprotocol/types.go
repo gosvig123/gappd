@@ -21,13 +21,14 @@ type CodexStatusResponse struct {
 }
 
 type AIConfig struct {
-	Provider        string  `json:"provider"`
-	Model           string  `json:"model"`
-	Endpoint        string  `json:"endpoint"`
-	Temperature     float64 `json:"temperature"`
-	Managed         bool    `json:"managed"`
-	CodexExecutable string  `json:"codexExecutable"`
-	CodexModel      string  `json:"codexModel"`
+	Provider             string  `json:"provider"`
+	Model                string  `json:"model"`
+	Endpoint             string  `json:"endpoint"`
+	Temperature          float64 `json:"temperature"`
+	Managed              bool    `json:"managed"`
+	CodexExecutable      string  `json:"codexExecutable"`
+	CodexModel           string  `json:"codexModel"`
+	CodexReasoningEffort string  `json:"codexReasoningEffort"`
 }
 
 type DevicesResponse struct {

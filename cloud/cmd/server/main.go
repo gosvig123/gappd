@@ -1,0 +1,114 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/gosvig123/gappd/cloud/internal/service"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+func main() {
+	if err := run(); err != nil {
+		log.Fatal("cloud startup or server failed")
+	}
+}
+
+func run() error {
+	issuer, resource := os.Getenv("CLERK_ISSUER_URL"), os.Getenv("MCP_RESOURCE_URL")
+	if !validURL(issuer, "") || !validURL(resource, "/mcp") || os.Getenv("DATABASE_URL") == "" {
+		return errors.New("invalid configuration")
+	}
+	if err := productionIdentity(issuer); err != nil {
+		return err
+	}
+	pool, err := service.OpenPool(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	writer, err := demoPool()
+	if err != nil {
+		return err
+	}
+	if writer != nil {
+		defer writer.Close()
+	}
+	return serve(issuer, resource, pool, writer)
+}
+
+func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	uploads, err := meetingPool(writer)
+	if err != nil {
+		return err
+	}
+	if uploads.Meeting != nil {
+		defer uploads.Meeting.Close()
+	}
+	// Enabling storage also exposes owned cloud copies to the read tools. It fails closed
+	// when the union view is absent, so a deploy before migration 005 cannot serve them.
+	if err := service.SetRealCopies(context.Background(), pool, uploads.Meeting != nil); err != nil {
+		return err
+	}
+	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer),
+		Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool),
+		// The reader pool cannot write, so the client list uses the writer pool. Without storage
+		// there is nothing to record, and a nil pool makes recording a no-op.
+		Clients: service.NewClientDirectory(uploads.Meeting)}
+	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
+		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
+		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
+	return server.ListenAndServe()
+}
+
+// meetingPool opens the real-copy writer only when its separate capability is explicitly on.
+func meetingPool(demo *pgxpool.Pool) (service.Uploads, error) {
+	uploads := service.Uploads{Demo: demo, ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
+	if os.Getenv("GAPPD_MEETING_STORAGE_ENABLED") != "true" {
+		return uploads, nil
+	}
+	if uploads.ClientID == "" || os.Getenv("MEETING_STORAGE_DATABASE_URL") == "" {
+		return uploads, errors.New("meeting storage configuration required")
+	}
+	pool, err := service.OpenMeetingPool(context.Background(), os.Getenv("MEETING_STORAGE_DATABASE_URL"))
+	uploads.Meeting = pool
+	return uploads, err
+}
+
+// A production deployment must not accept the shared development identity, which cannot verify
+// domains or issue credentials that a real account can be revoked from.
+func productionIdentity(issuer string) error {
+	if os.Getenv("GAPPD_PRODUCTION_MODE") != "true" {
+		return nil
+	}
+	if strings.Contains(issuer, ".clerk.accounts.dev") {
+		return errors.New("production requires a production identity issuer")
+	}
+	return nil
+}
+
+func validURL(raw, path string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil &&
+		u.Path == path && u.RawQuery == "" && u.Fragment == "" && u.RawPath == ""
+}
+
+func demoPool() (*pgxpool.Pool, error) {
+	if os.Getenv("GAPPD_SYNTHETIC_UPLOAD_ENABLED") != "true" {
+		return nil, nil
+	}
+	if os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID") == "" || os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL") == "" {
+		return nil, errors.New("demo configuration required")
+	}
+	return service.OpenDemoPool(context.Background(), os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL"))
+}

@@ -1,4 +1,3 @@
-
 export * from './generated/protocol'
 export { RECORDING_STATUSES } from './meeting-recording-workflow'
 export type { AIConfig, CaptureStatusInfo, Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, MeetingSegment, MeetingStatus, ProcessingStatusInfo } from './generated/contracts'

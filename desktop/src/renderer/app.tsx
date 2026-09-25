@@ -1,51 +1,115 @@
-import { useState } from 'react'
-import { AppHeader } from './components/app-header'
-import { ManagedRuntimeBanner } from './components/managed-runtime-banner'
-import { MeetingAnnouncements } from './components/meeting-announcements'
-import { PageSearch } from './components/page-search'
-import { PermissionBanner } from './components/permission-banner'
-import { SettingsSheet } from './components/settings-sheet'
-import { UpdateBanner } from './components/update-banner'
-import { Banner, Button } from './components/ui'
+import { useCallback, useMemo, useState } from 'react'
+import type { MeetingDetail } from '../shared/contracts'
+import type { SavedAgendaDraft } from '../shared/agenda-draft'
+import type { CalendarEventSummary } from '../shared/calendar-contract'
+import type { SavedPerson } from '../shared/participant-contract'
+import { AppShell } from './components/app-shell'
+import { useSavedDrafts, useSavedPeople } from './hooks/use-app-data'
 import { useDashboardData } from './hooks/use-dashboard-data'
+import { useGoogleCalendar } from './hooks/use-google-calendar'
 import { useManagedRuntime } from './hooks/use-managed-runtime'
+import { useMeetingDetails } from './hooks/use-meeting-details'
+import { useMeetingEvents } from './hooks/use-meeting-events'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
+import { useSlackConnection } from './hooks/use-slack-connection'
+import { useTheme, type ThemeName } from './hooks/use-theme'
 import { useUpdateStatus } from './hooks/use-update-status'
-import { DashboardView } from './routes/dashboard-view'
-import { SettingsView } from './routes/settings-view'
+import type { AppActions, AppView } from './lib/app-view'
 
 export function App() {
   const runtime = useManagedRuntime()
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const permissions = useSetupPermissions(true)
   const dashboard = useDashboardData(true)
+  const calendar = useGoogleCalendar()
+  const slack = useSlackConnection()
   const update = useUpdateStatus()
-  const recordingReady = permissions.ready
-  return <div className="app-shell"><AppHeader appReady settingsOpen={settingsOpen} updateStatus={update.status} updateBlocked={dashboard.recording.status !== 'idle'} onToggleSettings={() => setSettingsOpen((value) => !value)} onUpdatePrimary={() => void runPrimaryUpdate(update, dashboard.actions.setError)} /><main className="app-main"><DashboardApp dashboard={dashboard} update={update} runtime={runtime} permissions={permissions} recordingReady={recordingReady} /></main>{settingsOpen ? <SettingsSheet currentVersion={update.status?.currentVersion} onClose={() => setSettingsOpen(false)}><SettingsView language={dashboard.language} onLanguageChange={dashboard.actions.setLanguage} localAI={{ status: runtime.status, loading: runtime.loading, busy: runtime.busy, onRepair: () => void runtime.prepare('repair') }} developerDebugEnabled={import.meta.env.DEV} /></SettingsSheet> : null}<PageSearch /></div>
+  const [theme, setTheme] = useTheme()
+  const meetingDetails = useMeetingDetails(dashboard.meetings)
+  const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
+  const [drafts, reloadDrafts] = useSavedDrafts()
+  const people = useSavedPeople()
+  const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
+  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar })
+  const view = buildView({ dashboard, permissions, calendar, slack, update, runtime, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
+  return <AppShell view={view} />
 }
 
-function DashboardApp({ dashboard, update, runtime, permissions, recordingReady }: DashboardProps) {
-  const reportError = dashboard.actions.setError
-  return <>{runtime.status ? <ManagedRuntimeBanner snapshot={runtime.status} busy={runtime.busy} onSetup={() => void runtime.prepare('setup')} onRepair={() => void runtime.prepare('repair')} /> : null}<PermissionsSetupBanner visible={!permissions.ready} busy={permissions.state.status === 'checking'} onRequest={() => void permissions.request()} /><PermissionBanner error={dashboard.bannerError} isPermissionError={dashboard.isPermissionError} onRetry={() => void dashboard.actions.start()} onOpenSettings={() => void dashboard.actions.openPermissionsSettings()} /><StaleRecoveryBanner recovering={dashboard.recoveringStale} notice={dashboard.staleRecoveryNotice} /><UpdateBanner status={update.status} recordingStatus={dashboard.recording.status} onDownload={() => void runUpdate(update.downloadUpdate, reportError)} onInstall={() => void runUpdate(update.installAndRestart, reportError)} onOpenReleasePage={() => void runUpdate(update.openUpdatePage, reportError)} onCheckNow={() => void runUpdate(update.checkNow, reportError)} /><MeetingAnnouncements meetings={dashboard.meetings} onOpenMeeting={(id) => void dashboard.actions.loadMeeting(id)} /><DashboardView device={dashboard.device} devices={dashboard.devices} meetings={dashboard.meetings} selectedMeetingId={dashboard.selectedMeetingId} selectedMeeting={dashboard.selectedMeeting} selectedMeetingLoading={dashboard.selectedMeetingLoading} selectedMeetingError={dashboard.selectedMeetingError} transcript={dashboard.transcript} recordingStatus={dashboard.recording.status} canStart={recordingReady && dashboard.canStart} canStop={dashboard.canStop} onDeviceChange={dashboard.actions.setDevice} onStart={() => void dashboard.actions.start()} onStop={() => void dashboard.actions.stop()} onSelectMeeting={(id) => void dashboard.actions.loadMeeting(id)} onClearSelection={dashboard.actions.clearSelectedMeeting} onRetryDiarization={dashboard.actions.retryDiarization} onDeleteMeeting={dashboard.actions.deleteMeeting} /></>
+type Inputs = {
+  dashboard: ReturnType<typeof useDashboardData>
+  permissions: ReturnType<typeof useSetupPermissions>
+  calendar: ReturnType<typeof useGoogleCalendar>
+  slack: ReturnType<typeof useSlackConnection>
+  update: ReturnType<typeof useUpdateStatus>
+  runtime: ReturnType<typeof useManagedRuntime>
+  meetingDetails: Map<string, MeetingDetail>
+  meetingEvents: Map<string, CalendarEventSummary>
+  people: SavedPerson[]
+  drafts: SavedAgendaDraft[]
+  theme: ThemeName
+  dismissals: ReadonlySet<string>
+  actions: AppActions
 }
 
-type DashboardProps = { dashboard: ReturnType<typeof useDashboardData>; update: ReturnType<typeof useUpdateStatus>; runtime: ReturnType<typeof useManagedRuntime>; permissions: ReturnType<typeof useSetupPermissions>; recordingReady: boolean }
-
-function PermissionsSetupBanner({ visible, busy, onRequest }: { visible: boolean; busy: boolean; onRequest: () => void }) {
-  if (!visible) return null
-  return <Banner title="Allow recording access" actions={<Button variant="primary" onClick={onRequest} disabled={busy}>{busy ? 'Checking…' : 'Allow recording access'}</Button>}>Gappd needs microphone and screen/system audio access before your first recording.</Banner>
+function buildView(input: Inputs): AppView {
+  const { dashboard, permissions, calendar, slack, update, runtime } = input
+  return {
+    meetings: dashboard.meetings, meetingDetails: input.meetingDetails, meetingEvents: input.meetingEvents,
+    people: input.people, drafts: input.drafts,
+    selectedMeetingId: dashboard.selectedMeetingId, selectedMeeting: dashboard.selectedMeeting,
+    selectedMeetingLoading: dashboard.selectedMeetingLoading, selectedMeetingError: dashboard.selectedMeetingError,
+    transcript: dashboard.transcript,
+    devices: dashboard.devices, device: dashboard.device, recording: dashboard.recording,
+    canStart: dashboard.canStart, canStop: dashboard.canStop, bannerError: dashboard.bannerError,
+    isPermissionError: dashboard.isPermissionError,
+    recoveringStale: dashboard.recoveringStale, staleRecoveryNotice: dashboard.staleRecoveryNotice,
+    permissionsReady: permissions.ready, permissionsBusy: permissions.state.status === 'checking',
+    runtime: runtime.status, runtimeBusy: runtime.busy, runtimeLoading: runtime.loading,
+    update: update.status, calendar: calendar.snapshot, calendarController: calendar,
+    slackController: slack,
+    calendarBusy: calendar.busy, calendarError: calendar.error,
+    language: dashboard.language, theme: input.theme,
+    alertDismissals: input.dismissals, actions: input.actions,
+  }
 }
 
-function StaleRecoveryBanner({ recovering, notice }: { recovering: boolean; notice: string | null }) {
-  if (recovering) return <Banner title="Checking previous recordings">Recovering any interrupted recording in the background.</Banner>
-  return notice ? <Banner>{notice}</Banner> : null
+type ActionInputs = Pick<Inputs, 'dashboard' | 'permissions' | 'calendar' | 'update' | 'runtime'> & {
+  linkMeetingCalendar: AppActions['linkMeetingCalendar']
+  reloadDrafts: () => void
+  setDismissals: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void
+  setTheme: (theme: ThemeName) => void
 }
 
-async function runPrimaryUpdate(update: ReturnType<typeof useUpdateStatus>, reportError: (message: string) => void) {
-  if (update.status?.phase === 'downloaded') return runUpdate(update.installAndRestart, reportError)
-  if (update.status?.phase === 'available') return runUpdate(update.downloadUpdate, reportError)
+function useAppActions(input: ActionInputs): AppActions {
+  const { dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar } = input
+  return useMemo(() => ({
+    openMeeting: (id) => void dashboard.actions.loadMeeting(id),
+    closeMeeting: dashboard.actions.clearSelectedMeeting,
+    retryDiarization: dashboard.actions.retryDiarization,
+    meetingUpdated: dashboard.actions.updateMeeting,
+    deleteMeeting: dashboard.actions.deleteMeeting,
+    setDevice: dashboard.actions.setDevice,
+    start: (eventSourceId) => void dashboard.actions.start(eventSourceId),
+    stop: () => void dashboard.actions.stop(),
+    requestPermissions: () => void permissions.request(),
+    openPermissionsSettings: dashboard.actions.openPermissionsSettings,
+    setLanguage: dashboard.actions.setLanguage,
+    setupRuntime: () => void runtime.prepare('setup'),
+    repairRuntime: () => void runtime.prepare('repair'),
+    syncCalendar: (id) => calendar.sync(id),
+    syncAllCalendars: calendar.syncAll,
+    connectCalendar: calendar.connect,
+    disconnectCalendar: async (id) => { await calendar.disconnect(id); reloadDrafts() },
+    ...updateActions(update),
+    dismissAlert: (id) => setDismissals((current) => new Set([...current, id])),
+    setTheme, linkMeetingCalendar,
+  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar])
 }
 
-async function runUpdate(action: () => Promise<unknown>, reportError: (message: string) => void) {
-  try { await action() } catch (error) { reportError(error instanceof Error ? error.message : String(error)) }
+function updateActions(update: Inputs['update']) {
+  return {
+    downloadUpdate: async () => { await update.downloadUpdate() },
+    installUpdate: async () => { await update.installAndRestart() },
+    checkForUpdate: async () => { await update.checkNow() },
+    openReleasePage: async () => { await update.openUpdatePage() },
+  }
 }

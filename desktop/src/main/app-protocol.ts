@@ -1,3 +1,4 @@
+import { selectedFixtureBackendEnv } from './selected-fixture-profile'
 import { spawn } from 'node:child_process'
 import {
   APP_COMMANDS,
@@ -20,8 +21,8 @@ type CommandEnv = NodeJS.ProcessEnv
 
 const PROCESSING_TIMING_MARKER = '● Timing '
 
-export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}, signal?: AbortSignal): Promise<AppCommandOutput[ID]> {
-  const output = await runCommand(id, commandArgs(id, input), env, signal)
+export async function requestCommand<ID extends AppRequestID>(id: ID, input: AppCommandInput[ID], env: CommandEnv = {}, signal?: AbortSignal, stdin?: string): Promise<AppCommandOutput[ID]> {
+  const output = await runCommand(id, commandArgs(id, input), env, signal, stdin)
   return parseCommandOutput(id, output)
 }
 
@@ -32,17 +33,21 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), ...overrides })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), ...overrides, ...selectedFixtureBackendEnv() })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {
   return APP_COMMANDS[id].args(input as never)
 }
 
-function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal): Promise<string> {
+function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal, stdin?: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] })
     collectCommandOutput(child, resolve, reject, signal)
+    if (stdin !== undefined) {
+      child.stdin?.on('error', () => reject(new Error('Could not pass agenda evidence to the AI process. Try again.')))
+      child.stdin?.end(stdin)
+    }
   })
 }
 
@@ -64,10 +69,14 @@ function parseCommandOutput<ID extends AppRequestID>(id: ID, output: string): Ap
 function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void, signal?: AbortSignal): void {
   let stdout = ''
   let stderr = ''
+  let processError: Error | undefined
+  child.stdout?.setEncoding('utf8')
+  child.stderr?.setEncoding('utf8')
   child.stdout?.on('data', (chunk) => { stdout += chunk.toString() })
   child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
-  child.on('error', (error) => signal?.aborted ? child.once('close', () => reject(error)) : reject(error))
-  child.on('exit', (code) => {
+  child.once('error', (error) => { processError = error; if (!signal?.aborted) reject(error) })
+  child.once('close', (code) => {
+    if (processError) return reject(processError)
     if (code !== 0) return reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
     if (stderr.trim()) console.warn(stderr.trim())
     resolve(stdout)
@@ -78,6 +87,8 @@ function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id:
   let stderr = ''
   let settled = false
   const state = { buffer: '', sawEvent: false, sawTerminal: false, protocolError: null as string | null }
+  child.stdout?.setEncoding('utf8')
+  child.stderr?.setEncoding('utf8')
   child.stdout?.on('data', (chunk) => readProtocolChunk(id, state, chunk.toString(), handlers))
   child.stderr?.on('data', (chunk) => { stderr = captureStreamStderr(stderr, chunk.toString()) })
   child.once('error', (error) => {

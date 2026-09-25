@@ -68,11 +68,14 @@ type Output struct {
 	Assignments  []db.SpeakerProjectionAssignment
 	SpeakerCount int
 	Coverage     float64
+	Embeddings   []db.SpeakerEmbedding
 }
 
 type globalCluster struct {
 	centroid []float64
 	count    int
+	unclean  bool
+	evidence [][]float64
 }
 type stitchedSpan struct {
 	speaker                int
@@ -92,37 +95,6 @@ type candidate struct {
 type speakerAnchor struct {
 	centroid  []float64
 	intervals [][2]float64
-}
-
-func Transform(in Input) (Output, error) {
-	if err := validate(in); err != nil {
-		return Output{}, err
-	}
-	spans := stitch(in.Windows)
-	suppressed := make(map[int]bool)
-	if speaker := singleSpeakerConsensus(in.Windows, spans); speaker != 0 {
-		for _, span := range spans {
-			if !span.vetoOnly && span.speaker != speaker {
-				suppressed[span.speaker] = true
-			}
-		}
-	}
-	visible := make(map[int]db.VisibleSpeaker)
-	assignments, coverage := alignWithVisible(in.Phrases, spans, suppressed, visible)
-	if len(in.ProjectionGroups) > 0 {
-		groupPhrases := make([]Phrase, len(in.ProjectionGroups))
-		for i, group := range in.ProjectionGroups {
-			groupPhrases[i] = group.Phrase
-		}
-		groupAssignments, _ := alignWithVisible(groupPhrases, spans, suppressed, visible)
-		assignments = preserveGroupAssignments(assignments, in.Phrases, groupAssignments, in.ProjectionGroups)
-		coverage = assignmentCoverage(assignments, in.Phrases)
-	}
-	count := compactSpeakerLabels(assignments)
-	if in.HasMicrophoneSpeech {
-		count++
-	}
-	return Output{assignments, count, coverage}, nil
 }
 
 func validate(in Input) error {
@@ -183,50 +155,8 @@ func validate(in Input) error {
 }
 
 func stitch(windows []WindowReport) []stitchedSpan {
-	globals := make(map[int]*globalCluster)
-	next := 1
-	var previous []stitchedSpan
-	var out []stitchedSpan
-	for wi, window := range windows {
-		clusters := append([]LocalCluster(nil), window.Clusters...)
-		sort.Slice(clusters, func(i, j int) bool { return clusters[i].ID < clusters[j].ID })
-		matches := matchWindow(window, clusters, globals, previous)
-		for _, cluster := range clusters {
-			match, found := matches[cluster.ID]
-			if !found {
-				match = clusterMatch{next, 1}
-				matches[cluster.ID] = match
-				globals[next] = &globalCluster{append([]float64(nil), cluster.Centroid...), 1}
-				next++
-			} else {
-				global := globals[match.speaker]
-				for i, value := range cluster.Centroid {
-					global.centroid[i] = (global.centroid[i]*float64(global.count) + value) / float64(global.count+1)
-				}
-				global.count++
-			}
-		}
-		canonicalEnd := window.StartSeconds + window.DurationSeconds
-		if wi+1 < len(windows) {
-			canonicalEnd = window.StartSeconds + WindowSeconds - WindowOverlapSeconds
-		}
-		previous = previous[:0]
-		for _, span := range window.Spans {
-			match := matches[span.ClusterID]
-			start, end := span.StartSeconds+window.StartSeconds, span.EndSeconds+window.StartSeconds
-			short := span.EndSeconds-span.StartSeconds < ShortSpanSeconds
-			confidence := math.Min(span.Quality, math.Min(match.continuity, span.Identity))
-			vetoOnly := short && confidence < ShortSpanConfidenceThreshold
-			if !short {
-				previous = append(previous, stitchedSpan{speaker: match.speaker, start: start, end: end})
-			}
-			start, end = math.Max(start, window.StartSeconds), math.Min(end, canonicalEnd)
-			if end > start {
-				out = append(out, stitchedSpan{speaker: match.speaker, start: start, end: end, confidence: confidence, vetoOnly: vetoOnly})
-			}
-		}
-	}
-	return out
+	spans, _ := stitchWindows(windows)
+	return spans
 }
 
 func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*globalCluster, previous []stitchedSpan) map[string]clusterMatch {
@@ -631,7 +561,7 @@ func preserveGroupAssignments(
 	return assignments
 }
 
-func compactSpeakerLabels(assignments []db.SpeakerProjectionAssignment) int {
+func compactSpeakerLabels(assignments []db.SpeakerProjectionAssignment) map[db.VisibleSpeaker]db.VisibleSpeaker {
 	labels := make(map[db.VisibleSpeaker]db.VisibleSpeaker)
 	for i := range assignments {
 		if assignments[i].Speaker == db.VisibleSpeakerOther {
@@ -644,7 +574,7 @@ func compactSpeakerLabels(assignments []db.SpeakerProjectionAssignment) int {
 		}
 		assignments[i].Speaker = label
 	}
-	return len(labels)
+	return labels
 }
 
 func assignmentCoverage(assignments []db.SpeakerProjectionAssignment, phrases []Phrase) float64 {

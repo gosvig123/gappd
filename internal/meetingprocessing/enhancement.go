@@ -131,7 +131,7 @@ func (s Service) saveEnhancement(ctx context.Context, meeting *db.Meeting, extra
 
 func (s Service) completeProcessing(ctx context.Context, meeting *db.Meeting, extraction *ai.Extraction, transcript, summary, extractionJSON string) error {
 	completion := meetinglifecycle.Completion{Title: extraction.Title, Transcript: transcript, Summary: summary, ExtractionJSON: extractionJSON, At: s.now()}
-	updated, err := s.transition(ctx, meeting.ID, meetinglifecycle.ProcessingCompleted{Completion: completion})
+	updated, err := s.storedTransition(ctx, meeting, meetinglifecycle.ProcessingCompleted{Completion: completion})
 	if err != nil {
 		return s.processingError("complete processing", meeting.ID, PhasePersist, err)
 	}
@@ -156,7 +156,7 @@ func (s Service) failureTransition(err error, transcript *string) meetinglifecyc
 
 func (s Service) saveEnhanceFailure(ctx context.Context, meeting *db.Meeting, transcript string, err error) error {
 	transition := s.failureTransition(err, &transcript)
-	updated, updateErr := s.transition(ctx, meeting.ID, transition)
+	updated, updateErr := s.storedTransition(ctx, meeting, transition)
 	if updateErr != nil {
 		return errors.Join(fmt.Errorf("enhance failed: %w", err), fmt.Errorf("save transcript: %w", updateErr))
 	}

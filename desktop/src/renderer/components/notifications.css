@@ -1,0 +1,33 @@
+/* Corner notification stack. Nothing here may stack above the content. */
+
+.app-toasts {
+  position: fixed;
+  inset-block-end: 5.5rem;
+  inset-inline-end: 1.25rem;
+  z-index: 86;
+  display: grid;
+  gap: var(--space-4);
+  inline-size: min(26rem, calc(50vw - 2rem));
+}
+
+.app-toast {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-raised);
+}
+
+.app-toast > svg { inline-size: 0.95rem; block-size: 0.95rem; color: var(--color-text-muted); margin-block-start: 2px; }
+.app-toast.attention { border-color: var(--color-warning-border); background: var(--color-warning-bg); }
+.app-toast.info { border-color: var(--color-accent-border); background: var(--color-accent-tint); }
+.app-toast.blocking { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
+
+.app-toast-copy { min-inline-size: 0; }
+.app-toast-copy strong { display: block; font-size: var(--font-size-small); line-height: var(--line-height-base); }
+.app-toast-copy p { margin: 0.1rem 0 0; color: var(--color-text-soft); font-size: var(--font-size-small); line-height: var(--line-height-body); }
+.app-toast-action { margin-block-start: var(--space-3); }

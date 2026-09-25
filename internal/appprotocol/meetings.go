@@ -26,6 +26,8 @@ type MeetingDetail struct {
 	TranscriptText        string           `json:"transcriptText,omitempty"`
 	TranscriptProvisional bool             `json:"transcriptProvisional"`
 	Summary               string           `json:"summary,omitempty"`
+	Speakers              []MeetingSpeaker `json:"speakers"`
+	SummaryUpdating       bool             `json:"summaryUpdating"`
 	Segments              []MeetingSegment `json:"segments"`
 	Diarization           DiarizationInfo  `json:"diarization"`
 }
@@ -37,11 +39,12 @@ type DiarizationInfo struct {
 }
 
 type MeetingSegment struct {
-	ID       string  `json:"id"`
-	StartSec float64 `json:"startSec"`
-	EndSec   float64 `json:"endSec"`
-	Speaker  string  `json:"speaker"`
-	Text     string  `json:"text"`
+	ID         string  `json:"id"`
+	StartSec   float64 `json:"startSec"`
+	EndSec     float64 `json:"endSec"`
+	Speaker    string  `json:"speaker"`
+	SpeakerKey string  `json:"speakerKey"`
+	Text       string  `json:"text"`
 }
 
 func BuildMeetingListViews(entries []db.MeetingListEntry) []MeetingListItem {
@@ -69,7 +72,7 @@ func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript st
 	status := MeetingStatusFor(meeting)
 	visible := visibleTranscriptSegments(meeting, segments)
 	provisional := meeting.Transcript == nil && len(visible) > 0
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Diarization: diarizationInfo(meeting)}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Speakers: buildSpeakerViews(visible), SummaryUpdating: summaryUpdating(meeting), Diarization: diarizationInfo(meeting)}
 }
 
 func diarizationInfo(meeting db.Meeting) DiarizationInfo {
@@ -125,7 +128,7 @@ func buildSegmentViews(segments []db.Segment) []MeetingSegment {
 }
 
 func buildSegmentView(segment db.Segment) MeetingSegment {
-	return MeetingSegment{ID: segment.ID, StartSec: segment.Start, EndSec: segment.End, Speaker: segment.Speaker, Text: segment.Text}
+	return MeetingSegment{ID: segment.ID, StartSec: segment.Start, EndSec: segment.End, Speaker: segment.Speaker, SpeakerKey: segment.RawSpeaker(), Text: segment.Text}
 }
 
 func stringValue(value *string) string {
@@ -133,4 +136,9 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func summaryUpdating(meeting db.Meeting) bool {
+	return meeting.Summary != nil && *meeting.Summary != "" && meeting.TranscriptRevision > meeting.SummaryTranscriptRevision &&
+		(meeting.ProcessingStatus == db.ProcessingStatusPending || meeting.ProcessingStatus == db.ProcessingStatusProcessing)
 }
