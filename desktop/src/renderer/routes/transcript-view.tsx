@@ -10,8 +10,8 @@ type TranscriptGroup = { speaker: string | null; lines: string[] }
 type TranscriptSpeaker = { key: string; name: string }
 type SegmentTurn = { speakerKey: string; speaker: string; startSec: number; texts: string[]; key: string }
 
-export function TranscriptText({ value, segments }: { value: string; segments: MeetingSegment[] }) {
-  if (segments.length > 0) return <TranscriptSegments segments={segments} />
+export function TranscriptText({ value, segments, onSeek, currentSec }: { value: string; segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
+  if (segments.length > 0) return <TranscriptSegments segments={segments} onSeek={onSeek} currentSec={currentSec} />
   return <div className="transcript-groups">{transcriptGroups(value).map((group, index) => <TranscriptGroupView key={index} group={group} />)}</div>
 }
 
@@ -28,11 +28,11 @@ export function meetingTranscriptEmptyText(meeting: MeetingDetail): string {
   return 'No transcript yet.'
 }
 
-function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
+function TranscriptSegments({ segments, onSeek, currentSec }: { segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
   const [hidden, setHidden] = useState<string[]>([])
   const speakers = useMemo(() => transcriptSpeakers(segments), [segments])
   const visible = visibleTranscriptSegments(segments, speakers.length < 2 ? [] : hidden)
-  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} /></div>
+  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} onSeek={onSeek} currentSec={currentSec} /></div>
 }
 
 function SpeakerFilter({ speakers, hidden, onChange }: { speakers: TranscriptSpeaker[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
@@ -42,20 +42,20 @@ function SpeakerFilter({ speakers, hidden, onChange }: { speakers: TranscriptSpe
   return <div className="transcript-speaker-filter" data-page-search-ignore><MultiSelect ariaLabel="Filter speakers" allLabel="All speakers" options={options} selected={selected} onChange={(values) => onChange(speakers.filter((speaker) => !values.includes(speaker.key)).map(speaker => speaker.key))} /></div>
 }
 
-function TranscriptSegmentList({ segments }: { segments: MeetingSegment[] }) {
+function TranscriptSegmentList({ segments, onSeek, currentSec }: { segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
   if (segments.length === 0) return <div className="transcript-empty-filter">{EMPTY_FILTER_TEXT}</div>
   const turns = segmentTurns(segments)
-  return <div className="transcript-segments">{turns.map((turn) => <TranscriptTurnRow key={turn.key} turn={turn} />)}</div>
+  return <div className="transcript-segments">{turns.map((turn) => <TranscriptTurnRow key={turn.key} turn={turn} onSeek={onSeek} active={currentSec !== undefined && turn.startSec <= currentSec && (turns.find(next => next.startSec > turn.startSec)?.startSec ?? Infinity) > currentSec} />)}</div>
 }
 
-function TranscriptTurnRow({ turn }: { turn: SegmentTurn }) {
+function TranscriptTurnRow({ turn, onSeek, active }: { turn: SegmentTurn; onSeek?: (sec: number) => void; active: boolean }) {
   return (
-    <article className="transcript-turn" style={speakerStyle(turn.speakerKey)}>
+    <article className="transcript-turn" aria-current={active ? "true" : undefined} style={speakerStyle(turn.speakerKey)}>
       <SpeakerAvatar speaker={turn.speaker} />
       <div className="transcript-turn-body">
         <div className="transcript-turn-meta">
           <button type="button" className="transcript-speaker transcript-speaker-label" title="Label this speaker" onClick={() => openSpeakerLabels(turn.speakerKey)}><SpeakerName speaker={turn.speaker} /></button>
-          <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>
+          {onSeek ? <button type="button" className="transcript-time" onClick={() => onSeek(turn.startSec)} aria-label={`Seek Meeting to ${formatSegmentTime(turn.startSec)}`}>{formatSegmentTime(turn.startSec)}</button> : <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>}
         </div>
         <div className="transcript-turn-lines">{turn.texts.map((text, index) => <p key={index} className="transcript-segment-text">{text}</p>)}</div>
       </div>

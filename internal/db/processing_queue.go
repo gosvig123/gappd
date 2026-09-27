@@ -144,7 +144,8 @@ func stageCondition(stage QueueStage) (string, []any) {
 const meetingColumns = `id,title,started_at,ended_at,capture_status,capture_status_updated_at,capture_failure_message,
 	processing_status,processing_status_updated_at,processing_failure_message,processing_claim_token,processing_claim_expires_at,
 	audio_path,transcript,transcript_revision,summary,summary_transcript_revision,extraction_json,
-	diarization_state,diarization_error,diarization_json,language,tags,source,created_at`
+	diarization_state,diarization_error,diarization_json,language,tags,source,created_at,
+ video_state,video_source_type,video_file,video_start_sec,video_end_sec,video_message,video_origin_host_sec,video_end_host_sec,mic_start_host_sec,system_start_host_sec`
 
 func scanClaimRow(row *sql.Row) (*Meeting, error) {
 	meeting, err := scanMeetingRow(row)

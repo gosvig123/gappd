@@ -13,6 +13,7 @@ export function RecordBar({ view }: { view: AppView }) {
   const stopping = view.recording.status === 'stopping'
   const elapsed = useElapsed(live ? startedAtOf(view) : null)
   const disabled = stopping || (live ? !view.canStop : !view.canStart)
+  const video = view.meetings.find(meeting => meeting.id === view.recording.meetingId)?.status.video
   return (
     <div className="app-toolbar">
       <div className={cx('app-record', live && 'is-recording')}>
@@ -22,6 +23,7 @@ export function RecordBar({ view }: { view: AppView }) {
             {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
           </select>
         </label>
+        {video && video.state !== 'off' ? <span role="status" title={video.message || 'Screen video status'}>Screen video: {video.state}{video.sourceType ? ` · ${video.sourceType}` : ''}</span> : null}
         <button
           type="button"
           className={cx('app-record-button', live && 'is-recording')}

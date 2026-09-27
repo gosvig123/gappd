@@ -35,6 +35,8 @@ const gappdBinaryPath = path.join(buildDir, 'gappd')
 const diarizerPath = path.join(buildDir, 'gappd-diarizer')
 const diarizationModelsPath = path.join(repoRoot, 'gappd-diarizer', 'models', 'speaker-diarization')
 const fluidAudioLicensePath = path.join(repoRoot, 'gappd-diarizer', 'legal', 'FluidAudio', 'LICENSE')
+const videoAppPath = path.join(buildDir, 'GappdVideo.app')
+const exportBinaryPath = path.join(buildDir, 'gappd-export')
 const captureAppPath = path.join(buildDir, 'GappdCapture.app')
 const captureBinaryPath = path.join(captureAppPath, 'Contents', 'MacOS', 'gappd-capture')
 const speechTranscriberAppPath = path.join(buildDir, 'GappdSpeechTranscriber.app')
@@ -52,6 +54,8 @@ await verifyFluidAudioLicenseFile(fluidAudioLicensePath)
 
 if (process.platform === 'darwin') {
   await requirePath(diarizerPath, `Native diarization helper missing at ${diarizerPath} after build.`)
+  await requirePath(videoAppPath, `Native video helper missing at ${videoAppPath} after build.`)
+  await requirePath(exportBinaryPath, `Recording export helper missing at ${exportBinaryPath} after build.`)
   await requirePath(captureAppPath, `Native capture helper missing at ${captureAppPath} after build.`)
   await requirePath(captureBinaryPath, `Native capture helper binary missing at ${captureBinaryPath} after build.`)
   await requirePath(speechTranscriberAppPath, `Native Apple speech transcriber app missing at ${speechTranscriberAppPath} after build.`)
@@ -59,6 +63,8 @@ if (process.platform === 'darwin') {
   if (shouldRunLocalBinaryCheck()) runDiarizerCheck()
   verifyBinaryCompatibility('gappd binary', gappdBinaryPath)
   verifyBinaryCompatibility('diarization helper', diarizerPath)
+  verifyBinaryCompatibility('video helper', path.join(videoAppPath, 'Contents', 'MacOS', 'gappd-video'))
+  verifyBinaryCompatibility('recording export helper', exportBinaryPath)
   verifyBinaryCompatibility('capture helper binary', captureBinaryPath)
   verifyBinaryCompatibility('Apple speech transcriber', speechTranscriberPath)
 }
@@ -71,6 +77,9 @@ async function buildNativeArtifacts() {
 
   await mkdir(buildDir, { recursive: true })
   await buildGoBinary()
+  runMake(['build-video'], { GAPPD_MAC_BUILD: macBuildProfile, GAPPD_MACOS_MIN_VERSION: macosMinVersion })
+  const exportBuild = spawnSync('bash', [path.join(desktopRoot, 'export-helper', 'build.sh')], { cwd: desktopRoot, stdio: 'inherit', env: { ...process.env, GAPPD_MAC_BUILD: macBuildProfile, GAPPD_MACOS_MIN_VERSION: macosMinVersion } })
+  if (exportBuild.error || exportBuild.status !== 0) throw new Error('Recording export helper build failed')
   runMake(['build-capture'], {
     GAPPD_MAC_BUILD: macBuildProfile,
     GAPPD_MACOS_MIN_VERSION: macosMinVersion,

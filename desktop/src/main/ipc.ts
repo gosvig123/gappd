@@ -1,3 +1,4 @@
+import { exportRecording } from './meeting-export'
 import { selectedFixtureUpload } from './selected-fixture-service'
 import { demoUpload } from './demo-upload-service'
 import { generateMeetingAgenda } from './meeting-agenda'
@@ -21,7 +22,7 @@ import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
-import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled } from './startup-settings'
+import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 
 type Awaitable<T> = T | Promise<T>
@@ -48,6 +49,7 @@ const IPC_HANDLERS: MainHandlers = {
     linkCalendar: (_event, input) => linkCalendar(input),
     enrichment: (_event, id: string) => loadMeetingEnrichment(id),
     enrich: (_event, id: string) => enrichMeeting(id),
+    exportRecording: (_event, id: string) => exportRecording(id),
   },
   recording: {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
@@ -101,6 +103,7 @@ const IPC_HANDLERS: MainHandlers = {
     getSettings: () => getStartupSettings(),
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
+    setScreenVideoEnabled: (_event, enabled: boolean) => setScreenVideoEnabled(enabled),
   },
 }
 

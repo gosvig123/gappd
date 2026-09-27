@@ -1,3 +1,4 @@
+import { MeetingReplay } from './meeting-replay'
 import { SelectedFixturePanel } from './selected-fixture-panel'
 import { useEffect, useRef, useState } from 'react'
 import { Copy, X } from 'lucide-react'
@@ -26,6 +27,8 @@ type TabId = MeetingTab
 /** Inline Meeting content. No modal or focus trap: the list remains interactive. */
 export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { view: AppView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
   const [tab, setTab] = useState<TabId>(initialTab ?? 'summary')
+  const [seekTo, setSeekTo] = useState<{ sec: number; request: number } | null>(null)
+  const [currentSec, setCurrentSec] = useState(0)
   const closeRef = useRef<HTMLButtonElement>(null)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
@@ -36,7 +39,7 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
     {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
     <div className="app-panel-body ui-scroll">
       <SelectedFixturePanel key={view.selectedMeetingId} meetingId={view.selectedMeetingId} />
-      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
+      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} onOpenSettings={onOpenSettings} seekTo={seekTo} onSeek={sec => setSeekTo(previous => ({ sec, request: (previous?.request ?? 0) + 1 }))} currentSec={currentSec} onTimeChange={setCurrentSec} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
     </div>
     {meeting ? <PanelFooter key={`${meeting.id}:${tab}`} view={view} confirm={confirm} meeting={meeting} tab={tab} transcript={transcript} /> : null}
   </article>
@@ -44,13 +47,20 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
 
 function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; tab: TabId; transcript: string }) {
   const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
   const copy = async () => {
     try { await navigator.clipboard.writeText(copySourceFor(tab, meeting, transcript)); setCopied(true); setError('') }
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
-  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, and audio for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
+  const exportVideo = async () => {
+    setExporting(true); setError('')
+    try { await window.gappd.meetings.exportRecording(meeting.id) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { setExporting(false) }
+  }
+  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
+  return <footer className="app-panel-foot">{meeting.status.capture.state === 'captured' && (meeting.status.video.state === 'ready' || (meeting.status.video.state === 'ended' && meeting.status.video.endSec !== undefined)) ? <Button className="compact-action" disabled={exporting} onClick={() => void exportVideo()}>{exporting ? 'Exporting…' : 'Export recording'}</Button> : null}<Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
 }
 
 function PanelHead({ meeting, transcript, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -79,18 +89,19 @@ function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HT
 }
 
 /** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
-function PanelContent({ view, meeting, transcript, tab, onOpenSettings }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; onOpenSettings: () => void }) {
+function PanelContent({ view, meeting, transcript, tab, onOpenSettings, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; onOpenSettings: () => void; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
   const meetingLevel = tab !== 'agenda'
   return (
     <>
+      <MeetingReplay meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
       {meetingLevel && meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
       {meetingLevel && meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
       {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} onLinkCalendar={view.actions.linkMeetingCalendar} /> : null}
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} /> : null}
         {tab === 'agenda' ? <AgendaPane view={view} meetingId={meeting.id} onOpenSettings={onOpenSettings} /> : null}
-        {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} /> : null}
+        {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} onSeek={onSeek} currentSec={currentSec} /> : null}
       </section>
     </>
   )
@@ -115,11 +126,11 @@ function SummaryPane({ view }: { view: AppView }) {
   return <div className="app-reading"><Markdown value={summary} />{view.selectedMeeting ? <MeetingEnrichmentSection meetingId={view.selectedMeeting.id} /> : null}</div>
 }
 
-function TranscriptPane({ view, text }: { view: AppView; text: string }) {
+function TranscriptPane({ view, text, onSeek, currentSec }: { view: AppView; text: string; onSeek: (sec: number) => void; currentSec: number }) {
   const meeting = view.selectedMeeting
   if (!meeting) return null
   if (!text) return <EmptyState>{meetingTranscriptEmptyText(meeting)}</EmptyState>
-  return <div className="app-reading"><TranscriptText value={text} segments={meetingHasSegments(meeting) ? meeting.segments : []} /></div>
+  return <div className="app-reading"><TranscriptText value={text} segments={meetingHasSegments(meeting) ? meeting.segments : []} onSeek={meeting.status.video.state === 'ready' || (meeting.status.video.state === 'ended' && meeting.status.video.endSec !== undefined) ? onSeek : undefined} currentSec={currentSec} /></div>
 }
 
 function DiarizationNotice({ view }: { view: AppView }) {

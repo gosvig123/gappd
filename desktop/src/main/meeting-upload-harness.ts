@@ -64,7 +64,7 @@ export function meetingItem(id: string, state: MeetingState = 'completed'): Meet
     : state === 'failed' ? 'failed' : 'pending'
   return {
     id, title: id, startedAt: '2026-09-01T10:00:00Z',
-    status: { state, updatedAt: '2026-09-01T10:05:00Z', capture: { state: capture, updatedAt: '' }, processing: { state: processing, updatedAt: '' } },
+    status: { state, updatedAt: '2026-09-01T10:05:00Z', capture: { state: capture, updatedAt: '' }, video: { state: 'off' }, processing: { state: processing, updatedAt: '' } },
     hasTranscript: state === 'completed', hasSummary: state === 'completed',
   }
 }

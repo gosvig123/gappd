@@ -27,9 +27,15 @@ export async function retryDiarization(id: string): Promise<MeetingDetail> {
 }
 
 export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
-  const result = await requestCommand('meetings.delete', { id })
+  const result = await requestCommand('meetings.delete', { id }).catch((cause) => {
+    console.error('Delete Meeting failed:', cause)
+    throw new Error('Could not delete this Meeting. Stop recording or wait for processing, check managed-file permissions, then retry from the Meeting list.')
+  })
   for (const forget of [forgetMeetingCalendar, forgetMeetingEnrichment]) {
-    await forget(id).catch((error) => { result.artifactWarning = [result.artifactWarning, String(error)].filter(Boolean).join(' ') })
+    await forget(id).catch((cause) => {
+      console.error('Meeting context cleanup failed:', cause)
+      result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
+    })
   }
   return result
 }

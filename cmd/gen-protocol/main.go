@@ -65,6 +65,7 @@ func fail(err error) {
 func renderProtocol() string {
 	var b strings.Builder
 	b.WriteString(protocolHeader)
+	writeEnum(&b, "VIDEO_STATES", "VideoState", values(db.AllVideoStates))
 	writeEnum(&b, "CAPTURE_STATUSES", "CaptureStatus", values(db.AllCaptureStatuses))
 	writeEnum(&b, "PROCESSING_STATUSES", "ProcessingStatus", values(db.AllProcessingStatuses))
 	writeEnum(&b, "DIARIZATION_STATES", "DiarizationState", values(db.AllDiarizationStates))

@@ -8,12 +8,12 @@ import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
 
 type RecordingChild = ReturnType<typeof spawn>
-const RECORDING_SHUTDOWN_TIMEOUT_MS = 5_000
+const RECORDING_SHUTDOWN_TIMEOUT_MS = 20_000
 const LIVE_TRANSCRIPT_CHUNK_SECONDS = '120'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
-export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean }, onStarted?: (meetingId: string) => void): Promise<void> {
+export async function startRecording(input: { title: string; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean; screenVideoEnabled?: boolean }, onStarted?: (meetingId: string) => void): Promise<void> {
   if (recordingChild) throw new Error('A recording is already running')
   const snapshot = managedRuntime.status()
   const liveTranscript = snapshot.capabilities.transcription.readiness === 'ready'
@@ -53,7 +53,9 @@ function childExited(child: RecordingChild): boolean {
 function recordingHandlers(title: string, onStarted?: (meetingId: string) => void) {
   return {
     onEvent(event: RecordingEvent) {
-      setRecordingState(recordingEventOutcome(event).state)
+      const next = recordingEventOutcome(event).state
+      if (event.type.startsWith('recording.video')) next.status = getRecordingState().status
+      setRecordingState(next)
       if (event.type === 'recording.started') onStarted?.(event.meetingId)
       if (event.type === 'recording.captured') requestDrains()
       if (event.type === 'recording.captured' || event.type === 'recording.failed') finishRecording()

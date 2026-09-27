@@ -20,7 +20,7 @@ func renderContracts() string {
 	collector := collectCommandTypes()
 	var b strings.Builder
 	b.WriteString(protocolHeader)
-	b.WriteString("\nimport type { CaptureStatus, DiarizationState, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
+	b.WriteString("\nimport type { CaptureStatus, VideoState, DiarizationState, MeetingState, ProcessingCapability, ProcessingStatus, RecordingProtocolEventType } from './protocol'\n")
 	for _, typ := range collector.order {
 		writeType(&b, typ)
 	}
@@ -121,6 +121,8 @@ func baseTSType(typ reflect.Type) string {
 
 func enumTypeName(typ reflect.Type) string {
 	switch typ {
+	case reflect.TypeOf(db.VideoState("")):
+		return "VideoState"
 	case reflect.TypeOf(db.CaptureStatus("")):
 		return "CaptureStatus"
 	case reflect.TypeOf(db.ProcessingStatus("")):

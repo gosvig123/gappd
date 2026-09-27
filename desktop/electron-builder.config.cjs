@@ -23,6 +23,8 @@ module.exports = {
     { from: '../gappd-diarizer/legal', to: 'legal' },
     { from: '../build/GappdSpeechTranscriber.app', to: 'GappdSpeechTranscriber.app' },
     { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
+    { from: '../build/GappdVideo.app', to: 'GappdVideo.app' },
+    { from: '../build/gappd-export', to: 'bin/gappd-export' },
     { from: 'resources/llamacpp', to: 'llamacpp' },
   ],
   afterPack: hooks.afterPack,
@@ -43,7 +45,7 @@ module.exports = {
     extendInfo: {
       NSAudioCaptureUsageDescription: 'Gappd captures system audio to transcribe your meetings.',
       NSMicrophoneUsageDescription: 'Gappd captures your microphone to transcribe your voice.',
-      NSScreenCaptureUsageDescription: 'Gappd uses screen capture to access system audio for meeting transcription.',
+      NSScreenCaptureUsageDescription: 'Gappd captures system audio for meeting transcription and, when you choose a source, Screen video for local Meeting replay.',
       NSSpeechRecognitionUsageDescription: 'Gappd uses on-device Apple Speech to transcribe meeting audio.',
     },
     entitlements: 'build/entitlements.mac.plist',

@@ -19,6 +19,12 @@ export function recordingStateFromEvent(event: RecordingEvent): RecordingState {
   const base = { meetingId: event.meetingId, title: event.title }
   switch (event.type) {
     case 'recording.started': return { ...base, status: RECORDING_STATUS_RECORDING }
+    case 'recording.videoCancelled':
+    case 'recording.videoSkipped':
+    case 'recording.videoStarted':
+    case 'recording.videoEnded':
+    case 'recording.videoFinalized':
+    case 'recording.videoFailed': return { ...base, status: RECORDING_STATUS_RECORDING }
     case 'recording.stopping': return { ...base, status: RECORDING_STATUS_STOPPING }
     case 'recording.captured': return { ...base, status: RECORDING_STATUS_IDLE }
     case 'recording.failed': return { ...base, status: RECORDING_STATUS_ERROR, error: event.error ?? recordingFailureMessage(event) }

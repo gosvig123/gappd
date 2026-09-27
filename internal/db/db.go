@@ -112,6 +112,9 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 	if _, err := conn.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("init schema: %w", err)
 	}
+	if err := migrateMeetingVideo(ctx, conn); err != nil {
+		return err
+	}
 	if err := migrateMeetingsSearchTrigger(ctx, conn); err != nil {
 		return err
 	}

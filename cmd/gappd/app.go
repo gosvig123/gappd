@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appAgendaHistoryCmd(), appAgendaCmd(), appEnrichCmd(), appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appAgendaHistoryCmd(), appAgendaCmd(), appEnrichCmd(), appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 
@@ -74,12 +74,13 @@ func appRecordStartCmd() *cobra.Command {
 	var mode string
 	var language string
 	var speakerLabelsEnabled bool
+	var screenVideoEnabled bool
 
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, &speakerLabelsEnabled, true)
+			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, &speakerLabelsEnabled, true, screenVideoEnabled)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
@@ -87,6 +88,7 @@ func appRecordStartCmd() *cobra.Command {
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
 	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
 	cmd.Flags().BoolVar(&speakerLabelsEnabled, "speaker-labels-enabled", true, "Run speaker labeling before summary")
+	cmd.Flags().BoolVar(&screenVideoEnabled, "screen-video-enabled", false, "Ask for Screen video source for this Meeting")
 	return cmd
 }
 

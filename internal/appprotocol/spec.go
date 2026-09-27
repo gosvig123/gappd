@@ -63,6 +63,7 @@ type RecordStartInput struct {
 	Mode                 string `json:"mode"`
 	Language             string `json:"language"`
 	SpeakerLabelsEnabled *bool  `json:"speakerLabelsEnabled,omitempty"`
+	ScreenVideoEnabled   *bool  `json:"screenVideoEnabled,omitempty"`
 }
 
 type CommandArg struct {
@@ -89,6 +90,7 @@ var Commands = []CommandSpec{
 	{ID: "meetings.enrich", Mode: CommandModeRequest, Input: typeOf[EnrichInput](), Output: typeOf[EnrichResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("enrich"), field("id"), flag("communication-input", "communicationInput", false), lit("--json")}},
 	{ID: "meetings.people", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[PeopleResponse](), Args: literalArgs("app", "meetings", "people", "--json")},
 	{ID: "meetings.assignSpeaker", Mode: CommandModeRequest, Input: typeOf[AssignSpeakerInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("assign-speaker"), field("id"), flag("speaker-key", "speakerKey", false), flag("person-id", "personId", true), flag("name", "name", true), flag("email", "email", true), lit("--json")}},
+	{ID: "meetings.videoAsset", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[VideoAssetResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("video-asset"), field("id"), lit("--json")}},
 	{ID: "meetings.speakerClip", Mode: CommandModeRequest, Input: typeOf[SpeakerClipInput](), Output: typeOf[SpeakerClipResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("speaker-clip"), field("id"), flag("speaker-key", "speakerKey", false), flag("index", "index", true), lit("--json")}},
 	{ID: "devices.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[DevicesResponse](), Args: literalArgs("app", "devices", "--json")},
 	{ID: "meetings.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingsResponse](), Args: literalArgs("app", "meetings", "list", "--json")},
@@ -103,7 +105,7 @@ var Commands = []CommandSpec{
 	{ID: "processing.pending", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ProcessingPendingResponse](), Args: literalArgs("app", "processing", "pending", "--json")},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
-	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
+	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true), flag("screen-video-enabled", "screenVideoEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
 	{ID: "meetings.voiceTargets", Mode: CommandModeRequest, Input: typeOf[VoiceTargetsInput](), Output: typeOf[VoiceTargetsResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("voice-targets"), flag("after", "after", false), lit("--json")}},
 	{ID: "meetings.recognizeSpeakers", Mode: CommandModeRequest, Input: typeOf[RecognizeSpeakersInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("recognize-speakers"), field("id"), flag("revision", "revision", false), flag("emails", "emails", false), flag("calendar", "calendar", false), lit("--json")}},
 }

@@ -7,6 +7,9 @@ Gappd is a local-first macOS meeting application. Recording, transcription, meet
 **Meeting**:
 A user-initiated local recording with its derived transcript and meeting data.
 
+**Screen video**:
+Optional local capture of a user-selected window or display, retained as part of one Meeting for synchronized replay.
+
 **Person**:
 A saved identity that can be assigned to speakers in multiple meetings.
 
@@ -34,6 +37,7 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 ## Relationships
 
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
+- **Screen video** is enabled before a Meeting and requires a fresh source choice for each Meeting; video failure does not stop its audio recording, and deleting the Meeting removes its managed video but not any exported copy.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.

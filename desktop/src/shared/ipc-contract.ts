@@ -17,7 +17,7 @@ export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
-export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean }
 export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; codexReasoningEffort: string; available: boolean; error?: string }
 export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
 export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
@@ -49,6 +49,7 @@ export type IpcInvokeContract = {
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
     enrichment: OperationSpec<[id: string], MeetingEnrichment | null>
     enrich: OperationSpec<[id: string], MeetingEnrichment>
+    exportRecording: OperationSpec<[id: string], boolean>
   }
   recording: {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
@@ -98,6 +99,7 @@ export type IpcInvokeContract = {
     getSettings: OperationSpec<[], StartupSettings>
     setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
+    setScreenVideoEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
 }
 
@@ -124,7 +126,7 @@ export const IPC_OPERATIONS = {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
     people: 'meetings:people', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
-    enrichment: 'meetings:enrichment', enrich: 'meetings:enrich',
+    enrichment: 'meetings:enrichment', enrich: 'meetings:enrich', exportRecording: 'meetings:exportRecording',
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
@@ -146,7 +148,7 @@ export const IPC_OPERATIONS = {
   startup: {
     getSettings: 'startup:getSettings',
     setOpenAtLogin: 'startup:setOpenAtLogin',
-    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled',
+    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled', setScreenVideoEnabled: 'startup:setScreenVideoEnabled',
   },
 } as const satisfies IpcOperationChannels
 

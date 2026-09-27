@@ -1,7 +1,8 @@
 import { initializeSelectedFixtureProfile } from './selected-fixture-profile'
 import path from 'node:path'
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor, protocol } from 'electron'
 import { registerIpc } from './ipc'
+import { registerMeetingMedia } from './meeting-media'
 import { onMeetingProcessingFinished, pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
 import { logMainProcessMemory } from './memory'
 import { meetingUpload } from './meeting-upload-service'
@@ -14,6 +15,7 @@ import { completeSlackAuthorization } from './slack-oauth'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
+protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
 
 app.on('open-url', (event, url) => {
@@ -80,6 +82,7 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 }
 
 app.whenReady().then(async () => {
+  registerMeetingMedia()
   applyDevDockIcon()
   migrateScreenCapturePermission()
   const startHidden = shouldStartHidden()
@@ -106,7 +109,7 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   if (shutdownStarted) return
   shutdownStarted = true
-  void shutdown().finally(quitAfterShutdown)
+  void shutdown().finally(() => setImmediate(quitAfterShutdown))
 })
 
 function quitAfterShutdown(): void {

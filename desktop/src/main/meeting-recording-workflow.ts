@@ -21,7 +21,8 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   await pauseDrains('recording')
   try {
     await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
-      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled },
+      language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled,
+      screenVideoEnabled: getStartupSettings().screenVideoEnabled },
     (id) => { if (calendar) void rememberRecordingCalendar(id, calendar).catch((error) => console.warn('Save recording calendar context:', error)) })
     return getRecordingState()
   } catch (error) {

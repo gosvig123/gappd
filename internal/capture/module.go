@@ -33,9 +33,16 @@ type NoticeKind string
 const (
 	NoticeReady         NoticeKind = "ready"
 	NoticeStopRequested NoticeKind = "stop_requested"
+	NoticeAudioStart    NoticeKind = "audio_start"
 )
 
+type AudioStart struct {
+	Source      string
+	HostSeconds float64
+}
+
 type Notice struct {
+	AudioStart       AudioStart
 	Kind             NoticeKind
 	TranscriptEvents <-chan livetranscript.Event
 }
@@ -74,23 +81,39 @@ func (m Module) Run(ctx context.Context, input Input, observe Observe) (Result, 
 		return result, err
 	}
 	observe(Notice{Kind: NoticeReady, TranscriptEvents: process.events.output})
+	drainStarts := func() {
+		for {
+			select {
+			case started := <-process.audioStart:
+				observe(Notice{Kind: NoticeAudioStart, AudioStart: started})
+			default:
+				return
+			}
+		}
+	}
+	defer drainStarts()
 	if process.waited {
 		return result, process.finishUnexpected(process.waitErr)
 	}
 
-	select {
-	case waitErr := <-process.wait:
-		process.recordWait(waitErr)
-		return result, process.finishUnexpected(waitErr)
-	case <-ctx.Done():
+captureRunning:
+	for {
 		select {
+		case started := <-process.audioStart:
+			observe(Notice{Kind: NoticeAudioStart, AudioStart: started})
 		case waitErr := <-process.wait:
 			process.recordWait(waitErr)
 			return result, process.finishUnexpected(waitErr)
-		default:
+		case <-ctx.Done():
+			select {
+			case waitErr := <-process.wait:
+				process.recordWait(waitErr)
+				return result, process.finishUnexpected(waitErr)
+			default:
+			}
+			break captureRunning
 		}
 	}
-
 	observe(Notice{Kind: NoticeStopRequested})
 	waitErr, stopWarning, stopDelivered := process.requestStop()
 	finishErr := process.finish(false)
