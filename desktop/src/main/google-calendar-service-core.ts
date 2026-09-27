@@ -41,11 +41,13 @@ export class GoogleCalendarServiceCore {
   private readonly api: CalendarApi
   private readonly store: CalendarStore
   private readonly now: () => Date
+  private readonly gmailAvailable: boolean
 
-  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date()) {
+  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date(), gmailAvailable = false) {
     this.api = api
     this.store = store
     this.now = now
+    this.gmailAvailable = gmailAvailable
   }
 
   pendingSyncIds(): string[] {
@@ -59,6 +61,7 @@ export class GoogleCalendarServiceCore {
 
   connect(includeGmail = false): Promise<CalendarSnapshot> {
     if (typeof includeGmail !== 'boolean') throw new Error('Invalid Gmail connection choice.')
+    if (includeGmail && !this.gmailAvailable) throw new Error('Gmail access is unavailable pending separate approval.')
     if (!this.connecting) this.connecting = this.performConnect(includeGmail, ++this.authorizationVersion).finally(() => { this.connecting = null })
     return this.connecting
   }
@@ -85,6 +88,7 @@ export class GoogleCalendarServiceCore {
   }
 
   agendaCommunication(connectionId: string, read: (token: string, subject: string) => Promise<AgendaCommunication>): Promise<AgendaCommunication> {
+    if (!this.gmailAvailable) return Promise.resolve({ sources: [], warning: 'Gmail access is unavailable pending separate approval.' })
     const version = this.authorizationVersion
     const assertCurrent = () => { if (version !== this.authorizationVersion) throw new Error('The Google connection changed. Generate the agenda again.') }
     return this.withStore(async () => {
@@ -146,7 +150,7 @@ export class GoogleCalendarServiceCore {
     const status = this.syncing.has(connection.id) ? SYNCING_STATUS : connection.error ? ERROR_STATUS : READY_STATUS
     return {
       id: connection.id, email: connection.email, status,
-      gmailEnabled: connection.tokens.scope?.split(' ').includes(GMAIL_READ_SCOPE) ?? false,
+      gmailEnabled: this.gmailAvailable && (connection.tokens.scope?.split(' ').includes(GMAIL_READ_SCOPE) ?? false),
       historyRanges: connection.historyRanges, lastSyncedAt: connection.lastSyncedAt, error: connection.error,
     }
   }

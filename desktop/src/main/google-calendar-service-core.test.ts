@@ -48,6 +48,24 @@ test('preserves cached events and records a safe account-local sync error', asyn
   assert.equal(snapshot.events.length, 1)
 })
 
+test('Gmail grants and reads stay disabled in the shipping Calendar service', async () => {
+  let authorizations = 0
+  const api: CalendarApi = {
+    configured: () => true,
+    authorize: async () => { authorizations++; return account('work', 'work@example.com') },
+    sync: async (_id, _email, tokens) => ({ tokens, events: [] }), revoke: async () => undefined,
+  }
+  const service = new GoogleCalendarServiceCore(api, memoryStore())
+  assert.throws(() => service.connect(true), /unavailable pending separate approval/)
+  assert.equal(authorizations, 0)
+  const connected = await service.connect()
+  assert.equal(connected.connections.length, 1)
+  let reads = 0
+  const result = await service.agendaCommunication(connected.connections[0].id, async () => { reads++; return { sources: [] } })
+  assert.match(result.warning!, /unavailable pending separate approval/)
+  assert.equal(reads, 0)
+})
+
 function memoryStore(initial: CalendarDocument | null = null): CalendarStore {
   let document = initial
   return {

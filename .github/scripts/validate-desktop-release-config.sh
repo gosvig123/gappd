@@ -18,5 +18,10 @@ if [[ ! "${GAPPD_GOOGLE_OAUTH_CLIENT_ID:-}" =~ $client_pattern ]]; then
   exit 1
 fi
 
+if [[ "${GAPPD_CLERK_ISSUER_URL:-}" != 'https://clerk.getgappd.com' || "${GAPPD_CLERK_CLIENT_ID:-}" != 't3RzfAuaxamgqOQV' ]]; then
+  echo "Set the production Clerk issuer and desktop client ID before release." >&2
+  exit 1
+fi
+
 echo "GAPPD_SIGNED_RELEASE=1" >> "$GITHUB_ENV"
 echo "Release configuration: signed, notarized, and production Calendar enabled"

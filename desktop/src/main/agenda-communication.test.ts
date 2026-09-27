@@ -113,7 +113,7 @@ test('Slack honors short rate limits once and rejects unbounded waits', async ()
 test('Gmail access is opt-in, account-bound, and refreshed tokens are saved before reads', async () => {
   const tokens = { accessToken: 'test-old', refreshToken: 'refresh', expiresAt: 0, tokenType: 'Bearer', scope: '' }
   let document: CalendarDocument = { version: 1, connections: [{ id: 'one', subject: 'subject', email: 'self@example.com', tokens, events: [] }] }
-  const core = new GoogleCalendarServiceCore({ configured: () => true, authorize: async () => { throw new Error('not used') }, sync: async () => { throw new Error('not used') }, revoke: async () => {}, refresh: async value => ({ ...value, accessToken: 'test-new' }) }, { read: async () => structuredClone(document), write: async value => { document = value } })
+  const core = new GoogleCalendarServiceCore({ configured: () => true, authorize: async () => { throw new Error('not used') }, sync: async () => { throw new Error('not used') }, revoke: async () => {}, refresh: async value => ({ ...value, accessToken: 'test-new' }) }, { read: async () => structuredClone(document), write: async value => { document = value } }, undefined, true)
   let reads = 0
   const read = async (token: string, subject: string) => { reads++; assert.equal(token, document.connections[0].tokens.accessToken); assert.equal(subject, 'subject'); return { sources: [] } }
   assert.match((await core.agendaCommunication('one', read)).warning!, /not read/)
