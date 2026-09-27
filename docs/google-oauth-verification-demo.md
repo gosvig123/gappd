@@ -1,11 +1,11 @@
 # Google Calendar OAuth verification demo
 
-The [September 5 verification email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0706249e1227c9) says the previous video did not show why `calendar.events.owned.readonly` is needed or why narrower access is insufficient. Reply to that thread after the replacement video and factual AI-processing answers are ready. The project is in production publishing status, but Calendar data access is still under review. Do not distribute a new Calendar-enabled release until Google approves it.
+The [September 5 verification email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0706249e1227c9) says the previous video did not show why `calendar.events.owned.readonly` is needed or why narrower access is insufficient. Reply to that thread after the replacement video and factual AI-processing answers are ready. The project is in production publishing status, but Calendar data access is still under review. The owner chose to keep Calendar available in the beta while review continues; users may see Google's unverified-app warning and the unverified-user cap applies.
 
 ## Prepare
 
 - Use a clean macOS test profile and a Google test account with a primary calendar. Keep real Meetings and emails out of the recording. Create one upcoming event with a harmless title, time, and two test invitees. Do not create a second Calendar OAuth client or alter the submitted scopes.
-- Use a Calendar-enabled verification build from the staging branch, not a public release. Confirm the Google OAuth desktop client points to the submitted `gappd-production` project. Ensure the consent screen language is **English**.
+- Use an isolated development profile with the same Calendar flow as the signed beta app, not the owner's existing app data. Confirm the Google OAuth desktop client points to the submitted `gappd-production` project. Ensure the consent screen language is **English**.
 - Use **Local AI** for the demo. Do not connect Gmail or Cloud sync: Gmail is a separate restricted scope and Cloud sync is not needed to prove Calendar access. Close unrelated windows and notifications.
 - Run `bash scripts/record-calendar-verification.sh 240` from the project root. The script starts a screen recording after five seconds; the user performs browser sign-in and consent. It never enters a password or clicks consent.
 
