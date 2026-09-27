@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { MeetingEnrichment, MeetingEnrichmentNote } from '../../shared/meeting-enrichment'
 import { Button, StatusPill } from './ui'
 
-const EXPLANATION = 'Reads Gmail and existing Slack DMs with this Meeting’s Calendar invitees, from 30 days before to 7 days after the Meeting. The configured AI provider adds context only to action items that are already in these notes; a remote provider receives the message text. No messages are sent, and the notes do not change.'
+const EXPLANATION = 'Reads Gmail and existing Slack DMs with this Meeting’s Calendar invitees, from 30 days before to 7 days after the Meeting. Local AI on this Mac adds context only to action items that are already in these notes. Installed Codex cannot process Calendar-based Meeting enrichment. No messages are sent, and the notes do not change.'
 
 /** Optional, on-demand context for the summary's action items. The transcript stays the source of truth. */
 export function MeetingEnrichmentSection({ meetingId }: { meetingId: string }) {
@@ -28,7 +28,7 @@ export function MeetingEnrichmentSection({ meetingId }: { meetingId: string }) {
       <h2>Gmail and Slack context</h2>
       <p>{EXPLANATION}</p>
       <Button className="compact-action" disabled={busy} onClick={() => void enrich()}>{busy ? 'Reading messages…' : enrichment ? 'Add context again' : 'Add Gmail and Slack context'}</Button>
-      {busy ? <p role="status">Reading Gmail and Slack, then asking the configured AI provider. Slack rate limits can add up to 10 minutes.</p> : null}
+      {busy ? <p role="status">Reading Gmail and Slack, then using Local AI on this Mac. Slack rate limits can add up to 10 minutes.</p> : null}
       {error ? <p role="alert">{error}</p> : null}
       {enrichment ? <EnrichmentResult enrichment={enrichment} /> : null}
     </section>
