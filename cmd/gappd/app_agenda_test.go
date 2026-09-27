@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/gappd-dev/gappd/internal/ai"
 	"strings"
 	"sync"
 	"testing"
 
+	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/config"
 	"github.com/gappd-dev/gappd/internal/db"
 )
 
@@ -71,6 +72,13 @@ func TestAgendaSourcesAcceptLargeHistory(t *testing.T) {
 	}
 	if provider.calls < 3 || provider.calls > 96 {
 		t.Fatalf("calls=%d", provider.calls)
+	}
+}
+
+func TestAgendaRejectsInstalledCodexBeforeSendingCalendarContext(t *testing.T) {
+	err := completeAgenda(config.AI{Provider: config.ProviderCodexExec, CodexExecutable: "/not-installed/codex"}, "Test event", []ai.AgendaSource{{ID: "test-meeting", Title: "Test meeting", Text: "Test transcript"}})
+	if err == nil || !strings.Contains(err.Error(), "select Local AI in Settings") {
+		t.Fatalf("expected local-only Calendar error before starting Codex, got %v", err)
 	}
 }
 

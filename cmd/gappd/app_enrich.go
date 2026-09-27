@@ -49,7 +49,7 @@ func runEnrich(input appprotocol.EnrichInput) error {
 	if len(sources) == 0 {
 		return fmt.Errorf("enrich: no Gmail or Slack messages were supplied")
 	}
-	provider, err := newAIProvider(cfg.AI)
+	provider, err := newCalendarAIProvider(cfg.AI)
 	if err != nil {
 		return err
 	}

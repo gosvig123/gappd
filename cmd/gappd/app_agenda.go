@@ -79,7 +79,7 @@ func readAgendaCommunication(reader io.Reader) ([]ai.AgendaSource, error) {
 }
 
 func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource) error {
-	provider, err := newAIProvider(settings)
+	provider, err := newCalendarAIProvider(settings)
 	if err != nil {
 		return err
 	}
@@ -94,6 +94,13 @@ func completeAgenda(settings config.AI, title string, sources []ai.AgendaSource)
 		return fmt.Errorf("generate agenda: %w; check your AI model in Settings or retry", err)
 	}
 	return writeJSON(appprotocol.BuildAgenda(draft, agendaGenerationFor(provider, settings)))
+}
+
+func newCalendarAIProvider(settings config.AI) (ai.Provider, error) {
+	if settings.Provider == config.ProviderCodexExec {
+		return nil, fmt.Errorf("Google Calendar context stays on this Mac; select Local AI in Settings to generate an Agenda draft or enrich a Meeting")
+	}
+	return newAIProvider(settings)
 }
 
 func agendaGenerationFor(provider ai.Provider, settings config.AI) appprotocol.AgendaGeneration {
