@@ -1,18 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Mic, Square } from 'lucide-react'
+import { Mic, Monitor, Square } from 'lucide-react'
 import type { AppView } from '../lib/app-view'
 import { cx } from './ui'
 
 /**
  * Recording is app chrome, so it sits in the main toolbar rather than floating
- * over the content: device on the left, action on the right, and no second
- * status block in between. The action label carries the live elapsed time.
+ * over the content. Choose audio and Screen video before starting; the action
+ * label carries the live elapsed time.
  */
 export function RecordBar({ view }: { view: AppView }) {
   const live = view.recording.status === 'recording'
   const stopping = view.recording.status === 'stopping'
   const elapsed = useElapsed(live ? startedAtOf(view) : null)
-  const disabled = stopping || (live ? !view.canStop : !view.canStart)
+  const [videoEnabled, setVideoEnabled] = useState<boolean | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    let active = true
+    window.gappd.startup.getSettings().then(settings => { if (active) setVideoEnabled(settings.screenVideoEnabled) }).catch(() => { if (active) setError('Could not load Screen video. Reopen Meetings to retry.') })
+    return () => { active = false }
+  }, [])
+  const toggleVideo = async () => {
+    setSaving(true); setError('')
+    try { setVideoEnabled((await window.gappd.startup.setScreenVideoEnabled(!videoEnabled)).screenVideoEnabled) }
+    catch { setError('Could not change Screen video. Try again before recording.') }
+    finally { setSaving(false) }
+  }
+  const disabled = saving || stopping || (live ? !view.canStop : !view.canStart)
   const video = view.meetings.find(meeting => meeting.id === view.recording.meetingId)?.status.video
   return (
     <div className="app-toolbar">
@@ -23,7 +37,7 @@ export function RecordBar({ view }: { view: AppView }) {
             {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
           </select>
         </label>
-        {video && video.state !== 'off' ? <span role="status" title={video.message || 'Screen video status'}>Screen video: {video.state}{video.sourceType ? ` · ${video.sourceType}` : ''}</span> : null}
+        {!live && !stopping ? <button type="button" className="app-record-video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title="Remember this choice for future Meetings. Choose a window or display each time you record."><Monitor aria-hidden="true" />Screen video: {videoEnabled ? 'On' : 'Off'}</button> : null}
         <button
           type="button"
           className={cx('app-record-button', live && 'is-recording')}
@@ -34,6 +48,9 @@ export function RecordBar({ view }: { view: AppView }) {
           {live || stopping ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
           {stopping ? 'Stopping…' : live ? `Stop · ${elapsed}` : 'Record'}
         </button>
+      </div>
+      <div className="app-record-hint" role="status">
+        {error || (live || stopping ? video?.state === 'selecting' ? 'Choose a window or display in the macOS picker. Audio is recording.' : video?.state === 'recording' ? `Recording ${video.sourceType === 'window' ? 'window' : video.sourceType === 'display' ? 'display' : 'screen'} and audio` : video?.state === 'ended' ? 'Screen video ended. Audio continues.' : video && ['failed', 'cancelled', 'skipped'].includes(video.state) ? 'Audio only. Screen video did not start.' : stopping ? 'Saving your recording…' : 'Recording audio' : videoEnabled ? 'Choose a window or display when recording starts.' : 'Audio only. Turn on Screen video to include a window or display.')}
       </div>
     </div>
   )

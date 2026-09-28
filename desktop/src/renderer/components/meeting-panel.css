@@ -38,7 +38,7 @@
   font-size: var(--font-size-small);
 }
 
-.app-panel-body { min-block-size: 0; min-inline-size: 0; overflow: auto; display: grid; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
+.app-panel-body { min-block-size: 0; min-inline-size: 0; overflow: auto; display: grid; grid-auto-rows: max-content; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
 
 .app-panel-foot {
   display: flex;
@@ -107,9 +107,3 @@
 .meeting-enrichment h3 { font-size: 13px; margin: 14px 0 4px; }
 .meeting-enrichment blockquote { margin: 6px 0; opacity: .75; }
 .meeting-enrichment-source { opacity: .65; font-size: 12px; }
-
-.meeting-replay { padding: var(--space-4) var(--space-8); border-bottom: 1px solid var(--color-border); }
-.meeting-replay video { display: block; width: min(100%, 700px); max-height: 280px; background: #000; }
-.meeting-replay-controls { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-.meeting-replay-controls input { flex: 1; }
-.transcript-turn[aria-current="true"] { outline: 1px solid var(--color-accent); }

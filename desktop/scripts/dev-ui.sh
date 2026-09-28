@@ -8,6 +8,8 @@ profile="$GAPPD_SELECTED_FIXTURE_PROFILE"
 }
 port="${GAPPD_UI_CDP_PORT:-9337}"
 [[ "$port" =~ ^[0-9]+$ && "$port" -gt 0 && "$port" -le 65535 ]] || { echo 'Invalid GAPPD_UI_CDP_PORT' >&2; exit 1; }
+vite_port="${GAPPD_UI_VITE_PORT:-5173}"
+[[ "$vite_port" =~ ^[0-9]+$ && "$vite_port" -gt 0 && "$vite_port" -le 65535 ]] || { echo 'Invalid GAPPD_UI_VITE_PORT' >&2; exit 1; }
 cd "$(dirname "$0")/.."
 export PATH="$PWD/node_modules/.bin:$PATH"
-exec concurrently -k 'vite' 'tsup --config tsup.config.ts --watch' "wait-on tcp:5173 dist-electron/main/main.js && VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron --remote-debugging-address=127.0.0.1 --remote-debugging-port=$port ."
+exec concurrently -k "vite --host 127.0.0.1 --port $vite_port --strictPort" 'tsup --config tsup.config.ts --watch' "wait-on tcp:$vite_port dist-electron/main/main.js && VITE_DEV_SERVER_URL=http://127.0.0.1:$vite_port electron --remote-debugging-address=127.0.0.1 --remote-debugging-port=$port ."
