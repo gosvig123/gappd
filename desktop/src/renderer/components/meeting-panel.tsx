@@ -33,7 +33,7 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
   const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
-  useEffect(() => { setTab(initialTab ?? 'summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId, initialTab])
+  useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab(initialTab ?? 'summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId, initialTab])
   return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
     {meeting ? <PanelHead meeting={meeting} transcript={transcript} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
     {meeting ? <TabBar tab={tab} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
@@ -47,20 +47,13 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
 
 function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; tab: TabId; transcript: string }) {
   const [copied, setCopied] = useState(false)
-  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState('')
   const copy = async () => {
     try { await navigator.clipboard.writeText(copySourceFor(tab, meeting, transcript)); setCopied(true); setError('') }
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
-  const exportVideo = async () => {
-    setExporting(true); setError('')
-    try { await window.gappd.meetings.exportRecording(meeting.id) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setExporting(false) }
-  }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot">{meeting.status.capture.state === 'captured' && (meeting.status.video.state === 'ready' || (meeting.status.video.state === 'ended' && meeting.status.video.endSec !== undefined)) ? <Button className="compact-action" disabled={exporting} onClick={() => void exportVideo()}>{exporting ? 'Exporting…' : 'Export recording'}</Button> : null}<Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
 }
 
 function PanelHead({ meeting, transcript, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -94,7 +87,7 @@ function PanelContent({ view, meeting, transcript, tab, onOpenSettings, seekTo, 
   const meetingLevel = tab !== 'agenda'
   return (
     <>
-      <MeetingReplay meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
+      <MeetingReplay key={meeting.id} meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
       {meetingLevel && meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
       {meetingLevel && meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
       {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} onUpdated={view.actions.meetingUpdated} onLinkCalendar={view.actions.linkMeetingCalendar} /> : null}
