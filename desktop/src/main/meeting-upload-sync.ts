@@ -1,6 +1,7 @@
 import type { CloudCredential } from './cloud-auth'
 import type { MeetingSyncWork } from '../shared/meeting-sync-contract'
 import type { UploadContext } from './meeting-upload-context'
+import type { PauseReason } from './meeting-upload-transport'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { ensureRegistered } from './meeting-upload-context.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
@@ -10,6 +11,14 @@ import { sendDocument } from './meeting-upload-transport.ts'
 
 /** One pass sends at most this many Meetings, so no pass can run without end. */
 const MAX_SENDS_PER_PASS = 5
+
+const PAUSE_MESSAGES: Record<PauseReason, string> = {
+  'uploads-off': 'Gappd Cloud has uploads off for this account. Queued Meetings stay on this Mac; choose Allow uploads again to resume.',
+  'not-authorized': 'Gappd Cloud did not authorize this Mac to upload. Queued Meetings stay on this Mac; reconnect the upload account to resume.',
+  'stale-generation': 'Uploads were reset for this account, so this Mac\'s upload authorization is out of date. Queued Meetings stay on this Mac; choose Allow uploads again to resume.',
+  'storage-full': 'This account has reached its cloud storage limit. Queued Meetings stay on this Mac; delete cloud copies to make room.',
+  'rate-limited': 'Gappd Cloud asked this Mac to slow down. Queued Meetings stay on this Mac and upload in the next minute.',
+}
 
 /**
  * Sends queued copies while consent and the account still hold, in passes of
@@ -56,6 +65,10 @@ async function sendOne(context: UploadContext, credential: CloudCredential, cont
     await context.queue.reject(work.localId, work.revision, 'The server refused this Meeting document. Recording it again will not help.')
     context.setResult('The server refused one Meeting document. Other queued Meetings are unaffected.')
     return true
+  }
+  if (outcome.kind === 'paused') {
+    context.setResult(PAUSE_MESSAGES[outcome.reason])
+    return false
   }
   await context.queue.fail(work.localId, work.revision, 'No acknowledgment from Gappd Cloud.')
   context.setResult('No acknowledgment. The server may have accepted the copy; it will be retried. A cloud copy is never deleted by turning sync off.')

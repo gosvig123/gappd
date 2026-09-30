@@ -3,8 +3,18 @@ import type { CloudCredential } from './cloud-auth'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { accepted, deletedAcknowledged } from './meeting-upload-ack.ts'
 
-/** The outcome of one upload attempt. Only `unavailable` is worth retrying. */
-export type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'unavailable' }
+/**
+ * Account-wide reasons the server gives for not taking any upload now. None is about one
+ * document, so the work stays queued without spending an attempt.
+ */
+export type PauseReason = 'uploads-off' | 'not-authorized' | 'stale-generation' | 'storage-full' | 'rate-limited'
+
+/** The outcome of one upload attempt. Only `unavailable` spends a retry attempt. */
+export type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'paused'; reason: PauseReason } | { kind: 'unavailable' }
+
+const PAUSE_STATUSES: Record<number, PauseReason> = { 403: 'not-authorized', 409: 'stale-generation', 413: 'storage-full', 429: 'rate-limited' }
+// The server's one 403 that is about the account, not this Mac's token or signature.
+const UPLOADS_OFF_BODY = 'uploads are off for this account'
 
 const TIMEOUT_MS = 15_000
 
@@ -22,6 +32,9 @@ export async function sendDocument(fetcher: typeof fetch, resource: string, cred
     })
     // A refusal is about this document, so retrying it can never help.
     if (response.status === 400) return { kind: 'refused' }
+    const reason = PAUSE_STATUSES[response.status]
+    if (reason === 'not-authorized' && (await response.text()).trim() === UPLOADS_OFF_BODY) return { kind: 'paused', reason: 'uploads-off' }
+    if (reason) return { kind: 'paused', reason }
     const value: unknown = await response.json()
     if (!response.ok || !accepted(value, credential, work.revision)) return { kind: 'unavailable' }
     return { kind: 'accepted', expiresAt: value.expires_at }
