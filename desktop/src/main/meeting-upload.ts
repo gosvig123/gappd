@@ -190,10 +190,14 @@ export class MeetingUpload {
     if (!credential || generation !== this.generation) return
     const { queued, unreadable } = await this.enqueueMissing(credential)
     if (generation !== this.generation || !await this.consented()) return
-    // Retry durable pending work even when discovery found no new Meeting.
-    if ((await this.queue.status()).pending > 0) await this.sync()
+    // Retry durable pending work even when discovery found no new Meeting. An announced refresh
+    // clears the old result first, so what remains afterwards is this sync's own reason.
+    if ((await this.queue.status()).pending > 0) {
+      if (announce) this.result = null
+      await this.sync()
+    }
     if (announce && (queued > 0 || unreadable > 0) && generation === this.generation) {
-      this.result = backfillMessage(queued, unreadable, await this.queue.status())
+      this.result = backfillMessage(queued, unreadable, await this.queue.status(), this.result)
     }
   }
 
@@ -290,10 +294,11 @@ export class MeetingUpload {
   }
 }
 
-function backfillMessage(queued: number, unreadable: number, queue: MeetingUploadStatus['queue']): string {
+function backfillMessage(queued: number, unreadable: number, queue: MeetingUploadStatus['queue'], syncResult: string | null): string {
   const parts = [`Queued ${queued} existing ${queued === 1 ? 'Meeting' : 'Meetings'} for upload.`]
   if (unreadable > 0) parts.push(`${unreadable} could not be read yet and stay on this Mac.`)
-  if (queue.pending > 0) parts.push(`${queue.pending} still queued; sync retries automatically while consent remains active.`)
+  // The sync result says why work is still queued, such as a pause the server asked for.
+  if (queue.pending > 0) parts.push(syncResult ? `${queue.pending} still queued. ${syncResult}` : `${queue.pending} still queued; sync retries automatically while consent remains active.`)
   if (queue.failed > 0) parts.push(`${queue.failed} failed and will not retry.`)
   return parts.join(' ')
 }
