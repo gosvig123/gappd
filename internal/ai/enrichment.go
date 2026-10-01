@@ -146,22 +146,18 @@ func validateEnrichment(raw json.RawMessage, items []string, sources []AgendaSou
 	if err := json.Unmarshal(raw, &response); err != nil || response.Notes == nil || len(response.Notes) > enrichmentMaxNotes {
 		return nil, fmt.Errorf("enrich: invalid model response; please retry")
 	}
-	evidence := make(map[string]string, len(sources))
-	for _, source := range sources {
-		evidence[source.ID] = source.Text
-	}
 	notes := make([]indexedEnrichmentNote, 0, len(response.Notes))
 	for _, note := range response.Notes {
-		text, exists := evidence[note.SourceID]
-		valid := exists && note.ActionItem >= 1 && note.ActionItem <= len(items) &&
+		sourceID, quote, found := citedEvidence(sources, note.SourceID, note.Quote)
+		valid := note.ActionItem >= 1 && note.ActionItem <= len(items) &&
 			(note.Status == "context" || note.Status == "possibly_done") &&
 			strings.TrimSpace(note.Note) != "" && len(note.Note) <= 1000 &&
-			len(strings.TrimSpace(note.Quote)) >= 12 && len(note.Quote) <= 1000 && strings.Contains(text, note.Quote)
+			len(note.Quote) <= 1000 && found
 		if !valid {
 			return nil, fmt.Errorf("enrich: model returned unsupported source evidence; please retry")
 		}
 		notes = append(notes, indexedEnrichmentNote{
-			EnrichmentNote: EnrichmentNote{ActionItem: items[note.ActionItem-1], Status: note.Status, Note: strings.TrimSpace(note.Note), SourceID: note.SourceID, Quote: note.Quote},
+			EnrichmentNote: EnrichmentNote{ActionItem: items[note.ActionItem-1], Status: note.Status, Note: strings.TrimSpace(note.Note), SourceID: sourceID, Quote: quote},
 			index:          note.ActionItem,
 		})
 	}
