@@ -32,6 +32,7 @@ export type CalendarEventSummary = {
 
 export type CalendarSnapshot = {
   configured: boolean
+  gmailAvailable?: boolean
   connections: CalendarConnection[]
   events: CalendarEventSummary[]
 }

@@ -18,6 +18,7 @@ node_modules/
 !/docs/cloud-data-lifecycle.md
 !/docs/cloud-operations.md
 !/docs/cloud-selected-fixture.md
+!/docs/google-gmail-verification.md
 # Go
 vendor/
 

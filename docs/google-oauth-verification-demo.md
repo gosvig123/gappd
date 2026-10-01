@@ -6,7 +6,7 @@ Google approved `calendar.events.owned.readonly` for `gappd-production` on 30 Se
 
 - The 100-user cap no longer applies to Calendar-only consent. It still applies to any unapproved scope.
 - A change to branding, domains, privacy URL, or scopes requires a new verification request. Approval is not inherited by new scopes.
-- `gmail.readonly` is restricted and not approved. Keep the Gmail option blocked in Settings until it has its own verification and security assessment; each Gmail consent would otherwise show the unverified-app screen and consume the user cap.
+- `gmail.readonly` is restricted and not approved. Keep the Gmail option blocked in release builds until it has its own verification; see [Gmail verification](google-gmail-verification.md).
 
 The rest of this document records how the approved demo was prepared. Reuse it for a future scope request.
 
