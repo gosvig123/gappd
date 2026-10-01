@@ -143,7 +143,7 @@ export class GoogleCalendarServiceCore {
     const connections = document.connections.map((connection) => this.toConnection(connection))
     const events = document.connections.flatMap((connection) => [...new Map([...(connection.historicalEvents ?? []), ...connection.events].map(event => [event.sourceId, event])).values()])
       .sort((left, right) => left.start.localeCompare(right.start))
-    return { configured: this.api.configured(), connections, events }
+    return { configured: this.api.configured(), gmailAvailable: this.gmailAvailable, connections, events }
   }
 
   private toConnection(connection: StoredCalendarConnection): CalendarConnection {
