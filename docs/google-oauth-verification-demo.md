@@ -1,6 +1,18 @@
 # Google Calendar OAuth verification demo
 
-The [September 5 verification email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0706249e1227c9) says the previous video did not show why `calendar.events.owned.readonly` is needed or why narrower access is insufficient. Reply to that thread after the replacement video and factual AI-processing answers are ready. The project is in production publishing status, but Calendar data access is still under review. The owner chose to keep Calendar available in the beta while review continues; users may see Google's unverified-app warning and the unverified-user cap applies.
+## Status
+
+Google approved `calendar.events.owned.readonly` for `gappd-production` on 30 September 2026 ([approval email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0f338b636dab66)). On 1 October 2026 the Verification Center showed branding and data access as verified, publishing status **In production**, and the declared scopes as `openid`, `userinfo.email`, and `calendar.events.owned.readonly`, with no restricted scope. These match `GOOGLE_SCOPES` in `desktop/src/main/google-calendar-api.ts`.
+
+- The 100-user cap no longer applies to Calendar-only consent. It still applies to any unapproved scope.
+- A change to branding, domains, privacy URL, or scopes requires a new verification request. Approval is not inherited by new scopes.
+- `gmail.readonly` is restricted and not approved. Keep the Gmail option blocked in Settings until it has its own verification and security assessment; each Gmail consent would otherwise show the unverified-app screen and consume the user cap.
+
+The rest of this document records how the approved demo was prepared. Reuse it for a future scope request.
+
+## Original review request
+
+The [September 5 verification email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0706249e1227c9) says the previous video did not show why `calendar.events.owned.readonly` is needed or why narrower access is insufficient. Reply to that thread after the replacement video and factual AI-processing answers are ready. At that time Calendar data access was still under review, and beta users could see Google's unverified-app warning.
 
 ## Prepare
 
