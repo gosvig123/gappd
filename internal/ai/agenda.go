@@ -55,15 +55,12 @@ func validateAgenda(raw json.RawMessage, sources []AgendaSource) (AgendaDraft, e
 	if draft.Items == nil || len(draft.Items) > 8 {
 		return AgendaDraft{}, fmt.Errorf("agenda: invalid item count")
 	}
-	evidence := make(map[string]string)
-	for _, source := range sources {
-		evidence[source.ID] = source.Text
-	}
-	for _, item := range draft.Items {
-		text, exists := evidence[item.SourceID]
-		if !exists || strings.TrimSpace(item.Topic) == "" || len(item.Topic) > 1000 || len(strings.TrimSpace(item.Quote)) < 12 || len(item.Quote) > 1000 || !strings.Contains(text, item.Quote) {
+	for i, item := range draft.Items {
+		sourceID, quote, found := citedEvidence(sources, item.SourceID, item.Quote)
+		if strings.TrimSpace(item.Topic) == "" || len(item.Topic) > 1000 || len(item.Quote) > 1000 || !found {
 			return AgendaDraft{}, fmt.Errorf("agenda: model returned unsupported source evidence; please retry")
 		}
+		draft.Items[i].SourceID, draft.Items[i].Quote = sourceID, quote
 	}
 	return draft, nil
 }

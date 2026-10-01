@@ -32,6 +32,12 @@ Release builds cannot request Gmail. `gmailReviewEnabled()` in `desktop/src/main
 7. Narrate the scope choice: `gmail.metadata` gives headers without bodies, but the features need message text; `gmail.readonly` is the narrowest scope that reads bodies, and it cannot send, delete, label, or change read state.
 8. Disconnect the account and show that access is revoked in the Google Account's third-party connections page.
 
+Lessons from the 1 October 2026 recording:
+
+- Google skips the consent screen when the account already granted these scopes to the client. Disconnect in Gappd first (this revokes the grant, including the installed app's Calendar connection), then connect again.
+- The fixture's isolated home has no Codex login, so Settings cannot save Installed Codex. For step 6, set `provider = "codex_exec"` in the fixture's `config.toml`; the refusal happens before Codex is called.
+- Enrichment links a Meeting to one overlapping Calendar event. Give the synthetic Meeting the test event's time.
+
 Trim personal data. Upload to Google Drive with "Anyone with the link can view", or as unlisted YouTube, and check playback in a signed-out browser. Google refused a downloadable GitHub release file for the Calendar review.
 
 ## Submit
