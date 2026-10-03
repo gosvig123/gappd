@@ -94,8 +94,12 @@
   --shadow-accent: 0 1px 2px color-mix(in srgb, #05070c 50%, transparent), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 50%, transparent);
   --shadow-logo: 0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent);
   --focus-ring: 0 0 0 3px var(--color-accent-soft);
-  --gradient-accent: linear-gradient(180deg, #5e9ce0, #4d87cf);
-  --gradient-accent-hover: linear-gradient(180deg, #6aa6e8, #5690d6);
+  /* Deep enough that white button text meets WCAG AA (4.5:1) at every stop, in both themes.
+     Hover darkens rather than lightens so it keeps that contrast. */
+  --gradient-accent: linear-gradient(180deg, #2b70bd, #2864ae);
+  --gradient-accent-hover: linear-gradient(180deg, #2867b0, #225797);
+  /* Speaker names in transcripts: hue per speaker, lightness per theme. */
+  --speaker-ink-lightness: 78%;
   /* Zed is flat and calm — drop the colored glows, keep a whisper of top sheen. */
   --shell-glow: linear-gradient(180deg, color-mix(in srgb, #ffffff 2.5%, transparent), transparent 22%);
 
@@ -150,7 +154,7 @@
   --shadow-raised: 0 1px 2px rgb(27 31 39 / 8%), 0 16px 40px -20px rgb(27 31 39 / 24%);
   --shadow-sheet: 0 1.5rem 4rem rgb(27 31 39 / 22%);
   --shadow-accent: 0 1px 2px rgb(27 31 39 / 10%), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 45%, transparent);
-  --gradient-accent: linear-gradient(180deg, #4b8ed6, #3a76bd);
-  --gradient-accent-hover: linear-gradient(180deg, #5697dd, #4380c7);
+  /* 28% keeps every speaker hue at 5:1 or more on white and on reading paper. */
+  --speaker-ink-lightness: 28%;
   --shell-glow: linear-gradient(180deg, rgb(255 255 255 / 60%), transparent 24%);
 }

@@ -5,7 +5,7 @@ import { buildAlerts, type AlertItem } from '../lib/alerts'
 import { MeetingsView } from '../sections/meetings-view'
 import { PeopleView } from '../sections/people-view'
 import { TodayView } from '../sections/today-view'
-import { AppSidebar, sectionCounts, type SectionKey } from './app-sidebar'
+import { AppSidebar, type SectionKey } from './app-sidebar'
 import { useConfirm } from './confirm'
 import { OpenMeetingScope, type MeetingTab, type OpenMeeting } from './meeting-open-scope'
 import { NotificationStack, useMeetingReadyNotices } from './notifications'
@@ -26,7 +26,7 @@ export function AppShell({ view }: { view: AppView }) {
   const shell = useShellController(view)
   const routedView = { ...view, actions: { ...view.actions, openMeeting: shell.openMeeting } }
   return <div className="app-shell">
-    <AppSidebar section={shell.section} counts={sectionCounts(view)} onSelect={shell.setSection} onOpenSettings={() => shell.setSettingsCategory('General')} />
+    <AppSidebar section={shell.section} onSelect={shell.setSection} onOpenSettings={() => shell.setSettingsCategory('General')} />
     <ShellMain view={routedView} shell={shell} />
     <NotificationStack alerts={shell.alerts.filter(alert => alert.kind !== 'blocking')} notices={shell.notices} onDismissAlert={view.actions.dismissAlert} onDismissNotice={shell.dismissNotice} onOpenMeeting={shell.openMeeting} />
     {shell.settingsCategory ? <SettingsDialog view={routedView} initialCategory={shell.settingsCategory} onClose={() => shell.setSettingsCategory(null)} /> : null}

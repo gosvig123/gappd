@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
 )
@@ -27,8 +28,10 @@ func Bootstrap(profile string) error {
 	if err = store.Init(); err != nil {
 		return err
 	}
-	if err = store.CreateMeeting(Meeting()); err != nil {
-		return err
+	for _, meeting := range append([]*db.Meeting{Meeting()}, ReviewMeetings(time.Now())...) {
+		if err = store.CreateMeeting(meeting); err != nil {
+			return err
+		}
 	}
 	return os.WriteFile(filepath.Join(profile, "selected-fixture"), []byte(Marker), 0600)
 }

@@ -9,12 +9,12 @@ import { meetingHasWork, meetingProgressLabel } from '../components/meeting-prog
 import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../components/ui'
 import { SpeakerLabels } from '../routes/speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from '../routes/transcript-view'
-import { artifactLine, statusLabel, type AppView } from '../lib/app-view'
+import { artifactNote, statusLabel, type AppView } from '../lib/app-view'
 import { agendaStateForMeeting, agendaTabLabel } from '../lib/agenda-status'
 import { AgendaPane } from './agenda-tab'
 import { MeetingEnrichmentSection } from './meeting-enrichment'
 import type { MeetingTab } from './meeting-open-scope'
-import { meetingDurationLabel, meetingTimeLabel } from '../lib/meeting-grouping'
+import { meetingDurationLabel } from '../lib/meeting-grouping'
 import type { ConfirmController } from './confirm'
 
 const TABS: ReadonlyArray<{ id: MeetingTab; label: string }> = [
@@ -58,17 +58,17 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
 
 function PanelHead({ meeting, transcript, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
+  const duration = meetingDurationLabel(row)
+  const note = artifactNote(row)
   return (
     <header className="app-panel-top">
       <div className="app-panel-titles">
-        <p className="ui-eyebrow">{meetingTimeLabel(row)}</p>
         <h1>{meeting.title || 'Untitled meeting'}</h1>
         <p className="app-panel-meta">
-          <span>{meetingDurationLabel(row)}</span>
-          <span aria-hidden="true">·</span>
-          <span>{meeting.speakers.length} {meeting.speakers.length === 1 ? 'speaker' : 'speakers'}</span>
-          <span aria-hidden="true">·</span>
-          <span>{artifactLine(row)}</span>
+          <span>{new Date(meeting.startedAt).toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          {duration !== '—' ? <span>{duration}</span> : null}
+          {meeting.speakers.length ? <span>{meeting.speakers.length} {meeting.speakers.length === 1 ? 'speaker' : 'speakers'}</span> : null}
+          {note ? <span>{note}</span> : null}
           {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{statusLabel(row)}</StatusPill> : null}
         </p>
       </div>

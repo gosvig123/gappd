@@ -9,6 +9,8 @@ import { GoogleCalendarApi } from './google-calendar-api'
 import { GoogleCalendarServiceCore, type CalendarDocument } from './google-calendar-service-core'
 import { createOAuthRelay } from './oauth-relay'
 import { serviceConfig } from './service-config'
+import { selectedFixtureCalendar } from './selected-fixture-calendar'
+import { selectedFixtureProfile } from './selected-fixture-profile'
 
 const CALENDAR_STORE_FILE = 'google-calendar.enc'
 let instance: GoogleCalendarServiceCore | null = null
@@ -18,6 +20,7 @@ export function googleCalendarPendingSyncIds(): string[] {
 }
 
 export function googleCalendarSnapshot(): Promise<CalendarSnapshot> {
+  if (selectedFixtureProfile()) return Promise.resolve(selectedFixtureCalendar())
   return calendarService().snapshot()
 }
 
