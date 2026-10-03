@@ -10,7 +10,7 @@ UNAME_S   := $(shell uname -s)
 
 export MACOSX_DEPLOYMENT_TARGET ?= 26.0
 
-.PHONY: build build-capture build-speech build-diarizer ensure-macos run dev db-init db-reset clean install-capture install gen-protocol check-protocol
+.PHONY: build build-capture build-video build-speech build-diarizer ensure-macos run dev db-init db-reset clean install-capture install-video install gen-protocol check-protocol
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -19,6 +19,9 @@ build:
 
 build-capture: ensure-macos
 	@bash capture-helper/build.sh
+
+build-video: ensure-macos
+	@bash video-helper/build.sh
 
 build-speech: ensure-macos
 	@bash apple-speech-transcriber/build.sh
@@ -40,6 +43,11 @@ install-capture: build-capture
 	@rm -rf $(HOME)/.gappd/GappdCapture.app
 	@cp -R $(BUILD_DIR)/GappdCapture.app $(HOME)/.gappd/GappdCapture.app
 	@echo "Done. gappd-capture installed at ~/.gappd/GappdCapture.app"
+
+install-video: build-video
+	@mkdir -p $(HOME)/.gappd
+	@rm -rf $(HOME)/.gappd/GappdVideo.app
+	@cp -R $(BUILD_DIR)/GappdVideo.app $(HOME)/.gappd/GappdVideo.app
 
 install: build
 	@echo "Installing gappd binary to /usr/local/bin/..."

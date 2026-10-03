@@ -15,7 +15,6 @@ import '@fontsource/jetbrains-mono/500.css';
 import './theme.css'
 import './styles.css'
 import './components/ui.css'
-import './shell.css'
 
 installTransientScrollbars()
 

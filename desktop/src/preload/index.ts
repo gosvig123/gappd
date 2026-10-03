@@ -16,6 +16,10 @@ function buildOperationApi(): IpcInvokeApi {
     recording: invokeGroup('recording'),
     managedRuntime: invokeGroup('managedRuntime'),
     aiProvider: invokeGroup('aiProvider'),
+    agenda: invokeGroup('agenda'),
+    googleCalendar: invokeGroup('googleCalendar'),
+    slack: invokeGroup('slack'),
+    meetingUpload: invokeGroup('meetingUpload'),
     update: invokeGroup('update'),
     startup: invokeGroup('startup'),
   }

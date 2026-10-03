@@ -1,6 +1,7 @@
-import type { AIConfig } from '../shared/generated/contracts'
+import type { AIConfig, CodexStatusResponse } from '../shared/generated/contracts'
 import type { ManagedRuntimeOperation, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
 import { LOCAL_AI_PROVIDER_LLAMACPP, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL } from '../shared/managed-local-ai'
+import { requestCommand } from './app-protocol'
 import { appleSpeechAssetAvailable, missingAppleSpeechAssetMessage } from './apple-speech'
 import { managedLanguageModelAvailable, missingManagedLanguageModelMessage } from './language-model'
 import { getManagedLlamaCppRuntimeStatus, missingBundledLlamaCppMessage } from './llamacpp'
@@ -10,6 +11,22 @@ import { diarizationAssetsAvailable, missingDiarizationAssetsMessage } from './d
 export type RuntimeProbe = { config: AIConfig | null; error?: string; providerError?: string }
 
 const CODEX_PROVIDER = 'codex_exec'
+const CODEX_STATUS_FALLBACK = 'Installed Codex is unavailable'
+
+export async function loadProviderProbe(providerHealth?: CodexStatusResponse): Promise<RuntimeProbe> {
+  try { return probeFor(providerHealth ?? await requestCommand('config.codexStatus', {})) }
+  catch (error) { return { config: null, error: error instanceof Error ? error.message : String(error) } }
+}
+
+function probeFor(status: CodexStatusResponse): RuntimeProbe {
+  const providerError = status.ai.provider === CODEX_PROVIDER && !status.available
+    ? status.error || CODEX_STATUS_FALLBACK : undefined
+  return { config: status.ai, ...(providerError ? { providerError } : {}) }
+}
+
+export function isManagedLocal(config: Pick<AIConfig, 'provider' | 'managed'>): boolean {
+  return config.provider === LOCAL_AI_PROVIDER_LLAMACPP && config.managed
+}
 
 export function initialRuntimeSnapshot(): ManagedRuntimeSnapshot {
   return baseSnapshot('checking', 'Checking Managed Runtime readiness')

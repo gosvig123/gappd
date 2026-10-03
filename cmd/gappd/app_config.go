@@ -15,7 +15,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigCodexModelsCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
 	return cmd
 }
 
@@ -63,11 +63,64 @@ func codexStatusFor(cfg config.Config) appprotocol.CodexStatusResponse {
 	if cfg.AI.Provider != config.ProviderCodexExec {
 		return status
 	}
-	if err := ai.NewCodexExec(cfg.AI.CodexExecutable, cfg.AI.CodexModel).Available(); err != nil {
-		message := err.Error()
-		status.Available, status.Error = false, &message
+	if err := ai.ValidateCodexExecutable(cfg.AI.CodexExecutable); err != nil {
+		return unavailableCodexStatus(status, err)
+	}
+	selection, err := resolveCodexSelection(cfg.AI)
+	if err != nil {
+		return unavailableCodexStatus(status, err)
+	}
+	if err := ai.NewCodexExec(cfg.AI.CodexExecutable, selection.Model, selection.Effort).Available(); err != nil {
+		return unavailableCodexStatus(status, err)
 	}
 	return status
+}
+
+func unavailableCodexStatus(status appprotocol.CodexStatusResponse, err error) appprotocol.CodexStatusResponse {
+	message := err.Error()
+	status.Available, status.Error = false, &message
+	return status
+}
+
+func appConfigCodexModelsCmd() *cobra.Command {
+	var asJSON bool
+	var entered string
+	cmd := &cobra.Command{
+		Use: "codex-models", Short: "List the installed Codex model catalog",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !asJSON {
+				return fmt.Errorf("app config codex-models requires --json")
+			}
+			cfg, err := loadAppConfig()
+			if err != nil {
+				return err
+			}
+			executable := strings.TrimSpace(entered)
+			if executable == "" {
+				executable = cfg.AI.CodexExecutable
+			}
+			models, err := codexCatalog(executable)
+			if err != nil {
+				return fmt.Errorf("read installed Codex model catalog: %w; update Codex or open Settings", err)
+			}
+			return writeJSON(codexModelsFor(models))
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	cmd.Flags().StringVar(&entered, "executable", "", "Codex executable to inspect; defaults to the saved one")
+	return cmd
+}
+
+func codexModelsFor(models []ai.CodexModel) appprotocol.CodexModelsResponse {
+	infos := make([]appprotocol.CodexModelInfo, 0, len(models))
+	for _, model := range models {
+		infos = append(infos, appprotocol.CodexModelInfo{
+			ID: model.ID, DisplayName: model.DisplayName,
+			DefaultReasoningEffort: model.DefaultReasoningEffort,
+			ReasoningEfforts:       model.ReasoningEfforts, IsDefault: model.IsDefault,
+		})
+	}
+	return appprotocol.CodexModelsResponse{Models: infos, DefaultModel: ai.DefaultCodexModel, DefaultReasoningEffort: ai.DefaultCodexReasoningEffort}
 }
 
 func appConfigUseManagedLocalAICmd() *cobra.Command {
@@ -97,7 +150,7 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 }
 
 func appConfigUseCodexCmd() *cobra.Command {
-	var executable, model string
+	var executable, model, reasoningEffort string
 	cmd := &cobra.Command{
 		Use: "use-codex", Short: "Use an installed Codex CLI for summaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -105,8 +158,12 @@ func appConfigUseCodexCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			applyCodex(&cfg, executable, model)
-			if err := ai.NewCodexExec(cfg.AI.CodexExecutable, cfg.AI.CodexModel).Available(); err != nil {
+			selection, err := resolveCodexSelection(config.AI{CodexExecutable: strings.TrimSpace(executable), CodexModel: model, CodexReasoningEffort: reasoningEffort})
+			if err != nil {
+				return err
+			}
+			applyCodex(&cfg, executable, selection)
+			if err := ai.NewCodexExec(cfg.AI.CodexExecutable, selection.Model, selection.Effort).Available(); err != nil {
 				return fmt.Errorf("preflight Installed Codex: %w", err)
 			}
 			if err := config.Save(cfg); err != nil {
@@ -116,15 +173,17 @@ func appConfigUseCodexCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&executable, "executable", "", "Absolute Codex executable path")
-	cmd.Flags().StringVar(&model, "model", "", "Optional Codex model")
+	cmd.Flags().StringVar(&model, "model", "", "Codex model from the installed catalog")
+	cmd.Flags().StringVar(&reasoningEffort, "reasoning-effort", "", "Reasoning effort supported by that model")
 	_ = cmd.MarkFlagRequired("executable")
 	return cmd
 }
 
-func applyCodex(cfg *config.Config, executable, model string) {
+func applyCodex(cfg *config.Config, executable string, selection ai.CodexSelection) {
 	cfg.AI.Provider = config.ProviderCodexExec
 	cfg.AI.CodexExecutable = strings.TrimSpace(executable)
-	cfg.AI.CodexModel = strings.TrimSpace(model)
+	cfg.AI.CodexModel = selection.Model
+	cfg.AI.CodexReasoningEffort = selection.Effort
 }
 
 func loadAppConfig() (config.Config, error) {
@@ -171,5 +230,6 @@ func appAIConfigFor(cfg config.Config) appprotocol.AIConfig {
 		Provider: cfg.AI.Provider, Model: cfg.AI.Model, Endpoint: cfg.AI.Endpoint,
 		Temperature: cfg.AI.Temp, Managed: cfg.AI.Managed,
 		CodexExecutable: cfg.AI.CodexExecutable, CodexModel: cfg.AI.CodexModel,
+		CodexReasoningEffort: cfg.AI.CodexReasoningEffort,
 	}
 }

@@ -1,6 +1,6 @@
 export type ProviderChangeToken = { generation: number }
 
-export type ProviderChangeGate = {
+type ProviderChangeGate = {
   generation(): number
   current(generation: number): boolean
   changing(): boolean

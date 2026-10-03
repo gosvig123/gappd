@@ -39,20 +39,16 @@ func runAppMeetingsDelete(id string, asJSON bool) error {
 }
 
 func appDeleteMeeting(store *db.DB, id string) (appprotocol.MeetingDeleteResponse, error) {
-	meeting, err := store.DeleteMeeting(id)
+	meeting, err := store.DeleteMeeting(id, removeMeetingArtifacts)
 	if err != nil {
 		return appprotocol.MeetingDeleteResponse{}, err
 	}
-	return appprotocol.MeetingDeleteResponse{DeletedID: meeting.ID, ArtifactWarning: removeMeetingArtifacts(meeting.AudioPath)}, nil
+	return appprotocol.MeetingDeleteResponse{DeletedID: meeting.ID}, nil
 }
 
-func removeMeetingArtifacts(sessionDir *string) *string {
+func removeMeetingArtifacts(sessionDir *string) error {
 	if sessionDir == nil || *sessionDir == "" {
 		return nil
 	}
-	if err := audioartifact.DeleteSession(*sessionDir); err != nil {
-		message := err.Error()
-		return &message
-	}
-	return nil
+	return audioartifact.DeleteSession(*sessionDir)
 }

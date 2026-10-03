@@ -1,0 +1,69 @@
+/* Next + history remains navigable while the selected content gets most space. */
+.app-scroll.is-workspace { overflow: hidden; }
+.meetings-workspace { container: meetings-workspace / inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); block-size: 100%; min-block-size: 0; min-inline-size: 0; gap: var(--space-8); }
+.workspace-head { min-inline-size: 0; }
+.workspace-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-6); }
+.workspace-heading h1 { margin: 0; }
+.workspace-calendar-actions { display: flex; gap: var(--space-7); flex-wrap: wrap; }
+.workspace-search { margin-block-start: var(--space-7); max-inline-size: 38rem; }
+.workspace-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: 24px; }
+.has-selection .workspace-columns { grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); }
+.workspace-list { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-4) var(--space-7) 2px; overscroll-behavior: contain; }
+.workspace-content { min-inline-size: 0; min-block-size: 0; }
+.workspace-next { margin-block-end: var(--space-9); }
+.workspace-next > h2, .workspace-history > h2 { font-size: var(--font-size-title); font-weight: var(--font-weight-semibold); letter-spacing: var(--tracking-tight); color: var(--color-text); margin: 0 0 var(--space-4); }
+.workspace-next details { margin-block-start: var(--space-4); }
+.workspace-next summary { color: var(--color-text-muted); font-size: var(--font-size-small); cursor: pointer; }
+.workspace-day + .workspace-day, .workspace-next details .workspace-day:first-child { margin-block-start: var(--space-6); }
+/* The list scrolls, so headings take the row padding instead of rows taking a negative margin. */
+.workspace-list :is(h2, h3, summary, .app-block-note) { padding-inline: var(--space-5); }
+.workspace-day h3 { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); }
+
+/* Title first in the DOM, so a screen reader and a text match start with it; the grid shows time first. */
+.workspace-row { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) auto; grid-template-areas: "time title note"; align-items: center; gap: var(--space-6); inline-size: 100%; min-inline-size: 0; padding: var(--space-3) var(--space-5); border: 0; border-radius: var(--radius-md); background: transparent; color: var(--color-text); text-align: start; cursor: pointer; }
+.workspace-row:hover { background: var(--surface-hover); }
+.workspace-row[aria-current] { background: var(--color-accent-tint); box-shadow: inset 3px 0 var(--color-accent); }
+.workspace-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.workspace-row.is-next { background: var(--color-accent-tint); }
+.workspace-row-title { grid-area: title; min-inline-size: 0; font-size: var(--font-size-body); font-weight: var(--font-weight-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace-row-time { grid-area: time; color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; }
+.workspace-row-note { grid-area: note; display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); white-space: nowrap; }
+.workspace-row-note.is-failed { color: var(--color-text-soft); }
+.workspace-row-note svg { flex: none; inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-danger); }
+:is(.workspace-row.is-next, .workspace-row[aria-current]) :is(.workspace-row-time, .workspace-row-note) { color: var(--color-text-soft); }
+/* Beside an open Meeting the list is narrow: title on its own line, time and note under it. */
+.has-selection .workspace-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "title title" "time note"; row-gap: var(--space-1); column-gap: var(--space-4); }
+.has-selection .workspace-row-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.workspace-agenda { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; block-size: 100%; min-block-size: 0; min-inline-size: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface); }
+.workspace-agenda-body { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: clamp(16px, 3cqi, 36px); }
+.workspace-content .meeting-agenda-draft { max-inline-size: 60rem; margin-inline: auto; }
+.workspace-content .meeting-agenda-draft textarea { inline-size: 100%; min-block-size: 6rem; resize: vertical; padding: var(--space-7); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-card); color: var(--color-text); font: inherit; line-height: 1.6; }
+.workspace-content .meeting-agenda-draft label { display: grid; gap: var(--space-4); }
+.workspace-content .meeting-agenda-draft :is(p, blockquote, label) { overflow-wrap: anywhere; }
+.workspace-content .meeting-agenda-draft section[aria-label="Saved agenda draft"] > div { margin-block: var(--space-8); }
+.workspace-content .app-panel-top { background: transparent; }
+.workspace-content .app-panel-titles h1 { font-size: clamp(1.4rem, 2.4cqi, 2rem); }
+.workspace-content .app-reading { font-size: 1rem; line-height: 1.75; }
+.workspace-content .app-panel-pane { padding: clamp(16px, 3cqi, 36px); }
+.app-panel-body { grid-row: 3; }
+.app-panel-foot { grid-row: 4; }
+.workspace-agenda > .app-panel-foot { grid-row: 3; }
+@container meetings-workspace (max-width: 800px) {
+  .has-selection .workspace-columns { grid-template-columns: minmax(0, 1fr); }
+  .has-selection .workspace-list { display: none; }
+  .has-selection .workspace-heading { display: none; }
+  .has-selection .workspace-search { margin-block-start: 0; }
+  .workspace-content .app-panel-meta, .workspace-content .app-panel-titles > .ui-eyebrow { display: none; }
+  .workspace-content .app-panel-foot { padding: var(--space-3); gap: var(--space-3); }
+  .has-selection.is-searching .workspace-list { display: block; }
+  .has-selection.is-searching .workspace-content { display: none; }
+}
+@media (max-height: 540px) {
+  .has-selection .workspace-heading { display: none; }
+  .has-selection .workspace-search { margin-block-start: 0; }
+  .workspace-content .app-panel-meta, .workspace-content .app-panel-titles > .ui-eyebrow { display: none; }
+  .workspace-content .app-panel-top { padding: var(--space-4); }
+}
+@container meetings-workspace (max-width: 400px) {
+  .workspace-agenda-body { padding: var(--space-5); }
+}

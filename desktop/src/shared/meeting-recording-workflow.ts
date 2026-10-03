@@ -5,8 +5,8 @@ export const RECORDING_STATUS_IDLE = 'idle'
 export const RECORDING_STATUS_RECORDING = 'recording'
 export const RECORDING_STATUS_STOPPING = 'stopping'
 export const RECORDING_STATUS_ERROR = 'error'
-export const RECORDING_STATUSES = [RECORDING_STATUS_IDLE, RECORDING_STATUS_RECORDING, RECORDING_STATUS_STOPPING, RECORDING_STATUS_ERROR] as const
-export type RecordingStatus = (typeof RECORDING_STATUSES)[number]
+const RECORDING_STATUSES = [RECORDING_STATUS_IDLE, RECORDING_STATUS_RECORDING, RECORDING_STATUS_STOPPING, RECORDING_STATUS_ERROR] as const
+type RecordingStatus = (typeof RECORDING_STATUSES)[number]
 
 export type RecordingState = { status: RecordingStatus; meetingId?: string; title?: string; error?: string }
 type RecordingEventOutcome = { state: RecordingState }
@@ -15,10 +15,16 @@ export function recordingEventOutcome(event: RecordingEvent): RecordingEventOutc
   return { state: recordingStateFromEvent(event) }
 }
 
-export function recordingStateFromEvent(event: RecordingEvent): RecordingState {
+function recordingStateFromEvent(event: RecordingEvent): RecordingState {
   const base = { meetingId: event.meetingId, title: event.title }
   switch (event.type) {
     case 'recording.started': return { ...base, status: RECORDING_STATUS_RECORDING }
+    case 'recording.videoCancelled':
+    case 'recording.videoSkipped':
+    case 'recording.videoStarted':
+    case 'recording.videoEnded':
+    case 'recording.videoFinalized':
+    case 'recording.videoFailed': return { ...base, status: RECORDING_STATUS_RECORDING }
     case 'recording.stopping': return { ...base, status: RECORDING_STATUS_STOPPING }
     case 'recording.captured': return { ...base, status: RECORDING_STATUS_IDLE }
     case 'recording.failed': return { ...base, status: RECORDING_STATUS_ERROR, error: event.error ?? recordingFailureMessage(event) }

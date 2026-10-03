@@ -45,14 +45,16 @@ type StartInput struct {
 }
 
 type Session struct {
-	module Module
-	input  StartInput
-	cancel context.CancelFunc
-	done   chan *streamState
-	mu     sync.Mutex
-	result Outcome
-	err    error
-	closed bool
+	module   Module
+	input    StartInput
+	cancel   context.CancelFunc
+	done     chan *streamState
+	mu       sync.Mutex
+	result   Outcome
+	err      error
+	closed   bool
+	state    *streamState
+	drainErr error
 }
 
 func New(store *db.DB, lifecycle meetinglifecycle.Module, transcriber Transcriber) Module {
@@ -77,9 +79,24 @@ func (s *Session) Finish(ctx context.Context) (Outcome, error) {
 	return s.result, s.err
 }
 
+// Drain joins provisional writes without committing or discarding the transcript.
+// Errors are retained for Finish; cancellation still requires cooperative dependencies.
+func (s *Session) Drain(ctx context.Context) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, _ = s.drain(ctx)
+}
+
+func (s *Session) drain(ctx context.Context) (*streamState, error) {
+	if s.state == nil {
+		s.state, s.drainErr = s.await(ctx)
+	}
+	return s.state, s.drainErr
+}
+
 func (s *Session) finish(ctx context.Context) (Outcome, error) {
 	defer s.cancel()
-	state, err := s.await(ctx)
+	state, err := s.drain(ctx)
 	if err != nil {
 		discardErr := s.module.discard(context.Background(), s.input.MeetingID)
 		return "", errors.Join(err, discardErr)

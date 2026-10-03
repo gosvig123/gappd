@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestCommitSpeakerProjectionUpdatesInPlace(t *testing.T) {
 		t.Fatal("transcript or changed revision not updated")
 	}
 	if meeting.Summary == nil || *meeting.Summary != "old summary" || meeting.SummaryTranscriptRevision != 7 ||
-		DeriveQueueStage(*meeting) != QueueStageSummarization {
+		!slices.Equal(pendingStages(t, store), []QueueStage{QueueStageSummarization}) {
 		t.Fatal("summary did not remain stale")
 	}
 	if meeting.DiarizationState != DiarizationStateCompleted || meeting.DiarizationJSON == nil ||
@@ -42,9 +43,9 @@ func TestCommitSpeakerProjectionNoOpDoesNotBumpRevision(t *testing.T) {
 	mustExec(t, store, `UPDATE meetings SET transcript='[You] microphone words\n[Speaker 1] remote words\n' WHERE id=?`, id)
 	meeting, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id))
 	if err != nil || !applied || meeting.TranscriptRevision != 7 || meeting.SummaryTranscriptRevision != 7 ||
-		meeting.ProcessingStatus != ProcessingStatusCompleted || DeriveQueueStage(*meeting) != QueueStageNone {
-		t.Fatalf("no-op = applied %v, revision %d, status %q, stage %q, error %v", applied,
-			meeting.TranscriptRevision, meeting.ProcessingStatus, DeriveQueueStage(*meeting), err)
+		meeting.ProcessingStatus != ProcessingStatusCompleted || len(pendingStages(t, store)) != 0 {
+		t.Fatalf("no-op = applied %v, revision %d, status %q, pending %v, error %v", applied,
+			meeting.TranscriptRevision, meeting.ProcessingStatus, pendingStages(t, store), err)
 	}
 }
 
@@ -63,9 +64,10 @@ func TestCommitSpeakerProjectionNoOpWithStaleOrMissingArtifactsRemainsPending(t 
 
 			meeting, applied, err := store.CommitSpeakerProjection(context.Background(), projectionInput(id))
 			if err != nil || !applied || meeting.TranscriptRevision != 7 ||
-				meeting.ProcessingStatus != ProcessingStatusPending || DeriveQueueStage(*meeting) != QueueStageSummarization {
-				t.Fatalf("no-op = applied %v, revision %d, status %q, stage %q, error %v", applied,
-					meeting.TranscriptRevision, meeting.ProcessingStatus, DeriveQueueStage(*meeting), err)
+				meeting.ProcessingStatus != ProcessingStatusPending ||
+				!slices.Equal(pendingStages(t, store), []QueueStage{QueueStageSummarization}) {
+				t.Fatalf("no-op = applied %v, revision %d, status %q, pending %v, error %v", applied,
+					meeting.TranscriptRevision, meeting.ProcessingStatus, pendingStages(t, store), err)
 			}
 		})
 	}

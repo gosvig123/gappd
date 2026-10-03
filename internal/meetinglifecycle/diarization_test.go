@@ -3,6 +3,7 @@ package meetinglifecycle
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -33,7 +34,7 @@ func TestDiarizationClaimRecoveryAndRetry(t *testing.T) {
 		t.Fatalf("restart = %#v, %v", result, err)
 	}
 	degraded, err := module.DegradeDiarization(context.Background(), meeting.ID, recovered.Token, errors.New("helper failed"), now)
-	if err != nil || !degraded.Applied || db.DeriveQueueStage(*degraded.Meeting) != db.QueueStageSummarization {
+	if err != nil || !degraded.Applied || !slices.Equal(pendingStages(t, store, now), []db.QueueStage{db.QueueStageSummarization}) {
 		t.Fatalf("degrade = %#v, %v", degraded, err)
 	}
 	summaryClaim, _ := store.ClaimNext(context.Background(), db.QueueStageSummarization, now, time.Minute, nil)
@@ -70,11 +71,11 @@ func TestTerminalDiarizationProcessingStatusFollowsQueueFreshness(t *testing.T) 
 		summaryRevision int
 		extraction      any
 		wantStatus      db.ProcessingStatus
-		wantStage       db.QueueStage
+		wantPending     []db.QueueStage
 	}{
-		{name: "current", summaryRevision: 2, extraction: `{}`, wantStatus: db.ProcessingStatusCompleted, wantStage: db.QueueStageNone},
-		{name: "stale_summary", summaryRevision: 1, extraction: `{}`, wantStatus: db.ProcessingStatusPending, wantStage: db.QueueStageSummarization},
-		{name: "missing_extraction", summaryRevision: 2, extraction: nil, wantStatus: db.ProcessingStatusPending, wantStage: db.QueueStageSummarization},
+		{name: "current", summaryRevision: 2, extraction: `{}`, wantStatus: db.ProcessingStatusCompleted},
+		{name: "stale_summary", summaryRevision: 1, extraction: `{}`, wantStatus: db.ProcessingStatusPending, wantPending: []db.QueueStage{db.QueueStageSummarization}},
+		{name: "missing_extraction", summaryRevision: 2, extraction: nil, wantStatus: db.ProcessingStatusPending, wantPending: []db.QueueStage{db.QueueStageSummarization}},
 	}
 
 	for _, outcome := range outcomes {
@@ -104,8 +105,8 @@ func TestTerminalDiarizationProcessingStatusFollowsQueueFreshness(t *testing.T) 
 					t.Fatalf("states = diarization %q, processing %q; want %q, %q", result.Meeting.DiarizationState,
 						result.Meeting.ProcessingStatus, outcome.state, artifact.wantStatus)
 				}
-				if stage := db.DeriveQueueStage(*result.Meeting); stage != artifact.wantStage {
-					t.Fatalf("queue stage = %q, want %q", stage, artifact.wantStage)
+				if pending := pendingStages(t, store, testTime(4)); !slices.Equal(pending, artifact.wantPending) {
+					t.Fatalf("pending stages = %v, want %v", pending, artifact.wantPending)
 				}
 			})
 		}
@@ -121,7 +122,17 @@ func TestDiarizationNotApplicableSeam(t *testing.T) {
 	claim, _ := store.ClaimNext(context.Background(), db.QueueStageDiarization, testTime(2), time.Minute, nil)
 	_, _ = module.StartDiarization(context.Background(), meeting.ID, claim.Token)
 	result, err := module.MarkDiarizationNotApplicable(context.Background(), meeting.ID, claim.Token, testTime(2))
-	if err != nil || !result.Applied || result.Meeting.DiarizationState != db.DiarizationStateNotApplicable || db.DeriveQueueStage(*result.Meeting) != db.QueueStageSummarization {
+	if err != nil || !result.Applied || result.Meeting.DiarizationState != db.DiarizationStateNotApplicable || !slices.Equal(pendingStages(t, store, testTime(2)), []db.QueueStage{db.QueueStageSummarization}) {
 		t.Fatalf("not applicable = %#v, %v", result, err)
 	}
+}
+
+// pendingStages reports the stages that the processing queue can claim at now.
+func pendingStages(t *testing.T, store *db.DB, now time.Time) []db.QueueStage {
+	t.Helper()
+	stages, err := store.PendingStages(context.Background(), now, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return stages
 }

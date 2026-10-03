@@ -49,7 +49,7 @@
 }
 
 .transcript-speaker {
-  color: hsl(var(--speaker-hue, 210) 48% 78%);
+  color: hsl(var(--speaker-hue, 210) 48% var(--speaker-ink-lightness));
   font-family: var(--font-ui);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -117,3 +117,6 @@
     height: 1.75rem;
   }
 }
+
+.transcript-speaker-label { border: 0; padding: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.transcript-speaker-label:hover { text-decoration: underline; }

@@ -144,10 +144,6 @@ func processingStatusBackfillWhere(status string) string {
 	return emptyColumnWhere("processing_status") + fmt.Sprintf(" OR (processing_status = 'not_started' AND %s IN ('processing', 'completed', 'failed'))", status)
 }
 
-func (d *DB) tableColumns(name string) (map[string]bool, error) {
-	return tableColumns(context.Background(), d.Conn, name)
-}
-
 type tableInfoQueryer interface {
 	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
 }

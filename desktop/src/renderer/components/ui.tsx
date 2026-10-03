@@ -1,28 +1,17 @@
 import { type ButtonHTMLAttributes, type HTMLAttributes, type KeyboardEvent, type ReactNode, type Ref, useId, useRef, useState } from 'react'
 import { ChevronDownIcon } from './icons'
 
-type PanelProps = HTMLAttributes<HTMLElement> & { children: ReactNode }
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary'; ref?: Ref<HTMLButtonElement> }
-type PageHeaderProps = { title: string; description?: ReactNode; action?: ReactNode; middle?: ReactNode; className?: string }
 type BannerProps = { tone?: 'error' | 'info'; title?: ReactNode; children: ReactNode; actions?: ReactNode; className?: string; dismissible?: boolean; dismissKey?: string; dismissLabel?: string }
 type ProgressBarProps = { value: number | null; label: string; className?: string }
-type ListRowProps = ButtonHTMLAttributes<HTMLButtonElement> & { selected?: boolean }
 type MultiSelectProps = { ariaLabel: string; allLabel: string; options: Array<{ value: string; label: ReactNode }>; selected: string[]; onChange: (values: string[]) => void }
 
 export function cx(...classes: Array<string | false | null | undefined>): string {
   return classes.filter(Boolean).join(' ')
 }
 
-export function Panel({ className, children, ...props }: PanelProps) {
-  return <section className={cx('panel', className)} {...props}>{children}</section>
-}
-
 export function Card({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cx('ui-card', className)} {...props}>{children}</div>
-}
-
-export function PageHeader({ title, description, action, middle, className }: PageHeaderProps) {
-  return <div className={cx('panel-header', className)}><div><h1>{title}</h1>{description ? <p>{description}</p> : null}</div>{middle}{action}</div>
 }
 
 export function StatusPill({ tone, children }: { tone: string; children: ReactNode }) {
@@ -80,10 +69,6 @@ export function Banner({ tone = 'info', title, children, actions, className, dis
 
 function fallbackDismissKey(title: ReactNode, children: ReactNode): string {
   return `${typeof title === 'string' ? title : ''}:${typeof children === 'string' ? children : ''}`
-}
-
-export function ListRow({ selected, className, ...props }: ListRowProps) {
-  return <button className={cx('list-row', selected && 'selected', className)} aria-pressed={selected} {...props} />
 }
 
 export function EmptyState({ className, children }: { className?: string; children: ReactNode }) {

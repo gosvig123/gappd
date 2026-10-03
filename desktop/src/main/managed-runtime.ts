@@ -1,16 +1,16 @@
 import type { CodexStatusResponse } from '../shared/generated/contracts'
-import type { ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
-import { LOCAL_AI_PROVIDER_LLAMACPP, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
+import type { ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimePullStage, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
+import { MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../shared/managed-local-ai'
 import { requestCommand } from './app-protocol'
+import { ensureAppleSpeechAsset } from './apple-speech'
+import { ensureManagedLanguageModel } from './language-model'
 import { acquireManagedLlamaCpp, stopManagedLlamaCpp, type ManagedLlamaCppLease } from './llamacpp'
 import { createObservableState } from './observable-state'
-import { prepareManagedAssets, type PrepareProgress } from './managed-runtime-prepare'
 import { createProviderChangeGate, type ProviderChangeToken } from './managed-runtime-provider-gate'
-import { loadProviderProbe, resumeManagedRepair } from './managed-runtime-provider-lifecycle'
-import { baseSnapshot, initialRuntimeSnapshot, probeRuntime, runtimeErrorSnapshot, type RuntimeProbe } from './managed-runtime-status'
+import { baseSnapshot, initialRuntimeSnapshot, isManagedLocal, loadProviderProbe, probeRuntime, runtimeErrorSnapshot, type RuntimeProbe } from './managed-runtime-status'
 
-export type RuntimeScope = { endpoint: string }
-export type ManagedRuntime = {
+type RuntimeScope = { endpoint: string }
+type ManagedRuntime = {
   status(): ManagedRuntimeSnapshot
   observe(listener: (snapshot: ManagedRuntimeSnapshot) => void): () => void
   prepare(mode: ManagedRuntimePrepareMode, model?: string): Promise<ManagedRuntimeSnapshot>
@@ -22,7 +22,8 @@ export type ManagedRuntime = {
   close(): Promise<void>
 }
 
-export type RuntimeProviderChange = { gate: ProviderChangeToken; prepare: Promise<ManagedRuntimeSnapshot> | null; model: string | null }
+type RuntimeProviderChange = { gate: ProviderChangeToken; prepare: Promise<ManagedRuntimeSnapshot> | null; model: string | null }
+type PrepareProgress = { progress?: number; message?: string; pullStage?: ManagedRuntimePullStage }
 
 const state = createObservableState<ManagedRuntimeSnapshot>(initialRuntimeSnapshot())
 const providerGate = createProviderChangeGate()
@@ -47,7 +48,7 @@ export async function bootstrapManagedRuntime(): Promise<void> {
   const generation = ++refreshGeneration
   const probe = await loadProviderProbe()
   const snapshot = await publishProbe(probe, false, generation)
-  if (probe.config?.provider === LOCAL_AI_PROVIDER_LLAMACPP && probe.config.managed && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
+  if (probe.config && isManagedLocal(probe.config) && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
 }
 
 async function refreshStatus(providerHealth?: CodexStatusResponse, providerGeneration = providerGate.generation()): Promise<ManagedRuntimeSnapshot> {
@@ -95,12 +96,14 @@ async function runPrepare(_mode: ManagedRuntimePrepareMode, model: string, gener
   }
 }
 
-function prepareAssets(model: string, generation: number): Promise<boolean> {
-  return prepareManagedAssets(model, {
-    current: () => providerGate.current(generation),
-    stage: (message, extra) => setPrepareOperation(generation, 'pulling_model', message, extra),
-    progress: (fallback, progress) => publishProgress(model, generation, fallback, progress),
-  })
+async function prepareAssets(model: string, generation: number): Promise<boolean> {
+  const modelMessage = `Downloading meeting model ${model}`
+  if (!setPrepareOperation(generation, 'pulling_model', modelMessage, { pullStage: 'preparing' })) return false
+  await ensureManagedLanguageModel((progress) => publishProgress(model, generation, modelMessage, progress))
+  if (!providerGate.current(generation)) return false
+  if (!setPrepareOperation(generation, 'pulling_model', 'Preparing Apple speech model', { model, pullStage: 'preparing', progress: undefined })) return false
+  await ensureAppleSpeechAsset((progress) => publishProgress(model, generation, 'Downloading Apple speech model', progress))
+  return providerGate.current(generation)
 }
 
 function publishProgress(model: string, generation: number, fallback: string, progress: PrepareProgress): void {
@@ -173,10 +176,17 @@ async function beginProviderChange(): Promise<RuntimeProviderChange> {
 
 function endProviderChange(change: RuntimeProviderChange, resumeRepair: boolean): void {
   providerGate.endChange(change.gate)
-  if (!resumeRepair) return
-  const context = { generation: change.gate.generation, prepare: change.prepare, model: change.model }
-  const hooks = { current: (generation: number) => providerGate.current(generation), refresh: refreshStatus, prepare: (model: string) => { void prepare('repair', model) } }
-  void resumeManagedRepair(context, hooks).catch(() => undefined)
+  if (resumeRepair) void resumeManagedRepair(change).catch(() => undefined)
+}
+
+async function resumeManagedRepair(change: RuntimeProviderChange): Promise<void> {
+  const generation = change.gate.generation
+  await change.prepare?.catch(() => undefined)
+  if (!providerGate.current(generation)) return
+  const health = await requestCommand('config.codexStatus', {})
+  if (!providerGate.current(generation) || !isManagedLocal(health.ai)) return
+  const snapshot = await refreshStatus(health, generation)
+  if (snapshot.operation !== 'ready') void prepare('repair', change.model || health.ai.model)
 }
 
 async function refreshPreparedConfig(providerGeneration: number): Promise<ManagedRuntimeSnapshot> {
