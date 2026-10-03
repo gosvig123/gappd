@@ -2,13 +2,10 @@ package service_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
-	"github.com/gosvig123/gappd/cloud/internal/admin"
 	"github.com/gosvig123/gappd/cloud/internal/service"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func TestMeetingCopyCannotBeRestoredAfterDeletion(t *testing.T) {
@@ -63,20 +60,13 @@ func TestMeetingCopyLeavesTheSyntheticSliceAlone(t *testing.T) {
 	if _, err := service.Read(context.Background(), reader, owner, id); err == nil {
 		t.Fatal("real copy visible to the synthetic read path")
 	}
-	if seeded, err := service.Read(context.Background(), reader, "user_synthetic", service.DemoID); err != nil || !seeded.Synthetic {
+	if seeded, err := service.Read(context.Background(), reader, "user_synthetic", service.SyntheticMeetingID); err != nil || !seeded.Synthetic {
 		t.Fatal("synthetic read regressed", err)
 	}
 	var rows int
 	if err := lifecycleAdmin(t).QueryRow(context.Background(),
 		`SELECT count(*) FROM meetings WHERE id=$1`, id).Scan(&rows); err != nil || rows != 0 {
 		t.Fatal("real copy landed in the synthetic table", err)
-	}
-	demoWriter := demoWriterPool(t)
-	if err := service.DeleteDemo(context.Background(), demoWriter, owner); err != nil {
-		t.Fatal(err)
-	}
-	if visibleCopies(t, reader, owner, id) != 1 {
-		t.Fatal("demo writer removed a real copy")
 	}
 }
 
@@ -104,22 +94,4 @@ func TestMeetingLifecycleRejectsFutureAndRewrite(t *testing.T) {
 			t.Fatal("deletion marker cleared")
 		}
 	})
-}
-
-func demoWriterPool(t *testing.T) *pgxpool.Pool {
-	t.Helper()
-	if os.Getenv("TEST_DEMO_DATABASE_URL") == "" {
-		t.Skip("requires TEST_DEMO_DATABASE_URL")
-	}
-	database(t)
-	conn := lifecycleAdmin(t)
-	if err := admin.ProvisionDemo(context.Background(), conn, "synthetic-test-password-only"); err != nil {
-		t.Fatal(err)
-	}
-	pool, err := service.OpenDemoPool(context.Background(), os.Getenv("TEST_DEMO_DATABASE_URL"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(pool.Close)
-	return pool
 }

@@ -35,15 +35,32 @@ func database(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+func lifecycleAdmin(t *testing.T) *pgx.Conn {
+	t.Helper()
+	conn, err := pgx.Connect(context.Background(), os.Getenv("TEST_ADMIN_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { conn.Close(context.Background()) })
+	return conn
+}
+
+func mustExec(t *testing.T, conn *pgx.Conn, sql string, args ...any) {
+	t.Helper()
+	if _, err := conn.Exec(context.Background(), sql, args...); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDatabaseIsolation(t *testing.T) {
 	pool := database(t)
 	ctx := context.Background()
 	for range 8 {
-		m, err := service.Read(ctx, pool, "user_synthetic", service.DemoID)
+		m, err := service.Read(ctx, pool, "user_synthetic", service.SyntheticMeetingID)
 		if err != nil || !m.Synthetic {
 			t.Fatalf("owned read: %v", err)
 		}
-		_, other := service.Read(ctx, pool, "user_other", service.DemoID)
+		_, other := service.Read(ctx, pool, "user_other", service.SyntheticMeetingID)
 		_, missing := service.Read(ctx, pool, "user_other", "00000000-0000-0000-0000-000000000000")
 		if other == nil || missing == nil || other.Error() != missing.Error() {
 			t.Fatal("owner leak")
@@ -89,10 +106,10 @@ func TestMCP(t *testing.T) {
 	token := sign("user_synthetic")
 	session := connect(t, host.URL+"/mcp", &token)
 	assertTools(t, session)
-	callMeeting(t, session, service.DemoID, false)
+	callMeeting(t, session, service.SyntheticMeetingID, false)
 	callMeeting(t, session, "bad-id", true)
 	token = sign("user_other")
-	callMeeting(t, session, service.DemoID, true)
+	callMeeting(t, session, service.SyntheticMeetingID, true)
 	token = "invalid"
 	if _, err := session.ListTools(context.Background(), nil); err == nil {
 		t.Fatal("request reused prior identity")

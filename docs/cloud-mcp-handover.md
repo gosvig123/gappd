@@ -1,17 +1,11 @@
 # Gappd optional cloud MCP — implementation handover
 
-The selected-local-fixture document transport is implemented for development only and
-OFF by default; see [isolated setup, consent and migration 003](cloud-selected-fixture.md).
-It reads only the explicitly bootstrapped synthetic SQLite Meeting. The original
-empty-body demo and its permanent deletion markers are unchanged. No real uploads
-or live deployment of this new slice are approved. Historical status below describes
-the original demo unless stated otherwise.
+Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md).
+The synthetic upload demo was removed in cloud migration 012. Dated sections are historical records.
 
 ## Status and approved scope
 
-The desktop retains its development auth-only preview. Cloud sync remains unimplemented.
-An OFF-by-default synthetic demo action now creates one fixed server-side Meeting per account;
-see the runbook for its separate consent, writer role, and parent-owned deployment gates.
+Real Meeting sync is implemented and live for beta users; see [Live beta status](#live-beta-status).
 Pi live login and owned get_meeting passed; live second-account and ChatGPT checks are deferred.
 See [runbook](../cloud/README.md).
 Build this for all Gappd users. Target hosted ChatGPT and desktop MCP clients such as Pi/Codex.
@@ -44,8 +38,7 @@ and without a Gappd identity. Remote MCP is an additional connection that users 
 Settings → Connections → Cloud sync defaults OFF and opens Clerk only after explicit ON.
 Only a verified account and protected credentials enable the auth-only preview. No Meetings
 are uploaded by that preview. Cloud MCP remains synthetic-only and read-only;
-no real Meeting upload, sync, or device registration exists. The gated empty-body demo POST
-is a consent/transport test, not a Meeting-document upload implementation.
+no real Meeting upload, sync, or device registration existed at that stage.
 This preview consent is authentication only: a future upgrade MUST ask for new explicit upload
 consent. It must never interpret this credential or enabled state as upload permission.
 

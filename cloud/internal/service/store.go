@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const DemoID = "b47c5e70-8030-4b9e-bb5a-146d17c68731"
+const SyntheticMeetingID = "b47c5e70-8030-4b9e-bb5a-146d17c68731"
 
 var meetingID = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 var unavailable = errors.New("Meeting not found")
@@ -87,7 +87,7 @@ func verifyRuntimeRole(ctx context.Context, conn *pgx.Conn) error {
 	var safe bool
 	err := conn.QueryRow(ctx, `SELECT current_user='gappd_reader' AND NOT rolsuper AND NOT rolbypassrls
  AND NOT EXISTS (SELECT FROM pg_auth_members WHERE member=pg_roles.oid)
- AND NOT EXISTS (SELECT FROM pg_class WHERE relname IN ('meetings','demo_lifecycle') AND relowner=pg_roles.oid)
+ AND NOT EXISTS (SELECT FROM pg_class WHERE relname='meetings' AND relowner=pg_roles.oid)
  FROM pg_roles WHERE rolname=current_user`).Scan(&safe)
 	if err != nil || !safe {
 		return errors.New("runtime requires isolated gappd_reader role")

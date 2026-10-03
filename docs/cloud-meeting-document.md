@@ -120,11 +120,10 @@ Provider contract: [Clerk OAuth and offline access](https://clerk.com/docs/guide
 Migration 004 puts a real copy in its own `cloud_meetings` table with 1 MiB `transcript`,
 512-byte `title`, 4096-byte `summary` and 2 MiB `document` bounds. Migration 011 raises only
 the real-copy summary limit to 65536 bytes; deploy it before enabling longer summaries. The synthetic `meetings`
-table keeps its 16384-byte transcript cap, its constraints and its policies untouched, so a
-real copy and a demo row never share a table or a policy.
+table keeps its 16384-byte transcript cap and its own policies, so a real copy and a synthetic
+row never share a table or a policy.
 
-`cloud_meetings.id` is `meeting_copy_id(owner_id, local_id)` in a namespace separate from
-every synthetic namespace. `meeting_lifecycle` holds the acceptance, the fixed 30-day expiry
+`cloud_meetings.id` is `meeting_copy_id(owner_id, local_id)` in a owner-scoped namespace. `meeting_lifecycle` holds the acceptance, the fixed 30-day expiry
 and the permanent deletion marker, and it owns the `local_id` mapping.
 
 An insert must find a live accepted lifecycle row; the trigger never creates one. A copy that

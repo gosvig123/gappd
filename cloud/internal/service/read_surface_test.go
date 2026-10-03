@@ -99,7 +99,7 @@ func TestRealCopyDisappearsFromTheReadSurfaceAfterDeletion(t *testing.T) {
 	}
 }
 
-// The union view carries the synthetic demo rows beside the real copies.
+// The union view carries the synthetic rows beside the real copies.
 func TestRealCopySurfaceKeepsTheSyntheticSlice(t *testing.T) {
 	host, reader, sign := uploadHost(t)
 	owner := "user_synthetic"
@@ -112,7 +112,7 @@ func TestRealCopySurfaceKeepsTheSyntheticSlice(t *testing.T) {
 	if err != nil || len(page.Meetings) != 2 {
 		t.Fatalf("list: %v %v", page, err)
 	}
-	seeded, err := service.Read(context.Background(), reader, owner, service.DemoID)
+	seeded, err := service.Read(context.Background(), reader, owner, service.SyntheticMeetingID)
 	if err != nil || !seeded.Synthetic {
 		t.Fatal("seeded fixture lost", err)
 	}

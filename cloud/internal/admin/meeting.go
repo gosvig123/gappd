@@ -9,7 +9,6 @@ import (
 )
 
 // ProvisionMeeting is an explicit private administrator action, never runtime setup.
-// It stays separate from the synthetic writer so neither role can reach the other's table.
 func ProvisionMeeting(ctx context.Context, conn *pgx.Conn, password string) error {
 	if len(password) < 24 || strings.ContainsAny(password, "\x00\r\n") {
 		return errors.New("invalid password")
@@ -59,3 +58,27 @@ const meetingPolicy = `
  USING (current_user='gappd_meeting_writer' AND owner_id=current_setting('app.owner_id',true))
  WITH CHECK (current_user='gappd_meeting_writer' AND owner_id=current_setting('app.owner_id',true));
 `
+
+func mutationRole(ctx context.Context, tx pgx.Tx, role, password string) error {
+	if len(password) < 24 || strings.ContainsAny(password, "\x00\r\n") {
+		return errors.New("invalid password")
+	}
+	if role != "gappd_meeting_writer" && role != "gappd_meeting_cleanup" {
+		return errors.New("invalid role")
+	}
+	_, err := tx.Exec(ctx, `SET LOCAL log_statement='none'; SET LOCAL log_min_error_statement='panic';
+ SET LOCAL log_min_duration_statement=-1; SET LOCAL log_min_duration_sample=-1;
+ SET LOCAL log_statement_sample_rate=0; SET LOCAL standard_conforming_strings=on`)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='`+role+`')
+ THEN CREATE ROLE `+role+`; END IF; END $$`)
+	if err != nil {
+		return err
+	}
+	literal := "'" + strings.ReplaceAll(password, "'", "''") + "'"
+	_, err = tx.Exec(ctx, `ALTER ROLE `+role+` LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOINHERIT NOREPLICATION NOBYPASSRLS PASSWORD `+literal)
+	return err
+}

@@ -10,8 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// MeetingCopyID maps one local Meeting to its cloud copy. The namespace is separate from
-// every synthetic namespace, so a real copy can never collide with a demo identity.
+// MeetingCopyID maps one local Meeting to its cloud copy within an owner-scoped namespace.
 func MeetingCopyID(owner, localID string) string {
 	sum := sha256.Sum256([]byte("gappd-meeting-v1:" + owner + ":" + localID))
 	sum[6] = (sum[6] & 15) | 128

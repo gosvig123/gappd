@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// The synthetic surface keeps the demo slice exactly as it was: synthetic rows only.
+// The synthetic surface serves only the administrator-seeded synthetic rows.
 const syntheticSource = `(SELECT id,owner_id,title,summary,transcript,started_at,updated_at,synthetic
  FROM meetings WHERE synthetic=true)`
 

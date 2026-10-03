@@ -1,11 +1,7 @@
-# Synthetic cloud operations
+# Cloud operations
 
-The selected-local-fixture document transport is implemented for development only and
-OFF by default; see [isolated setup, consent and migration 003](cloud-selected-fixture.md).
-It reads only the explicitly bootstrapped synthetic SQLite Meeting. The original
-empty-body demo and its permanent deletion markers are unchanged. No real uploads
-or live deployment of this new slice are approved. Historical status below describes
-the original demo unless stated otherwise.
+Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md).
+The synthetic upload demo was removed in cloud migration 012. Dated sections are historical records.
 
 ## Verified on 2026-09-13
 
@@ -14,10 +10,10 @@ The existing API and local MCP are unchanged by this operations setup.
 
 ### Hourly expiry cleanup
 
-The cleanup service sweeps two slices in one run, because real copies need the same 30-day
-retention. It handles the synthetic slice with `SYNTHETIC_CLEANUP_DATABASE_URL` and real copies with
-`MEETING_CLEANUP_DATABASE_URL`, each under its own restricted non-owner role (`gappd_demo_cleanup`
-and `gappd_meeting_cleanup`). A missing variable simply skips that slice.
+The cleanup service removes expired real copies with `MEETING_CLEANUP_DATABASE_URL`, under the
+restricted non-owner role `gappd_meeting_cleanup`. The command fails when that variable is missing.
+Before deploying the build that removed the demo (cloud migration 012), set
+`MEETING_CLEANUP_DATABASE_URL` on this service and remove `SYNTHETIC_CLEANUP_DATABASE_URL`.
 
 - Railway service: `gappd-cloud-cleanup`, ID `0d10a939-a74c-463f-b1cf-211e15bc230c`.
 - Project: `b73b1b1e-810b-4c3d-af03-6136244852c0`.
@@ -37,8 +33,7 @@ then exited. Railway showed zero running/crashed replicas and one exited replica
 This proves scheduled execution, authentication and clean exit, not deletion under live load.
 Local PostgreSQL tests already cover expiry removal and the 100-copy batch boundary.
 
-Each run handles at most 100 expired deterministic demo copies and retains deletion markers.
-The real-copy sweep is bounded the same way and keeps its own markers.
+Each run handles at most 100 expired copies and retains deletion markers.
 At hourly frequency, nominal capacity is 2,400 copies per day without failures; this is not
 an SLA. Railway can delay ticks and skips a tick while its prior execution is still active.
 Before real data, configure failure/missed-run alerts, backlog-age monitoring and enough

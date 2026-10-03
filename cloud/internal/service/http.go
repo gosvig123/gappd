@@ -24,17 +24,12 @@ func (a *Auth) ResourceMetadata() string {
 
 // Uploads carries the optional write pools. A nil pool leaves its routes absent.
 type Uploads struct {
-	Demo     *pgxpool.Pool
 	Meeting  *pgxpool.Pool
 	ClientID string
 }
 
 func Handler(a *Auth, pool *pgxpool.Pool) http.Handler {
 	return HandlerWithUploads(a, pool, Uploads{})
-}
-
-func HandlerWithDemo(a *Auth, pool, writer *pgxpool.Pool, clientID string) http.Handler {
-	return HandlerWithUploads(a, pool, Uploads{Demo: writer, ClientID: clientID})
 }
 
 func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handler {
@@ -54,14 +49,6 @@ func registerWriteRoutes(mux *http.ServeMux, a *Auth, uploads Uploads) {
 	uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
 	protect := func(h http.Handler) http.Handler {
 		return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
-	}
-	if uploads.Demo != nil {
-		for _, route := range []string{"POST /selected-demo-meeting", "DELETE /selected-demo-meeting"} {
-			mux.Handle(route, protect(selectedDemoHandler(uploads.Demo)))
-		}
-		for _, route := range []string{"POST /demo-meeting", "DELETE /demo-meeting"} {
-			mux.Handle(route, protect(demoHandler(uploads.Demo)))
-		}
 	}
 	if uploads.Meeting != nil {
 		registerMeetingUploads(mux, protect, uploads.Meeting)

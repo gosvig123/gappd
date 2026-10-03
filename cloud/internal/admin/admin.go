@@ -43,6 +43,9 @@ var backlogMigration string
 //go:embed 011.sql
 var summaryLimitMigration string
 
+//go:embed 012.sql
+var demoRemovalMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -76,7 +79,7 @@ func Provision(ctx context.Context, conn *pgx.Conn, password string) error {
 	if err = setPassword(ctx, tx, password); err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, demo_lifecycle, cloud_meetings, meeting_lifecycle, cloud_read_meetings, revoked_grants TO gappd_reader;
+	_, err = tx.Exec(ctx, `GRANT USAGE ON SCHEMA public TO gappd_reader; GRANT SELECT ON meetings, cloud_meetings, meeting_lifecycle, cloud_read_meetings, revoked_grants TO gappd_reader;
  GRANT EXECUTE ON FUNCTION cleanup_backlog() TO gappd_reader;
  ALTER ROLE gappd_reader SET default_transaction_read_only=on; ALTER ROLE gappd_reader SET statement_timeout='3s'`)
 	if err != nil {
@@ -92,10 +95,10 @@ func Seed(ctx context.Context, conn *pgx.Conn, owner string) error {
 	var id string
 	err := conn.QueryRow(ctx, `INSERT INTO meetings VALUES ($1,$2,$3,$4,$5,$6,$6,true)
  ON CONFLICT (id) DO UPDATE SET id=excluded.id WHERE meetings.owner_id=excluded.owner_id RETURNING id::text`,
-		service.DemoID, owner, "SYNTHETIC: Demo planning Meeting", "Synthetic participants agreed to review a fictional prototype.",
+		service.SyntheticMeetingID, owner, "SYNTHETIC: Demo planning Meeting", "Synthetic participants agreed to review a fictional prototype.",
 		"[00:00] Synthetic speaker: This is fabricated test data.\n[00:05] Synthetic speaker: Review the fictional prototype next week.", "2026-09-13T12:00:00Z").Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return errors.New("demo already belongs to another owner")
+		return errors.New("synthetic Meeting already belongs to another owner")
 	}
 	return err
 }
@@ -118,7 +121,7 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration, readSurfaceMigration, revocationMigration,
-		accountStateMigration, deviceMigration, clientDirectoryMigration, backlogMigration, summaryLimitMigration} {
+		accountStateMigration, deviceMigration, clientDirectoryMigration, backlogMigration, summaryLimitMigration, demoRemovalMigration} {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err

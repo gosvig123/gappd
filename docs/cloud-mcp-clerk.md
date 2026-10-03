@@ -1,21 +1,15 @@
 # Gappd cloud MCP — Clerk setup
 
-The selected-local-fixture document transport is implemented for development only and
-OFF by default; see [isolated setup, consent and migration 003](cloud-selected-fixture.md).
-It reads only the explicitly bootstrapped synthetic SQLite Meeting. The original
-empty-body demo and its permanent deletion markers are unchanged. No real uploads
-or live deployment of this new slice are approved. Historical status below describes
-the original demo unless stated otherwise.
+Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md).
+The synthetic upload demo was removed in cloud migration 012. Dated sections are historical records.
 
 ## Status
 
-Clerk development auth is wired to Settings → Connections → Cloud sync, default OFF.
-Automated tests and a user-completed live development Settings login passed on 2026-09-13.
-`/cloud` serves synthetic-only read MCP on Railway; Pi live login and owned get passed.
-Live second-account and ChatGPT checks are deferred. A disabled-by-default synthetic demo
-creation/deletion consent transport is implemented; no real Meeting upload or device registration
-exists. See the [service runbook](../cloud/README.md#optional-synthetic-demo-transport-disabled-by-default).
-The existing local MCP remains the default. No Meetings are uploaded.
+Production now uses the Clerk production instance `https://clerk.getgappd.com`; see
+[production identity](cloud-production-identity.md). The development setup below is historical.
+`/cloud` serves the read MCP on Railway; Pi live login and owned get passed.
+Live second-account and ChatGPT checks are deferred. See the [service runbook](../cloud/README.md).
+The existing local MCP remains the default.
 
 This extends [the cloud MCP handover](cloud-mcp-handover.md). Reuse the existing Clerk
 application; do not create a second Gappd identity system or reuse Google Calendar credentials.
@@ -50,8 +44,7 @@ No client secrets, sign-in methods, user accounts, or redirect URIs were changed
   registration endpoint and requires a deliberate onboarding/security decision.
 
 Not advertising a scope is NOT an authorization boundary. A production upload API must accept only the approved desktop client, the sync scope,
-a registered device, and the correct owner. The fixed synthetic demo intentionally defers
-device registration; it verifies signed client_id, sync scope and token subject.
+a registered device, and the correct owner.
 Adding an allowed scope does not grant it to existing tokens or enable application sync.
 
 ## Read-only client setup
@@ -81,8 +74,8 @@ public signing-key endpoint; administrative operations may need separately provi
 
 ## Implemented authentication-only preview
 
-The preview panel and its `cloudAuth` IPC group were removed. Meeting upload and the synthetic
-demo still use the `CloudAuth` class below, each with its own credential store.
+The preview panel and its `cloudAuth` IPC group were removed. Meeting upload still uses the
+`CloudAuth` class below, with its own credential store.
 
 - Explicit development issuer/client in `service-config.ts`; no production fallback or secret.
 - ON opens the system browser with public-client authorization code + S256 PKCE and only
@@ -160,7 +153,6 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
   was owner-only (0600); OFF removed it. All 258 desktop tests, typecheck, and builds passed.
 - Synthetic remote MCP has automated isolation coverage plus Pi live owned-read proof;
   live second-account and hosted ChatGPT remain deferred.
-  No device upload is implemented. The new demo creates server-fixed fabricated text only.
 - Application-wide PKCE enforcement affects future logins for every OAuth client in this
   development instance. Only the existing public Gappd Desktop client was listed during setup.
 
@@ -173,23 +165,3 @@ isolate Electron userData and pass a separate HOME to backend subprocesses inste
 Raw JWT claim references used by `/cloud` (no live tokens retained):
 - [Clerk OAuthJwtPayload scp/scope](https://github.com/clerk/javascript/blob/main/packages/backend/src/api/resources/IdPOAuthAccessToken.ts)
 - [Clerk OAuth at+jwt discriminator](https://github.com/clerk/javascript/blob/main/packages/backend/src/tokens/machine.ts)
-
-### Synthetic demo authorization
-
-The demo uses the existing public Desktop client and PKCE helpers but a separate protected
-`cloud-demo-development.enc` store. Only explicit Connect demo account requests
-`email profile meetings:sync` and resource `https://gappd-cloud-api-production.up.railway.app/mcp`.
-No refresh token is requested or retained. Existing auth-only credentials are unchanged.
-Trusted HTTPS userinfo verifies the account with the exact Bearer token used by POST/DELETE;
-redirects are rejected. Separate main-process one-use create/delete consent binds that account/token and final action.
-OFF/account changes invalidate consent; expiry needs explicit reconnect. No startup network,
-automatic upload, backfill or local Meeting reads exist. Both capability flags default disabled.
-Live demo login, new consent, server acceptance and Pi readback passed on 2026-09-13,
-including the strict signed Desktop client_id check. OFF removed isolated demo credentials;
-the app was closed and cloud capability disabled. No raw tokens were inspected or logged.
-Live second-account and ChatGPT checks remain deferred; real Meeting uploads remain gated.
-Live separate delete confirmation and Pi denial passed on 2026-09-13 for the created demo.
-Private checks confirmed its marker remained and live content was removed; the seed was unchanged.
-Legacy acceptance used the conservative UTC start of the documented test day, not a recovered
-exact timestamp: 2026-09-13T00:00:00Z, with expiry 2026-10-13T00:00:00Z.
-Cleanup completed with credentials removed, test app closed and cloud mutation route disabled.

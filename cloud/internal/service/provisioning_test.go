@@ -16,7 +16,6 @@ import (
 // role is therefore provisioned once per test binary.
 var (
 	readerOnce   sync.Once
-	demoOnce     sync.Once
 	meetingOnce  sync.Once
 	cleanupOnce  sync.Once
 	provisionErr error

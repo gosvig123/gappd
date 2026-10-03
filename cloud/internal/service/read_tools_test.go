@@ -14,7 +14,7 @@ import (
 func TestListOwnedMeetings(t *testing.T) {
 	pool := database(t)
 	page, err := service.List(context.Background(), pool, "user_synthetic", service.ListParams{Limit: 20})
-	if err != nil || len(page.Meetings) != 1 || page.Meetings[0].ID != service.DemoID || page.NextOffset != 0 {
+	if err != nil || len(page.Meetings) != 1 || page.Meetings[0].ID != service.SyntheticMeetingID || page.NextOffset != 0 {
 		t.Fatalf("owned list: %v %v", page, err)
 	}
 	if page.Meetings[0].Title == "" || page.Meetings[0].StartedAt.IsZero() {
@@ -63,7 +63,7 @@ func TestListReportsNextPageOnlyWhenMoreRowsExist(t *testing.T) {
 func TestSearchOwnedMeetings(t *testing.T) {
 	pool := database(t)
 	result, err := service.Search(context.Background(), pool, "user_synthetic", "fictional prototype", 10)
-	if err != nil || len(result.Matches) != 1 || result.Matches[0].ID != service.DemoID {
+	if err != nil || len(result.Matches) != 1 || result.Matches[0].ID != service.SyntheticMeetingID {
 		t.Fatalf("owned search: %v %v", result, err)
 	}
 	if !strings.Contains(result.Matches[0].Passage, "prototype") || strings.Contains(result.Matches[0].Passage, "<b>") {
@@ -106,10 +106,10 @@ func TestSearchRejectsInvalidInput(t *testing.T) {
 
 func TestMCPReadTools(t *testing.T) {
 	session := readSession(t, "user_synthetic")
-	if text := toolText(t, session, "list_meetings", map[string]any{"limit": 5}); !strings.Contains(text, service.DemoID) {
+	if text := toolText(t, session, "list_meetings", map[string]any{"limit": 5}); !strings.Contains(text, service.SyntheticMeetingID) {
 		t.Fatalf("list: %s", text)
 	}
-	if text := toolText(t, session, "search_meetings", map[string]any{"query": "fictional prototype"}); !strings.Contains(text, service.DemoID) {
+	if text := toolText(t, session, "search_meetings", map[string]any{"query": "fictional prototype"}); !strings.Contains(text, service.SyntheticMeetingID) {
 		t.Fatalf("search: %s", text)
 	}
 }
@@ -138,7 +138,7 @@ func TestMCPReadToolsIsolateOwners(t *testing.T) {
 		{"search_meetings", map[string]any{"query": "fictional prototype"}},
 	}
 	for _, read := range reads {
-		if text := toolText(t, session, read.name, read.args); strings.Contains(text, service.DemoID) {
+		if text := toolText(t, session, read.name, read.args); strings.Contains(text, service.SyntheticMeetingID) {
 			t.Fatalf("owner leak on %s: %s", read.name, text)
 		}
 	}

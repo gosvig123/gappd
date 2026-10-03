@@ -33,22 +33,15 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	writer, err := demoPool()
-	if err != nil {
-		return err
-	}
-	if writer != nil {
-		defer writer.Close()
-	}
-	return serve(issuer, resource, pool, writer)
+	return serve(issuer, resource, pool)
 }
 
-func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
+func serve(issuer, resource string, pool *pgxpool.Pool) error {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	uploads, err := meetingPool(writer)
+	uploads, err := meetingPool()
 	if err != nil {
 		return err
 	}
@@ -72,8 +65,8 @@ func serve(issuer, resource string, pool, writer *pgxpool.Pool) error {
 }
 
 // meetingPool opens the real-copy writer only when its separate capability is explicitly on.
-func meetingPool(demo *pgxpool.Pool) (service.Uploads, error) {
-	uploads := service.Uploads{Demo: demo, ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
+func meetingPool() (service.Uploads, error) {
+	uploads := service.Uploads{ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
 	if os.Getenv("GAPPD_MEETING_STORAGE_ENABLED") != "true" {
 		return uploads, nil
 	}
@@ -101,14 +94,4 @@ func validURL(raw, path string) bool {
 	u, err := url.Parse(raw)
 	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil &&
 		u.Path == path && u.RawQuery == "" && u.Fragment == "" && u.RawPath == ""
-}
-
-func demoPool() (*pgxpool.Pool, error) {
-	if os.Getenv("GAPPD_SYNTHETIC_UPLOAD_ENABLED") != "true" {
-		return nil, nil
-	}
-	if os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID") == "" || os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL") == "" {
-		return nil, errors.New("demo configuration required")
-	}
-	return service.OpenDemoPool(context.Background(), os.Getenv("SYNTHETIC_UPLOAD_DATABASE_URL"))
 }
