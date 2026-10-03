@@ -9,7 +9,8 @@ import {
   type AppStreamID,
 } from '../shared/generated/app-protocol'
 import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
-import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveGappdBinary, resolveSpeechTranscriberBinary } from './native-runtime'
+import { missingRuntimeAssetMessage } from './binaries'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveGappdBinary, resolveSpeechTranscriberBinary, resolveVideoHelperBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
   onEvent(event: AppStreamEvent<ID>): void
@@ -33,7 +34,7 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), ...overrides, ...selectedFixtureBackendEnv() })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), GAPPD_VIDEO_HELPER_PATH: resolveVideoHelperBinary(), ...overrides, ...selectedFixtureBackendEnv() })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {
@@ -74,7 +75,7 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
   child.stderr?.setEncoding('utf8')
   child.stdout?.on('data', (chunk) => { stdout += chunk.toString() })
   child.stderr?.on('data', (chunk) => { stderr += chunk.toString() })
-  child.once('error', (error) => { processError = error; if (!signal?.aborted) reject(error) })
+  child.once('error', (error) => { processError = spawnError(error); if (!signal?.aborted) reject(processError) })
   child.once('close', (code) => {
     if (processError) return reject(processError)
     if (code !== 0) return reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
@@ -94,13 +95,18 @@ function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id:
   child.once('error', (error) => {
     if (settled) return
     settled = true
-    handlers.onError(error.message)
+    handlers.onError(spawnError(error).message)
   })
   child.once('close', (code, signal) => {
     if (settled) return
     settled = true
     finishStream(state, stderr, code, signal, handlers)
   })
+}
+
+function spawnError(error: Error): Error {
+  const missing = 'code' in error && error.code === 'ENOENT'
+  return missing ? new Error(missingRuntimeAssetMessage('Gappd backend', resolveGappdBinary())) : error
 }
 
 function captureStreamStderr(current: string, chunk: string): string {

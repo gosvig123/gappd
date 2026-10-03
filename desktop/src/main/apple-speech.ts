@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { isExecutableFile } from './binaries'
+import { isExecutableFile, missingRuntimeAssetMessage } from './binaries'
 import { childEnv, resolveSpeechTranscriberBinary } from './native-runtime'
 
 const SPEECH_LOCALE_ENV = 'GAPPD_SPEECH_LOCALE'
@@ -27,7 +27,7 @@ export function missingAppleSpeechAssetMessage(): string {
 }
 
 function missingAppleSpeechHelperMessage(path = resolveSpeechTranscriberBinary()): string {
-  return `Apple speech transcriber missing at ${path}. Run \`npm run native:prepare -- build\`.`
+  return missingRuntimeAssetMessage('Apple speech transcriber', path)
 }
 
 function speechLocale(): string {

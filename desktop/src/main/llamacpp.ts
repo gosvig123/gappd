@@ -1,8 +1,7 @@
 import path from 'node:path'
-import { app } from 'electron'
 import { BUNDLED_LLAMACPP_BINARY_NAME, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_HOST, MANAGED_LLAMACPP_MODEL } from '../shared/managed-local-ai'
 import { lastLines } from '../shared/subprocess-output'
-import { isExecutableFile, resolveBinary } from './binaries'
+import { isExecutableFile, missingRuntimeAssetMessage, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
 import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
 import { type ManagedRuntimeErrorState, toManagedRuntimeErrorState } from './managed-runtime-errors'
@@ -160,4 +159,4 @@ function isReadinessTimeout(error: unknown): error is Error {
   return error instanceof Error && error.message.startsWith('Managed llama.cpp did not become ready in time')
 }
 
-export function missingBundledLlamaCppMessage(): string { return app.isPackaged ? 'Bundled llama.cpp runtime files are missing from this app. Reinstall Gappd.' : `Bundled llama.cpp binary missing at ${resolveBundledLlamaCppBinary()}. Run \`npm run prepare:llamacpp\` before launching the desktop app.` }
+export function missingBundledLlamaCppMessage(): string { return missingRuntimeAssetMessage('Bundled llama.cpp runtime', resolveBundledLlamaCppBinary()) }

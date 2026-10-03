@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { access } from 'node:fs/promises'
 import macReleaseUtils from './mac-release-utils.cjs'
+import { writeDevRuntimeAssets } from './dev-runtime-assets.mjs'
 
 const {
   DEFAULT_MACOS_MIN_VERSION,
@@ -68,6 +69,8 @@ if (process.platform === 'darwin') {
   verifyBinaryCompatibility('capture helper binary', captureBinaryPath)
   verifyBinaryCompatibility('Apple speech transcriber', speechTranscriberPath)
 }
+
+if (workflow === WORKFLOW_DEV) await writeDevRuntimeAssets(repoRoot, { macBuildProfile, macosMinVersion })
 
 async function buildNativeArtifacts() {
   if (process.platform !== 'darwin') {

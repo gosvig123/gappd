@@ -14,13 +14,14 @@ const COMMANDS = {
   'test.request': { args: () => ['request'], env: [], terminal: [] },
   'test.stream': { args: () => ['stream'], env: [], terminal: ['recording.completed'] },
 }
-const NATIVE = { childEnv: (overrides: unknown) => overrides, resolveCaptureApp: () => null, resolveCaptureBinary: () => '', resolveDiarizationModels: () => '', resolveDiarizerBinary: () => '', resolveGappdBinary: () => 'gappd', resolveSpeechTranscriberBinary: () => '' }
+const NATIVE = { childEnv: (overrides: unknown) => overrides, resolveCaptureApp: () => null, resolveCaptureBinary: () => '', resolveDiarizationModels: () => '', resolveDiarizerBinary: () => '', resolveGappdBinary: () => 'gappd', resolveSpeechTranscriberBinary: () => '', resolveVideoHelperBinary: () => '' }
 
 function protocol(child: FakeChild) {
   return loadSourceModule(new URL('./app-protocol.ts', import.meta.url), {
     'node:child_process': { spawn: () => child },
     '../shared/generated/app-protocol': { APP_COMMANDS: COMMANDS },
     '../shared/generated/protocol': { RECORDING_PROTOCOL_EVENT_TYPES: ['recording.completed'] },
+    './binaries': { missingRuntimeAssetMessage: (component: string) => `${component} is missing` },
     './native-runtime': NATIVE,
     './selected-fixture-profile': { selectedFixtureBackendEnv: () => ({}) },
   }, { console })
@@ -73,4 +74,19 @@ test('a failed command reports stderr and an aborted command rejects with its er
   aborted.emit('error', Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }))
   aborted.emit('close', null, 'SIGTERM')
   await assert.rejects(interrupting, { name: 'AbortError' })
+})
+
+test('a missing gappd binary reports the runtime asset recovery step in both paths', { timeout: 2000 }, async () => {
+  const enoent = () => Object.assign(new Error('spawn gappd ENOENT'), { code: 'ENOENT' })
+  const request = new FakeChild()
+  const pending = protocol(request).requestCommand('test.request', {})
+  request.emit('error', enoent())
+  request.emit('close', -2, null)
+  await assert.rejects(pending, { message: 'Gappd backend is missing' })
+
+  const stream = new FakeChild()
+  const errors: string[] = []
+  protocol(stream).streamCommand('test.stream', {}, { onEvent() {}, onError: (error: string) => errors.push(error), onExitWithoutTerminal() {} })
+  stream.emit('error', enoent())
+  assert.deepEqual(errors, ['Gappd backend is missing'])
 })

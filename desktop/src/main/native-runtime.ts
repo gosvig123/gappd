@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { resolveBinary } from './binaries'
+import { devOverride, resolveBinary } from './binaries'
 
 const CAPTURE_APP_ENV = 'GAPPD_CAPTURE_APP_PATH'
 const CAPTURE_HELPER_ENV = 'GAPPD_CAPTURE_HELPER_PATH'
@@ -15,9 +15,9 @@ export function resolveCaptureBinary(): string {
 }
 
 export function resolveCaptureApp(): string | null {
-  const override = process.env[CAPTURE_APP_ENV]
+  const override = devOverride(CAPTURE_APP_ENV)
   if (override) return override
-  const helperOverride = process.env[CAPTURE_HELPER_ENV]
+  const helperOverride = devOverride(CAPTURE_HELPER_ENV)
   if (helperOverride) return appPathFromBinary(helperOverride)
   return resolveBinary({ packaged: ['GappdCapture.app'], dev: ['..', 'build', 'GappdCapture.app'] })
 }
@@ -43,6 +43,7 @@ export function resolveSpeechTranscriberBinary(): string {
   })
 }
 
+export const resolveVideoHelperBinary = (): string => resolveBinary({ envVar: 'GAPPD_VIDEO_HELPER_PATH', packaged: ['GappdVideo.app', 'Contents', 'MacOS', 'gappd-video'], dev: ['..', 'build', 'GappdVideo.app', 'Contents', 'MacOS', 'gappd-video'] })
 export const resolveDiarizerBinary = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZER_BIN', packaged: ['bin', 'gappd-diarizer'], dev: ['..', 'build', 'gappd-diarizer'] })
 export const resolveDiarizationModels = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZATION_MODELS', packaged: ['diarization-models'], dev: ['..', 'gappd-diarizer', 'models'] })
 
