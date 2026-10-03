@@ -31,6 +31,9 @@ Optional Gmail and Slack context for the action items already in one Meeting's n
 **Google Calendar connection**:
 Read-only authorization for one Google account's primary calendar, with independent synchronization, errors, reconnect, and disconnect behavior.
 
+**Cloud upload consent**:
+Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
+
 **OAuth relay**:
 The isolated `auth.getgappd.com` credential proxy that transiently adds Google's Desktop client secret and does not persist authorization codes, tokens, Calendar data, or meeting data.
 
@@ -39,7 +42,10 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
 - **Screen video** is enabled before a Meeting and requires a fresh source choice for each Meeting; video failure does not stop its audio recording, and deleting the Meeting removes its managed video but not any exported copy.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
+- **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
+- Explicitly labeling clean remote speech can supply local voice evidence for future **Meeting speaker** auto-fill; automatic labels never supply training evidence, and correction or removal retracts the affected evidence.
+- Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain, but that account no longer supplies inferred overlap context. Saved Agenda drafts are local user work and remain.
 - The renderer receives Calendar snapshots and account operations, never Google tokens or relay private keys.

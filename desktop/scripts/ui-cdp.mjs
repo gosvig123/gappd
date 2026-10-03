@@ -40,6 +40,12 @@ async function evaluate(expression) {
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text)
   return result.result.value
 }
+// macOS pauses frames for a hidden window, which also freezes CSS transitions halfway, so both
+// pixels and computed colours can be mid-transition. Run `read` on the settled state instead.
+async function settled(read) {
+  await evaluate(`document.head.insertAdjacentHTML('beforeend', '<style id="ui-cdp-still">*, *::before, *::after { transition: none !important; animation: none !important; }</style>'); new Promise((resolve) => { requestAnimationFrame(() => requestAnimationFrame(resolve)); setTimeout(resolve, 300) })`)
+  try { return await read() } finally { await evaluate(`document.getElementById('ui-cdp-still')?.remove()`) }
+}
 // Runs in the page. Composites every background layer behind each text element; a gradient
 // counts at its worst stop. Disabled controls are exempt, as in WCAG 1.4.3.
 function measureTextContrast() {
@@ -117,13 +123,12 @@ try {
     const [width, height] = (size || '').split('x').map(Number)
     if (size && !(width > 0 && height > 0)) throw new Error('Size must be WIDTHxHEIGHT, for example 1280x800')
     if (size) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile: false })
-    await evaluate('new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-    const { data } = await send('Page.captureScreenshot', { format: 'png' })
+    const { data } = await settled(() => send('Page.captureScreenshot', { format: 'png' }))
     writeFileSync(selector, Buffer.from(data, 'base64'))
     console.log(`Saved ${selector}`)
   } else if (action === 'audit') {
     // Electron's CDP has no Audits.checkContrast, so the page measures WCAG contrast itself.
-    const contrast = await evaluate(`(${measureTextContrast})()`)
+    const contrast = await settled(() => evaluate(`(${measureTextContrast})()`))
     const interactive = new Set(['button', 'link', 'textbox', 'searchbox', 'checkbox', 'switch', 'combobox', 'menuitem', 'tab', 'radio', 'slider'])
     const { nodes } = await send('Accessibility.getFullAXTree')
     const unnamed = nodes.filter((node) => !node.ignored && interactive.has(node.role?.value) && !node.name?.value?.trim()).map((node) => ({ role: node.role.value, backendNodeId: node.backendDOMNodeId }))

@@ -1,11 +1,11 @@
-import { CalendarDays, Clock } from 'lucide-react'
+import { CalendarDays, CircleAlert, Clock, MapPin, Video } from 'lucide-react'
 import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calendar-contract'
 import type { MeetingListItem } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import { meetingHasWork, meetingProgressLabel } from '../components/meeting-progress'
 import { Button, ProgressBar, StatusPill, cx } from '../components/ui'
-import { artifactLine, eventIsNow, eventTimeRange, upcomingEvents, type AppView } from '../lib/app-view'
-import { meetingDurationLabel, meetingTimeLabel } from '../lib/meeting-grouping'
+import { artifactLine, artifactNote, eventIsNow, eventPeople, eventPlace, eventTimeRange, upcomingEvents, type AppView } from '../lib/app-view'
+import { dayLabel, durationLabel, meetingDurationLabel } from '../lib/meeting-grouping'
 import { EventAgendaChip, MeetingAgendaChip } from '../components/agenda-tab'
 import { useOpenMeeting } from '../components/meeting-open-scope'
 
@@ -14,22 +14,20 @@ type TodayProps = { view: AppView; onOpenMeetings: () => void; onOpenCalendar: (
 export function TodayView({ view, onOpenMeetings, onOpenCalendar }: TodayProps) {
   const events = todayTimeline(view.calendar)
   const work = view.meetings.filter(meetingHasWork)
-  const connections = view.calendar?.connections.length ?? 0
   return (
     <div className="app-stack">
       <header className="app-section-head">
-        <p className="ui-eyebrow">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
         <h1 className="ui-title">Today</h1>
-        <p className="app-section-sub">{events.length} {events.length === 1 ? 'event' : 'events'} on your calendar · {view.meetings.length} Meetings recorded · {connections} calendar {connections === 1 ? 'account' : 'accounts'}</p>
+        <p className="app-today-date">{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</p>
       </header>
       {work.length ? <ul className="app-live">{work.map((meeting) => <LiveCard key={meeting.id} meeting={meeting} view={view} />)}</ul> : null}
-      <section className="app-block" aria-label="Today's calendar">
-        <BlockHead title="Today's calendar" action={{ label: 'Upcoming events', onClick: onOpenCalendar }} />
+      <section className="app-block" aria-label="Schedule">
+        <BlockHead title="Schedule" action={{ label: 'Upcoming', onClick: onOpenCalendar }} />
         {events.length ? <Timeline events={events} view={view} /> : <UpNext view={view} />}
       </section>
       <section className="app-block" aria-label="Recent meetings">
         <BlockHead title="Recent meetings" action={{ label: 'All meetings', onClick: onOpenMeetings }} />
-        <ul className="app-recent">{view.meetings.slice(0, 4).map((meeting) => <RecentRow key={meeting.id} meeting={meeting} view={view} />)}</ul>
+        <RecentDays meetings={view.meetings.slice(0, 5)} view={view} />
       </section>
     </div>
   )
@@ -51,22 +49,25 @@ function Timeline({ events, view }: { events: CalendarEventSummary[]; view: AppV
 
 function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next: boolean; view: AppView }) {
   const now = eventIsNow(event)
+  const past = !now && new Date(event.end).getTime() < Date.now()
+  const people = eventPeople(event)
+  const place = eventPlace(event)
+  const Place = place?.call ? Video : MapPin
   return (
-    <li className={cx('app-timeline-row', now && 'is-now', next && 'is-next')}>
-      <span className="app-timeline-pin" aria-hidden="true" />
+    <li className={cx('app-timeline-row', past && 'is-past', now && 'is-now', next && 'is-next')}>
       <div className="app-timeline-when">
-        <strong>{now ? 'Happening now' : clockOf(event)}</strong>
-        <span>{eventTimeRange(event)}</span>
+        <strong>{now ? 'Now' : clockOf(event)}</strong>
+        <span>{durationLabel(event.start, event.end)}</span>
       </div>
       <div className="app-timeline-copy">
         <strong>{event.title}</strong>
         <div className="app-timeline-sub">
-          <span>{[event.accountEmail, event.location].filter(Boolean).join(' · ')}</span>
+          {people ? <span>{people}</span> : null}
+          {place ? <span className="app-timeline-place"><Place aria-hidden="true" />{place.label}</span> : null}
           <EventAgendaChip view={view} event={event} />
         </div>
       </div>
-      {now || next ? <span className="app-chip">{now ? 'Now' : 'Next'}</span> : null}
-      <Button className="compact-action" disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
+      {past ? null : <Button variant={now || next ? 'primary' : 'secondary'} className={cx('compact-action', !(now || next) && 'app-reveal')} disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>}
     </li>
   )
 }
@@ -112,15 +113,33 @@ function LiveCard({ meeting, view }: { meeting: MeetingListItem; view: AppView }
   )
 }
 
+function RecentDays({ meetings, view }: { meetings: MeetingListItem[]; view: AppView }) {
+  const days = new Map<string, MeetingListItem[]>()
+  for (const meeting of meetings) days.set(dayLabel(meeting.startedAt), [...(days.get(dayLabel(meeting.startedAt)) ?? []), meeting])
+  return (
+    <div className="app-recent">
+      {[...days].map(([day, items]) => (
+        <section key={day} className="app-recent-day" aria-label={day}>
+          <h3>{day}</h3>
+          <ul>{items.map((meeting) => <RecentRow key={meeting.id} meeting={meeting} view={view} />)}</ul>
+        </section>
+      ))}
+    </div>
+  )
+}
+
 function RecentRow({ meeting, view }: { meeting: MeetingListItem; view: AppView }) {
   const open = useOpenMeeting(view.actions.openMeeting)
+  const note = artifactNote(meeting)
+  const failed = meeting.status.state === 'failed'
   return (
     <li className="app-recent-row">
-      <span className="app-recent-time">{meetingTimeLabel(meeting)}</span>
+      <span className="app-recent-time">{new Date(meeting.startedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
       <button type="button" className="app-recent-title" onClick={() => open(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
       <span className="app-recent-meta">
-        <span>{meetingDurationLabel(meeting)} · {artifactLine(meeting)}</span>
+        {note ? <span className={cx('app-recent-note', failed && 'is-failed')}>{failed ? <CircleAlert aria-hidden="true" /> : null}{note}</span> : null}
         <MeetingAgendaChip view={view} meetingId={meeting.id} onOpen={() => open(meeting.id, 'agenda')} />
+        <span className="app-recent-duration">{meetingDurationLabel(meeting)}</span>
       </span>
     </li>
   )

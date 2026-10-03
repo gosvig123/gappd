@@ -27,14 +27,13 @@ export function agendaTopicCount(state: AgendaState): number {
 }
 
 /**
- * Row label. An unlinked Meeting stays quiet: the chip should mark real Agenda
- * work, not repeat "no calendar event" on most rows.
+ * Row label. Only a saved Agenda gets one: the chip should mark real Agenda
+ * work, not repeat "no calendar event" or "no Agenda" on most rows.
  */
 export function agendaChipLabel(state: AgendaState): string | null {
-  if (state.kind === 'unlinked') return null
-  if (state.kind === 'empty') return 'Agenda · none'
+  if (state.kind !== 'saved') return null
   const count = agendaTopicCount(state)
-  return `Agenda · ${count} ${count === 1 ? 'topic' : 'topics'}`
+  return `${count} agenda ${count === 1 ? 'topic' : 'topics'}`
 }
 
 export function agendaTabLabel(state: AgendaState): string {

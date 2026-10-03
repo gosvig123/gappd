@@ -107,6 +107,8 @@ export function eventIsNow(event: CalendarEventSummary, now = new Date()): boole
   return new Date(event.start).getTime() <= now.getTime() && new Date(event.end).getTime() >= now.getTime()
 }
 
+const COMPLETE_ARTIFACTS = 'Notes and transcript available'
+
 /** One line describing what a Meeting has produced so far. */
 export function artifactLine(meeting: MeetingListItem): string {
   if (meeting.status.state === 'recording') return 'Recording now · transcript follows after stop'
@@ -115,10 +117,36 @@ export function artifactLine(meeting: MeetingListItem): string {
   if (meeting.status.processing.state === 'processing') return 'Finalizing notes…'
   if (meeting.status.state === 'failed') return meeting.status.processing.failureMessage ?? meeting.status.capture.failureMessage ?? 'Recording failed'
   if (meeting.status.state === 'pending') return 'Audio captured · waiting to process'
-  if (meeting.hasSummary && meeting.hasTranscript) return 'Notes and transcript available'
+  if (meeting.hasSummary && meeting.hasTranscript) return COMPLETE_ARTIFACTS
   if (meeting.hasSummary) return 'Notes available'
   if (meeting.hasTranscript) return 'Transcript available'
   return 'Artifacts pending'
+}
+
+/** The artifact line only when it says something unusual: a finished Meeting stays quiet. */
+export function artifactNote(meeting: MeetingListItem): string | null {
+  const line = artifactLine(meeting)
+  return line === COMPLETE_ARTIFACTS ? null : line
+}
+
+/** Who else is invited, by name: "Jordan Patel, Sam Rivera +2". */
+export function eventPeople(event: CalendarEventSummary): string {
+  const names = (event.attendees ?? []).filter((person) => !person.self).map((person) => person.name || person.email.split('@')[0])
+  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')
+}
+
+const CALL_SERVICES: Array<[RegExp, string]> = [[/meet\.google\.com|^google meet/i, 'Google Meet'], [/zoom\.us|^zoom/i, 'Zoom'], [/teams\.microsoft\.com|^microsoft teams/i, 'Microsoft Teams']]
+
+/** Where an event happens, named for people: a call service, a host name, or the room text. */
+export function eventPlace(event: CalendarEventSummary): { label: string; call: boolean } | null {
+  const location = event.location?.trim()
+  if (!location) return null
+  const service = CALL_SERVICES.find(([pattern]) => pattern.test(location))
+  if (service) return { label: service[1], call: true }
+  if (/^https?:\/\//i.test(location)) {
+    try { return { label: new URL(location).hostname.replace(/^www\./, ''), call: true } } catch { return { label: location, call: true } }
+  }
+  return { label: location, call: false }
 }
 
 export function statusLabel(meeting: MeetingListItem): string {

@@ -64,18 +64,24 @@ export function excerpt(source: string, term: string, radius = 64): string {
 
 export function meetingDurationLabel(meeting: MeetingListItem): string {
   if (!meeting.endedAt) return 'In progress'
-  const minutes = Math.round((new Date(meeting.endedAt).getTime() - new Date(meeting.startedAt).getTime()) / 60000)
+  return durationLabel(meeting.startedAt, meeting.endedAt)
+}
+
+export function durationLabel(start: string, end: string): string {
+  const minutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000)
   if (!Number.isFinite(minutes) || minutes <= 0) return '—'
   if (minutes < 60) return `${minutes} min`
   return `${Math.floor(minutes / 60)} h ${minutes % 60 ? `${minutes % 60} min` : ''}`.trim()
 }
 
-export function meetingTimeLabel(meeting: MeetingListItem): string {
-  const started = new Date(meeting.startedAt)
-  const now = new Date()
-  const sameDay = started.toDateString() === now.toDateString()
-  const time = started.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-  return sameDay ? time : `${started.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} · ${time}`
+/** "Today", "Yesterday", "Tomorrow", or "Wednesday, September 30". */
+export function dayLabel(iso: string, now = new Date()): string {
+  const day = new Date(iso)
+  const days = Math.round((new Date(now.toDateString()).getTime() - new Date(day.toDateString()).getTime()) / DAY_MS)
+  if (days === 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days === -1) return 'Tomorrow'
+  return day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
 export function meetingSummaryLine(meeting: MeetingListItem): string {
