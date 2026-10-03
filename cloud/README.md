@@ -24,6 +24,8 @@ Both protected-resource metadata paths are public:
 `/mcp` is authenticated Streamable HTTP, stateless, with three read-only tools over owned
 Meetings (the synthetic seed and synced cloud copies): `get_meeting({id})`, `list_meetings({since,until,offset,limit})` and
 `search_meetings({query,limit})`. List returns summaries only; search returns ranked passages.
+Search uses web search syntax (`websearch_to_tsquery`): all words must match, `OR` adds alternatives,
+quotes match a phrase and `-word` excludes.
 Each request verifies RS256, fixed issuer JWKS, `typ` at+jwt or application/at+jwt,
 expiration, optional nbf/iat, a single exact audience, nonempty subject, and
 `meetings:read`. Clerk's `scp` array takes precedence over space-delimited `scope`.

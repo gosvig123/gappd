@@ -58,7 +58,7 @@ func buildQueries(source string) readQueries {
  ORDER BY started_at DESC,id DESC OFFSET $4 LIMIT $5`,
 		search: `SELECT id::text,title,started_at,ts_headline('english',
  CASE WHEN to_tsvector('english',transcript)@@q THEN transcript ELSE title||E'\n'||summary END,
- q,'MaxWords=30,MinWords=8,MaxFragments=1') FROM ` + source + `,plainto_tsquery('english',$2) q
+ q,'MaxWords=30,MinWords=8,MaxFragments=1') FROM ` + source + `,websearch_to_tsquery('english',$2) q
  WHERE owner_id=$1 AND to_tsvector('english',title||' '||summary||' '||transcript)@@q
  ORDER BY ts_rank(to_tsvector('english',title||' '||summary||' '||transcript),q) DESC,started_at DESC LIMIT $3`,
 	}

@@ -17,7 +17,7 @@ type listInput struct {
 }
 
 type searchInput struct {
-	Query string `json:"query" jsonschema:"text matched against Meeting title, summary and transcript"`
+	Query string `json:"query" jsonschema:"words matched against Meeting title, summary and transcript; all words must match. Use OR for alternatives, quotes for a phrase and -word to exclude. Try synonyms when there are few matches"`
 	Limit int    `json:"limit,omitempty" jsonschema:"maximum matches 1 to 25; default 10"`
 }
 
