@@ -81,6 +81,9 @@ public signing-key endpoint; administrative operations may need separately provi
 
 ## Implemented authentication-only preview
 
+The preview panel and its `cloudAuth` IPC group were removed. Meeting upload and the synthetic
+demo still use the `CloudAuth` class below, each with its own credential store.
+
 - Explicit development issuer/client in `service-config.ts`; no production fallback or secret.
 - ON opens the system browser with public-client authorization code + S256 PKCE and only
   `email profile`. No `meetings:sync`, `offline_access`, resource or upload grant is requested.

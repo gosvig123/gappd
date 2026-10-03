@@ -1,7 +1,7 @@
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { authorizeSlack, refreshSlackTokens, SlackReconnectError, SLACK_REFRESH_SKEW_MS, type SlackOAuthDependencies, type SlackTokenSet } from './slack-oauth.ts'
 
-export type SlackConnectionStore = {
+type SlackConnectionStore = {
   read(): Promise<SlackTokenSet | null>
   write(value: SlackTokenSet): Promise<void>
   clear(): Promise<void>
@@ -11,7 +11,7 @@ export type SlackConnectionStore = {
 export type SlackAccountIdentity = { generation: number; teamId: string; userId: string }
 
 /** Thrown when the connected Slack account changed after an action was reviewed. */
-export class SlackAccountChangedError extends Error {
+class SlackAccountChangedError extends Error {
   constructor() {
     super('The Slack connection changed. Review the message again.')
     this.name = 'SlackAccountChangedError'

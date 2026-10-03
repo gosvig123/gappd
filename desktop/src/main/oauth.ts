@@ -32,7 +32,7 @@ export type OAuthConfig = {
   issuer?: string
 }
 
-export type OAuthDependencies = {
+type OAuthDependencies = {
   openExternal(url: string): Promise<unknown>
   fetcher?: typeof fetch
   now?: () => number
@@ -43,7 +43,7 @@ export type OAuthDependencies = {
 
 type Loopback = { redirectUri: string; code: Promise<string>; close: () => void }
 
-export type LoopbackOptions = { timeoutMs?: number; callbackHost?: string; callbackPort?: number; issuer?: string }
+type LoopbackOptions = { timeoutMs?: number; callbackHost?: string; callbackPort?: number; issuer?: string }
 type Completion = { resolve: (code: string) => void; reject: (error: Error) => void; done: boolean }
 
 export function createPkce(): { verifier: string; challenge: string; state: string } {

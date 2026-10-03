@@ -5,7 +5,7 @@ import { requestCommand } from './app-protocol'
 const LOCAL_PROVIDER = 'local'
 const CODEX_PROVIDER = 'codex_exec'
 
-export type AIProviderResult = { status: AIProviderStatus; health: CodexStatusResponse }
+type AIProviderResult = { status: AIProviderStatus; health: CodexStatusResponse }
 
 export async function providerStatus(): Promise<AIProviderResult> {
   const health = await requestCommand('config.codexStatus', {})

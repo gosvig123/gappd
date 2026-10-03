@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CapturePermissions, CapturePermissionTarget } from '../../shared/ipc-contract'
 
-export type SetupPermissionState = {
+type SetupPermissionState = {
   status: 'waiting' | 'checking' | 'granted' | 'blocked' | 'unknown' | 'error'
   permissions?: CapturePermissions
   error?: string

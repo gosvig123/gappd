@@ -74,9 +74,6 @@ func (a *Auth) identity(claims jwt.MapClaims) (caller, error) {
 	return caller{owner: sub, client: client}, nil
 }
 
-// Clerk OAuthJwtPayload uses scp, or space-delimited scope when scp is absent.
-func hasScope(c jwt.MapClaims) bool { return hasRequiredScope(c, Scope) }
-
 func (a *Auth) scope() string {
 	if a.RequiredScope != "" {
 		return a.RequiredScope

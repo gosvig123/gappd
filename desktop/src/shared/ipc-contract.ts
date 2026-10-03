@@ -1,8 +1,6 @@
 import type { SelectedFixtureStatus } from './selected-fixture-contract'
 import type { DemoUploadStatus } from './demo-upload-contract'
-import type { CloudAuthStatus } from './cloud-auth-contract'
 import type { MeetingUploadStatus } from './meeting-upload-contract'
-import type { MeetingAgendaDraft } from './meeting-agenda'
 import type { MeetingEnrichment } from './meeting-enrichment'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
@@ -29,7 +27,6 @@ type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Resul
 export type IpcInvokeContract = {
   selectedFixture: { status: OperationSpec<[], SelectedFixtureStatus>; preview: OperationSpec<[id: string], SelectedFixtureStatus>; cancel: OperationSpec<[], void>; connect: OperationSpec<[enabled: boolean], SelectedFixtureStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean, action: 'upload' | 'delete'], SelectedFixtureStatus>; perform: OperationSpec<[subject: string, action: 'upload' | 'delete'], SelectedFixtureStatus> }
   demoUpload: { status: OperationSpec<[], DemoUploadStatus>; connect: OperationSpec<[enabled: boolean], DemoUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], DemoUploadStatus>; upload: OperationSpec<[subject: string], DemoUploadStatus>; setDeleteConsent: OperationSpec<[subject: string, enabled: boolean], DemoUploadStatus>; deleteCopy: OperationSpec<[subject: string], DemoUploadStatus> }
-  cloudAuth: { status: OperationSpec<[], CloudAuthStatus>; setEnabled: OperationSpec<[enabled: boolean], CloudAuthStatus> }
   meetingUpload: { status: OperationSpec<[], MeetingUploadStatus>; connect: OperationSpec<[enabled: boolean], MeetingUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; enqueue: OperationSpec<[localId: string], MeetingUploadStatus>; sync: OperationSpec<[], MeetingUploadStatus>; setAccountDeleteConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; deleteAll: OperationSpec<[], MeetingUploadStatus>; allowUploads: OperationSpec<[], MeetingUploadStatus>; setRevokeConsent: OperationSpec<[subject: string, enabled: boolean, clientId: string], MeetingUploadStatus>; revokeClient: OperationSpec<[subject: string, clientId: string], MeetingUploadStatus>; knownClients: OperationSpec<[], string[]>; setDeleteConsent: OperationSpec<[subject: string, enabled: boolean, localId: string], MeetingUploadStatus>; deleteCopy: OperationSpec<[subject: string, localId: string], MeetingUploadStatus> }
   system: {
     getDevices: OperationSpec<[], Device[]>
@@ -114,7 +111,6 @@ type IpcOperationChannels = { [G in IpcOperationGroup]: { [N in IpcOperationName
 export const IPC_OPERATIONS = {
   selectedFixture: { status: 'selectedFixture:status', preview: 'selectedFixture:preview', cancel: 'selectedFixture:cancel', connect: 'selectedFixture:connect', setConsent: 'selectedFixture:setConsent', perform: 'selectedFixture:perform' },
   demoUpload: { status: 'demoUpload:status', connect: 'demoUpload:connect', setConsent: 'demoUpload:setConsent', upload: 'demoUpload:upload', setDeleteConsent: 'demoUpload:setDeleteConsent', deleteCopy: 'demoUpload:deleteCopy' },
-  cloudAuth: { status: 'cloudAuth:status', setEnabled: 'cloudAuth:setEnabled' },
   meetingUpload: { status: 'meetingUpload:status', connect: 'meetingUpload:connect', setConsent: 'meetingUpload:setConsent', enqueue: 'meetingUpload:enqueue', sync: 'meetingUpload:sync', setAccountDeleteConsent: 'meetingUpload:setAccountDeleteConsent', deleteAll: 'meetingUpload:deleteAll', allowUploads: 'meetingUpload:allowUploads', setRevokeConsent: 'meetingUpload:setRevokeConsent', revokeClient: 'meetingUpload:revokeClient', knownClients: 'meetingUpload:knownClients', setDeleteConsent: 'meetingUpload:setDeleteConsent', deleteCopy: 'meetingUpload:deleteCopy' },
   system: {
     getDevices: 'system:getDevices',

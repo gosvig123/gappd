@@ -3,7 +3,7 @@ import type { AgendaSource } from '../shared/meeting-agenda'
 export type CommunicationSource = AgendaSource & { kind: 'gmail' | 'slack'; text: string }
 export type AgendaCommunication = { sources: CommunicationSource[]; warning?: string; assertCurrent?: () => void }
 export const GMAIL_READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
-export const COMMUNICATION_DAYS = 30
+const COMMUNICATION_DAYS = 30
 
 export async function communicationJSON(response: Response): Promise<any> {
   const reader = response.body?.getReader()
@@ -26,7 +26,7 @@ export async function communicationJSON(response: Response): Promise<any> {
   } finally { await reader.cancel().catch(() => undefined) }
 }
 
-export const FOLLOW_UP_DAYS = 7
+const FOLLOW_UP_DAYS = 7
 /** Milliseconds. A number means "the 30 days before this time"; a range sets both ends. */
 export type CommunicationPeriod = number | { from: number; until: number }
 

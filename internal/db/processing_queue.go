@@ -16,7 +16,6 @@ const (
 	QueueStageDiarization   QueueStage = "diarization"
 	QueueStageSummarization QueueStage = "summarization"
 	QueueStageNone          QueueStage = "none"
-	QueueStageRepair        QueueStage = "repair"
 )
 
 type ProcessingClaim struct {
@@ -26,32 +25,7 @@ type ProcessingClaim struct {
 	ExpiresAt time.Time
 }
 
-func DeriveQueueStage(m Meeting) QueueStage {
-	if !filledArtifact(m.Transcript) {
-		if filledArtifact(m.Summary) || filledArtifact(m.ExtractionJSON) {
-			return QueueStageRepair
-		}
-		return QueueStageTranscription
-	}
-	if m.DiarizationState == DiarizationStatePending {
-		return QueueStageDiarization
-	}
-	if diarizationTerminal(m.DiarizationState) && !processingArtifactsCurrent(m) {
-		return QueueStageSummarization
-	}
-	return QueueStageNone
-}
-
-func processingArtifactsCurrent(m Meeting) bool {
-	return filledArtifact(m.Transcript) && filledArtifact(m.Summary) && filledArtifact(m.ExtractionJSON) &&
-		m.SummaryTranscriptRevision == m.TranscriptRevision
-}
-
-func filledArtifact(value *string) bool {
-	return value != nil && strings.TrimSpace(*value) != ""
-}
-
-// ProcessingArtifactsCurrentSQL returns the SQL equivalent of processingArtifactsCurrent.
+// ProcessingArtifactsCurrentSQL reports whether the summary and extraction match the current transcript revision.
 func ProcessingArtifactsCurrentSQL(transcriptExpr, revisionExpr string) string {
 	return processingArtifactPresentSQL(transcriptExpr) + ` AND NOT (` + processingArtifactsStaleSQL(revisionExpr) + `)`
 }
@@ -62,11 +36,6 @@ func processingArtifactPresentSQL(expression string) string {
 
 func processingArtifactsStaleSQL(revisionExpr string) string {
 	return `NULLIF(trim(summary),'') IS NULL OR NULLIF(trim(extraction_json),'') IS NULL OR summary_transcript_revision<>` + revisionExpr
-}
-
-func diarizationTerminal(state DiarizationState) bool {
-	return state == "" || state == DiarizationStateNotRequested || state == DiarizationStateNotApplicable ||
-		state == DiarizationStateCompleted || state == DiarizationStateDegraded
 }
 
 func (d *DB) ClaimNext(ctx context.Context, stage QueueStage, now time.Time, ttl time.Duration, excluded []string) (*ProcessingClaim, error) {

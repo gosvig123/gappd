@@ -2,7 +2,7 @@ import type {
   AgendaDraftDocument, AgendaDraftRecord, AgendaDraftRemoveResult, AgendaDraftSaveInput, AgendaDraftWriteResult,
   GeneratedAgenda, SavedAgendaDraft,
 } from '../shared/agenda-draft'
-import { agendaDraftKey, agendaDraftKeyFromSourceId } from '../shared/agenda-draft'
+import { agendaDraftKey } from '../shared/agenda-draft'
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { AgendaGeneration } from '../shared/generated/contracts'
 import type { MeetingAgendaDraft } from '../shared/meeting-agenda'
@@ -31,15 +31,6 @@ export function saveAgendaTopics(input: AgendaDraftSaveInput): Promise<AgendaDra
 
 export function removeSavedAgenda(draftKey: string): Promise<AgendaDraftRemoveResult> {
   return drafts().remove(draftKey)
-}
-
-/** Key for one event, used by the renderer to address an existing saved draft. */
-export function savedAgendaKey(event: Pick<CalendarEventSummary, 'accountEmail' | 'calendarId' | 'eventId'>): string {
-  return agendaDraftKey(event)
-}
-
-export function savedAgendaKeyFromSourceId(accountEmail: string, sourceId: string): string | null {
-  return agendaDraftKeyFromSourceId(accountEmail, sourceId)
 }
 
 /**

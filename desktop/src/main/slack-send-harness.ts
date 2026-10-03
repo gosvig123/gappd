@@ -7,15 +7,15 @@ import { completeSlackAuthorization, type SlackTokenSet } from './slack-oauth.ts
 
 export const CLIENT_ID = '1234567890.1234567890'
 export const NOW = 1_788_000_000_000
-export const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 export const TEAM_ID = 'T0C19BLLJBX'
 export const CHANNEL_ID = 'C0C1C2FVC78'
 export const MESSAGE_TS = '1750000000.123456'
 export const REVIEW_ID = 'review-1'
 
-export type PostCall = { redirect: RequestRedirect | undefined; url: string; authorization: string; body: Record<string, unknown> }
+type PostCall = { redirect: RequestRedirect | undefined; url: string; authorization: string; body: Record<string, unknown> }
 
-export type HarnessOptions = {
+type HarnessOptions = {
   tokens?: Partial<SlackTokenSet> | null
   confirm?: (review: SlackSendConfirmation) => Promise<boolean>
   respond?: (call: PostCall) => Response | Promise<Response>

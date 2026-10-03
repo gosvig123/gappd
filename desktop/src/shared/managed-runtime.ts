@@ -1,5 +1,5 @@
 export type ManagedRuntimeCapability = 'summarization' | 'transcription' | 'diarization'
-export type ManagedRuntimeReadiness = 'ready' | 'missing' | 'unavailable'
+type ManagedRuntimeReadiness = 'ready' | 'missing' | 'unavailable'
 
 export type ManagedRuntimeOperation =
   | 'checking'

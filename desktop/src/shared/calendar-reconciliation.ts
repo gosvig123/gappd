@@ -8,7 +8,7 @@ const CANCELLED_STATUS = 'cancelled'
 const DECLINED_STATUS = 'declined'
 const MINIMUM_OVERLAP_FRACTION = 0.5
 export type MeetingInterval = { startedAt: string; endedAt?: string }
-export type CalendarEvidence = { calendarAmbiguous?: boolean; event?: CalendarEventSummary; calendarProvenance?: CalendarProvenance }
+type CalendarEvidence = { calendarAmbiguous?: boolean; event?: CalendarEventSummary; calendarProvenance?: CalendarProvenance }
 
 export function reconcileMeetingCalendar(meeting: MeetingInterval, saved: ParticipantContext | undefined, events: CalendarEventSummary[], selfEmails: string[]): CalendarEvidence {
   if (saved?.event) return { event: saved.event, calendarProvenance: CONFIRMED_CALENDAR_PROVENANCE }
@@ -42,7 +42,7 @@ export function reconcileAgendaHistory(meetings: AgendaHistory[], contexts: Reco
   })
 }
 
-export function meetingHasValidRecordedInterval(meeting: MeetingInterval): boolean {
+function meetingHasValidRecordedInterval(meeting: MeetingInterval): boolean {
   const start = Date.parse(meeting.startedAt), end = Date.parse(meeting.endedAt ?? '')
   return Number.isFinite(start) && Number.isFinite(end) && end > start && end <= Date.now()
 }
@@ -65,7 +65,7 @@ export function agendaHistoryWarning(history: AgendaHistory[], snapshot: Calenda
   return warnings.join(' ')
 }
 
-export function meetingHasCalendarCoverage(meeting: MeetingInterval, snapshot: CalendarSnapshot): boolean {
+function meetingHasCalendarCoverage(meeting: MeetingInterval, snapshot: CalendarSnapshot): boolean {
   const start = Date.parse(meeting.startedAt), end = Date.parse(meeting.endedAt ?? '')
   if (!meetingHasValidRecordedInterval(meeting) || !snapshot.connections.length) return false
   return snapshot.connections.every(connection => {

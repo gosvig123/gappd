@@ -11,7 +11,7 @@ import './agenda-tab.css'
  * A compact Agenda marker for a preview line. It renders nothing when the
  * Meeting has no Calendar event, so the row only carries real Agenda work.
  */
-export function AgendaChip({ state, onOpen }: { state: AgendaState; onOpen?: () => void }) {
+function AgendaChip({ state, onOpen }: { state: AgendaState; onOpen?: () => void }) {
   const label = agendaChipLabel(state)
   if (!label) return null
   const className = state.kind === 'saved' ? 'app-agenda-chip is-ready' : 'app-agenda-chip'

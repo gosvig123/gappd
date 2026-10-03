@@ -5,10 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gappd-dev/gappd/internal/db"
-	"github.com/gappd-dev/gappd/internal/meetinglifecycle"
 )
 
 type recordingEvent struct {
@@ -50,18 +48,6 @@ func createRecordingMeeting(t *testing.T, store *db.DB) *db.Meeting {
 	if err := store.CreateMeeting(meeting); err != nil {
 		t.Fatalf("CreateMeeting() error = %v", err)
 	}
-	return meeting
-}
-
-func createCapturedMeeting(t *testing.T, store *db.DB) *db.Meeting {
-	t.Helper()
-	meeting := createRecordingMeeting(t, store)
-	at := time.Date(2026, 4, 10, 12, 30, 0, 0, time.UTC)
-	result, err := meetinglifecycle.New(store).Transition(context.Background(), meeting.ID, meetinglifecycle.Captured{At: at})
-	if err != nil {
-		t.Fatalf("Captured transition error = %v", err)
-	}
-	meeting = result.Meeting
 	return meeting
 }
 

@@ -19,7 +19,7 @@ export type RelayInstallationStore = {
   write(value: RelayInstallation): Promise<void>
 }
 
-export type OAuthRelayOptions = {
+type OAuthRelayOptions = {
   baseUrl: string
   store: RelayInstallationStore
   fetcher?: typeof fetch

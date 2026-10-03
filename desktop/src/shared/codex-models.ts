@@ -1,8 +1,8 @@
 import type { CodexModelCatalog, CodexModelOption } from './ipc-contract'
 
-export const UNAVAILABLE_MODEL_SUFFIX = ' (unavailable)'
+const UNAVAILABLE_MODEL_SUFFIX = ' (unavailable)'
 
-export type CodexModelChoice = { value: string; label: string; available: boolean }
+type CodexModelChoice = { value: string; label: string; available: boolean }
 
 /** Model choices keep a stale saved model visible instead of silently replacing it. */
 export function codexModelChoices(catalog: CodexModelCatalog | null, savedModel: string): CodexModelChoice[] {
@@ -39,7 +39,7 @@ export function defaultEffortForModel(catalog: CodexModelCatalog | null, model: 
   return codexModel(catalog, model)?.defaultReasoningEffort ?? ''
 }
 
-export function codexModel(catalog: CodexModelCatalog | null, model: string): CodexModelOption | null {
+function codexModel(catalog: CodexModelCatalog | null, model: string): CodexModelOption | null {
   return catalog?.models.find((option) => option.id === model) ?? null
 }
 

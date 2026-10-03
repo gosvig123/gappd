@@ -1,6 +1,6 @@
 import type { MeetingUploadStatus } from '../shared/meeting-upload-contract'
 import type { MeetingListItem } from '../shared/contracts'
-import type { CloudAuth, CloudCredential } from './cloud-auth'
+import type { CloudCredential } from './cloud-auth'
 import type { MeetingDevice } from './meeting-device'
 import type { MeetingSyncQueue } from './meeting-sync-queue'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.

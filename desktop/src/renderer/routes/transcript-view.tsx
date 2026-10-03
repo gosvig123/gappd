@@ -21,8 +21,6 @@ export function meetingTranscript(meeting: MeetingDetail, transcript: string): s
 
 export function meetingHasSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
 
-export function TranscriptTrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
-
 export function meetingTranscriptEmptyText(meeting: MeetingDetail): string {
   if (meetingHasWork(meeting)) return 'Transcript is being created locally…'
   return 'No transcript yet.'

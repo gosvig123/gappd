@@ -19,7 +19,7 @@ export const cipher: StoreCipher = {
 }
 
 // The device credential is kept in memory, so tests exercise real signing without disk.
-export class DeviceStore extends SecureJsonStore<DeviceCredential> {
+class DeviceStore extends SecureJsonStore<DeviceCredential> {
   override async read(): Promise<DeviceCredential | null> { return this.stored }
   override async write(value: DeviceCredential): Promise<void> { this.stored = structuredClone(value) }
   stored: DeviceCredential | null = null
@@ -42,7 +42,7 @@ export const credential = (subject = 'user_a', token = `token-${subject}`): Clou
 export const accepted = (revision: number, subject = 'user_a') => Response.json(
   { status: 'accepted', subject, id: '11111111-1111-5111-8111-111111111111', revision, expires_at: '2026-10-13T12:00:00Z' })
 
-export type RecordedRequest = {
+type RecordedRequest = {
   url: string
   method: string
   body: string | undefined
@@ -52,7 +52,7 @@ export type RecordedRequest = {
   generation: string | null
 }
 
-export type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
+type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
 
 /**
  * One Meeting list row, shaped as the app protocol sends it. Capture and processing statuses
@@ -88,7 +88,7 @@ export function harness(options: HarnessOptions = {}) {
 
 export type Harness = ReturnType<typeof harness>
 
-export function buildAuth(current: () => CloudCredential | null, set: (value: CloudCredential | null) => void) {
+function buildAuth(current: () => CloudCredential | null, set: (value: CloudCredential | null) => void) {
   const auth = {
     status: async () => ({ enabled: Boolean(current()), pending: false, subject: current()?.subject ?? null, email: current()?.email ?? null, error: null }),
     credential: async () => current(),
@@ -98,7 +98,7 @@ export function buildAuth(current: () => CloudCredential | null, set: (value: Cl
 }
 
 // Registration is recorded separately from the writes, so a write assertion stays readable.
-export function recordingFetcher(options: HarnessOptions, requests: RecordedRequest[], registrations: string[]): typeof fetch {
+function recordingFetcher(options: HarnessOptions, requests: RecordedRequest[], registrations: string[]): typeof fetch {
   return async (input, init) => {
     if (String(input).endsWith('/device')) {
       registrations.push(String(init?.body))

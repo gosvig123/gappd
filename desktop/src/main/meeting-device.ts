@@ -5,7 +5,7 @@ import type { SecureJsonStore } from './secure-json-store'
  * A registered upload device. The server refuses every write that is not signed by one, so the
  * private key never leaves this machine and only its public half is registered.
  */
-export const DEVICE_VERSION = 1
+const DEVICE_VERSION = 1
 const SIGNATURE_VERSION = 'gappd-write-v1'
 const SPKI_HEADER_BYTES = 12
 

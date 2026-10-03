@@ -7,7 +7,7 @@ import type { ManagedRuntimePullStage } from '../shared/contracts'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT, MANAGED_LLAMACPP_MODELS_DIRNAME } from '../shared/managed-local-ai'
 
 type LanguageModel = typeof MANAGED_LLAMACPP_MODEL_ARTIFACT
-export type LanguageModelProgress = { progress?: number; message?: string; pullStage?: ManagedRuntimePullStage }
+type LanguageModelProgress = { progress?: number; message?: string; pullStage?: ManagedRuntimePullStage }
 
 type ProgressSink = (progress: LanguageModelProgress) => void
 let downloadPromise: Promise<string> | null = null

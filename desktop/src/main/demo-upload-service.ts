@@ -21,7 +21,3 @@ export function demoUpload(): DemoUpload {
   }
   return instance
 }
-
-export async function cancelDemoUpload(): Promise<void> {
-  if (authorization) await authorization.setEnabled(false)
-}

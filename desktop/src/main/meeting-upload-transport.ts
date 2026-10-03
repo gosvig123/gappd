@@ -10,7 +10,7 @@ import { accepted, deletedAcknowledged } from './meeting-upload-ack.ts'
 export type PauseReason = 'uploads-off' | 'not-authorized' | 'stale-generation' | 'storage-full' | 'rate-limited'
 
 /** The outcome of one upload attempt. Only `unavailable` spends a retry attempt. */
-export type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'paused'; reason: PauseReason } | { kind: 'unavailable' }
+type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'paused'; reason: PauseReason } | { kind: 'unavailable' }
 
 const PAUSE_STATUSES: Record<number, PauseReason> = { 403: 'not-authorized', 409: 'stale-generation', 413: 'storage-full', 429: 'rate-limited' }
 // The server's one 403 that is about the account, not this Mac's token or signature.

@@ -20,7 +20,7 @@ const capabilityFlag = 'GAPPD_MEETING_UPLOAD_ENABLED'
 let instance: MeetingUpload | null = null
 let authorization: CloudAuth | null = null
 
-export function meetingUploadAuthorization(): CloudAuth {
+function meetingUploadAuthorization(): CloudAuth {
   authorization ||= new CloudAuth({ ...cloudAuthConfig(), resource: cloudResource(), refreshTokens: true },
     createSecureStore<CloudCredential>('cloud-upload-development.enc'), {
       openExternal: (url) => shell.openExternal(url), requireSecureStorage: requireEncryption,
@@ -44,8 +44,4 @@ export function meetingUpload(): MeetingUpload {
     listMeetings,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
-}
-
-export async function cancelMeetingUpload(): Promise<void> {
-  if (authorization) await authorization.setEnabled(false)
 }

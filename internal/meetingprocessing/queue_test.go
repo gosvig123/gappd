@@ -19,29 +19,6 @@ func (c cancelingTranscriber) Transcribe(ctx context.Context, _, _ string) ([]tr
 	return nil, ctx.Err()
 }
 
-func TestDeriveQueueStageArtifacts(t *testing.T) {
-	text, summary, extraction := "transcript", "summary", "{}"
-	tests := []struct {
-		name    string
-		meeting db.Meeting
-		want    db.QueueStage
-	}{
-		{"empty before diarization", db.Meeting{DiarizationState: db.DiarizationStatePending}, db.QueueStageTranscription},
-		{"legacy bypass", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStateNotRequested}, db.QueueStageSummarization},
-		{"pending diarization", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStatePending}, db.QueueStageDiarization},
-		{"completed", db.Meeting{Transcript: &text, Summary: &summary, ExtractionJSON: &extraction, DiarizationState: db.DiarizationStateCompleted}, db.QueueStageNone},
-		{"degraded unblocks summary", db.Meeting{Transcript: &text, DiarizationState: db.DiarizationStateDegraded}, db.QueueStageSummarization},
-		{"inconsistent", db.Meeting{Summary: &summary}, db.QueueStageRepair},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if got := db.DeriveQueueStage(test.meeting); got != test.want {
-				t.Fatalf("stage = %q, want %q", got, test.want)
-			}
-		})
-	}
-}
-
 func TestTranscriptionDrainPersistsSourceAndRevision(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()

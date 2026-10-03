@@ -14,7 +14,7 @@ export function validateSlackMessageText(value: unknown): string {
 }
 
 /** Plain text only: escaping stops `<@user>`, `<!channel>`, and links from activating. */
-export function escapeSlackText(text: string): string {
+function escapeSlackText(text: string): string {
   return text.replace(/[&<>]/g, (character) => ESCAPES[character] ?? character)
 }
 

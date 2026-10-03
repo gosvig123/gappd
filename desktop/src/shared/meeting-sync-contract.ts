@@ -1,6 +1,6 @@
 /** Durable one-way upload queue for owned cloud Meeting copies. */
 
-export const MEETING_SYNC_VERSION = 1
+const MEETING_SYNC_VERSION = 1
 export const MAX_SYNC_ATTEMPTS = 5
 
 export type MeetingSyncState = 'pending' | 'failed'

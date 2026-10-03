@@ -19,9 +19,9 @@ const MAX_PAGES_PER_RANGE = 20
 const MAX_HISTORY_PAGES = 200
 const REQUEST_TIMEOUT_MS = 10_000
 
-export type GoogleAuthorizedAccount = { subject: string; email: string; tokens: OAuthTokenSet }
-export type GoogleSyncResult = { tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarRange[]; historyError?: string }
-export type GoogleCalendarApiOptions = {
+type GoogleAuthorizedAccount = { subject: string; email: string; tokens: OAuthTokenSet }
+type GoogleSyncResult = { tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarRange[]; historyError?: string }
+type GoogleCalendarApiOptions = {
   clientId: string
   tokenRequester?: OAuthTokenRequester
   openExternal(url: string): Promise<unknown>

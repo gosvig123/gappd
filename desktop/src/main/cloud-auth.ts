@@ -3,7 +3,7 @@ import type { CloudAuthStatus } from '../shared/cloud-auth-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { authorizeOAuth, parseTokenResponse, refreshOAuthToken, type OAuthTokenRequest, type OAuthTokenSet } from './oauth.ts'
 
-export type CloudAuthConfig = { issuer: string; clientId: string; resource?: string; refreshTokens?: boolean }
+type CloudAuthConfig = { issuer: string; clientId: string; resource?: string; refreshTokens?: boolean }
 export type CloudCredential = { version: 1; issuer: string; clientId: string; resource?: string; subject: string; email: string; tokens: OAuthTokenSet; authorizationId?: string; uploadConsent?: boolean; verificationPending?: boolean }
 type Store = { read(): Promise<CloudCredential | null>; write(value: CloudCredential): Promise<void>; clear(): Promise<void> }
 type Dependencies = { openExternal(url: string): Promise<unknown>; requireSecureStorage(): void; fetcher?: typeof fetch; now?: () => number; timeoutMs?: number }

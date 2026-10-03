@@ -2,8 +2,8 @@ import { timingSafeEqual } from 'node:crypto'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { buildAuthorizationUrl, createPkce, type OAuthConfig } from './oauth.ts'
 
-export const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
-export const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access'
+const SLACK_AUTHORIZE_URL = 'https://slack.com/oauth/v2/authorize'
+const SLACK_TOKEN_URL = 'https://slack.com/api/oauth.v2.access'
 export const SLACK_USER_SCOPES = ['chat:write', 'channels:read', 'groups:read', 'im:read', 'mpim:read', 'users:read', 'users:read.email', 'channels:history', 'groups:history', 'im:history']
 export const SLACK_REFRESH_SKEW_MS = 5 * 60 * 1000
 
@@ -45,7 +45,7 @@ export type SlackOAuthDependencies = SlackTokenDependencies & {
 
 type SlackCodeExchange = { code: string; redirectUri: string; codeVerifier: string }
 
-export function slackOAuthConfig(clientId: string): OAuthConfig {
+function slackOAuthConfig(clientId: string): OAuthConfig {
   return {
     clientId,
     authorizeUrl: SLACK_AUTHORIZE_URL,
@@ -112,7 +112,7 @@ function waitForSlackCode(state: string, timeoutMs: number) {
   return { code, close: () => finish(null, new Error('Slack authorization cancelled.')) }
 }
 
-export function exchangeSlackCode(config: OAuthConfig, exchange: SlackCodeExchange, dependencies: SlackTokenDependencies): Promise<SlackTokenSet> {
+function exchangeSlackCode(config: OAuthConfig, exchange: SlackCodeExchange, dependencies: SlackTokenDependencies): Promise<SlackTokenSet> {
   return postSlackTokens({
     grant_type: 'authorization_code',
     client_id: config.clientId,

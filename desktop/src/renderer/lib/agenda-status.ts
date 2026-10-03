@@ -22,7 +22,7 @@ export function agendaStateForMeeting(view: AppView, meetingId: string): AgendaS
   return agendaStateForEvent(event, view.drafts)
 }
 
-export function agendaTopicCount(state: AgendaState): number {
+function agendaTopicCount(state: AgendaState): number {
   return state.kind === 'saved' ? state.draft.items.length : 0
 }
 

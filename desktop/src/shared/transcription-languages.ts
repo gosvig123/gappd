@@ -1,6 +1,6 @@
 export const DEFAULT_TRANSCRIPTION_LANGUAGE = 'en_US'
 
-export type TranscriptionLanguage = {
+type TranscriptionLanguage = {
   code: string
   label: string
   summaryLanguage: string

@@ -58,7 +58,7 @@ function updateAlert(status: UpdateStatus, view: AppView): AlertItem {
   return { id: 'update', kind: 'info', title: `${version} is ready to install`, detail: `You are on ${status.currentVersion}. Installing restarts Gappd.`, ...action }
 }
 
-export function updateActionLabel(status: UpdateStatus): string {
+function updateActionLabel(status: UpdateStatus): string {
   if (status.phase === 'downloaded') return 'Restart and install'
   if (status.phase === 'downloading') return `Downloading ${status.progress ?? 0}%`
   if (status.phase === 'installing') return 'Installing…'

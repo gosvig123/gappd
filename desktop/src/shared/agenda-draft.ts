@@ -1,14 +1,13 @@
-import type { AgendaItem } from './generated/contracts'
 import type { CalendarEventSummary } from './calendar-contract'
 import type { AgendaSource, MeetingAgendaDraft } from './meeting-agenda'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { calendarEventIsUpcoming } from './meeting-agenda.ts'
 
 export const SAVED_AGENDA_VERSION = 2
-export const SAVED_AGENDA_LEGACY_VERSION = 1
+const SAVED_AGENDA_LEGACY_VERSION = 1
 export const MAX_SAVED_AGENDA_DRAFTS = 100
-export const MAX_AGENDA_ITEMS = 200
-export const MAX_AGENDA_TEXT_LENGTH = 2000
+const MAX_AGENDA_ITEMS = 200
+const MAX_AGENDA_TEXT_LENGTH = 2000
 
 export type AgendaSourceRecord = Pick<AgendaSource, 'id' | 'title' | 'startedAt'> & Pick<Partial<AgendaSource>, 'calendarProvenance' | 'calendarTitle' | 'kind'>
 
@@ -89,7 +88,7 @@ export type AgendaDraftView = MeetingAgendaDraft & {
   reasoningEffort: string
 }
 
-export function normalizeAccountKey(email: string): string {
+function normalizeAccountKey(email: string): string {
   return email.trim().toLowerCase()
 }
 
@@ -99,7 +98,7 @@ export function agendaDraftKey(event: Pick<CalendarEventSummary, 'accountEmail' 
 }
 
 /** Legacy records stored only `connectionId:calendarId:eventId`; migrate them once. */
-export function agendaDraftKeyFromSourceId(accountEmail: string, sourceId: string): string | null {
+function agendaDraftKeyFromSourceId(accountEmail: string, sourceId: string): string | null {
   const parts = sourceId.split(':')
   if (parts.length !== 3 || !parts[1] || !parts[2] || !normalizeAccountKey(accountEmail)) return null
   return `${normalizeAccountKey(accountEmail)}:${parts[1]}:${parts[2]}`
@@ -163,10 +162,6 @@ export function missingAgendaSourceIds(record: AgendaDraftRecord, knownMeetingId
   return record.sources.filter((source) => !source.kind && !knownMeetingIds.has(source.id)).map((source) => source.id)
 }
 
-export function agendaItemIsValid(value: unknown): value is AgendaItem {
-  return validatedAgendaItem(value) !== null
-}
-
 function validatedAgendaItem(value: unknown): AgendaItemRecord | null {
   if (!value || typeof value !== 'object') return null
   const candidate = value as Record<string, unknown>
@@ -181,7 +176,7 @@ function textValue(value: unknown): string | null {
   return typeof value === 'string' && value.length <= MAX_AGENDA_TEXT_LENGTH ? value : null
 }
 
-export function isAgendaSourceRecord(value: unknown): value is AgendaSourceRecord {
+function isAgendaSourceRecord(value: unknown): value is AgendaSourceRecord {
   if (!value || typeof value !== 'object') return false
   const source = value as Record<string, unknown>
   return nonEmptyId(source.id) && typeof source.title === 'string' && typeof source.startedAt === 'string' && (source.kind === undefined || source.kind === 'gmail' || source.kind === 'slack')

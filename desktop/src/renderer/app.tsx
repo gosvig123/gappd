@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { MeetingDetail } from '../shared/contracts'
 import type { SavedAgendaDraft } from '../shared/agenda-draft'
 import type { CalendarEventSummary } from '../shared/calendar-contract'

@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,13 +104,4 @@ func validDeviceID(id string) bool {
 	}
 	_, err := hex.DecodeString(id)
 	return err == nil
-}
-
-// requestGenerationValue parses a generation header value.
-func requestGenerationValue(raw string) (int, error) {
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < 0 || value > 1<<31 {
-		return 0, errors.New("invalid generation")
-	}
-	return value, nil
 }

@@ -154,11 +154,6 @@ func validate(in Input) error {
 	return nil
 }
 
-func stitch(windows []WindowReport) []stitchedSpan {
-	spans, _ := stitchWindows(windows)
-	return spans
-}
-
 func matchWindow(window WindowReport, clusters []LocalCluster, globals map[int]*globalCluster, previous []stitchedSpan) map[string]clusterMatch {
 	matches := make(map[string]clusterMatch)
 	centroids := make(map[string][]float64, len(clusters))
@@ -373,16 +368,6 @@ func sortedIntKeys[V any](values map[int]V) []int {
 	sort.Ints(keys)
 	return keys
 }
-func align(phrases []Phrase, spans []stitchedSpan) ([]db.SpeakerProjectionAssignment, int, float64) {
-	return alignWithSuppressed(phrases, spans, nil)
-}
-
-func alignWithSuppressed(phrases []Phrase, spans []stitchedSpan, suppressed map[int]bool) ([]db.SpeakerProjectionAssignment, int, float64) {
-	visible := make(map[int]db.VisibleSpeaker)
-	assignments, coverage := alignWithVisible(phrases, spans, suppressed, visible)
-	return assignments, len(visible), coverage
-}
-
 func alignWithVisible(
 	phrases []Phrase,
 	spans []stitchedSpan,

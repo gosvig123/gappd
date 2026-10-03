@@ -6,7 +6,7 @@ import { agendaDraftTopics, agendaDraftViewOf } from '../../shared/agenda-draft.
 import type { AgendaDraftView } from '../../shared/agenda-draft'
 import type { MeetingAgendaDraft } from '../../shared/meeting-agenda'
 
-export const AUTOSAVE_DELAY_MS = 700
+const AUTOSAVE_DELAY_MS = 700
 
 export type AgendaSaveState = 'clean' | 'saving' | 'pending' | 'failed' | 'conflict'
 

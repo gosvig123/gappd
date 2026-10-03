@@ -4,7 +4,7 @@ import type { SlackSendConfirmation } from './slack-send'
 import { slackDestinationLabel } from './slack-destination.ts'
 
 export const CONFIRM_SEND_URL = 'https://confirmation.invalid/send'
-export const CONFIRM_CANCEL_URL = 'https://confirmation.invalid/cancel'
+const CONFIRM_CANCEL_URL = 'https://confirmation.invalid/cancel'
 const SCRIPT = `const review = JSON.parse(decodeURIComponent(location.hash.slice(1)));
 document.getElementById('destination').textContent = review.destination;
 document.getElementById('account').textContent = review.account;

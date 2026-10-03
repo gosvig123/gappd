@@ -6,7 +6,7 @@ declare const __GAPPD_CLERK_CLIENT_ID__: string
 const DEFAULT_GOOGLE_RELAY_URL = 'https://auth.getgappd.com'
 const DEFAULT_SLACK_CLIENT_ID = '12043394698405.12046083998246'
 
-export type ServiceConfig = {
+type ServiceConfig = {
   googleClientId: string
   googleRelayUrl: string
   slackClientId: string
