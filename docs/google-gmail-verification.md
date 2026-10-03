@@ -38,10 +38,12 @@ Lessons from the 1 October 2026 recording:
 - The fixture's isolated home has no Codex login, so Settings cannot save Installed Codex. For step 6, set `provider = "codex_exec"` in the fixture's `config.toml`; the refusal happens before Codex is called.
 - Enrichment links a Meeting to one overlapping Calendar event. Give the synthetic Meeting the test event's time.
 
-Trim personal data. Upload to Google Drive with "Anyone with the link can view", or as unlisted YouTube, and check playback in a signed-out browser. Google refused a downloadable GitHub release file for the Calendar review.
+Trim personal data. Upload to YouTube as Unlisted and check playback in a signed-out browser. The Data Access form accepts only `youtube.com` or `youtu.be` links; Google refused a downloadable GitHub release file for the Calendar review.
 
 ## Submit
 
-In Data Access, paste the justification below, add the video link, and submit. Reply to Google's follow-up thread only with facts that have been checked.
+In Data Access, choose **Email productivity** under "What features will you use?", paste the justification below and a reason for each sensitive scope, add the video link, and Save. Save persists only when the button receives a real click; confirm on Verification Center → Prepare for verification that no fields are listed as missing. That page also takes Additional info, then a questionnaire (personal, internal, development, WordPress SMTP: all No) and an acknowledgement that restricted scopes require a CASA security assessment, renewed yearly. Reply to Google's follow-up thread only with facts that have been checked.
+
+Submitted 3 October 2026 with the demo at https://youtu.be/IwmY0CQ-Zpw (unlisted). Verification Center then showed "Your app's data access is under review." If Google requires CASA, decide between a paid assessment and withdrawing `gmail.readonly`.
 
 > Gappd is a macOS meeting notes app. With optional Gmail read access, when the user requests an Agenda draft or Meeting enrichment for a Calendar event, Gappd reads up to 30 recent plain-text messages exchanged with that event's invitees and uses them to prepare agenda items and add context to existing action items, with citations. Processing runs only on the user's Mac with an on-device llama.cpp model; Gmail content is never sent to a remote AI provider, to Gappd's servers, or to the operator, and is not used for training. gmail.metadata cannot provide message text; gmail.readonly is the narrowest scope that can, and Gappd never sends, deletes, labels, or modifies mail. Gappd's OAuth relay handles authorization tokens transiently during token exchange and refresh, stores no tokens, and never calls the Gmail API or receives Gmail content. Privacy policy: https://getgappd.com/privacy/
