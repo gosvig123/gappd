@@ -12,8 +12,8 @@ The existing API and local MCP are unchanged by this operations setup.
 
 The cleanup service removes expired real copies with `MEETING_CLEANUP_DATABASE_URL`, under the
 restricted non-owner role `gappd_meeting_cleanup`. The command fails when that variable is missing.
-Before deploying the build that removed the demo (cloud migration 012), set
-`MEETING_CLEANUP_DATABASE_URL` on this service and remove `SYNTHETIC_CLEANUP_DATABASE_URL`.
+Since 2026-10-03 this service runs the build that removed the demo (cloud migration 012), with
+`MEETING_CLEANUP_DATABASE_URL` as its only database setting.
 
 - Railway service: `gappd-cloud-cleanup`, ID `0d10a939-a74c-463f-b1cf-211e15bc230c`.
 - Project: `b73b1b1e-810b-4c3d-af03-6136244852c0`.

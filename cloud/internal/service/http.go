@@ -14,7 +14,7 @@ import (
 const MaxBody = 16 << 10
 
 type input struct {
-	ID string `json:"id" jsonschema:"Globally unique synthetic Meeting UUID"`
+	ID string `json:"id" jsonschema:"Globally unique Meeting UUID"`
 }
 
 func (a *Auth) ResourceMetadata() string {

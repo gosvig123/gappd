@@ -236,10 +236,16 @@ owned cloud copies. `security_invoker` is required: without it the view runs as 
 would bypass both tables' row level security.
 Migration 012 removes the synthetic upload demo from migrations 002 and 003: its copies, triggers,
 policies, `demo_lifecycle` and helper functions. It keeps the seeded Meeting. Roles are cluster-wide,
-so it only revokes `gappd_demo_writer` and `gappd_demo_cleanup` access in this database. After it runs,
-drop those roles (`DROP ROLE gappd_demo_writer, gappd_demo_cleanup`) and remove the API's
-`GAPPD_SYNTHETIC_UPLOAD_ENABLED` and `SYNTHETIC_UPLOAD_DATABASE_URL` and the cleanup job's
-`SYNTHETIC_CLEANUP_DATABASE_URL`. The new API and cleanup binaries ignore them.
+so it only revokes `gappd_demo_writer` and `gappd_demo_cleanup` access in this database; drop those
+roles separately (`DROP ROLE gappd_demo_writer, gappd_demo_cleanup`). Production applied 012 on
+2026-10-03, dropped both roles and removed `GAPPD_SYNTHETIC_UPLOAD_ENABLED`,
+`SYNTHETIC_UPLOAD_DATABASE_URL` and `SYNTHETIC_CLEANUP_DATABASE_URL`.
+
+The image is distroless, so `railway ssh` into the API cannot run `/admin` with an admin URL. On
+2026-10-03 012 ran instead through `railway ssh --service Postgres` with the container's local
+`psql`, inside one transaction holding `pg_advisory_xact_lock(74812001)` like `/admin migrate`.
+`railway ssh` joins its arguments into a remote `bash -c`, so pass SQL base64-encoded and decode
+it remotely. No admin credential leaves Railway and no public proxy is opened.
 Provision grants `gappd_reader` SELECT only on `meetings`, `cloud_meetings`,
 `meeting_lifecycle` and `cloud_read_meetings`, with read-only defaults.
 Both tables force owner RLS; missing owner context denies access. No lifecycle metadata is in MCP output.
