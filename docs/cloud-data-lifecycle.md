@@ -1,24 +1,18 @@
 # Cloud Meeting deletion and retention
 
-Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md).
-The synthetic upload demo was removed in cloud migration 012. Dated sections are historical records.
+Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md),
+the [service runbook](../cloud/README.md) and [operations](cloud-operations.md).
 
 ## Status and scope
 
-Owner-approved retention periods; not a full implementation or legal compliance claim.
-Hourly cleanup ran successfully; daily backups are configured with 6-day retention.
-Actual backup removal/restore and cleanup alerts remain unverified. Railway Pro's documented
-30-day logs conflict with the approved 14-day maximum; see [operations](cloud-operations.md).
-Real Meeting uploads, account/device generations and account-wide deletion are implemented;
-see the [service runbook](../cloud/README.md).
-No existing local or synthetic cloud data is deleted by this document.
-Local-first behavior and OFF-by-default sync remain unchanged.
-See [cloud handover](cloud-mcp-handover.md) for the wider release gates.
+The owner approved these retention periods. This page is the product contract, not a legal
+compliance claim. [Implementation status](#implementation-status) records which rules are built
+and checked. Local-first behavior and OFF-by-default sync are unchanged.
 
 A **cloud copy** is the uploaded text and derived data for one Meeting, not its audio.
 A **deletion marker** stores only enough identity/version data to reject an old upload.
 An **account generation** is a server-issued version that invalidates earlier upload grants.
-These are proposed cloud terms, not changes to the local Meeting model.
+These are cloud terms, not changes to the local Meeting model.
 
 ## Owner-approved retention periods
 
@@ -91,13 +85,16 @@ Current locally verified Clerk JWTs can remain valid until expiry despite grant 
 Before promising immediate account/client revocation, add and test server-side revocation
 checks or supported online token validation. Deleting content still blocks later reads of it.
 
-## Gates before real uploads
+## Implementation status
 
-- Periods are owner-approved: 30-day content, 7-day backups, 14-day logs. Approve real-upload consent wording separately.
-- Implement deletion, expiry filtering, generation/device validation and bounded cleanup.
-- Test offline deletion, account switch, OFF, reconnect, concurrent upload/delete, expiry,
-  lost acknowledgment, duplicate requests and delayed higher-revision uploads.
-- Prove an old device and a restored backup cannot restore deleted content.
-- Configure backup expiry, test isolated restore and verify actual removal deadlines.
-- Show account, expiry, pending deletion and backup limits in the app.
-- Keep the existing production identity, isolation, rate/cost and rollout gates.
+| Rule | State and evidence |
+| --- | --- |
+| 30-day expiry, permanent deletion markers, generations, device signatures | Built. Cloud tests cover deletion, expiry, stale revisions, delayed uploads after deletion, delete-all, consent generations and revoked devices (`cloud/internal/service/*_test.go`). |
+| Bounded cleanup within 24 hours | Built and scheduled hourly; `/status` reports the backlog. |
+| Delete a local Meeting | Built. The deletion is recorded in the upload queue before the local Meeting is removed, sent with the next consented sync and retried until acknowledged. A Mac that never synced records nothing. Pending deletions belong to the queue's account; another account cannot send them, and those copies expire on their own. |
+| Send a deletion with sync OFF | Not built. Pending deletions and the per-Meeting delete action both need active upload consent, so with sync OFF a deletion waits until sync is turned on again. |
+| Turn sync OFF, account switch, reconnect, concurrent sends, lost acknowledgment | Built. Desktop tests cover each (`desktop/src/main/meeting-upload*.test.ts`, `meeting-sync-queue.test.ts`). |
+| Show account, expiry, pending deletion and backup limits | Built in Settings → Connections → Cloud Meeting upload: the account, a deletion count while deletions wait, the 7-day backup note, and the expiry in each accepted upload's result. |
+| Restore cannot revive deleted content | Partly proven. Isolated volume and PITR restores passed; replaying later deletion markers onto a restore is not automated, so a restore must stay offline. |
+| Backup expiry and removal | Configured (6 days); actual removal is unverified. |
+| 14-day log retention | Blocked by the Railway plan; see [operations](cloud-operations.md#open-gates). |

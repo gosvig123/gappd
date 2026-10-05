@@ -43,6 +43,7 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - **Screen video** is enabled before a Meeting and requires a fresh source choice for each Meeting; video failure does not stop its audio recording, and deleting the Meeting removes its managed video but not any exported copy.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
+- Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - Explicitly labeling clean remote speech can supply local voice evidence for future **Meeting speaker** auto-fill; automatic labels never supply training evidence, and correction or removal retracts the affected evidence.
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.

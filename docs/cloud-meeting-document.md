@@ -1,9 +1,8 @@
 # Cloud Meeting document — version 1
 
-This is the Meeting text document contract. Desktop uploads require the
-`GAPPD_MEETING_UPLOAD_ENABLED` build/runtime capability, a connected upload account, and
-separate explicit upload consent. See [the cloud handover](cloud-mcp-handover.md) and
-[the lifecycle contract](cloud-data-lifecycle.md) for rollout and retention constraints.
+This is the Meeting text document contract. Desktop uploads require a connected upload account and
+separate explicit upload consent. See [the lifecycle contract](cloud-data-lifecycle.md) for
+retention and deletion rules.
 
 One document is the complete uploaded text of one Meeting. It is not a copy of the local
 SQLite database. `ParseMeetingDocument` in `cloud/internal/service/document.go` is the
@@ -93,9 +92,13 @@ document stops after five failed attempts; a server-refused document stops immed
 Failed entries require an explicit per-Meeting upload to try again.
 
 The encrypted queue stores a SHA-256 content hash for each accepted Meeting, excluding its
-revision. Older queues without hashes send one new revision on the next consented scan to
+revision. A Meeting with no stored hash sends one new revision on the next consented scan to
 establish a baseline. Hashes and queued work remain scoped to the upload account. Deleted and
 expired cloud identities remain blocked by the server; edits never extend retention.
+
+Deleting a local Meeting first records a cloud deletion in the same queue, for any Meeting the
+queue has queued or seen accepted, and drops its pending upload. Each sync pass sends recorded
+deletions before uploads. The Settings panel shows how many wait.
 
 Upload consent is stored in the same encrypted on-device record as the upload account's
 credentials. Startup restores only an explicitly saved opt-in for that authorization; signing
@@ -117,11 +120,9 @@ Provider contract: [Clerk OAuth and offline access](https://clerk.com/docs/guide
 
 ## Storage
 
-Migration 004 puts a real copy in its own `cloud_meetings` table with 1 MiB `transcript`,
-512-byte `title`, 4096-byte `summary` and 2 MiB `document` bounds. Migration 011 raises only
-the real-copy summary limit to 65536 bytes; deploy it before enabling longer summaries. The synthetic `meetings`
-table keeps its 16384-byte transcript cap and its own policies, so a real copy and a synthetic
-row never share a table or a policy.
+A copy lives in the `cloud_meetings` table with 1 MiB `transcript`, 512-byte `title`,
+65536-byte `summary` (migration 011) and 2 MiB `document` bounds. The read tools query this table
+directly.
 
 `cloud_meetings.id` is `meeting_copy_id(owner_id, local_id)` in a owner-scoped namespace. `meeting_lifecycle` holds the acceptance, the fixed 30-day expiry
 and the permanent deletion marker, and it owns the `local_id` mapping.

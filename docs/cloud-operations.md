@@ -1,57 +1,50 @@
 # Cloud operations
 
-Real Meeting sync is live for beta users; see the [Meeting document contract](cloud-meeting-document.md).
-The synthetic upload demo was removed in cloud migration 012. Dated sections are historical records.
+How the Gappd cloud service runs, how to change it, and what is still open. The service itself is
+described in the [service runbook](../cloud/README.md); retention rules are in the
+[lifecycle contract](cloud-data-lifecycle.md). Never print resolved service variables; inspect
+names or unresolved references only.
 
-## Verified on 2026-09-13
+## Railway resources
 
-This is the development-only synthetic service. Real Meeting uploads remain disabled.
-The existing API and local MCP are unchanged by this operations setup.
+Workspace: Kristian Gosvig's Projects. Project
+[gappd-cloud](https://railway.com/project/b73b1b1e-810b-4c3d-af03-6136244852c0), separate from the
+site and OAuth relay project. Railway names the environment `production`.
 
-### Hourly expiry cleanup
+| Resource | Identifier / configuration |
+| --- | --- |
+| Project | `b73b1b1e-810b-4c3d-af03-6136244852c0` |
+| Environment | `production`: `7b4a6831-62f8-4dda-a2e1-773542c266fb` |
+| API service | `gappd-cloud-api`: `7407bf7c-600e-4a4c-928d-bf4c02747463` |
+| Cleanup service | `gappd-cloud-cleanup`: `0d10a939-a74c-463f-b1cf-211e15bc230c` |
+| Database service | `Postgres`: `1e6d7e2d-b50a-4685-ab97-cacc4557aeae`, image `ghcr.io/railwayapp-templates/postgres-ssl:18` |
+| Database volume | `postgres-volume`: `09e2971f-5fba-4cc9-8d60-729a27812e94`, mounted at `/var/lib/postgresql/data` |
+| Region | `europe-west4-drams3a` (EU West) |
+| Source | `gosvig123/gappd`, branch `beta`, root `/cloud`, watch `/cloud/**` |
+| Public MCP URL | `https://gappd-cloud-api-production.up.railway.app/mcp` |
 
-The cleanup service removes expired real copies with `MEETING_CLEANUP_DATABASE_URL`, under the
-restricted non-owner role `gappd_meeting_cleanup`. The command fails when that variable is missing.
-Since 2026-10-03 this service runs the build that removed the demo (cloud migration 012), with
-`MEETING_CLEANUP_DATABASE_URL` as its only database setting.
+PostgreSQL is private, with no public TCP proxy. The API's `DATABASE_URL` is a private-network URL
+for `gappd_reader`; no service holds administrator credentials. Builder (Dockerfile) and the
+`/ready` healthcheck are explicit service settings, because the CLI did not persist the nested
+`/cloud/railway.toml` path.
 
-- Railway service: `gappd-cloud-cleanup`, ID `0d10a939-a74c-463f-b1cf-211e15bc230c`.
-- Project: `b73b1b1e-810b-4c3d-af03-6136244852c0`.
-- Environment: `7b4a6831-62f8-4dda-a2e1-773542c266fb` (development despite its production label).
-- Region: `europe-west4-drams3a`; no public domain or attached volume.
-- Source: `gosvig123/gappd`, beta, root `/cloud`, watch `/cloud/**`.
-- Explicit Dockerfile builder; start command `/cleanup` overrides the image entrypoint.
-- Schedule: `0 * * * *` (UTC). Restart policy: NEVER. No HTTP healthcheck.
-- Sole database setting: `SYNTHETIC_CLEANUP_DATABASE_URL`, private-network connection
-  for `gappd_demo_cleanup`. No admin, reader or demo-writer credentials in this service.
-- Provisioned the restricted role privately with password statement logging/tracking suppressed.
-  Temporary local password material was removed after the service setting was verified.
+Link the CLI explicitly before an infrastructure change:
 
-Deployment `0c0f3571-dc28-4a37-a0e6-c4d65f5c9eaa` built commit `33c99e9`.
-The first scheduled run logged `expired synthetic copies removed: 0` at 17:01:18 UTC,
-then exited. Railway showed zero running/crashed replicas and one exited replica.
-This proves scheduled execution, authentication and clean exit, not deletion under live load.
-Local PostgreSQL tests already cover expiry removal and the 100-copy batch boundary.
+```sh
+railway link --project b73b1b1e-810b-4c3d-af03-6136244852c0 \
+  --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb \
+  --service 7407bf7c-600e-4a4c-928d-bf4c02747463
+```
 
-Each run handles at most 100 expired copies and retains deletion markers.
-At hourly frequency, nominal capacity is 2,400 copies per day without failures; this is not
-an SLA. Railway can delay ticks and skips a tick while its prior execution is still active.
-Before real data, configure failure/missed-run alerts, backlog-age monitoring and enough
-capacity, then exercise the <=24-hour physical cleanup deadline. These alerts are not set up.
-The seeded fixture remains an explicit synthetic exception, not general retention coverage.
+This CLI version's environment edit reads piped stdin before configuration flags. In automation,
+supply a JSON patch on stdin and verify the persisted configuration.
 
-### Deployment path
+## Deploying the API
 
-A push to `beta` does NOT deploy. Commit `dfda434` reached `beta` and the service kept
-serving `ca64391`; the handover's "automatic push deployment is not yet proved" is now
-settled as disabled for `gappd-cloud-api`. Check the source/auto-deploy setting in the
-dashboard before relying on a push.
-
-`railway redeploy --service 7407bf7c-600e-4a4c-928d-bf4c02747463 --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb`
-rebuilds the SAME commit and cannot ship a newer one. The working path is an upload from the
-repository root, because the service sets `rootDirectory=/cloud` with
-`dockerfilePath=Dockerfile`, so the Dockerfile only resolves when the upload root is the
-repository root:
+A push to `beta` does NOT deploy `gappd-cloud-api`; automatic deployment is off. `railway redeploy`
+rebuilds the same commit and cannot ship a newer one. Upload from the repository root with a clean
+working tree, because the service sets `rootDirectory=/cloud` with `dockerfilePath=Dockerfile` and
+an upload deploys the working tree, not a commit:
 
 ```sh
 railway up --service 7407bf7c-600e-4a4c-928d-bf4c02747463 \
@@ -59,149 +52,135 @@ railway up --service 7407bf7c-600e-4a4c-928d-bf4c02747463 \
   --project b73b1b1e-810b-4c3d-af03-6136244852c0 --detach --yes
 ```
 
-Confirm the new deployment reports `SUCCESS`, then check `/health`, `/ready` and the MCP
-tool list. An upload deploys the working tree, not a commit, so keep the tree clean.
-`railway up` from `/cloud` does not resolve the configured Dockerfile path.
+Wait for CI on the commit first. Then confirm the deployment reports `SUCCESS`, and check `/health`,
+`/ready`, `/status`, a 401 for `/mcp` without a token, and one authenticated `list_meetings` call.
+`railway up` from `/cloud` does not resolve the Dockerfile path. Apply database migrations as the
+[runbook](../cloud/README.md#applying-a-migration-in-production) describes.
 
-### Daily volume backups
+## Identity (Clerk)
 
-- PostgreSQL volume: `09e2971f-5fba-4cc9-8d60-729a27812e94`.
-- Volume instance: `190d6f11-ec72-4a03-a36d-55774b567e7e`.
-- Schedule: DAILY only, ID `45cb81af-0160-4847-a7eb-2948aea475c2`.
-- Provider-selected UTC schedule: `16 16 * * *`.
-- API-verified retention: 518,400 seconds (6 days), below the approved 7-day maximum.
-- Weekly and monthly schedules are absent. No existing backups were deleted.
+Production uses the Clerk production instance of the `Gappd` application.
 
-The schedule was enabled after that day's scheduled time. The backup list was still empty
-at verification. First backup success, actual expiry/removal and isolated restore remain
-unverified. Do not create indefinite manual backups as a substitute for this schedule.
-Do not restore over the live volume. A restore must remain offline until current deletion
-control records and expiry rules are applied; a snapshot alone cannot supply later deletions.
-Provider snapshot scheduling is not proof of application-consistent PostgreSQL recovery.
+| Item | Value |
+| --- | --- |
+| Application | `app_3Id4GHzrmEco43rxk3si2knnZAZ` |
+| Production instance | `ins_3JJlwm8pUSkAERBSaRo0Ii5ue6X` (Hobby plan; OAuth applications and custom scopes are not plan-gated) |
+| Issuer (Frontend API) | `https://clerk.getgappd.com` |
+| Application domain / account portal | `app.getgappd.com` / `accounts.getgappd.com` |
+| Domain | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, verified |
+| Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
+| Dynamic Client Registration | Off; the metadata has no registration endpoint |
 
-### Operational scripts
+Not advertising `meetings:sync` is not an authorization boundary. The server accepts writes only
+from the Desktop client, with that scope and a registered device signature.
 
-Two scripts cover the verification and monitoring the runbook needed by hand.
+| Client | Client ID | Scopes | Redirect URIs |
+| --- | --- | --- | --- |
+| `Gappd Desktop` | `t3RzfAuaxamgqOQV` | `email`, `profile`, `offline_access`, `meetings:sync` | `http://127.0.0.1/callback` |
+| `Gappd MCP - Pi` | `WFvlqsHImvP7f14t` | `meetings:read`, `offline_access` | `http://localhost:19876/callback`, `http://127.0.0.1/callback` |
 
-**`npm run cloud:proof`** proves the whole upload path against the deployed service. It signs in
-with the Desktop public client, registers a device, adds one recorded turn to an isolated fixture,
-exports the document with the real exporter, signs the upload and sends it. It imports the app's
-own device module, so the signing format is not reimplemented.
+Both clients are public, use PKCE and show a consent screen; no client secret is stored. The bare
+`http://127.0.0.1/callback` is deliberate: the desktop binds a random loopback port and Clerk accepts
+the port at request time. The release workflow bakes the identity into the desktop build from the
+repository variables `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID`. The development instance
+(`https://learning-mutt-4805.clerk.accounts.dev`) and its clients are obsolete, and the server refuses
+a development issuer with `GAPPD_PRODUCTION_MODE=true`.
 
-`--dry-run` stops before any network call, which is the check to run when only the exporter is in
-question. `--revision=N` raises the revision: a changed document needs a higher revision, because
-one revision means one document, and the identity is deterministic, so re-running at the same
-revision with the same bytes is a harmless retry.
+**Include Audience must stay on** (Configure → Developers → OAuth applications → Settings → Access
+tokens). Without it access tokens have no `aud` claim, and the server answers a bare 401 before any
+scope or revocation check, so the fault looks like a bad token.
 
-The sign-in is the one step no script can do alone: the browser it opens must already hold a Clerk
-session. Verified on 2026-09-14 with a revision-2 update, the returned transcript intact
-(`[0:00] You: ...`) and the fixed expiry unchanged between revisions.
+Five CNAME records at Namecheap serve the instance: `clerk` → `frontend-api.clerk.services`,
+`accounts` → `accounts.clerk.services`, `clkmail` → `mail.xk2n1iwgxvot.clerk.services`, and
+`clk._domainkey` / `clk2._domainkey` → `dkim1` / `dkim2.xk2n1iwgxvot.clerk.services`.
 
-**`npm run cloud:status`** reads `GET /status` and fails when `cleanup.behind` is true, with a
-macOS notification when it can. `cloud:status:install` writes a LaunchAgent that runs it hourly and
-logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it. A breach
-is an exit code and a notification, so any scheduler treats it as a failure.
+### Google sign-in
 
-### Backup restore drill (2026-09-14) — PASSED, in an isolated target
+A production instance needs its own Google credentials. Google Cloud project `gappd-production`
+holds the Web application client `Gappd Clerk Production v2`
+(`185849256404-c3psc1m1h9rl7kknaldc5e9g06cqo87d.apps.googleusercontent.com`) with the redirect URI
+`https://clerk.getgappd.com/v1/oauth_callback`. Its secret lives only in Clerk. The `Gappd Desktop`
+client in the same project serves the app's Calendar and Gmail access and cannot serve Clerk.
 
-The drill ran under explicit owner approval, and it did **not** touch the live volume.
+Clerk reports a wrong secret only as `oauth_token_exchange_error`. Check a secret before wiring it in:
 
-Method. A manual backup was taken, a sentinel row was written to the live database *after* the
-backup, and the backup was then restored. The dashboard stages the restore: it creates the restored
-volume **unmounted** and shows three changes (unmount the old volume, mount the new, redeploy), with
-`Discard` and `Deploy`. Instead of deploying onto live, the restored volume was attached to a
-throwaway Postgres service in the same project and environment, and the staged change on live was
-discarded. The live service kept running on its own volume throughout.
+```sh
+curl -s https://oauth2.googleapis.com/token \
+  -d "client_id=$CID" --data-urlencode "client_secret=$SEC" \
+  -d grant_type=authorization_code -d code=bogus -d "redirect_uri=https://clerk.getgappd.com/v1/oauth_callback"
+```
 
-Evidence. The restored cluster reported migrations `1 2 3 4 5 6 7 8 9 10`, one cloud copy, two
-deletion markers, and **zero sentinel rows** — the row written after the backup was gone, so the
-restore really rolled the cluster back rather than being a no-op. It also carried all five `gappd%`
-roles, so a restored database is immediately usable. The live database still held its sentinel while
-this was true, which is what proves live was never rolled back. The restored cluster rejected the
-service's own generated password and accepted the live cluster's credentials, which is further
-evidence that the restore is a faithful cluster copy.
+`invalid_grant` means the credentials are good; `invalid_client` means the secret is wrong.
 
-Two operational facts worth keeping. A restore creates and stages a volume; the current volume is
-preserved and nothing happens until `Deploy`, so a staged restore is discardable. And a manual backup
-has no expiry (`expiresAt: null`), so it falls outside the 6-day policy and must be deleted by hand —
-the drill backup and every throwaway volume were deleted, and Railway completes volume deletion
-within 48 hours.
+### Pi re-authorization
 
-### Point-in-time recovery enabled and proven (2026-09-14)
+Pi keeps its MCP OAuth entry in the system keychain under service `pi-mcp-adapter.oauth` and account
+`sha256-<sha256 of the server name>`, plus one `.chunk.*` entry per segment. The `security` command
+does not find these entries; delete them with the adapter's own `@napi-rs/keyring` library from
+`~/.pi/agent/npm/node_modules/pi-mcp-adapter`. Restart Pi after changing the client ID in
+`~/.pi/agent/mcp.json`, because Pi reads it only at start-up.
 
-PITR was off. It is now on: `WAL_ARCHIVE_*` variables point at a new `Postgres-PITR` archive bucket,
-and the service redeployed once.
+## Expired copy cleanup
 
-Enabling is staged like a restore, so it is reviewable before it applies. The drill then restored a
-known point: a sentinel row was written at 13:37:25 and the restore target was 13:35, chosen from
-the window. The recovered service `Postgres-restored-20260914-1135` reported migrations
-`1 2 3 4 5 6 7 8 9 10`, one cloud copy, two deletion markers, all five `gappd%` roles, and **zero
-sentinel rows** — genuine point-in-time recovery, not a snapshot.
+`gappd-cloud-cleanup` runs `/cleanup` (start command override) on the schedule `0 * * * *` UTC, with
+restart policy NEVER and no HTTP healthcheck. Its only database setting is
+`MEETING_CLEANUP_DATABASE_URL`, a private URL for the restricted non-owner role
+`gappd_meeting_cleanup`; the command fails without it.
 
-Two properties worth knowing. A PITR restore **creates a new standalone Postgres service and leaves
-the current one running**, so it is the isolated target this runbook wanted, and unlike a volume
-restore it never swaps the live volume. And the restorable window starts when PITR is enabled, so
-until archiving has run for a while the earliest target is the enablement moment.
+Each run removes at most 100 expired copies and keeps their deletion markers. At an hourly
+frequency that is a nominal 2,400 copies a day, not an SLA: Railway can delay a tick and skips one
+while the previous run is active. `GET /status` publishes the backlog; `cleanup.behind` is true when
+the oldest unremoved expired copy is older than 24 hours.
 
-The drill service and its volume were deleted, and the live service was verified healthy with its own
-volume still mounted throughout.
+`npm run cloud:status` reads `/status` and fails when `cleanup.behind` is true, with a macOS
+notification when it can. `npm run cloud:status:install` writes a LaunchAgent that runs it hourly and
+logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it.
 
-### Log-retention blocker### Log-retention blocker
+## End-to-end upload proof
 
-The workspace API reports plan **PRO**. Railway documents 30-day log retention for Pro, and the
-documentation is now explicit that **there is no log drain setting and no per-service retention
-control**: the plan fixes the window, and an upgrade "immediately restore[s] logs that were
-previously outside of the retention period". So the 14-day cap cannot be enforced by configuration.
-The only options are a third-party log forwarder with its own 14-day retention, or an owner-approved
-exception. Either way the window holds content-free operational logs only: the service never logs
-tokens, account ids or Meeting text.
-Its documentation also says a plan upgrade can restore logs outside the previous retention
-window, so a visibility window alone is not proof of physical deletion.
+`npm run cloud:proof` proves the upload path against the deployed service without the app UI. It
+signs in with the Desktop client, registers a device, creates and exports its own fixture Meeting
+with the real exporter, signs the upload and sends it, using the app's own device module. The
+browser it opens must already hold a Clerk session or complete one sign-in.
 
-The 14-day limit is NOT enforced or verified. No plan change, log erasure or policy exception
-was made. Before real data, obtain Railway confirmation of a hard deletion control, or get
-explicit owner approval for a different policy/platform. A shorter downstream log-store
-setting would not remove Railway's own captured logs.
+`--delete` removes the copy afterwards, `--dry-run` stops before any network call, `--revision=N`
+raises the revision, and `--keep` keeps the isolated profile. Each run gets a fresh Meeting, so
+`--delete` never spends the proof for the whole account. It passed against the production identity
+on 2026-09-14: registration, upload, read-back and delete, with the fixed 30-day expiry.
 
-## Next verification
+## Backups and recovery
 
-1. Observe a completed daily backup and verify its expiry metadata.
-2. Point an external monitor at `GET /status` and alert when `cleanup.behind` is true. The endpoint
-   is public and content free; a missed run with nothing expired has no user impact, so the backlog
-   is the signal. Done on the development Mac: `npm run cloud:status:install` writes a LaunchAgent
-   that runs hourly and notifies on a breach. A second monitor on the deployed side is still
-   outstanding.
-3. Test restore in an isolated target with current deletion evidence; do not serve it publicly.
-4. Verify aged backup removal and resolve the log-retention blocker before real uploads.
+Daily volume backups: schedule `45cb81af-0160-4847-a7eb-2948aea475c2` on volume instance
+`190d6f11-ec72-4a03-a36d-55774b567e7e`, at the provider-selected `16 16 * * *` UTC, retention
+518,400 seconds (6 days), below the approved 7-day maximum. There are no weekly or monthly schedules.
+A manual backup has no expiry (`expiresAt: null`) and must be deleted by hand; do not use manual
+backups as a substitute for the schedule.
 
-## Primary sources
+Point-in-time recovery is on: `WAL_ARCHIVE_*` variables on `Postgres` point at the `Postgres-PITR`
+bucket. A PITR restore creates a new standalone Postgres service and leaves the live one running.
+The restorable window starts at the moment PITR was enabled (2026-09-14).
 
-- [Railway cron semantics](https://docs.railway.com/cron-jobs)
-- [Docker entrypoint override](https://docs.railway.com/deployments/start-command)
-- [Backup schedules and retention](https://docs.railway.com/volumes/backups)
-- [Plan-based log retention](https://docs.railway.com/observability/logs#log-retention)
-- [Approved lifecycle contract](cloud-data-lifecycle.md)
+Both paths were drilled on 2026-09-14 into isolated targets, never the live volume. Each restored
+cluster had the expected migrations, copies, deletion markers and all `gappd%` roles, and lacked a
+sentinel row written after the restore point, which proves a real rollback. A volume restore is
+staged (unmount old, mount new, redeploy) and stays discardable until `Deploy`; attach the restored
+volume to a throwaway Postgres service instead of deploying it onto live. Delete drill services and
+volumes afterwards; Railway completes volume deletion within 48 hours.
 
+A restore must stay offline until current deletion markers and expiry rules are applied: a snapshot
+cannot know about deletions made after it.
 
 ## Why a re-upload of a deleted Meeting fails with 503
 
-Three deliberate rules meet here, and together they produce a confusing error.
-
-1. The cloud copy id is derived, not random: `meeting_copy_id(owner_id, local_id)`.
-   The same local Meeting always maps to the same cloud id.
-2. Deletion is permanent. `meeting_lifecycle` keeps `deleted_at` and the DELETE path only sets it.
-3. `guard_cloud_meeting_insert` requires a live accepted lifecycle row, so a deleted or expired copy
-   never returns.
-
-A re-upload therefore reaches `verifyStored`, finds no live lifecycle row, and fails. That failure has
-no sentinel of its own, so `writeUploadRefusal` falls through to its default and answers
-`503 cloud copy unavailable`. A 503 reads as retryable and names nothing, so it looks like an
-outage rather than a permanent refusal of that one Meeting. The desktop queue does stop after
-`MAX_SYNC_ATTEMPTS`, so it is a diagnosability problem, not a retry loop. Giving this case its own
-sentinel and a permanent status is worth doing.
+The cloud copy ID is derived (`meeting_copy_id(owner_id, local_id)`), deletion is permanent
+(`meeting_lifecycle.deleted_at` is only ever set), and `guard_cloud_meeting_insert` requires a live
+accepted lifecycle row. A re-upload of a deleted Meeting therefore fails in `verifyStored`, and
+`writeUploadRefusal` falls through to `503 cloud copy unavailable`. The desktop queue stops after
+`MAX_SYNC_ATTEMPTS`, so this is a diagnosability problem, not a retry loop. A dedicated sentinel and
+a permanent status would make it clear.
 
 To see which local Meetings are spent for an account, read the lifecycle table over the private
-tunnel:
+tunnel. Never clear `deleted_at` to revive a copy; the permanence is the guarantee.
 
 ```sh
 printf "SELECT owner_id, left(id::text,8), left(local_id,8), deleted_at IS NOT NULL AS deleted FROM meeting_lifecycle ORDER BY 1;\n" \
@@ -209,9 +188,22 @@ printf "SELECT owner_id, left(id::text,8), left(local_id,8), deleted_at IS NOT N
       --environment 7b4a6831-62f8-4dda-a2e1-773542c266fb
 ```
 
-Never reach for this to revive a copy. The permanence is the guarantee, and clearing `deleted_at`
-would break it.
+## Open gates
 
-`cloud:proof` used to hit this on its second run in an account, because it reused the one pinned
-synthetic fixture identity. It now creates and exports its own Meeting with a fresh id, so each run
-gets its own cloud copy and `--delete` no longer consumes the proof for the whole account.
+| Gate | State |
+| --- | --- |
+| Log retention | Blocked. The workspace is on Railway Pro, which keeps logs 30 days with no per-service control or drain, against the approved 14-day cap. Options: a log forwarder with its own 14-day store (Railway still keeps its copy) or an owner-approved exception. Logs carry no tokens, account IDs or Meeting text. |
+| Backup expiry | Unverified. Observe a scheduled backup and confirm its expiry metadata and actual removal. |
+| Deployed-side monitor | Only the development Mac's LaunchAgent polls `/status`. Add a monitor that does not depend on that Mac. |
+| Second account and hosted ChatGPT | Deferred. Pi's owned read is proven; a second real account and ChatGPT developer mode are needed for cross-account and client checks. |
+| Revocation timing | `POST /revoke` is checked on every request with a 30-second per-instance cache. Clerk refresh tokens do not expire, and signed access tokens stay valid until expiry outside that check. |
+| Limits and instances | Rate buckets and the storage check live in one process. Move them to a shared store before running a second instance. |
+| Staging | There is no separate staging environment; `beta` is the deploy branch. |
+
+## Primary sources
+
+- [Railway cron semantics](https://docs.railway.com/cron-jobs)
+- [Docker entrypoint override](https://docs.railway.com/deployments/start-command)
+- [Backup schedules and retention](https://docs.railway.com/volumes/backups)
+- [Plan-based log retention](https://docs.railway.com/observability/logs#log-retention)
+- [Clerk OAuth behavior, scopes, PKCE and token lifetime](https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth)
