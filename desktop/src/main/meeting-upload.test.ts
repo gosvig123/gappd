@@ -6,16 +6,12 @@ import type { MeetingListItem } from '../shared/contracts'
 
 const ids = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7']
 
-test('signing in never permits an upload; the capability gate blocks everything', async () => {
+test('signing in never permits an upload', async () => {
   const h = harness()
   assert.equal((await h.upload.status()).consent, false)
   await h.upload.enqueue(MEETING)
   await h.upload.sync()
   assert.equal(h.sends(), 0)
-  const disabled = harness({ available: false })
-  await assert.rejects(disabled.upload.connect(true))
-  await assert.rejects(disabled.upload.enqueue(MEETING))
-  assert.equal(disabled.sends(), 0)
 })
 
 test('the explicit consent is required before any send', async () => {

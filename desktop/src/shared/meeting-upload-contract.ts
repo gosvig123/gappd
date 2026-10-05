@@ -6,7 +6,6 @@ import type { MeetingSyncStatus } from './meeting-sync-contract'
  * from signing in: an account alone never permits an upload.
  */
 export type MeetingUploadStatus = {
-  available: boolean
   account: CloudAuthStatus
   consent: boolean
   deleteConsent: boolean

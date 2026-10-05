@@ -8,7 +8,6 @@ import test from 'node:test'
 
 function status(overrides: Partial<MeetingUploadStatus> = {}): MeetingUploadStatus {
   return {
-    available: true,
     account: { enabled: true, pending: false, email: 'a@example.test', subject: 'user_a', error: null },
     consent: false, deleteConsent: false, accountDeleteConsent: false, revokeConsent: false, sending: false, result: null,
     queue: { pending: 0, failed: 0, entries: [] },

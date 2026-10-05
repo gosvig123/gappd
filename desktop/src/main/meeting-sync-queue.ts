@@ -40,8 +40,6 @@ export class MeetingSyncQueue {
   /**
    * Makes this queue belong to one account. Memory never crosses accounts: a second account drops
    * the first account's watermark and its queued work, because neither was ever accepted for it.
-   * A queue that no account has claimed adopts the first one that claims it, so a document written
-   * before queues were owned keeps the watermark of the only account this Mac has used.
    */
   claim(subject: string): Promise<void> {
     return this.serialize(async () => {
@@ -74,7 +72,7 @@ export class MeetingSyncQueue {
         try {
           const document = await load(localId, nextRevision(state, localId))
           if (!document) throw new Error('The Meeting document is unavailable.')
-          const previous = entry ? contentHash(entry.document) : state.acceptedContent?.[localId]
+          const previous = entry ? contentHash(entry.document) : state.acceptedContent[localId]
           if (contentHash(document) === previous) continue
           await this.queueOne(state, localId, async () => document)
           queued += 1
@@ -108,7 +106,6 @@ export class MeetingSyncQueue {
       const state = await this.load()
       state.accepted[localId] = Math.max(state.accepted[localId] ?? 0, revision)
       if (state.entries[localId]?.revision === revision) {
-        state.acceptedContent ??= {}
         state.acceptedContent[localId] = contentHash(state.entries[localId].document)
         delete state.entries[localId]
       }

@@ -52,7 +52,7 @@ type RecordedRequest = {
   generation: string | null
 }
 
-type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; available?: boolean; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
+type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
 
 /**
  * One Meeting list row, shaped as the app protocol sends it. Capture and processing statuses
@@ -74,7 +74,7 @@ export function harness(options: HarnessOptions = {}) {
   const requests: RecordedRequest[] = []
   const registrations: string[] = []
   const auth = options.auth ?? buildAuth(() => saved, (next) => { saved = next })
-  const upload = new MeetingUpload(auth, 'https://example.test/mcp', options.available ?? true,
+  const upload = new MeetingUpload(auth, 'https://example.test/mcp',
     options.queue ?? new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
     options.load ?? (async (_localId, revision) => `{"version":1,"revision":${revision}}`),
     async () => options.meetings ?? [],

@@ -29,14 +29,14 @@ export type MeetingSyncDocument = {
   subject: string | null
   /** Highest revision accepted by the server for each local Meeting. */
   accepted: Record<string, number>
-  /** Content hashes exclude the revision. Older queues acquire them on their next upload. */
-  acceptedContent?: Record<string, string>
+  /** Content hash of each accepted document, excluding the revision. */
+  acceptedContent: Record<string, string>
   /** Pending work, newest revision per local Meeting. */
   entries: Record<string, { revision: number; document: string; state: MeetingSyncState; attempts: number; updatedAt: string; error: string | null }>
 }
 
 export function emptyMeetingSyncDocument(): MeetingSyncDocument {
-  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, entries: {} }
+  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, acceptedContent: {}, entries: {} }
 }
 
 /**
@@ -48,15 +48,14 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
   if (!stored || typeof stored !== 'object') return null
   const candidate = stored as Partial<MeetingSyncDocument>
   if (candidate.version !== MEETING_SYNC_VERSION || !candidate.accepted || !candidate.entries) return null
-  // A document written before the queue belonged to an account has no subject and is adopted
-  // by the first account that claims it.
-  if (candidate.subject !== undefined && !(candidate.subject === null || (typeof candidate.subject === 'string' && candidate.subject.length > 0 && candidate.subject.length <= 320))) return null
+  if (!(candidate.subject === null || (typeof candidate.subject === 'string' && candidate.subject.length > 0 && candidate.subject.length <= 320))) return null
   const accepted: Record<string, number> = {}
   for (const [localId, revision] of Object.entries(candidate.accepted)) {
     if (!revisionOf(revision)) return null
     accepted[localId] = revision
   }
   const acceptedContent: Record<string, string> = {}
+  // Released builds wrote a new queue without this field until its first accepted upload.
   if (candidate.acceptedContent !== undefined) {
     if (!candidate.acceptedContent || typeof candidate.acceptedContent !== 'object' || Array.isArray(candidate.acceptedContent)) return null
     for (const [localId, hash] of Object.entries(candidate.acceptedContent)) {
@@ -69,7 +68,7 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
     if (!validEntry(entry)) return null
     entries[localId] = entry
   }
-  return { version: MEETING_SYNC_VERSION, subject: candidate.subject ?? null, accepted, acceptedContent, entries }
+  return { version: MEETING_SYNC_VERSION, subject: candidate.subject, accepted, acceptedContent, entries }
 }
 
 function revisionOf(value: unknown): value is number {

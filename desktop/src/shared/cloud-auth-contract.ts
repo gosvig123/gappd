@@ -1,4 +1,4 @@
-/** Authentication-only preview. This state never grants permission to upload Meetings. */
+/** The cloud upload account. Being signed in never grants permission to upload Meetings. */
 export type CloudAuthStatus = {
   enabled: boolean
   pending: boolean

@@ -17,7 +17,6 @@ import { consentedCredential, grantedConsent, newStoredConsent, reconcileConsent
 export class MeetingUpload {
   private readonly auth: Authorization
   private readonly resource: string
-  private readonly available: boolean
   private readonly queue: MeetingSyncQueue
   private readonly loadDocument: (localId: string, revision: number) => Promise<string>
   private readonly localMeetings: () => Promise<MeetingListItem[]>
@@ -33,12 +32,11 @@ export class MeetingUpload {
   private restored = false
   private restoring: Promise<void> | null = null
 
-  constructor(auth: Authorization, resource: string, available: boolean, queue: MeetingSyncQueue,
+  constructor(auth: Authorization, resource: string, queue: MeetingSyncQueue,
     loadDocument: (localId: string, revision: number) => Promise<string>, localMeetings: () => Promise<MeetingListItem[]>,
     device: MeetingDevice, fetcher: typeof fetch = fetch) {
     this.auth = auth
     this.resource = resource
-    this.available = available
     this.queue = queue
     this.loadDocument = loadDocument
     this.localMeetings = localMeetings
@@ -53,7 +51,7 @@ export class MeetingUpload {
     reconcileConsent(this.stored, account)
     if (!this.stored.upload) this.stopRetryTimer()
     return {
-      available: this.available, account, consent: Boolean(this.stored.upload),
+      account, consent: Boolean(this.stored.upload),
       deleteConsent: Boolean(this.stored.deletion), accountDeleteConsent: Boolean(this.stored.account),
       revokeConsent: Boolean(this.stored.revocation), sending: Boolean(this.pending), result: this.result,
       queue: await this.queue.status(),
@@ -63,7 +61,6 @@ export class MeetingUpload {
   /** The sync toggle. Turning it off drops consent and cancels locally; it never deletes a copy. */
   async connect(enabled: unknown): Promise<MeetingUploadStatus> {
     if (typeof enabled !== 'boolean') throw new Error('Boolean required.')
-    if (enabled && !this.available) throw new Error('Cloud Meeting upload is disabled.')
     this.revokeAll()
     await this.auth.setEnabled(enabled)
     return this.status()
@@ -96,16 +93,15 @@ export class MeetingUpload {
 
   /** Queues one local Meeting. It sends nothing: sync does that, and only with consent. */
   async enqueue(localId: unknown): Promise<MeetingUploadStatus> {
-    if (!this.available) throw new Error('Cloud Meeting upload is disabled.')
     if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
     await this.queue.enqueue(localId, (revision) => this.loadDocument(localId, revision))
     return this.status()
   }
 
-  /** Sends queued copies while consent, the account and the capability all still hold. */
+  /** Sends queued copies while consent and the account still hold. */
   async sync(): Promise<MeetingUploadStatus> {
     if (this.syncing) await this.syncing
-    else if (this.available && !this.pending) {
+    else if (!this.pending) {
       this.syncing = syncUploads(this.context())
       try { await this.syncing } finally { this.syncing = null }
     }
@@ -157,7 +153,6 @@ export class MeetingUpload {
 
   /** The clients that have used this account, so revocation offers a choice instead of a guess. */
   async knownClients(): Promise<string[]> {
-    if (!this.available) return []
     return listKnownClients(this.context())
   }
 
@@ -183,7 +178,6 @@ export class MeetingUpload {
   }
 
   private async refreshMeetings(announce: boolean): Promise<void> {
-    if (!this.available) return
     await this.restoreConsent()
     const generation = this.generation
     const credential = await this.consented()
@@ -227,13 +221,13 @@ export class MeetingUpload {
   }
 
   private writable(): boolean {
-    return this.available && !this.pending && !this.syncing
+    return !this.pending && !this.syncing
   }
 
   private async verified(subject: unknown, enabled: unknown): Promise<CloudCredential | null> {
     if (typeof enabled !== 'boolean' || typeof subject !== 'string') throw new Error('Invalid consent.')
     this.cancelPending()
-    if (!enabled || !this.available) return null
+    if (!enabled) return null
     const generation = this.generation
     const credential = await this.auth.credential()
     return generation === this.generation && credential?.subject === subject ? credential : null
@@ -260,7 +254,7 @@ export class MeetingUpload {
   }
 
   private restoreConsent(): Promise<void> {
-    if (this.restored || !this.available) return Promise.resolve()
+    if (this.restored) return Promise.resolve()
     if (this.restoring) return this.restoring
     const generation = this.generation
     this.restoring = (async () => {

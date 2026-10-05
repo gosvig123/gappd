@@ -10,13 +10,8 @@ import { MeetingSyncQueue } from './meeting-sync-queue'
 import { MeetingUpload } from './meeting-upload'
 import { cloudAuthConfig, cloudResource } from './service-config'
 
-/**
- * Cloud Meeting upload is a separate capability from the authentication-only preview, with its
- * own credentials. The preview's credential must never become upload authority, so this keeps a
- * distinct protected store even though it uses the same development identity.
- */
-const capabilityFlag = 'GAPPD_MEETING_UPLOAD_ENABLED'
-
+// The store names keep their original "development" suffix, so existing installs keep their
+// upload account, consent, queue and device key.
 let instance: MeetingUpload | null = null
 let authorization: CloudAuth | null = null
 
@@ -28,17 +23,8 @@ function meetingUploadAuthorization(): CloudAuth {
   return authorization
 }
 
-declare const __GAPPD_MEETING_UPLOAD_ENABLED__: string
-
-/** A packaged build carries the capability; a development run can still turn it on per shell. */
-function uploadCapability(): boolean {
-  if (typeof __GAPPD_MEETING_UPLOAD_ENABLED__ === 'string' && __GAPPD_MEETING_UPLOAD_ENABLED__.trim() === 'true') return true
-  return process.env[capabilityFlag] === 'true'
-}
-
 export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
-    uploadCapability(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentLoader(resolveGappdBinary),
     listMeetings,

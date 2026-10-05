@@ -10,7 +10,7 @@ export function MeetingUploadPanel() {
   const [selected, setSelected] = useState('')
   const [confirmed, setConfirmed] = useState(false)
   const [revokedClient, setRevokedClient] = useState('')
-  if (!status?.available) return null
+  if (!status) return null
   const subject = status.account.subject || ''
   const busy = status.account.pending || status.sending
   return <Card className="settings-section">

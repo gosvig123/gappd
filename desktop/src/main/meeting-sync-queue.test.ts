@@ -42,15 +42,6 @@ test('claiming a queue for another account drops the watermark and the queued wo
   assert.equal((await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')).revision, 1)
 })
 
-test('a queue written before queues were owned is adopted, not wiped', async () => {
-  const { store, queue: sync } = queue()
-  // The shape a version-1 document on disk has: a watermark and no account.
-  store.stored = { version: 1, accepted: { [MEETING]: 3 }, entries: {} } as unknown as MeetingSyncDocument
-  await sync.claim('user_a')
-  assert.equal(store.stored?.accepted[MEETING], 3, 'the only account this Mac has used keeps its history')
-  assert.equal(store.stored?.subject, 'user_a')
-})
-
 test('enqueue assigns increasing revisions and replaces the older pending copy', async () => {
   const { queue: sync } = queue()
   assert.equal((await sync.enqueue(MEETING, async () => '{"version":1,"revision":1}')).revision, 1)
@@ -163,7 +154,7 @@ test('a damaged or unsupported queue file is refused whole', async () => {
   const damaged = { ...store.stored, version: 99 }
   store.stored = damaged as MeetingSyncDocument
   await assert.rejects(new MeetingSyncQueue(store).status())
-  store.stored = { version: 1, subject: null, accepted: {}, entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
+  store.stored = { version: 1, subject: null, accepted: {}, acceptedContent: {}, entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
   await assert.rejects(new MeetingSyncQueue(store).status())
 })
 
@@ -193,9 +184,10 @@ test('accepted content survives restart; unchanged pending text preserves its re
   assert.equal((await restarted.backfill([MEETING], load)).queued, 1)
 })
 
-test('an old accepted record gains a content hash at a new revision, and a damaged hash is refused', async () => {
+test('a queue file without content hashes still loads, and a damaged hash is refused', async () => {
   const { store, queue: sync } = queue()
-  store.stored = { version: 1, subject: 'user_a', accepted: { [MEETING]: 3 }, entries: {} }
+  // The shape released builds wrote before a queue's first accepted upload: no content hashes.
+  store.stored = { version: 1, subject: 'user_a', accepted: { [MEETING]: 3 }, entries: {} } as unknown as MeetingSyncDocument
   const load = async (_id: string, revision: number) => JSON.stringify({ revision, title: 'Existing' })
   await sync.backfill([MEETING], load)
   assert.equal((await sync.pending())?.revision, 4)
