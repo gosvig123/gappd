@@ -2,7 +2,7 @@ import { exportRecording } from './meeting-export'
 import { generateMeetingAgenda } from './meeting-agenda'
 import { enrichMeeting, loadMeetingEnrichment } from './meeting-enrichment'
 import { openPermissionsSettings } from './privacy-settings'
-import { meetingUpload } from './meeting-upload-service'
+import { deleteMeetingAndCloudCopy, meetingUpload } from './meeting-upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { requestCapturePermissions } from './capture-permissions'
@@ -14,7 +14,7 @@ import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics 
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google-calendar-service'
 import { connectSlack, disconnectSlack, reviewSlackMessage, sendSlackMessage, slackConnectionStatus, slackDestinations } from './slack-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
-import { assignSpeaker, deleteMeeting, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
+import { assignSpeaker, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -38,7 +38,7 @@ const IPC_HANDLERS: MainHandlers = {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
-    delete: (_event, id: string) => deleteMeeting(id),
+    delete: (_event, id: string) => deleteMeetingAndCloudCopy(id),
     people: () => listPeople(),
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),

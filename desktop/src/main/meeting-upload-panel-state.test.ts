@@ -10,7 +10,7 @@ function status(overrides: Partial<MeetingUploadStatus> = {}): MeetingUploadStat
   return {
     account: { enabled: true, pending: false, email: 'a@example.test', subject: 'user_a', error: null },
     consent: false, deleteConsent: false, accountDeleteConsent: false, revokeConsent: false, sending: false, result: null,
-    queue: { pending: 0, failed: 0, entries: [] },
+    queue: { pending: 0, failed: 0, deleting: 0, entries: [] },
     ...overrides,
   }
 }
@@ -22,7 +22,7 @@ function harness(t: { after(fn: () => void): void }) {
     status: async () => status(),
     connect: async (enabled) => status({ account: { enabled, pending: false, email: null, subject: null, error: null } }),
     setConsent: async (_subject, enabled) => status({ consent: enabled }),
-    enqueue: async () => status({ queue: { pending: 1, failed: 0, entries: [{ localId: 'm1', revision: 1, state: 'pending', attempts: 0, updatedAt: '', error: null }] } }),
+    enqueue: async () => status({ queue: { pending: 1, failed: 0, deleting: 0, entries: [{ localId: 'm1', revision: 1, state: 'pending', attempts: 0, updatedAt: '', error: null }] } }),
     sync: async () => status(),
     setDeleteConsent: async () => status({ deleteConsent: true }),
     deleteCopy: async () => status(),

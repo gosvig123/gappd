@@ -17,6 +17,8 @@ export type MeetingSyncEntry = {
 export type MeetingSyncStatus = {
   pending: number
   failed: number
+  /** Meetings deleted on this Mac whose cloud copies still wait for deletion. */
+  deleting: number
   entries: MeetingSyncEntry[]
 }
 
@@ -31,12 +33,14 @@ export type MeetingSyncDocument = {
   accepted: Record<string, number>
   /** Content hash of each accepted document, excluding the revision. */
   acceptedContent: Record<string, string>
+  /** Local Meetings deleted on this Mac whose cloud copies still need a deletion request. */
+  deletions: string[]
   /** Pending work, newest revision per local Meeting. */
   entries: Record<string, { revision: number; document: string; state: MeetingSyncState; attempts: number; updatedAt: string; error: string | null }>
 }
 
 export function emptyMeetingSyncDocument(): MeetingSyncDocument {
-  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, acceptedContent: {}, entries: {} }
+  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, acceptedContent: {}, deletions: [], entries: {} }
 }
 
 /**
@@ -63,12 +67,15 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
       acceptedContent[localId] = hash
     }
   }
+  // Queue files written before local deletion reached the cloud have no deletions.
+  const deletions = candidate.deletions ?? []
+  if (!Array.isArray(deletions) || deletions.some((localId) => typeof localId !== 'string' || localId.length === 0 || localId.length > 128)) return null
   const entries: MeetingSyncDocument['entries'] = {}
   for (const [localId, entry] of Object.entries(candidate.entries)) {
     if (!validEntry(entry)) return null
     entries[localId] = entry
   }
-  return { version: MEETING_SYNC_VERSION, subject: candidate.subject, accepted, acceptedContent, entries }
+  return { version: MEETING_SYNC_VERSION, subject: candidate.subject, accepted, acceptedContent, deletions: [...new Set(deletions)], entries }
 }
 
 function revisionOf(value: unknown): value is number {

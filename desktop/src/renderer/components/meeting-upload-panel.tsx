@@ -71,13 +71,17 @@ function renderControls({ status, subject, account, busy, run }: Controls) {
 }
 
 function renderQueue(status: MeetingUploadStatus, busy: boolean) {
-  if (status.queue.entries.length === 0) return <p>{busy ? 'Uploading.' : 'Nothing is queued.'}</p>
-  return <ul>
+  const deleting = status.queue.deleting
+  const deletions = deleting > 0
+    ? <p>{deleting} cloud {deleting === 1 ? 'copy' : 'copies'} of deleted Meetings {deleting === 1 ? 'waits' : 'wait'} for deletion. Sync sends the deletion while consent is active.</p>
+    : null
+  if (status.queue.entries.length === 0) return <>{deletions}<p>{busy ? 'Uploading.' : 'Nothing is queued.'}</p></>
+  return <>{deletions}<ul>
     {status.queue.entries.map(entry => <li key={entry.localId}>
       {entry.localId} · revision {entry.revision} · {entry.state} · {entry.attempts} attempt(s)
       {entry.error ? ` · ${entry.error}` : ''}
     </li>)}
-  </ul>
+  </ul></>
 }
 
 type Account = {

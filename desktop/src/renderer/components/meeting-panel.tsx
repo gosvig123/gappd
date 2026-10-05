@@ -50,7 +50,7 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
     try { await navigator.clipboard.writeText(copySourceFor(tab, meeting, transcript)); setCopied(true); setError('') }
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
-  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
+  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
   return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
 }
 

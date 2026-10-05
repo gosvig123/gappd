@@ -8,6 +8,8 @@ import { ensureRegistered } from './meeting-upload-context.ts'
 import { acceptedMessage } from './meeting-upload-ack.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { sendDocument } from './meeting-upload-transport.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { sendDeletions } from './meeting-upload-delete.ts'
 
 /** One pass sends at most this many Meetings, so no pass can run without end. */
 const MAX_SENDS_PER_PASS = 5
@@ -21,8 +23,8 @@ const PAUSE_MESSAGES: Record<PauseReason, string> = {
 }
 
 /**
- * Sends queued copies while consent and the account still hold, in passes of
- * MAX_SENDS_PER_PASS. A pass that accepts nothing ends the call, because the server is
+ * Deletes the cloud copies of Meetings deleted on this Mac, then sends queued copies while
+ * consent and the account still hold, in passes of MAX_SENDS_PER_PASS. A pass that accepts nothing ends the call, because the server is
  * unavailable rather than slow, and the queue keeps the rest for the next attempt.
  */
 export async function syncUploads(context: UploadContext): Promise<void> {
@@ -32,6 +34,7 @@ export async function syncUploads(context: UploadContext): Promise<void> {
   context.setPending(controller)
   try {
     if (!await ensureRegistered(context, credential, controller.signal)) return
+    await sendDeletions(context, credential, controller.signal)
     while (!controller.signal.aborted) {
       const remaining = (await context.queue.status()).pending
       if (remaining === 0) return

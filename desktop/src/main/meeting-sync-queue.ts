@@ -40,6 +40,8 @@ export class MeetingSyncQueue {
   /**
    * Makes this queue belong to one account. Memory never crosses accounts: a second account drops
    * the first account's watermark and its queued work, because neither was ever accepted for it.
+   * It also drops the first account's pending deletions: another account cannot delete those
+   * copies, and they expire on their own.
    */
   claim(subject: string): Promise<void> {
     return this.serialize(async () => {
@@ -49,6 +51,7 @@ export class MeetingSyncQueue {
       if (state.subject !== null) {
         state.accepted = {}
         state.acceptedContent = {}
+        state.deletions = []
         state.entries = {}
       }
       state.subject = subject
@@ -68,7 +71,7 @@ export class MeetingSyncQueue {
       let unreadable = 0
       for (const localId of localIds) {
         const entry = state.entries[localId]
-        if (entry?.state === 'failed') continue
+        if (entry?.state === 'failed' || state.deletions.includes(localId)) continue
         try {
           const document = await load(localId, nextRevision(state, localId))
           if (!document) throw new Error('The Meeting document is unavailable.')
@@ -82,6 +85,41 @@ export class MeetingSyncQueue {
       }
       if (queued > 0) await this.persist(state)
       return { queued, unreadable }
+    })
+  }
+
+  /**
+   * Records that a local Meeting is being deleted. A Meeting this queue has queued or seen accepted
+   * may have a cloud copy, so its pending upload is dropped and a deletion waits for the next sync.
+   * Nothing is written for a Meeting the queue never knew, so a Mac that never synced stays as it is.
+   */
+  forget(localId: string): Promise<void> {
+    return this.serialize(async () => {
+      if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
+      const state = await this.load()
+      if (state.accepted[localId] === undefined && !state.entries[localId]) return
+      delete state.entries[localId]
+      if (!state.deletions.includes(localId)) state.deletions.push(localId)
+      await this.persist(state)
+    })
+  }
+
+  /** The deletions to send for this account. Another account's queue has none for it. */
+  deletionsFor(subject: string): Promise<string[]> {
+    return this.serialize(async () => {
+      const state = await this.load()
+      return state.subject === subject ? [...state.deletions] : []
+    })
+  }
+
+  /** Records that the server deleted the cloud copy, so nothing about that Meeting remains. */
+  deleted(localId: string): Promise<void> {
+    return this.serialize(async () => {
+      const state = await this.load()
+      state.deletions = state.deletions.filter((candidate) => candidate !== localId)
+      delete state.accepted[localId]
+      delete state.acceptedContent[localId]
+      await this.persist(state)
     })
   }
 
@@ -163,6 +201,7 @@ export class MeetingSyncQueue {
       return {
         pending: entries.filter((entry) => entry.state === 'pending').length,
         failed: entries.filter((entry) => entry.state === 'failed').length,
+        deleting: state.deletions.length,
         entries,
       }
     })

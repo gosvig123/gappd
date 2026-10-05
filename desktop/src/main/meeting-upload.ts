@@ -98,7 +98,17 @@ export class MeetingUpload {
     return this.status()
   }
 
-  /** Sends queued copies while consent and the account still hold. */
+  /**
+   * Records the cloud deletion of a local Meeting before the Meeting itself is deleted, then starts
+   * a sync to send it. A deletion that cannot be sent now waits for consent and a connection.
+   */
+  async forgetLocal(localId: unknown): Promise<void> {
+    if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
+    await this.queue.forget(localId)
+    void this.syncNew().catch(() => console.error('Cloud deletion of a deleted Meeting could not start; sync retries it automatically.'))
+  }
+
+  /** Sends queued deletions and copies while consent and the account still hold. */
   async sync(): Promise<MeetingUploadStatus> {
     if (this.syncing) await this.syncing
     else if (!this.pending) {
@@ -186,7 +196,8 @@ export class MeetingUpload {
     if (generation !== this.generation || !await this.consented()) return
     // Retry durable pending work even when discovery found no new Meeting. An announced refresh
     // clears the old result first, so what remains afterwards is this sync's own reason.
-    if ((await this.queue.status()).pending > 0) {
+    const queue = await this.queue.status()
+    if (queue.pending > 0 || queue.deleting > 0) {
       if (announce) this.result = null
       await this.sync()
     }

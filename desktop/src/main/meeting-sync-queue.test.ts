@@ -154,7 +154,7 @@ test('a damaged or unsupported queue file is refused whole', async () => {
   const damaged = { ...store.stored, version: 99 }
   store.stored = damaged as MeetingSyncDocument
   await assert.rejects(new MeetingSyncQueue(store).status())
-  store.stored = { version: 1, subject: null, accepted: {}, acceptedContent: {}, entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
+  store.stored = { version: 1, subject: null, accepted: {}, acceptedContent: {}, deletions: [], entries: { [MEETING]: { revision: 0, document: 'x', state: 'pending', attempts: 0, updatedAt: '', error: null } } }
   await assert.rejects(new MeetingSyncQueue(store).status())
 })
 
