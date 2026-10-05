@@ -32,8 +32,9 @@ func TestMeetingCopyIDMatchesSQL(t *testing.T) {
 	}
 }
 
-// Migrating a database that holds demo state keeps the seeded Meeting and removes every demo object.
-func TestMigrationsRemoveTheUploadDemo(t *testing.T) {
+// Migrating a database that holds demo state and the seeded Meeting removes every demo object and
+// the synthetic read slice, and leaves the cloud copy tables in place.
+func TestMigrationsRemoveTheDemoAndTheSyntheticSlice(t *testing.T) {
 	database(t)
 	conn := migrationDatabase(t)
 	applyOldMigrations(t, conn)
@@ -46,15 +47,15 @@ func TestMigrationsRemoveTheUploadDemo(t *testing.T) {
 	mustExec(t, conn, `INSERT INTO meetings VALUES(selected_meeting_id($1),$1,'SYNTHETIC: Selected local Meeting',
  'Fabricated participants will review a fictional paper prototype.','[00:00] Synthetic speaker: Review the fictional paper prototype.',
  '2026-09-14T12:00:00Z','2026-09-14T12:00:00Z',true)`, "live-owner")
-	if err := admin.Seed(context.Background(), conn, "seed-owner"); err != nil {
-		t.Fatal(err)
-	}
+	mustExec(t, conn, `INSERT INTO meetings VALUES('b47c5e70-8030-4b9e-bb5a-146d17c68731','seed-owner',
+ 'SYNTHETIC: Demo planning Meeting','Synthetic participants agreed to review a fictional prototype.',
+ '[00:00] Synthetic speaker: This is fabricated test data.','2026-09-13T12:00:00Z','2026-09-13T12:00:00Z',true)`)
 	for range 2 {
 		if err := admin.Migrate(context.Background(), conn); err != nil {
 			t.Fatal(err)
 		}
 	}
-	assertDemoRemoved(t, conn)
+	assertDemoAndSyntheticRemoved(t, conn)
 }
 
 func migrationDatabase(t *testing.T) *pgx.Conn {
@@ -87,31 +88,22 @@ func applyOldMigrations(t *testing.T, conn *pgx.Conn) {
 	}
 }
 
-func assertDemoRemoved(t *testing.T, conn *pgx.Conn) {
+func assertDemoAndSyntheticRemoved(t *testing.T, conn *pgx.Conn) {
 	t.Helper()
 	ctx := context.Background()
-	result, err := conn.Query(ctx, `SELECT id::text||':'||owner_id FROM meetings ORDER BY owner_id`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	rows, err := pgx.CollectRows(result, pgx.RowTo[string])
-	if err != nil || len(rows) != 1 || rows[0] != service.SyntheticMeetingID+":seed-owner" {
-		t.Fatalf("synthetic rows = %v, %v; want only the seeded Meeting", rows, err)
-	}
 	var leftovers int
 	if err := conn.QueryRow(ctx, `SELECT
- (SELECT count(*) FROM pg_class WHERE relname='demo_lifecycle') +
+ (SELECT count(*) FROM pg_class WHERE relname IN ('demo_lifecycle','meetings','cloud_read_meetings')) +
  (SELECT count(*) FROM pg_proc WHERE proname IN ('demo_meeting_id','selected_meeting_id','guard_demo_content','protect_demo_lifecycle')) +
- (SELECT count(*) FROM pg_trigger WHERE tgname IN ('guard_demo_content','guard_selected_content')) +
- (SELECT count(*) FROM pg_policies WHERE tablename='meetings' AND policyname<>'meeting_owner')`).Scan(&leftovers); err != nil || leftovers != 0 {
-		t.Fatalf("demo objects left: %d, %v", leftovers, err)
+ (SELECT count(*) FROM pg_trigger WHERE tgname IN ('guard_demo_content','guard_selected_content'))`).Scan(&leftovers); err != nil || leftovers != 0 {
+		t.Fatalf("demo or synthetic objects left: %d, %v", leftovers, err)
 	}
 	var tables, versions int
 	if err := conn.QueryRow(ctx, `SELECT count(*) FROM pg_class
  WHERE relname IN ('cloud_meetings','meeting_lifecycle') AND relkind='r'`).Scan(&tables); err != nil || tables != 2 {
 		t.Fatal("real copy tables missing", err)
 	}
-	if err := conn.QueryRow(ctx, `SELECT count(*) FROM cloud_migrations WHERE version=12`).Scan(&versions); err != nil || versions != 1 {
-		t.Fatal("version 12 not recorded", err)
+	if err := conn.QueryRow(ctx, `SELECT count(*) FROM cloud_migrations WHERE version IN (12,13)`).Scan(&versions); err != nil || versions != 2 {
+		t.Fatal("versions 12 and 13 not recorded", err)
 	}
 }

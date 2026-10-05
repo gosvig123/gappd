@@ -45,18 +45,10 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
-	if uploads.Meeting != nil {
-		defer uploads.Meeting.Close()
-	}
-	// Enabling storage also exposes owned cloud copies to the read tools. It fails closed
-	// when the union view is absent, so a deploy before migration 005 cannot serve them.
-	if err := service.SetRealCopies(context.Background(), pool, uploads.Meeting != nil); err != nil {
-		return err
-	}
+	defer uploads.Meeting.Close()
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer),
 		Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool),
-		// The reader pool cannot write, so the client list uses the writer pool. Without storage
-		// there is nothing to record, and a nil pool makes recording a no-op.
+		// The reader pool cannot write, so the client list uses the writer pool.
 		Clients: service.NewClientDirectory(uploads.Meeting)}
 	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
@@ -64,12 +56,9 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 	return server.ListenAndServe()
 }
 
-// meetingPool opens the real-copy writer only when its separate capability is explicitly on.
+// meetingPool opens the writer for cloud Meeting copies, which the desktop client uploads.
 func meetingPool() (service.Uploads, error) {
 	uploads := service.Uploads{ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
-	if os.Getenv("GAPPD_MEETING_STORAGE_ENABLED") != "true" {
-		return uploads, nil
-	}
 	if uploads.ClientID == "" || os.Getenv("MEETING_STORAGE_DATABASE_URL") == "" {
 		return uploads, errors.New("meeting storage configuration required")
 	}

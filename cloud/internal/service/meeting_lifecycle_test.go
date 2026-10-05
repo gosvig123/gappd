@@ -53,23 +53,6 @@ func TestMeetingCopyCannotOutliveItsExpiry(t *testing.T) {
 	}
 }
 
-func TestMeetingCopyLeavesTheSyntheticSliceAlone(t *testing.T) {
-	reader, writer := meetingDatabase(t)
-	owner := copyOwner("synthetic")
-	id := uploadCopy(t, writer, owner, "local-5", 1)
-	if _, err := service.Read(context.Background(), reader, owner, id); err == nil {
-		t.Fatal("real copy visible to the synthetic read path")
-	}
-	if seeded, err := service.Read(context.Background(), reader, "user_synthetic", service.SyntheticMeetingID); err != nil || !seeded.Synthetic {
-		t.Fatal("synthetic read regressed", err)
-	}
-	var rows int
-	if err := lifecycleAdmin(t).QueryRow(context.Background(),
-		`SELECT count(*) FROM meetings WHERE id=$1`, id).Scan(&rows); err != nil || rows != 0 {
-		t.Fatal("real copy landed in the synthetic table", err)
-	}
-}
-
 func TestMeetingLifecycleRejectsFutureAndRewrite(t *testing.T) {
 	_, writer := meetingDatabase(t)
 	owner := copyOwner("lifecycle")

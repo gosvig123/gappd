@@ -35,7 +35,7 @@ func verifyMeetingRole(ctx context.Context, conn *pgx.Conn) error {
 	var safe bool
 	err := conn.QueryRow(ctx, `SELECT current_user='gappd_meeting_writer' AND NOT rolsuper AND NOT rolbypassrls
  AND NOT EXISTS (SELECT FROM pg_auth_members WHERE member=pg_roles.oid)
- AND NOT EXISTS (SELECT FROM pg_class WHERE relname IN ('meetings','meeting_lifecycle') AND relowner=pg_roles.oid)
+ AND NOT EXISTS (SELECT FROM pg_class WHERE relname IN ('cloud_meetings','meeting_lifecycle') AND relowner=pg_roles.oid)
  FROM pg_roles WHERE rolname=current_user`).Scan(&safe)
 	if err != nil || !safe {
 		return errors.New("runtime requires isolated gappd_meeting_writer role")

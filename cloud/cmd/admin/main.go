@@ -41,9 +41,7 @@ func execute(ctx context.Context, conn *pgx.Conn, command string) error {
 		return admin.ProvisionMeeting(ctx, conn, os.Getenv("MEETING_WRITER_DB_PASSWORD"))
 	case "provision-meeting-cleanup":
 		return admin.ProvisionMeetingCleanup(ctx, conn, os.Getenv("MEETING_CLEANUP_DB_PASSWORD"))
-	case "seed":
-		return admin.Seed(ctx, conn, os.Getenv("DEMO_OWNER_ID"))
 	default:
-		return errors.New("use migrate, provision, provision-meeting, provision-meeting-cleanup, or seed")
+		return errors.New("use migrate, provision, provision-meeting, or provision-meeting-cleanup")
 	}
 }

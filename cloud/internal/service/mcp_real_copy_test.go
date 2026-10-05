@@ -16,7 +16,6 @@ func TestMCPReadsARealCopy(t *testing.T) {
 	if code, _ := meetingRequest(t, upload.URL, syncSign(owner), "POST", meetingDoc(localMeeting, 2, "Real weekly sync")); code != 200 {
 		t.Fatal("upload")
 	}
-	realReads(t, reader)
 	// The read client is a separate client with its own read-only grant.
 	readAuth, readSign := signerScopes(t, service.Scope, "pi")
 	mcpHost := httptest.NewServer(service.Handler(readAuth, reader))

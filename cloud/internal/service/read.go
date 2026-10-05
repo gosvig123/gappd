@@ -40,7 +40,7 @@ func List(ctx context.Context, pool *pgxpool.Pool, owner string, p ListParams) (
 	}
 	// ponytail: offset paging over one owner's rows; add keyset paging if a page set grows past 1000.
 	err := withReadTx(ctx, pool, owner, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, queries().list,
+		rows, err := tx.Query(ctx, listMeetingsSQL,
 			owner, optionalTime(p.Since), optionalTime(p.Until), p.Offset, p.Limit+1)
 		if err != nil {
 			return errors.New("Meetings unavailable")
@@ -105,7 +105,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, owner, query string, limit 
 	}
 	// ponytail: one on-the-fly tsvector scan, bounded by owner; add a stored tsvector column if search volume grows.
 	err := withReadTx(ctx, pool, owner, func(ctx context.Context, tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, queries().search, owner, query, limit)
+		rows, err := tx.Query(ctx, searchMeetingsSQL, owner, query, limit)
 		if err != nil {
 			return errors.New("Meetings unavailable")
 		}

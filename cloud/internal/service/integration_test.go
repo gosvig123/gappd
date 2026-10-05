@@ -2,11 +2,13 @@ package service_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gosvig123/gappd/cloud/internal/admin"
 	"github.com/gosvig123/gappd/cloud/internal/service"
@@ -35,6 +37,26 @@ func database(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+// The read tests share one owned copy that the administrator inserts through the same lifecycle
+// rules an accepted upload follows. Each test process uses its own owner, so a rerun against the
+// same database never sees another run's copies.
+const seededLocalID = "seeded-meeting"
+
+var seededOwner = fmt.Sprintf("user_seeded_%d", time.Now().UnixNano())
+var seededMeetingID = service.MeetingCopyID(seededOwner, seededLocalID)
+
+func seedMeeting(t *testing.T, conn *pgx.Conn) {
+	t.Helper()
+	// The database clock, not the test host's, decides acceptance, as it does for an upload.
+	mustExec(t, conn, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
+ VALUES($1,$2,$3,statement_timestamp(),statement_timestamp()+interval '720 hours') ON CONFLICT DO NOTHING`,
+		seededMeetingID, seededOwner, seededLocalID)
+	mustExec(t, conn, `INSERT INTO cloud_meetings VALUES($1,$2,'Demo planning Meeting',
+ 'Participants agreed to review a fictional prototype.',
+ E'[00:00] Speaker: This is fabricated test data.\n[00:05] Speaker: Review the fictional prototype next week.',
+ '2026-09-13T12:00:00Z','2026-09-13T12:00:00Z',1,'{}') ON CONFLICT DO NOTHING`, seededMeetingID, seededOwner)
+}
+
 func lifecycleAdmin(t *testing.T) *pgx.Conn {
 	t.Helper()
 	conn, err := pgx.Connect(context.Background(), os.Getenv("TEST_ADMIN_DATABASE_URL"))
@@ -56,24 +78,24 @@ func TestDatabaseIsolation(t *testing.T) {
 	pool := database(t)
 	ctx := context.Background()
 	for range 8 {
-		m, err := service.Read(ctx, pool, "user_synthetic", service.SyntheticMeetingID)
-		if err != nil || !m.Synthetic {
+		m, err := service.Read(ctx, pool, seededOwner, seededMeetingID)
+		if err != nil || m.Title != "Demo planning Meeting" {
 			t.Fatalf("owned read: %v", err)
 		}
-		_, other := service.Read(ctx, pool, "user_other", service.SyntheticMeetingID)
+		_, other := service.Read(ctx, pool, "user_other", seededMeetingID)
 		_, missing := service.Read(ctx, pool, "user_other", "00000000-0000-0000-0000-000000000000")
 		if other == nil || missing == nil || other.Error() != missing.Error() {
 			t.Fatal("owner leak")
 		}
 	}
 	var count int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM meetings`).Scan(&count); err != nil || count != 0 {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM cloud_meetings`).Scan(&count); err != nil || count != 0 {
 		t.Fatalf("RLS/pool leak: %d %v", count, err)
 	}
-	if _, err := pool.Exec(ctx, `DELETE FROM meetings`); err == nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM cloud_meetings`); err == nil {
 		t.Fatal("runtime write allowed")
 	}
-	if _, err := service.Read(ctx, pool, "user_synthetic", "not-a-uuid"); err == nil {
+	if _, err := service.Read(ctx, pool, seededOwner, "not-a-uuid"); err == nil {
 		t.Fatal("bad ID allowed")
 	}
 }
@@ -103,18 +125,18 @@ func TestMCP(t *testing.T) {
 	a, sign := signer(t)
 	host := httptest.NewServer(service.Handler(a, pool))
 	defer host.Close()
-	token := sign("user_synthetic")
+	token := sign(seededOwner)
 	session := connect(t, host.URL+"/mcp", &token)
 	assertTools(t, session)
-	callMeeting(t, session, service.SyntheticMeetingID, false)
+	callMeeting(t, session, seededMeetingID, false)
 	callMeeting(t, session, "bad-id", true)
 	token = sign("user_other")
-	callMeeting(t, session, service.SyntheticMeetingID, true)
+	callMeeting(t, session, seededMeetingID, true)
 	token = "invalid"
 	if _, err := session.ListTools(context.Background(), nil); err == nil {
 		t.Fatal("request reused prior identity")
 	}
-	checkPayload(t, host.URL, sign("user_synthetic"))
+	checkPayload(t, host.URL, sign(seededOwner))
 }
 
 func assertTools(t *testing.T, session *mcp.ClientSession) {
@@ -141,8 +163,8 @@ func callMeeting(t *testing.T, s *mcp.ClientSession, id string, wantError bool) 
 	if result.IsError != wantError {
 		t.Fatalf("unexpected tool result: %v", result)
 	}
-	if !wantError && !strings.Contains(result.Content[0].(*mcp.TextContent).Text, `"synthetic":true`) {
-		t.Fatal("missing synthetic marker")
+	if !wantError && !strings.Contains(result.Content[0].(*mcp.TextContent).Text, `"title":"Demo planning Meeting"`) {
+		t.Fatal("missing Meeting title")
 	}
 }
 
@@ -172,10 +194,5 @@ func prepareDatabase(t *testing.T, conn *pgx.Conn) {
 	provisionRole(t, &readerOnce, func(ctx context.Context, conn *pgx.Conn) error {
 		return admin.Provision(ctx, conn, "synthetic-test-password-only")
 	})
-	if err := admin.Seed(context.Background(), conn, "user_synthetic"); err != nil {
-		t.Fatal(err)
-	}
-	if err := admin.Seed(context.Background(), conn, "user_other"); err == nil {
-		t.Fatal("seed reassigned owner")
-	}
+	seedMeeting(t, conn)
 }

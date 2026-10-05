@@ -129,7 +129,6 @@ func TestMeetingUploadPreservesLongSummaryAndOverlappingSpeech(t *testing.T) {
 	if code, _ := meetingRequest(t, host.URL, sign(owner), "POST", string(body)); code != 200 {
 		t.Fatalf("upload: %d", code)
 	}
-	realReads(t, reader)
 	copy, err := service.Read(context.Background(), reader, owner, service.MeetingCopyID(owner, localMeeting))
 	if err != nil {
 		t.Fatal(err)
