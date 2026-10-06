@@ -24,6 +24,8 @@ export type OAuthTokenRequester = (request: OAuthTokenRequest) => Promise<OAuthT
 
 export type OAuthConfig = {
   clientId: string
+  /** Google Desktop clients require it although an installed app cannot keep it confidential. */
+  clientSecret?: string
   authorizeUrl: string
   tokenUrl: string
   scopes: string[]
@@ -82,7 +84,7 @@ export async function refreshOAuthToken(config: OAuthConfig, tokens: OAuthTokenS
   const request: OAuthTokenRequest = { grantType: 'refresh_token', refreshToken: tokens.refreshToken }
   const refreshed = tokenRequester
     ? await tokenRequester(request)
-    : await requestTokens(config.tokenUrl, new URLSearchParams({ grant_type: 'refresh_token', client_id: config.clientId, refresh_token: tokens.refreshToken }), fetcher, now)
+    : await requestTokens(config.tokenUrl, clientParams(config, { grant_type: 'refresh_token', refresh_token: tokens.refreshToken }), fetcher, now)
   return { ...refreshed, refreshToken: refreshed.refreshToken || tokens.refreshToken }
 }
 
@@ -91,8 +93,14 @@ export function needsTokenRefresh(tokens: OAuthTokenSet, now = Date.now(), skewM
 }
 
 async function exchangeCode(config: OAuthConfig, code: string, redirectUri: string, verifier: string, fetcher: typeof fetch = fetch, now: () => number = Date.now): Promise<OAuthTokenSet> {
-  const body = new URLSearchParams({ grant_type: 'authorization_code', client_id: config.clientId, code, redirect_uri: redirectUri, code_verifier: verifier })
+  const body = clientParams(config, { grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier })
   return requestTokens(config.tokenUrl, body, fetcher, now)
+}
+
+function clientParams(config: OAuthConfig, params: Record<string, string>): URLSearchParams {
+  const body = new URLSearchParams({ ...params, client_id: config.clientId })
+  if (config.clientSecret) body.set('client_secret', config.clientSecret)
+  return body
 }
 
 export async function startLoopback(callbackPath: string, state: string, options: LoopbackOptions = {}): Promise<Loopback> {

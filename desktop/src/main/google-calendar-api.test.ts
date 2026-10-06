@@ -5,15 +5,22 @@ import { GoogleCalendarApi } from './google-calendar-api.ts'
 
 const NOW = new Date('2026-08-30T14:00:00Z').getTime()
 const CLIENT_ID = 'public-client'
+const CLIENT_SECRET = 'desktop-secret'
+const TOKEN_URL = 'https://oauth2.googleapis.com/token'
 
-test('refreshes through the relay and fetches owned primary events from local midnight', async () => {
+test('refreshes directly at Google with the Desktop client secret and fetches owned primary events from local midnight', async () => {
   let eventsUrlValue = ''
+  let refreshBody = new URLSearchParams()
   const api = new GoogleCalendarApi({
     clientId: CLIENT_ID,
+    clientSecret: CLIENT_SECRET,
     openExternal: async () => undefined,
     now: () => NOW,
-    tokenRequester: async () => ({ accessToken: 'new-access', refreshToken: 'refresh', expiresAt: NOW + 60_000, tokenType: 'Bearer' }),
     fetcher: async (input, init) => {
+      if (String(input) === TOKEN_URL) {
+        refreshBody = new URLSearchParams(String(init?.body))
+        return Response.json({ access_token: 'new-access', expires_in: 3599, token_type: 'Bearer' })
+      }
       eventsUrlValue = String(input)
       assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer new-access')
       return Response.json({ items: [
@@ -23,7 +30,9 @@ test('refreshes through the relay and fetches owned primary events from local mi
     },
   })
   const result = await api.sync('connection-1', 'user@example.com', expiredTokens())
+  assert.deepEqual(Object.fromEntries(refreshBody), { grant_type: 'refresh_token', refresh_token: 'refresh', client_id: CLIENT_ID, client_secret: CLIENT_SECRET })
   assert.equal(result.tokens.accessToken, 'new-access')
+  assert.equal(result.tokens.refreshToken, 'refresh')
   assert.equal(result.events.length, 1)
   assert.equal(result.events[0].sourceId, 'connection-1:primary:event-1')
   const eventsUrl = new URL(eventsUrlValue)
@@ -34,10 +43,17 @@ test('refreshes through the relay and fetches owned primary events from local mi
 test('Gmail permission is requested only on explicit opt-in and survives refresh without returned scopes', async () => {
   const scope = 'https://www.googleapis.com/auth/gmail.readonly'
   for (const includeGmail of [false, true]) {
+    let codeBody = new URLSearchParams()
     const api = new GoogleCalendarApi({
       clientId: CLIENT_ID,
-      tokenRequester: async () => validTokens(),
-      fetcher: async () => Response.json({ sub: 'fixture-subject', email: 'fixture@example.com' }),
+      clientSecret: CLIENT_SECRET,
+      now: () => NOW,
+      fetcher: async (input, init) => {
+        if (String(input) !== TOKEN_URL) return Response.json({ sub: 'fixture-subject', email: 'fixture@example.com' })
+        const body = new URLSearchParams(String(init?.body))
+        if (body.get('grant_type') === 'authorization_code') codeBody = body
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 3599 })
+      },
       openExternal: async input => {
         const url = new URL(input)
         assert.equal(url.searchParams.get('scope')!.split(' ').includes(scope), includeGmail)
@@ -48,20 +64,24 @@ test('Gmail permission is requested only on explicit opt-in and survives refresh
       },
     })
     assert.equal((await api.authorize(includeGmail)).subject, 'fixture-subject')
+    assert.equal(codeBody.get('code'), 'synthetic-code')
+    assert.equal(codeBody.get('client_secret'), CLIENT_SECRET)
+    assert.match(codeBody.get('code_verifier') || '', /^[A-Za-z0-9_-]{43}$/)
     assert.equal((await api.refresh({ ...expiredTokens(), scope })).scope, scope)
   }
 })
 
-test('is not configured without both client ID and relay requester', () => {
+test('is not configured without both client ID and client secret', () => {
   const openExternal = async () => undefined
-  assert.equal(new GoogleCalendarApi({ clientId: '', openExternal }).configured(), false)
-  assert.equal(new GoogleCalendarApi({ clientId: CLIENT_ID, openExternal }).configured(), false)
+  assert.equal(new GoogleCalendarApi({ clientId: '', clientSecret: CLIENT_SECRET, openExternal }).configured(), false)
+  assert.equal(new GoogleCalendarApi({ clientId: CLIENT_ID, clientSecret: '', openExternal }).configured(), false)
+  assert.equal(new GoogleCalendarApi({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, openExternal }).configured(), true)
 })
 
 test('revocation failure does not block local disconnect', async () => {
   const api = new GoogleCalendarApi({
-    clientId: CLIENT_ID, openExternal: async () => undefined,
-    tokenRequester: async () => expiredTokens(), fetcher: async () => { throw new Error('offline') },
+    clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, openExternal: async () => undefined,
+    fetcher: async () => { throw new Error('offline') },
   })
   await assert.doesNotReject(api.revoke(expiredTokens()))
 })
@@ -80,7 +100,7 @@ const HISTORICAL_START = Date.parse('2025-01-01T12:00:00Z')
 const HISTORY_RANGE = { start: HISTORICAL_START, end: HISTORICAL_START + 3_600_000 }
 
 function historicalApi(fetcher: typeof fetch, historyRanges = async () => [HISTORY_RANGE]) {
-  return new GoogleCalendarApi({ clientId: CLIENT_ID, now: () => NOW, openExternal: async () => undefined, historyRanges, fetcher })
+  return new GoogleCalendarApi({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET, now: () => NOW, openExternal: async () => undefined, historyRanges, fetcher })
 }
 
 function validTokens() {

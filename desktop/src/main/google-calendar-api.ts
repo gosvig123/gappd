@@ -5,7 +5,7 @@ import type { CalendarEventSummary } from '../shared/calendar-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { mapGoogleEvent, type GoogleEventItem } from './google-calendar-model.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { authorizeOAuth, needsTokenRefresh, refreshOAuthToken, type OAuthConfig, type OAuthTokenRequester, type OAuthTokenSet } from './oauth.ts'
+import { authorizeOAuth, needsTokenRefresh, refreshOAuthToken, type OAuthConfig, type OAuthTokenSet } from './oauth.ts'
 
 const GOOGLE_AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
@@ -23,7 +23,7 @@ type GoogleAuthorizedAccount = { subject: string; email: string; tokens: OAuthTo
 type GoogleSyncResult = { tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarRange[]; historyError?: string }
 type GoogleCalendarApiOptions = {
   clientId: string
-  tokenRequester?: OAuthTokenRequester
+  clientSecret: string
   openExternal(url: string): Promise<unknown>
   fetcher?: typeof fetch
   historyRanges?: () => Promise<CalendarRange[]>
@@ -32,7 +32,7 @@ type GoogleCalendarApiOptions = {
 
 export class GoogleCalendarApi {
   private readonly clientId: string
-  private readonly tokenRequester?: OAuthTokenRequester
+  private readonly clientSecret: string
   private readonly openExternal: (url: string) => Promise<unknown>
   private readonly fetcher: typeof fetch
   private readonly historyRanges: () => Promise<CalendarRange[]>
@@ -41,23 +41,20 @@ export class GoogleCalendarApi {
   constructor(options: GoogleCalendarApiOptions) {
     this.historyRanges = options.historyRanges ?? (async () => [])
     this.clientId = options.clientId
-    this.tokenRequester = options.tokenRequester
+    this.clientSecret = options.clientSecret
     this.openExternal = options.openExternal
     this.fetcher = options.fetcher || fetch
     this.now = options.now || Date.now
   }
 
   configured(): boolean {
-    return Boolean(this.clientId && this.tokenRequester)
+    return Boolean(this.clientId && this.clientSecret)
   }
 
   async authorize(includeGmail = false): Promise<GoogleAuthorizedAccount> {
     const config = this.oauthConfig()
     if (includeGmail) config.scopes = [...config.scopes, GMAIL_READ_SCOPE]
-    const tokens = await authorizeOAuth(config, {
-      openExternal: this.openExternal,
-      tokenRequester: this.requiredTokenRequester(),
-    })
+    const tokens = await authorizeOAuth(config, { openExternal: this.openExternal, fetcher: this.fetcher, now: this.now })
     return { ...await this.fetchProfile(tokens), tokens }
   }
 
@@ -70,7 +67,7 @@ export class GoogleCalendarApi {
 
   async refresh(tokens: OAuthTokenSet): Promise<OAuthTokenSet> {
     if (!needsTokenRefresh(tokens, this.now())) return tokens
-    const refreshed = await refreshOAuthToken(this.oauthConfig(), tokens, this.fetcher, this.now, this.requiredTokenRequester())
+    const refreshed = await refreshOAuthToken(this.oauthConfig(), tokens, this.fetcher, this.now)
     return { ...refreshed, scope: refreshed.scope ?? tokens.scope }
   }
 
@@ -87,15 +84,10 @@ export class GoogleCalendarApi {
   private oauthConfig(): OAuthConfig {
     if (!this.configured()) throw new Error('Google Calendar is not configured for this build.')
     return {
-      clientId: this.clientId, authorizeUrl: GOOGLE_AUTHORIZE_URL, tokenUrl: GOOGLE_TOKEN_URL,
+      clientId: this.clientId, clientSecret: this.clientSecret, authorizeUrl: GOOGLE_AUTHORIZE_URL, tokenUrl: GOOGLE_TOKEN_URL,
       scopes: GOOGLE_SCOPES, callbackPath: '',
       authorizeParams: { access_type: 'offline', prompt: 'consent select_account' },
     }
-  }
-
-  private requiredTokenRequester(): OAuthTokenRequester {
-    if (!this.tokenRequester) throw new Error('Google Calendar is not configured for this build.')
-    return this.tokenRequester
   }
 
   private async fetchProfile(tokens: OAuthTokenSet): Promise<{ subject: string; email: string }> {

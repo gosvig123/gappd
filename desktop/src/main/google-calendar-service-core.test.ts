@@ -124,9 +124,10 @@ test('connecting Calendar fetches and reconciles an existing local Meeting autom
   const meeting = { id: 'old', title: 'Old recording', startedAt: '2025-01-01T12:00:00Z', endedAt: '2025-01-01T13:00:00Z', emails: [] }
   const reads: string[] = []
   const google = new GoogleCalendarApi({
-    clientId: 'public-client', now: () => NOW.getTime(), openExternal: async () => undefined, tokenRequester: async () => ({ ...tokens('work'), expiresAt: NOW.getTime() + 3_600_000 }),
+    clientId: 'public-client', clientSecret: 'desktop-secret', now: () => NOW.getTime(), openExternal: async () => undefined,
     historyRanges: async () => historicalCalendarRanges([meeting], NOW.getTime()),
     fetcher: async input => {
+      if (String(input) === 'https://oauth2.googleapis.com/token') return Response.json({ access_token: 'access-work', expires_in: 3599 })
       const start = new URL(String(input)).searchParams.get('timeMin')!; reads.push(start)
       return Response.json({ items: Date.parse(start) === Date.parse(meeting.startedAt) ? [{ id: 'old-event', start: { dateTime: meeting.startedAt }, end: { dateTime: meeting.endedAt }, attendees: [{ email: 'partner@example.com' }] }] : [] })
     },

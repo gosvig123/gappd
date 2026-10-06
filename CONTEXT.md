@@ -34,9 +34,6 @@ Read-only authorization for one Google account's primary calendar, with independ
 **Cloud upload consent**:
 Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
 
-**OAuth relay**:
-The isolated `auth.getgappd.com` credential proxy that transiently adds Google's Desktop client secret and does not persist authorization codes, tokens, Calendar data, or meeting data.
-
 ## Relationships
 
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
@@ -49,7 +46,8 @@ The isolated `auth.getgappd.com` credential proxy that transiently adds Google's
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain, but that account no longer supplies inferred overlap context. Saved Agenda drafts are local user work and remain.
-- The renderer receives Calendar snapshots and account operations, never Google tokens or relay private keys.
+- The renderer receives Calendar snapshots and account operations, never Google tokens.
+- The desktop app exchanges and refreshes Google tokens directly with Google; no Gappd server receives Google tokens or Google user data.
 - An **Agenda draft** uses matched **Meeting** history, optional Gmail communication with **Calendar invitees** from the event's Google account, and existing invitee DMs plus explicitly selected joined channels when Slack is connected. The configured AI provider processes bounded recent communication; a remote provider receives that text. Generation does not send messages or change Calendar, and saved drafts retain source labels and exact quotes rather than complete messages.
 - A **Meeting enrichment** is created only on request. It reads Gmail and existing Slack DMs with the **Calendar invitees** of the Meeting's confirmed Calendar link or single unambiguous overlap, from 30 days before to 7 days after the Meeting. It adds cited context or a "possibly done" status to existing action items; it never creates action items, sends messages, or changes the Meeting's notes, and it shows as stale after the notes change.
 - A **Saved Agenda draft** stays readable and editable after its event leaves the upcoming Calendar window or its **Google Calendar connection** becomes unavailable; regenerating it requires the event to be upcoming.

@@ -55,6 +55,21 @@ test('loopback authorization validates state and exchanges code without a secret
   assert.doesNotMatch(tokenBody, /client_secret=/)
 })
 
+test('a configured client secret is sent with code exchange and refresh', async () => {
+  const config: OAuthConfig = { ...CONFIG, clientSecret: 'desktop-secret' }
+  const bodies: URLSearchParams[] = []
+  const fetcher: typeof fetch = async (_url, init) => {
+    bodies.push(new URLSearchParams(String(init?.body)))
+    return Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 60 })
+  }
+  await authorizeOAuth(config, { openExternal: completeBrowserAuthorization, fetcher })
+  await refreshOAuthToken(config, { accessToken: 'old', refreshToken: 'refresh', expiresAt: 0, tokenType: 'Bearer' }, fetcher)
+  assert.deepEqual(bodies.map(body => [body.get('grant_type'), body.get('client_id'), body.get('client_secret')]), [
+    ['authorization_code', 'public-client', 'desktop-secret'],
+    ['refresh_token', 'public-client', 'desktop-secret'],
+  ])
+})
+
 test('loopback authorization can exchange through a token requester', async () => {
   const captured: { value: OAuthTokenRequest | null } = { value: null }
   const tokens = await authorizeOAuth(CONFIG, {

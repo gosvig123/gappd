@@ -27,7 +27,7 @@ Workflow releases require all signing and notarization secrets. The workflow fai
 
 The signing setup exports `CSC_KEYCHAIN` so Electron Builder uses the verified keychain. Do not also set `CSC_LINK`: that asks the builder to import the certificate again into a separate keychain.
 
-Calendar-enabled releases also require the public `GAPPD_GOOGLE_OAUTH_CLIENT_ID` repository variable. It must belong to the Gappd Production Google Cloud project; the Google client secret must never enter GitHub or the desktop bundle.
+Calendar-enabled releases also require the public `GAPPD_GOOGLE_OAUTH_CLIENT_ID` repository variable and the `GAPPD_GOOGLE_OAUTH_CLIENT_SECRET` repository secret, both from the Desktop client in the Gappd Production Google Cloud project. The build bakes both into the app, which exchanges and refreshes Google tokens directly with Google. Google requires the Desktop client secret at its token endpoint but does not treat it as confidential in an installed app. Keeping Google tokens off Gappd servers keeps Gmail out of the restricted-scope security assessment (see [Gmail verification](google-gmail-verification.md)).
 
 Required secrets:
 
@@ -37,6 +37,7 @@ Required secrets:
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`
+- `GAPPD_GOOGLE_OAUTH_CLIENT_SECRET`
 
 ## Local packaging
 

@@ -18,6 +18,11 @@ if [[ ! "${GAPPD_GOOGLE_OAUTH_CLIENT_ID:-}" =~ $client_pattern ]]; then
   exit 1
 fi
 
+if [[ ! "${GAPPD_GOOGLE_OAUTH_CLIENT_SECRET:-}" =~ ^GOCSPX-[A-Za-z0-9_-]+$ ]]; then
+  echo "Set the GAPPD_GOOGLE_OAUTH_CLIENT_SECRET repository secret to the Gappd Production Desktop client secret." >&2
+  exit 1
+fi
+
 if [[ "${GAPPD_CLERK_ISSUER_URL:-}" != 'https://clerk.getgappd.com' || "${GAPPD_CLERK_CLIENT_ID:-}" != 't3RzfAuaxamgqOQV' ]]; then
   echo "Set the production Clerk issuer and desktop client ID before release." >&2
   exit 1

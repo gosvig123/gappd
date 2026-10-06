@@ -7,7 +7,6 @@ import type { CalendarSnapshot } from '../shared/calendar-contract'
 import { createSecureStore } from './electron-secure-store'
 import { GoogleCalendarApi } from './google-calendar-api'
 import { GoogleCalendarServiceCore, type CalendarDocument } from './google-calendar-service-core'
-import { createOAuthRelay } from './oauth-relay'
 import { serviceConfig } from './service-config'
 import { selectedFixtureCalendar } from './selected-fixture-calendar'
 import { selectedFixtureProfile } from './selected-fixture-profile'
@@ -43,11 +42,10 @@ export function disconnectGoogleCalendar(connectionId: string): Promise<Calendar
 function calendarService(): GoogleCalendarServiceCore {
   if (instance) return instance
   const config = serviceConfig()
-  const relay = config.googleClientId ? createOAuthRelay(config.googleRelayUrl) : null
   const api = new GoogleCalendarApi({
     clientId: config.googleClientId,
+    clientSecret: config.googleClientSecret,
     historyRanges: async () => historicalCalendarRanges((await requestCommand('meetings.agendaHistory', {})).meetings),
-    tokenRequester: relay ? (request) => relay.requestTokens(request) : undefined,
     openExternal: (url) => shell.openExternal(url),
   })
   instance = new GoogleCalendarServiceCore(api, createSecureStore<CalendarDocument>(CALENDAR_STORE_FILE), undefined, gmailReviewEnabled())

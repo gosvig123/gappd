@@ -1,27 +1,31 @@
 declare const __GAPPD_GOOGLE_OAUTH_CLIENT_ID__: string
+declare const __GAPPD_GOOGLE_OAUTH_CLIENT_SECRET__: string
 declare const __GAPPD_SLACK_OAUTH_CLIENT_ID__: string
 declare const __GAPPD_CLERK_ISSUER_URL__: string
 declare const __GAPPD_CLERK_CLIENT_ID__: string
 
-const DEFAULT_GOOGLE_RELAY_URL = 'https://auth.getgappd.com'
 const DEFAULT_SLACK_CLIENT_ID = '12043394698405.12046083998246'
 
 type ServiceConfig = {
   googleClientId: string
-  googleRelayUrl: string
+  googleClientSecret: string
   slackClientId: string
 }
 
 export function serviceConfig(): ServiceConfig {
   return {
     googleClientId: buildGoogleClientId() || process.env.GAPPD_GOOGLE_OAUTH_CLIENT_ID?.trim() || '',
-    googleRelayUrl: process.env.GAPPD_GOOGLE_OAUTH_RELAY_URL?.trim() || DEFAULT_GOOGLE_RELAY_URL,
+    googleClientSecret: buildGoogleClientSecret() || process.env.GAPPD_GOOGLE_OAUTH_CLIENT_SECRET?.trim() || '',
     slackClientId: buildSlackClientId() || process.env.GAPPD_SLACK_OAUTH_CLIENT_ID?.trim() || DEFAULT_SLACK_CLIENT_ID,
   }
 }
 
 function buildGoogleClientId(): string {
   return typeof __GAPPD_GOOGLE_OAUTH_CLIENT_ID__ === 'string' ? __GAPPD_GOOGLE_OAUTH_CLIENT_ID__.trim() : ''
+}
+
+function buildGoogleClientSecret(): string {
+  return typeof __GAPPD_GOOGLE_OAUTH_CLIENT_SECRET__ === 'string' ? __GAPPD_GOOGLE_OAUTH_CLIENT_SECRET__.trim() : ''
 }
 
 function buildSlackClientId(): string {
