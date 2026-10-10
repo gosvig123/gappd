@@ -1,16 +1,25 @@
 package main
 
 import (
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"math"
 	"os"
+	"os/exec"
+	"strconv"
+	"time"
+
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 )
 
 const speakerWAVHeaderBytes = 44
 
 func readSpeakerWAV(path string, start, duration float64) ([]byte, error) {
+	if audioartifact.IsFLAC(path) {
+		return readSpeakerFLAC(path, start, duration)
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -59,4 +68,45 @@ func validSpeakerWAV(h []byte) bool {
 		u16(20) == 1 && u16(22) > 0 && u16(22) <= 2 && u16(34) == 16 &&
 		u16(32) == u16(22)*2 && u32(24) > 0 && u32(24) <= 192000 &&
 		u32(28) == u32(24)*uint32(u16(32)) && string(h[36:40]) == "data"
+}
+
+// readSpeakerFLAC decodes a clip of compacted FLAC audio through the diarizer helper, which owns retained-audio range reads.
+func readSpeakerFLAC(path string, start, duration float64) ([]byte, error) {
+	info, err := audioartifact.ReadPCM16(path)
+	if err != nil || info.Channels != 1 || math.IsNaN(start) || math.IsInf(start, 0) || start < 0 || duration <= 0 || duration > speakerClipSeconds {
+		return nil, fmt.Errorf("unsupported retained FLAC or invalid clip timing")
+	}
+	offset := int64(start * float64(info.Rate))
+	count := min(int64(duration*float64(info.Rate)), info.Frames-offset)
+	if count <= 0 {
+		return nil, fmt.Errorf("clip timing exceeds retained audio")
+	}
+	helper := os.Getenv("GAPPD_DIARIZER_BIN")
+	if helper == "" {
+		return nil, fmt.Errorf("play speaker: the audio helper is unavailable; restart Gappd")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	samples, err := exec.CommandContext(ctx, helper, "--pcm16", path, strconv.FormatInt(offset, 10), strconv.FormatInt(count, 10)).Output()
+	if err != nil || int64(len(samples)) != count*2 {
+		return nil, fmt.Errorf("play speaker: decode retained audio: %v", err)
+	}
+	return append(pcm16WAVHeader(info.Rate, len(samples)), samples...), nil
+}
+
+func pcm16WAVHeader(rate uint32, dataBytes int) []byte {
+	h := make([]byte, speakerWAVHeaderBytes)
+	copy(h[0:], "RIFF")
+	binary.LittleEndian.PutUint32(h[4:], uint32(36+dataBytes))
+	copy(h[8:], "WAVEfmt ")
+	binary.LittleEndian.PutUint32(h[16:], 16)
+	binary.LittleEndian.PutUint16(h[20:], 1)
+	binary.LittleEndian.PutUint16(h[22:], 1)
+	binary.LittleEndian.PutUint32(h[24:], rate)
+	binary.LittleEndian.PutUint32(h[28:], rate*2)
+	binary.LittleEndian.PutUint16(h[32:], 2)
+	binary.LittleEndian.PutUint16(h[34:], 16)
+	copy(h[36:], "data")
+	binary.LittleEndian.PutUint32(h[40:], uint32(dataBytes))
+	return h
 }

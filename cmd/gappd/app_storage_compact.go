@@ -12,7 +12,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// appCompactStorageCmd frees disk space of finished Meetings: leftover Live Transcript chunks, then one Screen video.
+// appCompactStorageCmd frees disk space of finished Meetings: leftover Live Transcript chunks, then the audio of one
+// Meeting as lossless FLAC, or else one Screen video.
 func appCompactStorageCmd() *cobra.Command {
 	return meetingJSONCommand("compact-storage", nil, func(_ []string) error {
 		_, store, err := loadStore()
@@ -28,9 +29,16 @@ func appCompactStorageCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		// The desktop stops compaction with SIGTERM on quit; the helper must stop and leave the original movie.
+		// The desktop stops compaction with SIGTERM on quit; encoders must stop and leave the original files.
 		ctx, stop := signal.NotifyContext(cmdContext(), syscall.SIGTERM, syscall.SIGINT)
 		defer stop()
+		audio, err := audioartifact.CompactNextAudio(ctx, store, root)
+		if err != nil {
+			return err
+		}
+		if audio.Attempted {
+			return writeJSON(appprotocol.CompactStorageResponse{Attempted: true, SavedBytes: freed + audio.SavedBytes})
+		}
 		result, err := video.CompactNext(ctx, store, root, time.Now())
 		if err != nil {
 			return err

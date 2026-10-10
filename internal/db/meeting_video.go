@@ -109,6 +109,16 @@ func (d *DB) ListFinishedSessionDirs() ([]string, error) {
 	return dirs, rows.Err()
 }
 
+// ListCompactableAudioMeetings returns finished Meetings with retained audio, newest first.
+func (d *DB) ListCompactableAudioMeetings(limit int) ([]Meeting, error) {
+	rows, err := d.Conn.Query(selectMeetingsSQL+` WHERE audio_path IS NOT NULL AND audio_path <> '' AND capture_status='captured' AND processing_status IN ('completed','failed') AND diarization_state NOT IN ('pending','processing') ORDER BY started_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanMeetings(rows)
+}
+
 // HasActiveRecording reports a recording whose heartbeat is newer than cutoff.
 func (d *DB) HasActiveRecording(cutoff string) (bool, error) {
 	var count int

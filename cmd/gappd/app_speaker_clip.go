@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"path/filepath"
 	"sort"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
@@ -89,9 +88,9 @@ func speakerAudioPath(meeting *db.Meeting, segment db.Segment) (string, error) {
 	if meeting.AudioPath == nil || *meeting.AudioPath == "" {
 		return "", fmt.Errorf("play speaker: retained audio is unavailable")
 	}
-	filename := audioartifact.SystemFilename
+	artifacts := audioartifact.New(*meeting.AudioPath)
 	if segment.RawSpeaker() == db.SpeakerYou || segment.SpeakerSource != nil && *segment.SpeakerSource == db.SegmentSourceMicrophone {
-		filename = audioartifact.MicFilename
+		return artifacts.MicPath(), nil
 	}
-	return filepath.Join(*meeting.AudioPath, filename), nil
+	return artifacts.SystemPath(), nil
 }

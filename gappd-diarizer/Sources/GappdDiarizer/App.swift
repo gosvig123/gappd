@@ -37,8 +37,12 @@ func makeOfflineDiarizerConfig() -> OfflineDiarizerConfig {
             emit(["schemaVersion": 1, "engine": engine, "engineRevision": revision] as [String: Any])
             return
         }
+        if args.count == 4 && args[0] == "--pcm16" {
+            writePCM16(path: args[1], start: args[2], count: args[3])
+            return
+        }
         guard args.count == 4 else {
-            fail("usage: gappd-diarizer <audio-path> <start-frame> <frame-count> <models-directory>", 64)
+            fail("usage: gappd-diarizer <audio-path> <start-frame> <frame-count> <models-directory> | --pcm16 <audio-path> <start-frame> <frame-count>", 64)
         }
         guard let start = Int(args[1]), let count = Int(args[2]), start >= 0, count > 0 else {
             fail("error: config: invalid frame range", 64)
@@ -47,8 +51,8 @@ func makeOfflineDiarizerConfig() -> OfflineDiarizerConfig {
         guard FileManager.default.fileExists(atPath: args[3], isDirectory: &isDirectory), isDirectory.boolValue else {
             fail("error: config: models directory unavailable", 66)
         }
-        let source: PCM16RangeSource
-        do { source = try PCM16RangeSource(url: URL(fileURLWithPath: args[0]), startFrame: start, frameCount: count) }
+        let source: any AudioSampleSource
+        do { source = try openAudioRange(url: URL(fileURLWithPath: args[0]), startFrame: start, frameCount: count) }
         catch { fail("error: config: audio range unavailable", 66) }
 
         let watchdog = Task.detached {
@@ -127,6 +131,21 @@ func makeOfflineDiarizerConfig() -> OfflineDiarizerConfig {
         FileHandle.standardOutput.write(try! JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]))
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
+    /// Writes a short range of retained audio as raw little-endian PCM16, for speaker clips of compacted FLAC audio.
+    private static func writePCM16(path: String, start: String, count: String) {
+        guard let start = Int(start), let count = Int(count), start >= 0, count > 0, count <= 1 << 20 else {
+            fail("error: config: invalid frame range", 64)
+        }
+        do {
+            let source = try AudioFileRangeSource(url: URL(fileURLWithPath: path), startFrame: start, frameCount: count)
+            try source.withSamples(offset: 0, count: count) { samples in
+                FileHandle.standardOutput.write(Data(bytes: samples, count: count * 2))
+            }
+        } catch {
+            fail("error: config: audio range unavailable", 66)
+        }
+    }
+
     private static func fail(_ message: String, _ status: Int32) -> Never {
         FileHandle.standardError.write(Data("\(message)\n".utf8)); Darwin.exit(status)
     }

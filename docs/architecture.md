@@ -58,7 +58,7 @@ All inference stays on the Mac. Network access is used for application updates a
 
 ### Native helpers
 
-- `capture-helper/`: Swift ScreenCaptureKit application that captures microphone and system audio, writes durable WAV artifacts, and emits chunk events.
+- `capture-helper/`: Swift ScreenCaptureKit application that captures microphone and system audio, writes durable WAV artifacts, and emits chunk events. A background pass later replaces idle Meetings' WAVs with lossless FLAC copies.
 - `apple-speech-transcriber/`: Swift application that prepares Apple speech assets and transcribes audio locally.
 - `gappd-diarizer/`: Swift executable using FluidAudio and bundled models to group remote speech into meeting-local speaker labels.
 - `desktop/resources/llamacpp/`: bundled llama.cpp runtime started on demand for summarization.

@@ -1,8 +1,8 @@
 import { powerMonitor } from 'electron'
 import { requestCommand } from './app-protocol'
 
-// Finished Meetings are compacted in the background to save disk space: leftover Live Transcript chunks are removed
-// and Screen videos are encoded again. The backend skips this while a Meeting records.
+// Finished Meetings are compacted in the background to save disk space: leftover Live Transcript chunks are removed,
+// audio becomes lossless FLAC, and Screen videos are encoded again. The backend skips this while a Meeting records.
 const FIRST_RUN_DELAY_MS = 2 * 60_000
 const INTERVAL_MS = 10 * 60_000
 

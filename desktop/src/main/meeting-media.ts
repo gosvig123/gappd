@@ -6,7 +6,8 @@ import { protocol } from 'electron'
 import { requestCommand } from './app-protocol'
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const FILES = { video: 'screen.mov', mic: 'mic.wav', system: 'system.wav' } as const
+// Audio is the capture WAV until storage compaction replaces it with a verified lossless FLAC copy.
+const FILES = { video: ['screen.mov'], mic: ['mic.flac', 'mic.wav'], system: ['system.flac', 'system.wav'] } as const
 export type MediaKind = keyof typeof FILES
 
 // The Go request owns Meeting lookup and validates its managed movie. Never give its path to the renderer.
@@ -14,11 +15,21 @@ export async function meetingMediaPath(id: string, kind: MediaKind): Promise<str
   if (!ID.test(id) || !Object.hasOwn(FILES, kind)) throw new Error('Invalid Meeting media request')
   const asset = await requestCommand('meetings.videoAsset', { id })
   const directory = path.dirname(asset.path)
-  if (path.basename(asset.path) !== FILES.video) throw new Error('Invalid managed movie')
-  const file = path.join(directory, FILES[kind])
-  const [realDirectory, realFile, info] = await Promise.all([fs.realpath(directory), fs.realpath(file), fs.lstat(file)])
-  if (realDirectory !== directory || realFile !== file || !info.isFile() || info.isSymbolicLink()) throw new Error('Invalid managed media')
-  return file
+  if (path.basename(asset.path) !== FILES.video[0]) throw new Error('Invalid managed movie')
+  const realDirectory = await fs.realpath(directory)
+  if (realDirectory !== directory) throw new Error('Invalid managed media')
+  for (const name of FILES[kind]) {
+    const file = path.join(directory, name)
+    try {
+      const [realFile, info] = await Promise.all([fs.realpath(file), fs.lstat(file)])
+      if (realFile === file && info.isFile() && !info.isSymbolicLink()) return file
+    } catch { /* Try the next retained format. */ }
+  }
+  throw new Error('Invalid managed media')
+}
+
+function contentType(file: string): string {
+  return file.endsWith('.mov') ? 'video/quicktime' : file.endsWith('.flac') ? 'audio/flac' : 'audio/wav'
 }
 
 export function registerMeetingMedia(): void {
@@ -39,7 +50,7 @@ export function registerMeetingMedia(): void {
       const stream = fileHandle.createReadStream({ start, end, autoClose: true })
       fileHandle = undefined
       return new Response(Readable.toWeb(stream) as ReadableStream, { status: request.headers.has('range') ? 206 : 200, headers: {
-        'Content-Type': match[2] === 'video' ? 'video/quicktime' : 'audio/wav',
+        'Content-Type': contentType(file),
         'Accept-Ranges': 'bytes', 'Content-Length': String(end - start + 1),
         ...(request.headers.has('range') ? { 'Content-Range': `bytes ${start}-${end}/${info.size}` } : {}),
       } })
