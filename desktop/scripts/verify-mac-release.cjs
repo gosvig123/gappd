@@ -24,6 +24,8 @@ const COMPATIBILITY_LIMITS = {
   'Apple speech transcriber': DEFAULT_MACOS_MIN_VERSION,
   'llama-server binary': DEFAULT_MACOS_MIN_VERSION,
   'capture helper binary': DEFAULT_MACOS_MIN_VERSION,
+  'video helper': DEFAULT_MACOS_MIN_VERSION,
+  'recording export helper': DEFAULT_MACOS_MIN_VERSION,
 }
 
 async function main() {

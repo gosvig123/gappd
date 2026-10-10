@@ -36,6 +36,8 @@ func meetingTableSQL(ctx context.Context, conn *sql.Conn) (string, error) {
 
 var queueRebuildStatements = []string{
 	`DROP TRIGGER IF EXISTS meetings_ai`, `DROP TRIGGER IF EXISTS meetings_ad`, `DROP TRIGGER IF EXISTS meetings_au`,
+	// Replacing meetings can change rowids. installSchema recreates and rebuilds the index.
+	`DROP TABLE IF EXISTS meetings_fts`,
 	`CREATE TABLE meetings_queue_new (
 		id TEXT PRIMARY KEY, title TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT,
 		capture_status TEXT NOT NULL DEFAULT 'recording' CHECK (capture_status IN ('recording','captured','failed')),

@@ -16,10 +16,12 @@ async function main() {
   const targets = await verifyRequiredNestedCode(appPath)
   const helperApp = targets.find((target) => target.label === 'capture helper app')
   for (const target of targets) {
-    if (target.label === 'capture helper app') continue
+    if (target.label === 'capture helper app' || target.label === 'video helper app') continue
     signTarget(target.path, { identity })
   }
   if (helperApp) signTarget(helperApp.path, { identity, entitlements: inheritEntitlementsPath })
+  const videoApp = targets.find((target) => target.label === 'video helper app')
+  if (videoApp) signTarget(videoApp.path, { identity, entitlements: inheritEntitlementsPath })
   console.log(`Signed nested macOS code in ${appPath} with identity ${identity}`)
 }
 

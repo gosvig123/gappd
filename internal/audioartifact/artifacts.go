@@ -10,9 +10,12 @@ import (
 const (
 	MicFilename    = "mic.wav"
 	SystemFilename = "system.wav"
-	MicSpeaker     = db.SpeakerYou
-	SystemSpeaker  = db.SpeakerOther
-	wavHeaderBytes = 44
+	// Lossless copies that replace the capture WAVs once a Meeting is idle.
+	MicFLACFilename    = "mic.flac"
+	SystemFLACFilename = "system.flac"
+	MicSpeaker         = db.SpeakerYou
+	SystemSpeaker      = db.SpeakerOther
+	wavHeaderBytes     = 44
 )
 
 type Artifacts struct {
@@ -27,7 +30,15 @@ type Source struct {
 }
 
 func New(dir string) Artifacts {
-	return Artifacts{micPath: pathFor(dir, MicFilename), systemPath: pathFor(dir, SystemFilename)}
+	return Artifacts{micPath: retainedPath(dir, MicFLACFilename, MicFilename), systemPath: retainedPath(dir, SystemFLACFilename, SystemFilename)}
+}
+
+// retainedPath prefers the compacted FLAC copy. It exists only after it was verified against the capture WAV.
+func retainedPath(dir, flac, wav string) string {
+	if info, err := os.Lstat(pathFor(dir, flac)); err == nil && info.Mode().IsRegular() {
+		return pathFor(dir, flac)
+	}
+	return pathFor(dir, wav)
 }
 
 func pathFor(dir, filename string) string {

@@ -9,6 +9,12 @@ node_modules/
 *.dylib
 /docs/*
 !/docs/desktop-macos-release.md
+!/docs/speaker-labeling.md
+!/docs/slack-integration.md
+!/docs/cloud-meeting-document.md
+!/docs/cloud-data-lifecycle.md
+!/docs/cloud-operations.md
+!/docs/google-gmail-verification.md
 # Go
 vendor/
 

@@ -6,6 +6,10 @@
 
 .settings-stack {
   gap: var(--space-6);
+  /* Settings are hosted in a sheet, a pane, or a modal, so field layout has to
+     follow the container width, not the window width. */
+  container-type: inline-size;
+  container-name: settings;
 }
 
 .setup-error-banner,
@@ -29,7 +33,9 @@
 .settings-grid {
   display: grid;
   gap: var(--space-5);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Field tracks fit the container: one column when tight, up to four when wide.
+     min(100%, 12rem) stops a single track from overflowing a tiny container. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
 }
 
 .settings-section {
@@ -42,12 +48,14 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-5);
+  flex-wrap: wrap;
   cursor: pointer;
 }
 
 .startup-setting-copy {
   display: grid;
   gap: var(--space-1);
+  min-inline-size: 0;
   color: var(--color-text-soft);
 }
 
@@ -76,6 +84,7 @@
   align-items: start;
   justify-content: space-between;
   gap: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .settings-section-head p {
@@ -158,8 +167,21 @@
   font: inherit;
 }
 
-@media (max-width: 68.75rem) {
-  .settings-grid {
-    grid-template-columns: 1fr;
+/* Narrow containers stack the section header instead of squeezing the status pill. */
+@container settings (max-width: 24rem) {
+  .settings-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@container settings (max-width: 26rem) {
+  .calendar-account {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-account-actions .ui-button {
+    flex: 1;
   }
 }

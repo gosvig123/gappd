@@ -4,7 +4,7 @@ export const MANAGED_LLAMACPP_HOST = '127.0.0.1'
 export const MANAGED_LLAMACPP_PORT = 11436
 export const MANAGED_LLAMACPP_ENDPOINT = `http://${MANAGED_LLAMACPP_HOST}:${MANAGED_LLAMACPP_PORT}`
 export const MANAGED_LLAMACPP_MODEL = 'LiquidAI/LFM2-2.6B-Transcript-GGUF'
-export const MANAGED_LLAMACPP_MODEL_FILE = 'LFM2-2.6B-Transcript-Q4_K_M.gguf'
+const MANAGED_LLAMACPP_MODEL_FILE = 'LFM2-2.6B-Transcript-Q4_K_M.gguf'
 export const MANAGED_LLAMACPP_MODELS_DIRNAME = 'llamacpp-models'
 export const BUNDLED_LLAMACPP_BINARY_NAME = 'llama-server'
 

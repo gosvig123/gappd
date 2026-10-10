@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 export type RequestGate = {
   next: () => number
@@ -8,6 +8,7 @@ export type RequestGate = {
 
 export function useRequestGate(): RequestGate {
   const requestRef = useRef(0)
+  useEffect(() => () => { advance(requestRef) }, [])
   return useMemo(() => ({
     next: () => advance(requestRef),
     cancel: () => { advance(requestRef) },

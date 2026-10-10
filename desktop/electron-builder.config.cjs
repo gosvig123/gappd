@@ -9,6 +9,7 @@ const MAC_BUILD_VERSION = process.env.GAPPD_BUILD_VERSION
 module.exports = {
   appId: 'dev.gappd.desktop',
   productName: 'Gappd',
+  protocols: [{ name: 'Gappd', schemes: ['gappd'] }],
   buildVersion: MAC_BUILD_VERSION,
   directories: {
     output: 'release',
@@ -22,6 +23,8 @@ module.exports = {
     { from: '../gappd-diarizer/legal', to: 'legal' },
     { from: '../build/GappdSpeechTranscriber.app', to: 'GappdSpeechTranscriber.app' },
     { from: '../build/GappdCapture.app', to: 'GappdCapture.app' },
+    { from: '../build/GappdVideo.app', to: 'GappdVideo.app' },
+    { from: '../build/gappd-export', to: 'bin/gappd-export' },
     { from: 'resources/llamacpp', to: 'llamacpp' },
   ],
   afterPack: hooks.afterPack,
@@ -35,10 +38,14 @@ module.exports = {
     identity: MAC_SIGNING_IDENTITY,
     hardenedRuntime: true,
     gatekeeperAssess: false,
+    // notarize-mac-build.cjs owns notarization in the afterSign hook. Disable the built-in
+    // @electron/notarize step so each app is notarized and stapled once, and so local builds
+    // never submit to Apple just because Apple credentials are present in the environment.
+    notarize: false,
     extendInfo: {
       NSAudioCaptureUsageDescription: 'Gappd captures system audio to transcribe your meetings.',
       NSMicrophoneUsageDescription: 'Gappd captures your microphone to transcribe your voice.',
-      NSScreenCaptureUsageDescription: 'Gappd uses screen capture to access system audio for meeting transcription.',
+      NSScreenCaptureUsageDescription: 'Gappd captures system audio for meeting transcription and, when you choose a source, Screen video for local Meeting replay.',
       NSSpeechRecognitionUsageDescription: 'Gappd uses on-device Apple Speech to transcribe meeting audio.',
     },
     entitlements: 'build/entitlements.mac.plist',

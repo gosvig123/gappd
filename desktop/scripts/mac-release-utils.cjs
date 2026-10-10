@@ -22,6 +22,9 @@ const nestedCodeLayout = [
   { label: 'Apple speech transcriber app', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app'], executable: false },
   { label: 'Apple speech transcriber', relativePath: ['Contents', 'Resources', 'GappdSpeechTranscriber.app', 'Contents', 'MacOS', 'apple-speech-transcriber'], executable: true },
   { label: 'llama-server binary', relativePath: ['Contents', 'Resources', 'llamacpp', 'llama-server'], executable: true },
+  { label: 'recording export helper', relativePath: ['Contents', 'Resources', 'bin', 'gappd-export'], executable: true },
+  { label: 'video helper app', relativePath: ['Contents', 'Resources', 'GappdVideo.app'], executable: false },
+  { label: 'video helper', relativePath: ['Contents', 'Resources', 'GappdVideo.app', 'Contents', 'MacOS', 'gappd-video'], executable: true },
   { label: 'capture helper app', relativePath: ['Contents', 'Resources', 'GappdCapture.app'], executable: false },
   { label: 'capture helper binary', relativePath: ['Contents', 'Resources', 'GappdCapture.app', 'Contents', 'MacOS', 'gappd-capture'], executable: true },
 ]

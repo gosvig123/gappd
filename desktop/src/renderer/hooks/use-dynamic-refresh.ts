@@ -12,10 +12,10 @@ type RefreshMeetings = (id?: string | null) => Promise<void>
  * Keeps the meeting list fresh: refreshes on focus/visibility, and polls on an
  * interval while a recording is active or any meeting is still processing.
  */
-export function useDynamicRefresh(enabled: boolean, meetings: MeetingListItem[], recording: RecordingState, getSelectedId: () => string | null, refreshMeetings: RefreshMeetings): void {
+export function useDynamicRefresh(enabled: boolean, meetings: MeetingListItem[], recording: RecordingState, refreshMeetings: RefreshMeetings): void {
   const hasWork = useMemo(() => needsDynamicRefresh(meetings, recording), [meetings, recording.status])
   useVisibleRefresh(enabled, refreshMeetings)
-  useIntervalRefresh(enabled && hasWork, recording.meetingId, getSelectedId, refreshMeetings)
+  useIntervalRefresh(enabled && hasWork, refreshMeetings)
 }
 
 function useVisibleRefresh(enabled: boolean, refreshMeetings: RefreshMeetings): void {
@@ -28,12 +28,12 @@ function useVisibleRefresh(enabled: boolean, refreshMeetings: RefreshMeetings): 
   }, [enabled])
 }
 
-function useIntervalRefresh(enabled: boolean, recordingMeetingId: string | undefined, getSelectedId: () => string | null, refreshMeetings: RefreshMeetings): void {
+function useIntervalRefresh(enabled: boolean, refreshMeetings: RefreshMeetings): void {
   useEffect(() => {
     if (!enabled) return undefined
-    const timer = window.setInterval(() => void refreshMeetings(getSelectedId() ?? recordingMeetingId).catch(console.error), DYNAMIC_REFRESH_INTERVAL_MS)
+    const timer = window.setInterval(() => void refreshMeetings().catch(console.error), DYNAMIC_REFRESH_INTERVAL_MS)
     return () => window.clearInterval(timer)
-  }, [enabled, recordingMeetingId])
+  }, [enabled])
 }
 
 function needsDynamicRefresh(meetings: MeetingListItem[], recording: RecordingState): boolean {

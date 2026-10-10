@@ -9,6 +9,16 @@ struct CaptureStopAcknowledgedEvent: Encodable {
     let type = "capture_stop_acknowledged"
 }
 
+struct AudioSourceStartedEvent: Encodable {
+    let type = "audio_source_started"
+    let source: String
+    let hostSeconds: Double
+}
+
+func emitAudioSourceStarted(source: String, hostSeconds: Double) {
+    printAudioChunkEvent(AudioSourceStartedEvent(source: source, hostSeconds: hostSeconds))
+}
+
 struct AudioChunkEvent: Encodable {
     let type = "audio_chunk"
     let source: String

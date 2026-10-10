@@ -1,8 +1,7 @@
 import path from 'node:path'
-import { app } from 'electron'
 import { BUNDLED_LLAMACPP_BINARY_NAME, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_HOST, MANAGED_LLAMACPP_MODEL } from '../shared/managed-local-ai'
 import { lastLines } from '../shared/subprocess-output'
-import { isExecutableFile, resolveBinary } from './binaries'
+import { isExecutableFile, missingRuntimeAssetMessage, resolveBinary } from './binaries'
 import { childEnv } from './native-runtime'
 import { managedLanguageModelAvailable, managedLanguageModelPath } from './language-model'
 import { type ManagedRuntimeErrorState, toManagedRuntimeErrorState } from './managed-runtime-errors'
@@ -11,16 +10,16 @@ import { chooseLlamaCppPort, isLlamaCppPortBindError, processServesEndpoint, rec
 type LlamaCppRuntime = { process: LlamaCppChild | null; startPromise: Promise<void> | null; stopPromise: Promise<void> | null; ownedBySession: boolean; endpoint: string; lastError?: ManagedRuntimeErrorState }
 type ModelListResponse = { models?: Array<{ name?: string; model?: string }> }
 export type ManagedLlamaCppLease = { endpoint: string; release(): Promise<void> }
-export type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: ManagedRuntimeErrorState }
+type ManagedLlamaCppRuntimeStatus = { supported: boolean; bundled: boolean; running: boolean; endpoint: string; error?: ManagedRuntimeErrorState }
 
 const MODEL_CHECK_TIMEOUT_MS = 2_000
 const runtime: LlamaCppRuntime = { process: null, startPromise: null, stopPromise: null, ownedBySession: false, endpoint: MANAGED_LLAMACPP_ENDPOINT }
 let runtimeUsers = 0
 
-export function resolveBundledLlamaCppBinary(): string {
+function resolveBundledLlamaCppBinary(): string {
   return resolveBinary({ packaged: ['llamacpp', BUNDLED_LLAMACPP_BINARY_NAME], dev: ['resources', 'llamacpp', BUNDLED_LLAMACPP_BINARY_NAME] })
 }
-export function managedLlamaCppSupported(): boolean { return process.platform === 'darwin' }
+function managedLlamaCppSupported(): boolean { return process.platform === 'darwin' }
 
 export async function getManagedLlamaCppRuntimeStatus(): Promise<ManagedLlamaCppRuntimeStatus> {
   const supported = managedLlamaCppSupported()
@@ -111,7 +110,7 @@ function wireEvents(child: LlamaCppChild, binaryPath: string): void {
 }
 
 function resetProcess(): void { runtime.ownedBySession = false; runtime.process = null }
-export function managedLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
+function managedLlamaCppAvailable(): Promise<boolean> { return isExecutableFile(resolveBundledLlamaCppBinary()) }
 async function managedLlamaCppReadiness(): Promise<boolean> {
   if (runtime.ownedBySession) return managedLlamaCppOwnedAndHealthy(runtime.process)
   if (await endpointServesManagedModel(runtime.endpoint)) return true
@@ -160,4 +159,4 @@ function isReadinessTimeout(error: unknown): error is Error {
   return error instanceof Error && error.message.startsWith('Managed llama.cpp did not become ready in time')
 }
 
-export function missingBundledLlamaCppMessage(): string { return app.isPackaged ? 'Bundled llama.cpp runtime files are missing from this app. Reinstall Gappd.' : `Bundled llama.cpp binary missing at ${resolveBundledLlamaCppBinary()}. Run \`npm run prepare:llamacpp\` before launching the desktop app.` }
+export function missingBundledLlamaCppMessage(): string { return missingRuntimeAssetMessage('Bundled llama.cpp runtime', resolveBundledLlamaCppBinary()) }

@@ -53,7 +53,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, speakerLabelsEnabled *bool, desktop bool) error {
+func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, speakerLabelsEnabled *bool, desktop bool, screenVideoEnabled ...bool) error {
 	_, store, err := loadStore()
 	if err != nil {
 		return err
@@ -64,6 +64,9 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 		return err
 	}
 	req := recording.Request{DeviceIdx: deviceIdx, Title: title, Mode: mode, Language: language, SpeakerLabelsEnabled: speakerLabelsEnabled}
+	if len(screenVideoEnabled) > 0 {
+		req.ScreenVideoEnabled = screenVideoEnabled[0]
+	}
 	if err := service.Run(req); err != nil || desktop {
 		return err
 	}

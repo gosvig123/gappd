@@ -7,10 +7,11 @@ import './transcript-view.css'
 const EMPTY_FILTER_TEXT = 'No speakers selected.'
 const SPEAKER_LINE_PATTERN = /^\[([^\]]+)\]\s*(.*)$/
 type TranscriptGroup = { speaker: string | null; lines: string[] }
-type SegmentTurn = { speaker: string; startSec: number; texts: string[]; key: string }
+type TranscriptSpeaker = { key: string; name: string }
+type SegmentTurn = { speakerKey: string; speaker: string; startSec: number; texts: string[]; key: string }
 
-export function TranscriptText({ value, segments }: { value: string; segments: MeetingSegment[] }) {
-  if (segments.length > 0) return <TranscriptSegments segments={segments} />
+export function TranscriptText({ value, segments, onSeek, currentSec }: { value: string; segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
+  if (segments.length > 0) return <TranscriptSegments segments={segments} onSeek={onSeek} currentSec={currentSec} />
   return <div className="transcript-groups">{transcriptGroups(value).map((group, index) => <TranscriptGroupView key={index} group={group} />)}</div>
 }
 
@@ -20,41 +21,39 @@ export function meetingTranscript(meeting: MeetingDetail, transcript: string): s
 
 export function meetingHasSegments(meeting: MeetingDetail): boolean { return (meeting.segments?.length ?? 0) > 0 }
 
-export function TranscriptTrackingIndicator() { return <div className="detail-surface detail-block"><div className="meeting-section-label">Live Transcript</div><p>Listening for speech…</p></div> }
-
 export function meetingTranscriptEmptyText(meeting: MeetingDetail): string {
   if (meetingHasWork(meeting)) return 'Transcript is being created locally…'
   return 'No transcript yet.'
 }
 
-function TranscriptSegments({ segments }: { segments: MeetingSegment[] }) {
+function TranscriptSegments({ segments, onSeek, currentSec }: { segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
   const [hidden, setHidden] = useState<string[]>([])
   const speakers = useMemo(() => transcriptSpeakers(segments), [segments])
   const visible = visibleTranscriptSegments(segments, speakers.length < 2 ? [] : hidden)
-  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} /></div>
+  return <div className="transcript-segment-view"><SpeakerFilter speakers={speakers} hidden={hidden} onChange={setHidden} /><TranscriptSegmentList segments={visible} onSeek={onSeek} currentSec={currentSec} /></div>
 }
 
-function SpeakerFilter({ speakers, hidden, onChange }: { speakers: string[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
+function SpeakerFilter({ speakers, hidden, onChange }: { speakers: TranscriptSpeaker[]; hidden: string[]; onChange: (speakers: string[]) => void }) {
   if (speakers.length < 2) return null
-  const selected = speakers.filter((speaker) => !hidden.includes(speaker))
-  const options = speakers.map((speaker) => ({ value: speaker, label: <><span className="transcript-chip-dot" style={speakerStyle(speaker)} aria-hidden="true" /><SpeakerName speaker={speaker} /></> }))
-  return <div className="transcript-speaker-filter" data-page-search-ignore><MultiSelect ariaLabel="Filter speakers" allLabel="All speakers" options={options} selected={selected} onChange={(values) => onChange(speakers.filter((speaker) => !values.includes(speaker)))} /></div>
+  const selected = speakers.filter((speaker) => !hidden.includes(speaker.key)).map(speaker => speaker.key)
+  const options = speakers.map((speaker) => ({ value: speaker.key, label: <><span className="transcript-chip-dot" style={speakerStyle(speaker.key)} aria-hidden="true" /><SpeakerName speaker={speaker.name} /></> }))
+  return <div className="transcript-speaker-filter" data-page-search-ignore><MultiSelect ariaLabel="Filter speakers" allLabel="All speakers" options={options} selected={selected} onChange={(values) => onChange(speakers.filter((speaker) => !values.includes(speaker.key)).map(speaker => speaker.key))} /></div>
 }
 
-function TranscriptSegmentList({ segments }: { segments: MeetingSegment[] }) {
+function TranscriptSegmentList({ segments, onSeek, currentSec }: { segments: MeetingSegment[]; onSeek?: (sec: number) => void; currentSec?: number }) {
   if (segments.length === 0) return <div className="transcript-empty-filter">{EMPTY_FILTER_TEXT}</div>
   const turns = segmentTurns(segments)
-  return <div className="transcript-segments">{turns.map((turn) => <TranscriptTurnRow key={turn.key} turn={turn} />)}</div>
+  return <div className="transcript-segments">{turns.map((turn) => <TranscriptTurnRow key={turn.key} turn={turn} onSeek={onSeek} active={currentSec !== undefined && turn.startSec <= currentSec && (turns.find(next => next.startSec > turn.startSec)?.startSec ?? Infinity) > currentSec} />)}</div>
 }
 
-function TranscriptTurnRow({ turn }: { turn: SegmentTurn }) {
+function TranscriptTurnRow({ turn, onSeek, active }: { turn: SegmentTurn; onSeek?: (sec: number) => void; active: boolean }) {
   return (
-    <article className="transcript-turn" style={speakerStyle(turn.speaker)}>
+    <article className="transcript-turn" aria-current={active ? "true" : undefined} style={speakerStyle(turn.speakerKey)}>
       <SpeakerAvatar speaker={turn.speaker} />
       <div className="transcript-turn-body">
         <div className="transcript-turn-meta">
-          <span className="transcript-speaker"><SpeakerName speaker={turn.speaker} /></span>
-          <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>
+          <button type="button" className="transcript-speaker transcript-speaker-label" title="Label this speaker" onClick={() => openSpeakerLabels(turn.speakerKey)}><SpeakerName speaker={turn.speaker} /></button>
+          {onSeek ? <button type="button" className="transcript-time" onClick={() => onSeek(turn.startSec)} aria-label={`Seek Meeting to ${formatSegmentTime(turn.startSec)}`}>{formatSegmentTime(turn.startSec)}</button> : <span className="transcript-time">{formatSegmentTime(turn.startSec)}</span>}
         </div>
         <div className="transcript-turn-lines">{turn.texts.map((text, index) => <p key={index} className="transcript-segment-text">{text}</p>)}</div>
       </div>
@@ -113,18 +112,18 @@ function segmentTranscriptLine(segment: MeetingSegment): string {
 function segmentTurns(segments: MeetingSegment[]): SegmentTurn[] {
   return segments.reduce<SegmentTurn[]>((turns, segment, index) => {
     const previous = turns[turns.length - 1]
-    if (previous && previous.speaker === segment.speaker) previous.texts.push(segment.text)
-    else turns.push({ speaker: segment.speaker, startSec: segment.startSec, texts: [segment.text], key: segmentKey(segment, index) })
+    if (previous && previous.speakerKey === (segment.speakerKey || segment.speaker)) previous.texts.push(segment.text)
+    else turns.push({ speakerKey: segment.speakerKey || segment.speaker, speaker: segment.speaker, startSec: segment.startSec, texts: [segment.text], key: segmentKey(segment, index) })
     return turns
   }, [])
 }
 
-function transcriptSpeakers(segments: MeetingSegment[]): string[] {
-  return Array.from(new Set(segments.map((segment) => segment.speaker).filter(Boolean)))
+function transcriptSpeakers(segments: MeetingSegment[]): TranscriptSpeaker[] {
+  return Array.from(new Map(segments.filter(segment => segment.speaker).map(segment => [segment.speakerKey || segment.speaker, { key: segment.speakerKey || segment.speaker, name: segment.speaker }])).values())
 }
 
 function visibleTranscriptSegments(segments: MeetingSegment[], hidden: string[]): MeetingSegment[] {
-  return hidden.length ? segments.filter((segment) => !hidden.includes(segment.speaker)) : segments
+  return hidden.length ? segments.filter((segment) => !hidden.includes(segment.speakerKey || segment.speaker)) : segments
 }
 
 function segmentKey(segment: MeetingSegment, index: number): string {
@@ -151,4 +150,9 @@ function speakerInitials(speaker: string): string {
 function formatSegmentTime(seconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(seconds))
   return `${Math.floor(safeSeconds / 60)}:${String(safeSeconds % 60).padStart(2, '0')}`
+}
+
+function openSpeakerLabels(speakerKey: string) {
+  const panel = document.getElementById("meeting-speaker-labels") as HTMLDetailsElement | null
+  if (panel) { panel.open = true; panel.scrollIntoView({ behavior: "smooth", block: "nearest" }); document.getElementById(`speaker-label-${encodeURIComponent(speakerKey)}`)?.querySelector("select")?.focus() }
 }

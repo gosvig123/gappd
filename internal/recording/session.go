@@ -13,15 +13,23 @@ type recordingSession struct {
 	lifecycle meetinglifecycle.Module
 	events    EventSink
 	meeting   *db.Meeting
+	store     *db.DB
 }
 
 func (w meetingRecordingWorkflow) sessionFor(meeting *db.Meeting) recordingSession {
-	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting}
+	return recordingSession{lifecycle: w.lifecycle, events: w.events, meeting: meeting, store: w.store}
 }
 
 func (r recordingSession) emit(name EventName, err error) error {
 	if r.events == nil {
 		return nil
+	}
+	if r.store != nil {
+		current, loadErr := r.store.GetMeeting(r.meeting.ID)
+		if loadErr != nil {
+			return loadErr
+		}
+		return r.events.EmitRecordingEvent(name, *current, err)
 	}
 	return r.events.EmitRecordingEvent(name, *r.meeting, err)
 }

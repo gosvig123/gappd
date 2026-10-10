@@ -11,6 +11,11 @@
     "desktop:typecheck": "npm --prefix ./desktop run typecheck",
     "desktop:dev": "npm --prefix ./desktop run dev",
     "desktop:build": "npm --prefix ./desktop run build",
-    "desktop:dist:dir": "npm --prefix ./desktop run dist:dir"
+    "desktop:dist:dir": "npm --prefix ./desktop run dist:dir",
+    "cloud:proof": "node --experimental-strip-types scripts/cloud-upload-proof.ts",
+    "cloud:proof:dry": "node --experimental-strip-types scripts/cloud-upload-proof.ts --dry-run",
+    "cloud:status": "node --experimental-strip-types scripts/cloud-status-watch.ts",
+    "cloud:status:install": "node --experimental-strip-types scripts/cloud-status-watch.ts --install",
+    "cloud:status:uninstall": "node --experimental-strip-types scripts/cloud-status-watch.ts --uninstall"
   }
 }

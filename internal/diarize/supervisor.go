@@ -3,18 +3,17 @@ package diarize
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/processgroup"
 )
 
@@ -59,7 +58,7 @@ func (s Supervisor) Run(ctx context.Context, audioPath string) ([]WindowReport, 
 	if err := ctx.Err(); err != nil {
 		return nil, fmt.Errorf("diarize: %w", err)
 	}
-	frames, err := wavFrames(audioPath)
+	frames, err := audioFrames(audioPath)
 	if err != nil {
 		return nil, err
 	}
@@ -87,23 +86,13 @@ func (s Supervisor) Run(ctx context.Context, audioPath string) ([]WindowReport, 
 	return out, nil
 }
 
-func wavFrames(path string) (int64, error) {
-	f, err := os.Open(path)
-	if err != nil {
+// audioFrames reads the length of 16 kHz mono PCM16 Meeting audio, WAV or its FLAC copy.
+func audioFrames(path string) (int64, error) {
+	info, err := audioartifact.ReadPCM16(path)
+	if err != nil || info.Rate != uint32(sampleRate) || info.Channels != 1 {
 		return 0, errors.New("diarize: invalid audio")
 	}
-	defer f.Close()
-	var h [44]byte
-	info, statErr := f.Stat()
-	_, readErr := io.ReadFull(f, h[:])
-	u16, u32 := func(at int) uint16 { return binary.LittleEndian.Uint16(h[at:]) }, func(at int) uint32 { return binary.LittleEndian.Uint32(h[at:]) }
-	data := int64(u32(40))
-	if statErr != nil || readErr != nil || string(h[0:4]) != "RIFF" || string(h[8:16]) != "WAVEfmt " || u32(16) != 16 ||
-		u16(20) != 1 || u16(22) != 1 || u32(24) != 16000 || u32(28) != 32000 || u16(32) != 2 || u16(34) != 16 ||
-		string(h[36:40]) != "data" || data == 0 || data%2 != 0 || info.Size() != 44+data || int64(u32(4)) != info.Size()-8 {
-		return 0, errors.New("diarize: invalid audio")
-	}
-	return data / 2, nil
+	return info.Frames, nil
 }
 
 func attemptTimeout(frames int64) time.Duration {

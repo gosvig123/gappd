@@ -1,12 +1,12 @@
 import { execFile } from 'node:child_process'
-import { isExecutableFile } from './binaries'
+import { isExecutableFile, missingRuntimeAssetMessage } from './binaries'
 import { childEnv, resolveSpeechTranscriberBinary } from './native-runtime'
 
 const SPEECH_LOCALE_ENV = 'GAPPD_SPEECH_LOCALE'
 const DEFAULT_SPEECH_LOCALE = 'en_US'
 const SPEECH_STATUS_NOT_INSTALLED = 2
 
-export type AppleSpeechProgressUpdate = { message?: string; progress?: number; pullStage?: 'preparing' | 'downloading' | 'verifying' }
+type AppleSpeechProgressUpdate = { message?: string; progress?: number; pullStage?: 'preparing' | 'downloading' | 'verifying' }
 
 export async function appleSpeechAssetAvailable(): Promise<boolean> {
   const result = await runSpeechHelper(['--status', speechLocale()])
@@ -26,8 +26,8 @@ export function missingAppleSpeechAssetMessage(): string {
   return `Apple speech model ${speechLocale()} is not installed. Run Local AI setup to download it.`
 }
 
-export function missingAppleSpeechHelperMessage(path = resolveSpeechTranscriberBinary()): string {
-  return `Apple speech transcriber missing at ${path}. Run \`npm run native:prepare -- build\`.`
+function missingAppleSpeechHelperMessage(path = resolveSpeechTranscriberBinary()): string {
+  return missingRuntimeAssetMessage('Apple speech transcriber', path)
 }
 
 function speechLocale(): string {
