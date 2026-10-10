@@ -39,6 +39,7 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
 - **Screen video** is enabled before a Meeting and requires a fresh source choice for each Meeting; video failure does not stop its audio recording, and deleting the Meeting removes its managed video but not any exported copy.
 - A finalized **Screen video** is encoded again as HEVC in the background (AC power, no Meeting recording) with the same timeline; the managed movie is replaced only when the new one is complete and smaller.
+- Live Transcript chunks are provisional copies of the Meeting audio; they are deleted when the recording ends, and a background pass deletes leftovers of interrupted recordings.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
 - Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.

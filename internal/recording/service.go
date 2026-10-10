@@ -117,6 +117,7 @@ func (w meetingRecordingWorkflow) run(ctx context.Context, req Request) error {
 
 func (w meetingRecordingWorkflow) record(ctx context.Context, req Request, session recordingSession, sessionDir string) error {
 	w.printRecordingStart(req, sessionDir)
+	defer w.removeLiveTranscriptChunks(sessionDir) // Runs after the Live Transcript drains; processing reads mic.wav and system.wav.
 	captureCtx, cancelCapture := context.WithCancel(ctx)
 	defer cancelCapture()
 	var live *livetranscript.Session

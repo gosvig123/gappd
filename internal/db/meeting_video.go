@@ -91,6 +91,24 @@ func (d *DB) ListCompactableVideoMeetings(limit int) ([]Meeting, error) {
 	return scanMeetings(rows)
 }
 
+// ListFinishedSessionDirs returns the session directories of Meetings that are not recording.
+func (d *DB) ListFinishedSessionDirs() ([]string, error) {
+	rows, err := d.Conn.Query(`SELECT audio_path FROM meetings WHERE audio_path IS NOT NULL AND audio_path <> '' AND capture_status <> 'recording'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var dirs []string
+	for rows.Next() {
+		var dir string
+		if err := rows.Scan(&dir); err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, dir)
+	}
+	return dirs, rows.Err()
+}
+
 // HasActiveRecording reports a recording whose heartbeat is newer than cutoff.
 func (d *DB) HasActiveRecording(cutoff string) (bool, error) {
 	var count int

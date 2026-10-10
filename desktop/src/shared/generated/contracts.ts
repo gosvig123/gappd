@@ -156,7 +156,7 @@ export type VideoAssetResponse = {
   endSec?: number
 }
 
-export type CompactVideoResponse = {
+export type CompactStorageResponse = {
   attempted: boolean
   savedBytes: number
 }

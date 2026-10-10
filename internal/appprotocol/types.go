@@ -61,7 +61,7 @@ type MeetingDeleteResponse struct {
 	ArtifactWarning *string `json:"artifactWarning,omitempty"`
 }
 
-type CompactVideoResponse struct {
+type CompactStorageResponse struct {
 	Attempted  bool  `json:"attempted"`
 	SavedBytes int64 `json:"savedBytes"`
 }
