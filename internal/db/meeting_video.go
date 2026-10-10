@@ -81,6 +81,23 @@ func (d *DB) UpdateVideoInterval(id string) error {
 	return err
 }
 
+// ListCompactableVideoMeetings returns Meetings with a finalized managed movie, newest first.
+func (d *DB) ListCompactableVideoMeetings(limit int) ([]Meeting, error) {
+	rows, err := d.Conn.Query(selectMeetingsSQL+` WHERE video_state IN ('ready','ended') AND video_file=? AND capture_status <> 'recording' ORDER BY started_at DESC LIMIT ?`, VideoFile, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanMeetings(rows)
+}
+
+// HasActiveRecording reports a recording whose heartbeat is newer than cutoff.
+func (d *DB) HasActiveRecording(cutoff string) (bool, error) {
+	var count int
+	err := d.Conn.QueryRow(`SELECT COUNT(*) FROM meetings WHERE capture_status='recording' AND capture_status_updated_at >= ?`, cutoff).Scan(&count)
+	return count > 0, err
+}
+
 func (d *DB) ListInterruptedVideoMeetings(cutoff string, limit int) ([]Meeting, error) {
 	rows, err := d.Conn.Query(selectMeetingsSQL+` WHERE (video_state='selecting' OR (video_state IN ('recording','ended','unfinished') AND video_file=?)) AND (capture_status <> 'recording' OR capture_status_updated_at < ?) ORDER BY started_at ASC LIMIT ?`, VideoPartialFile, cutoff, limit)
 	if err != nil {

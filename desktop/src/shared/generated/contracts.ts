@@ -156,6 +156,11 @@ export type VideoAssetResponse = {
   endSec?: number
 }
 
+export type CompactVideoResponse = {
+  attempted: boolean
+  savedBytes: number
+}
+
 export type SpeakerClipInput = {
   id: string
   speakerKey: string

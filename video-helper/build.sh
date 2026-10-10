@@ -43,6 +43,7 @@ build_arch_binary() {
         -framework ScreenCaptureKit \
         -framework CoreMedia \
         "${SCRIPT_DIR}/main.swift" \
+        "${SCRIPT_DIR}/compact.swift" \
         -o "${output_path}"
 }
 

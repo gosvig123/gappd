@@ -11,6 +11,7 @@ import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
+import { startVideoCompaction, stopVideoCompaction } from './video-compaction'
 import { completeSlackAuthorization } from './slack-oauth'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
@@ -94,6 +95,7 @@ app.whenReady().then(async () => {
   // A finished record joins the cloud queue on its own; without consent it stays local.
   onMeetingProcessingFinished(() => { void meetingUpload().syncNew().catch((error) => console.error('Meeting upload after processing failed', error)) })
   startMeetingPresence(showMainWindow)
+  startVideoCompaction()
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
 
@@ -121,6 +123,7 @@ function quitAfterShutdown(): void {
 async function shutdown(): Promise<void> {
   logMainProcessMemory('shutdown:start')
   stopStaleRecordingRecovery()
+  stopVideoCompaction()
   await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()

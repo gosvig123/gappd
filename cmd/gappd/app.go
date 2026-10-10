@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appAgendaHistoryCmd(), appAgendaCmd(), appEnrichCmd(), appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appAgendaHistoryCmd(), appAgendaCmd(), appEnrichCmd(), appPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactVideoCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
 	return cmd
 }
 

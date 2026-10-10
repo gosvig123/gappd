@@ -179,8 +179,22 @@ struct VideoHelper {
                 return
             } catch { exit(1) }
         }
+        if CommandLine.arguments.count == 4 && CommandLine.arguments[1] == "--compact" {
+            let source = URL(fileURLWithPath: CommandLine.arguments[2])
+            let destination = URL(fileURLWithPath: CommandLine.arguments[3])
+            do {
+                let compacted = try await Task.detached(priority: .utility) {
+                    try await Compactor.compact(source: source, destination: destination)
+                }.value
+                emit(VideoEvent(type: compacted ? "video_compacted" : "video_compact_unneeded"))
+                return
+            } catch {
+                fputs("Screen video compaction failed: \(error)\n", stderr)
+                exit(1)
+            }
+        }
         guard CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--output-dir" else {
-            fputs("Usage: gappd-video --output-dir <meeting-session-dir>\n", stderr)
+            fputs("Usage: gappd-video --output-dir <meeting-session-dir> | --inspect <movie> | --compact <movie> <new-movie>\n", stderr)
             exit(2)
         }
         let dir = URL(fileURLWithPath: CommandLine.arguments[2], isDirectory: true)
