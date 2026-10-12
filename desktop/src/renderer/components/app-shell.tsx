@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { CircleAlert } from 'lucide-react'
 import type { AppView } from '../lib/app-view'
-import { buildAlerts, type AlertItem } from '../lib/alerts'
+import { buildAlerts } from '../lib/alerts'
 import { MeetingsView } from '../views/meetings'
 import { PeopleView } from '../views/people'
 import { TodayView } from '../views/today'
@@ -12,7 +11,7 @@ import { NotificationStack, useMeetingReadyNotices } from './notifications'
 import { PageSearch } from './page-search'
 import { RecordBar } from './record-bar'
 import { SettingsDialog } from './settings/dialog'
-import { Button } from './ui'
+import { SetupChecklist } from './setup-checklist'
 import '../app.css'
 import '../views/views.css'
 import './atoms.css'
@@ -28,7 +27,7 @@ export function AppShell({ view }: { view: AppView }) {
   return <div className="app-shell">
     <AppSidebar section={shell.section} onSelect={shell.setSection} onOpenSettings={() => shell.setSettingsCategory('General')} />
     <ShellMain view={routedView} shell={shell} />
-    <NotificationStack alerts={shell.alerts.filter(alert => alert.kind !== 'blocking')} notices={shell.notices} onDismissAlert={view.actions.dismissAlert} onDismissNotice={shell.dismissNotice} onOpenMeeting={shell.openMeeting} />
+    <NotificationStack alerts={shell.alerts} notices={shell.notices} onDismissAlert={view.actions.dismissAlert} onDismissNotice={shell.dismissNotice} onOpenMeeting={shell.openMeeting} />
     {shell.settingsCategory ? <SettingsDialog view={routedView} initialCategory={shell.settingsCategory} onClose={() => shell.setSettingsCategory(null)} /> : null}
     {shell.confirm.dialog}<PageSearch />
   </div>
@@ -51,18 +50,13 @@ function useShellController(view: AppView) {
 }
 
 function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof useShellController> }) {
-  return <main className="app-main"><RecordBar view={view} /><BlockingBanner alerts={shell.alerts.filter(alert => alert.kind === 'blocking')} />
+  return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}><OpenMeetingScope open={shell.openMeeting}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} onOpenCalendar={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} initialTab={shell.pendingTab} onOpenSettings={() => shell.setSettingsCategory('Meeting processing')} onOpenCalendarSettings={() => shell.setSettingsCategory('Connections')} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}
     </OpenMeetingScope></div>
   </main>
-}
-
-function BlockingBanner({ alerts }: { alerts: AlertItem[] }) {
-  if (!alerts.length) return null
-  return <div className="app-blocking" role="alert"><CircleAlert aria-hidden="true" /><ul>{alerts.map(alert => <li key={alert.id}><div><strong>{alert.title}</strong>{alert.detail ? <span>{alert.detail}</span> : null}</div>{alert.actionLabel && alert.run ? <Button variant="primary" className="compact-action" onClick={alert.run}>{alert.actionLabel}</Button> : null}</li>)}</ul></div>
 }
 
 /** Cmd/Ctrl+F searches local Meetings, Calendar events, and saved Agenda topics. */

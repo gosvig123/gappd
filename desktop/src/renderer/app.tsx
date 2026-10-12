@@ -62,7 +62,7 @@ function buildView(input: Inputs): AppView {
     canStart: dashboard.canStart, canStop: dashboard.canStop, bannerError: dashboard.bannerError,
     isPermissionError: dashboard.isPermissionError,
     recoveringStale: dashboard.recoveringStale, staleRecoveryNotice: dashboard.staleRecoveryNotice,
-    permissionsReady: permissions.ready, permissionsBusy: permissions.state.status === 'checking',
+    permissionStatus: permissions.state.status,
     runtime: runtime.status, runtimeBusy: runtime.busy, runtimeLoading: runtime.loading,
     update: update.status, calendar: calendar.snapshot, calendarController: calendar,
     slackController: slack,

@@ -1,0 +1,69 @@
+.setup-checklist {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-5) var(--space-9) 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-tint);
+}
+
+.setup-checklist-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-6); }
+.setup-checklist-head h2 { margin: 0; font-size: var(--font-size-body); }
+.setup-checklist-head span { color: var(--color-text-soft); font-size: var(--font-size-small); }
+
+.setup-checklist ol { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-4); }
+
+.setup-step {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.setup-step-marker {
+  display: grid;
+  place-items: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.setup-step-marker svg { inline-size: 0.9rem; block-size: 0.9rem; }
+.setup-step.current .setup-step-marker { border-color: var(--color-accent); color: var(--color-text); }
+.setup-step.done .setup-step-marker,
+.setup-step.skipped .setup-step-marker { border-color: var(--color-success-border); background: var(--color-success-bg); color: var(--color-success); }
+
+.setup-step-body { display: grid; gap: var(--space-2); min-inline-size: 0; }
+.setup-step-body strong { display: flex; align-items: center; gap: var(--space-3); font-size: var(--font-size-body); line-height: 1.5rem; }
+.setup-step.done .setup-step-body strong,
+.setup-step.skipped .setup-step-body strong { color: var(--color-text-soft); font-weight: 500; }
+
+.setup-step-tag {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-soft);
+  font-size: var(--font-size-small);
+  font-weight: 500;
+}
+
+.setup-step-detail,
+.setup-step-progress { display: grid; gap: var(--space-2); color: var(--color-text-soft); font-size: var(--font-size-small); }
+.setup-step-detail p { margin: 0; max-inline-size: 64ch; }
+.setup-step-note { color: var(--color-text-soft); }
+/* The red sits in the border: red text on the tinted card fails contrast in dark mode. */
+.setup-step-warning { padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--color-danger); color: var(--color-text); }
+
+.setup-step-progress .progress-track { inline-size: min(100%, 24rem); }
+
+.setup-step-actions { display: flex; gap: var(--space-3); flex-wrap: wrap; justify-content: end; }
+
+@media (max-width: 720px) {
+  .setup-step { grid-template-columns: auto minmax(0, 1fr); }
+  .setup-step-actions { grid-column: 2; justify-content: start; }
+}

@@ -26,6 +26,7 @@ export type IpcInvokeContract = {
   meetingUpload: { status: OperationSpec<[], MeetingUploadStatus>; connect: OperationSpec<[enabled: boolean], MeetingUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; enqueue: OperationSpec<[localId: string], MeetingUploadStatus>; sync: OperationSpec<[], MeetingUploadStatus>; setAccountDeleteConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; deleteAll: OperationSpec<[], MeetingUploadStatus>; allowUploads: OperationSpec<[], MeetingUploadStatus>; setRevokeConsent: OperationSpec<[subject: string, enabled: boolean, clientId: string], MeetingUploadStatus>; revokeClient: OperationSpec<[subject: string, clientId: string], MeetingUploadStatus>; knownClients: OperationSpec<[], string[]>; setDeleteConsent: OperationSpec<[subject: string, enabled: boolean, localId: string], MeetingUploadStatus>; deleteCopy: OperationSpec<[subject: string, localId: string], MeetingUploadStatus> }
   system: {
     getDevices: OperationSpec<[], Device[]>
+    checkCapturePermissions: OperationSpec<[], CapturePermissions>
     requestCapturePermissions: OperationSpec<[], CapturePermissions>
     openPermissionsSettings: OperationSpec<[target?: CapturePermissionTarget], void>
     startStaleRecordingRecovery: OperationSpec<[], number>
@@ -108,6 +109,7 @@ export const IPC_OPERATIONS = {
   meetingUpload: { status: 'meetingUpload:status', connect: 'meetingUpload:connect', setConsent: 'meetingUpload:setConsent', enqueue: 'meetingUpload:enqueue', sync: 'meetingUpload:sync', setAccountDeleteConsent: 'meetingUpload:setAccountDeleteConsent', deleteAll: 'meetingUpload:deleteAll', allowUploads: 'meetingUpload:allowUploads', setRevokeConsent: 'meetingUpload:setRevokeConsent', revokeClient: 'meetingUpload:revokeClient', knownClients: 'meetingUpload:knownClients', setDeleteConsent: 'meetingUpload:setDeleteConsent', deleteCopy: 'meetingUpload:deleteCopy' },
   system: {
     getDevices: 'system:getDevices',
+    checkCapturePermissions: 'system:checkCapturePermissions',
     requestCapturePermissions: 'system:requestCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',

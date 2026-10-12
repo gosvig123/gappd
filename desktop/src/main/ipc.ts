@@ -5,7 +5,7 @@ import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
-import { requestCapturePermissions } from './capture-permissions'
+import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
@@ -30,6 +30,7 @@ type MainHandlers = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: Ma
 const IPC_HANDLERS: MainHandlers = {
   system: {
     getDevices: () => getDevices(),
+    checkCapturePermissions: () => checkCapturePermissions(),
     requestCapturePermissions: () => requestCapturePermissions(),
     openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
     startStaleRecordingRecovery: () => startStaleRecordingRecovery(),

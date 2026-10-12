@@ -1,8 +1,9 @@
 import type { UpdateStatus } from '../../shared/contracts'
 import { runtimeErrorView, runtimeOperationLabel } from '../components/settings/managed-runtime-contract'
 import type { AppView } from './app-view'
+import { localAiNeedsFirstSetup } from './setup-steps'
 
-export type AlertKind = 'blocking' | 'attention' | 'info'
+export type AlertKind = 'attention' | 'info'
 
 export type AlertItem = {
   id: string
@@ -14,15 +15,12 @@ export type AlertItem = {
 }
 
 /**
- * One ordered list of everything that wants the user's attention. The shell
- * decides how to present it: blocking items get a banner, the rest become
- * dismissible notifications. Nothing stacks a second banner.
+ * One ordered list of everything that wants the user's attention, shown as
+ * dismissible notifications. Recording access and first-time Local AI setup
+ * belong to the setup checklist instead.
  */
 export function buildAlerts(view: AppView): AlertItem[] {
   const items: AlertItem[] = []
-  if (!view.permissionsReady) {
-    items.push({ id: 'permissions', kind: 'blocking', title: 'Recording access is not ready', detail: 'Gappd needs microphone and screen and system audio access before the first recording.', actionLabel: view.permissionsBusy ? 'Checking…' : 'Allow recording access', run: view.actions.requestPermissions })
-  }
   if (view.bannerError) {
     items.push(view.isPermissionError
       ? { id: 'error', kind: 'attention', title: 'Recording could not start', detail: view.bannerError, actionLabel: 'Try again', run: () => view.actions.start() }
@@ -41,9 +39,8 @@ export function buildAlerts(view: AppView): AlertItem[] {
 
 function runtimeAlerts(view: AppView): AlertItem[] {
   const runtime = view.runtime
-  if (!runtime) return []
+  if (!runtime || localAiNeedsFirstSetup(runtime)) return []
   if (runtimeErrorView(runtime)) return [{ id: 'runtime-error', kind: 'attention', title: 'Local AI needs repair', detail: runtime.message, actionLabel: view.runtimeBusy ? 'Repairing…' : 'Repair local AI', run: view.actions.repairRuntime }]
-  if (runtime.operation === 'needs_setup') return [{ id: 'runtime-setup', kind: 'attention', title: 'Local AI setup is incomplete', detail: runtime.message, actionLabel: view.runtimeBusy ? 'Preparing…' : 'Set up local AI', run: view.actions.setupRuntime }]
   if (runtime.operation !== 'ready') return [{ id: 'runtime-busy', kind: 'info', title: runtimeOperationLabel(runtime.operation), detail: runtime.message }]
   return []
 }

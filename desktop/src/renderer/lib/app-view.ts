@@ -5,6 +5,7 @@ import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
 import { meetingProgressLabel } from '../components/meeting/progress'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
+import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
 import type { SlackConnectionController } from '../hooks/use-slack-connection'
 import type { ThemeName } from '../hooks/use-theme'
 
@@ -32,8 +33,7 @@ export type AppView = {
   isPermissionError: boolean
   recoveringStale: boolean
   staleRecoveryNotice: string | null
-  permissionsReady: boolean
-  permissionsBusy: boolean
+  permissionStatus: SetupPermissionStatus
   runtime: ManagedRuntimeSnapshot | null
   runtimeLoading: boolean
   runtimeBusy: boolean

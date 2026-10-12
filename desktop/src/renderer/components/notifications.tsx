@@ -25,7 +25,7 @@ export function NotificationStack({ alerts, notices, onDismissAlert, onDismissNo
         <Toast key={notice.id} title={notice.title} detail={notice.detail} tone={notice.kind === 'ready' ? 'info' : 'info'} action={notice.meetingId ? { label: 'Open', run: () => onOpenMeeting(notice.meetingId as string) } : undefined} onDismiss={() => onDismissNotice(notice.id)} />
       ))}
       {alerts.slice(0, 3).map((alert) => (
-        <Toast key={alert.id} title={alert.title} detail={alert.detail} tone={alert.kind} action={alert.actionLabel && alert.run ? { label: alert.actionLabel, run: alert.run } : undefined} onDismiss={alert.kind === 'blocking' ? undefined : () => onDismissAlert(alert.id)} />
+        <Toast key={alert.id} title={alert.title} detail={alert.detail} tone={alert.kind} action={alert.actionLabel && alert.run ? { label: alert.actionLabel, run: alert.run } : undefined} onDismiss={() => onDismissAlert(alert.id)} />
       ))}
     </div>
   )

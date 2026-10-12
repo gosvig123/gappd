@@ -66,24 +66,6 @@
 
 .app-scroll { grid-row: 3; min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
 
-.app-blocking {
-  display: flex;
-  align-items: start;
-  gap: var(--space-5);
-  margin: var(--space-5) var(--space-9) 0;
-  padding: var(--space-5) var(--space-6);
-  border: 1px solid var(--color-danger-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-danger-bg);
-  color: var(--color-danger);
-}
-
-.app-blocking > svg { inline-size: 1.1rem; block-size: 1.1rem; flex: 0 0 auto; margin-block-start: 1px; }
-.app-blocking ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-4); inline-size: 100%; }
-.app-blocking li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); flex-wrap: wrap; }
-.app-blocking strong { display: block; font-size: var(--font-size-body); }
-.app-blocking span { color: var(--color-text-soft); font-size: var(--font-size-small); }
-
 .app-icon-action {
   display: grid;
   place-items: center;
