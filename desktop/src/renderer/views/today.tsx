@@ -9,9 +9,9 @@ import { dayLabel, durationLabel, meetingDurationLabel } from '../lib/meeting-gr
 import { EventAgendaChip, MeetingAgendaChip } from '../components/agenda/tab'
 import { useOpenMeeting } from '../components/meeting/open-scope'
 
-type TodayProps = { view: AppView; onOpenMeetings: () => void; onOpenCalendar: () => void }
+type TodayProps = { view: AppView; onOpenMeetings: () => void }
 
-export function TodayView({ view, onOpenMeetings, onOpenCalendar }: TodayProps) {
+export function TodayView({ view, onOpenMeetings }: TodayProps) {
   const events = todayTimeline(view.calendar)
   const work = view.meetings.filter(meetingHasWork)
   return (
@@ -22,7 +22,7 @@ export function TodayView({ view, onOpenMeetings, onOpenCalendar }: TodayProps) 
       </header>
       {work.length ? <ul className="app-live">{work.map((meeting) => <LiveCard key={meeting.id} meeting={meeting} view={view} />)}</ul> : null}
       <section className="app-block" aria-label="Schedule">
-        <BlockHead title="Schedule" action={{ label: 'Upcoming', onClick: onOpenCalendar }} />
+        <BlockHead title="Schedule" />
         {events.length ? <Timeline events={events} view={view} /> : <UpNext view={view} />}
       </section>
       <section className="app-block" aria-label="Recent meetings">
@@ -33,11 +33,11 @@ export function TodayView({ view, onOpenMeetings, onOpenCalendar }: TodayProps) 
   )
 }
 
-function BlockHead({ title, action }: { title: string; action: { label: string; onClick: () => void } }) {
+function BlockHead({ title, action }: { title: string; action?: { label: string; onClick: () => void } }) {
   return (
     <div className="app-block-head">
       <h2>{title}</h2>
-      <button type="button" className="app-link" onClick={action.onClick}>{action.label}</button>
+      {action ? <button type="button" className="app-link" onClick={action.onClick}>{action.label}</button> : null}
     </div>
   )
 }

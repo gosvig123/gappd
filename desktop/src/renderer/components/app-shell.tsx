@@ -52,7 +52,7 @@ function useShellController(view: AppView) {
 function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof useShellController> }) {
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}><OpenMeetingScope open={shell.openMeeting}>
-      {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} onOpenCalendar={() => shell.setSection('meetings')} /> : null}
+      {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} initialTab={shell.pendingTab} onOpenSettings={() => shell.setSettingsCategory('Meeting processing')} onOpenCalendarSettings={() => shell.setSettingsCategory('Connections')} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}
     </OpenMeetingScope></div>
