@@ -1,5 +1,5 @@
 import { requestCommand } from './app-protocol'
-import { managedRuntime } from './managed-runtime'
+import { managedRuntime } from './managed-runtime/runtime'
 const CODEX_BACKEND = 'codex_exec'
 
 type Work<T> = (env: NodeJS.ProcessEnv) => Promise<T>

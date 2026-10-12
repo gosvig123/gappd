@@ -21,7 +21,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { createDeviceCredential, rawBase64, signDeviceRequest, type DeviceCredential } from '../desktop/src/main/meeting-device.ts'
+import { createDeviceCredential, rawBase64, signDeviceRequest, type DeviceCredential } from '../desktop/src/main/cloud/device.ts'
 
 const RESOURCE = process.env.GAPPD_CLOUD_RESOURCE_URL?.trim() || 'https://gappd-cloud-api-production.up.railway.app/mcp'
 const ISSUER = process.env.GAPPD_CLERK_ISSUER_URL?.trim() || 'https://learning-mutt-4805.clerk.accounts.dev'

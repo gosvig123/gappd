@@ -50,4 +50,6 @@ npm run desktop:dist:dir
 
 Output lands under `desktop/release/`; renderer assets remain under `desktop/dist/`.
 
+For one architecture, set the native build profile and pass the matching builder flags, for example `GAPPD_MAC_BUILD=x64 npm --prefix desktop run dist -- --mac dir --x64`. The release workflow uses `dist:mac:universal`.
+
 Local packaging does not require Apple credentials. Release-only notarization and Gatekeeper checks are enabled through `GAPPD_ENABLE_NOTARIZATION=1` and `GAPPD_REQUIRE_GATEKEEPER=1`.

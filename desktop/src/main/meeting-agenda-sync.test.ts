@@ -7,8 +7,8 @@ import * as agenda from '../shared/meeting-agenda.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { deferred, loadSourceModule } from './source-module-test-helper.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { GoogleCalendarServiceCore } from './google-calendar-service-core.ts'
-import type { CalendarDocument } from './google-calendar-service-core'
+import { GoogleCalendarServiceCore } from './google/calendar-service-core.ts'
+import type { CalendarDocument } from './google/calendar-service-core'
 import type { CalendarSnapshot, CalendarEventSummary } from '../shared/calendar-contract'
 import type { ParticipantContext } from '../shared/participant-contract'
 import type { GeneratedAgenda } from '../shared/agenda-draft'
@@ -30,13 +30,13 @@ function fixture(service: Record<string, unknown> = {}) {
   const persistCalls: Array<{ event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }> = []
   const module = loadSourceModule(new URL('./meeting-agenda.ts', import.meta.url), {
     '../shared/calendar-reconciliation': reconciliation, '../shared/meeting-agenda': agenda,
-    './slack-service': { slackAgendaCommunication: async () => ({ sources: [] }) },
-    './slack-agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
-    './google-calendar-service': { googleAgendaCommunication: async () => ({ sources: [] }), googleCalendarPendingSyncIds: () => f.pending, googleCalendarSnapshot: async () => snapshot, syncGoogleCalendar: async (id: string) => { calls.push(id); await f.sync(id) }, ...service },
+    './slack/service': { slackAgendaCommunication: async () => ({ sources: [] }) },
+    './slack/agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
+    './google/calendar-service': { googleAgendaCommunication: async () => ({ sources: [] }), googleCalendarPendingSyncIds: () => f.pending, googleCalendarSnapshot: async () => snapshot, syncGoogleCalendar: async (id: string) => { calls.push(id); await f.sync(id) }, ...service },
     './participant-calendar': { savedMeetingCalendarContexts: async () => contexts },
     './app-protocol': { requestCommand: async (id: string) => id === 'meetings.agendaHistory' ? { meetings } : { items: [], generation: { model: 'gpt-5.6-terra', reasoningEffort: 'medium' } } },
     './summary-runtime': { usingSummaryRuntime: async (work: () => Promise<unknown>) => work() },
-    './agenda-drafts': { persistGeneratedAgenda: async (input: { event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }) => { persistCalls.push(input); return { draft: input.draft, saved: true, revision: 1, generatedAt: '2026-01-01T00:00:00.000Z', model: input.generation?.model ?? '', reasoningEffort: input.generation?.reasoningEffort ?? '' } as GeneratedAgenda } },
+    './agenda/drafts': { persistGeneratedAgenda: async (input: { event: { sourceId: string }; draft: unknown; generation?: { model?: string; reasoningEffort?: string } }) => { persistCalls.push(input); return { draft: input.draft, saved: true, revision: 1, generatedAt: '2026-01-01T00:00:00.000Z', model: input.generation?.model ?? '', reasoningEffort: input.generation?.reasoningEffort ?? '' } as GeneratedAgenda } },
   }, { AbortSignal })
   const generate = async (sourceId: string) => (await module.generateMeetingAgenda({ sourceId, expectedRevision: 0 })).draft
   return { ...f, generate, persistCalls, state: f }

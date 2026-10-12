@@ -4,13 +4,11 @@ OUTPUT    ?= $(BUILD_DIR)/$(BINARY)
 MODULE    := $(shell grep '^module' go.mod 2>/dev/null | awk '{print $$2}')
 VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS   := -s -w -X $(MODULE)/internal/version.Version=$(VERSION)
-DB_PATH   := ~/.gappd/db.sqlite
-SCHEMA    := ./internal/db/schema.sql
 UNAME_S   := $(shell uname -s)
 
 export MACOSX_DEPLOYMENT_TARGET ?= 26.0
 
-.PHONY: build build-capture build-video build-speech build-diarizer ensure-macos run dev db-init db-reset clean install-capture install-video install gen-protocol check-protocol
+.PHONY: build build-capture build-video build-speech build-diarizer ensure-macos run dev clean install-capture install-video install gen-protocol check-protocol
 
 build:
 	@mkdir -p $(dir $(OUTPUT))
@@ -60,15 +58,6 @@ run: build
 dev:
 	@which watchexec > /dev/null 2>&1 || { echo "install watchexec: cargo install watchexec-cli"; exit 1; }
 	watchexec -r -e go -- go run ./cmd/gappd
-
-db-init:
-	@mkdir -p ~/.gappd
-	sqlite3 $(DB_PATH) < $(SCHEMA)
-	@echo "database initialised at $(DB_PATH)"
-
-db-reset:
-	rm -f $(DB_PATH)
-	$(MAKE) db-init
 
 gen-protocol:
 	go run ./cmd/gen-protocol

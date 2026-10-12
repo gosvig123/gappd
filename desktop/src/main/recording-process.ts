@@ -3,7 +3,7 @@ import type { RecordingEvent } from '../shared/generated/contracts'
 import { ignoresStopRequest, recordingEventOutcome, RECORDING_STATUS_ERROR, RECORDING_STATUS_IDLE, RECORDING_STATUS_STOPPING } from '../shared/meeting-recording-workflow'
 import { streamCommand } from './app-protocol'
 import { requestDrains, resumeDrains } from './drain-coordinator'
-import { managedRuntime } from './managed-runtime'
+import { managedRuntime } from './managed-runtime/runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
 

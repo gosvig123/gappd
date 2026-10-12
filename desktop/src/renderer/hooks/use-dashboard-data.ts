@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
-import { isPermissionErrorMessage } from '../components/meeting-status'
+import { isPermissionErrorMessage } from '../components/meeting/status'
 import { useDynamicRefresh } from './use-dynamic-refresh'
 import { useGuardedEffect } from './use-guarded-effect'
 import { useMeetingRecordingWorkflow } from './use-meeting-recording-workflow'

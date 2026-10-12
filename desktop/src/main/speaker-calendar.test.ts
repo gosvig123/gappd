@@ -11,7 +11,7 @@ test('relink persists constraint before requesting processing; reading preserves
   const module = loadSourceModule(new URL('./participant-calendar.ts', import.meta.url), {
     './app-protocol': { requestCommand: async () => ({ meeting: { startedAt: '2026-01-01' } }) },
     './electron-secure-store': { createSecureStore: () => ({ read: async () => document, write: async () => { calls.push('save') } }) },
-    './google-calendar-service': { googleCalendarSnapshot: async () => ({ events: [fresh] }) },
+    './google/calendar-service': { googleCalendarSnapshot: async () => ({ events: [fresh] }) },
     './drain-coordinator': { requestDrains: () => { calls.push('drain') } },
   })
   assert.equal((await module.participantContext('meeting')).event.title, 'old')

@@ -133,8 +133,8 @@ while the previous run is active. `GET /status` publishes the backlog; `cleanup.
 the oldest unremoved expired copy is older than 24 hours.
 
 `npm run cloud:status` reads `/status` and fails when `cleanup.behind` is true, with a macOS
-notification when it can. `npm run cloud:status:install` writes a LaunchAgent that runs it hourly and
-logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `cloud:status:uninstall` removes it.
+notification when it can. `npm run cloud:status -- --install` writes a LaunchAgent that runs it hourly and
+logs to `~/Library/Logs/gappd-cloud-status-watch.log`; `npm run cloud:status -- --uninstall` removes it.
 
 ## End-to-end upload proof
 

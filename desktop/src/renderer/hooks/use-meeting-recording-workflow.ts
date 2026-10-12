@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type Dispatch, type MutableRefObject, type S
 import type { Device, RecordingState } from '../../shared/contracts'
 import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
-import { permissionTarget } from '../components/meeting-status'
+import { permissionTarget } from '../components/meeting/status'
 import { useGuardedEffect } from './use-guarded-effect'
 
 const MEDIA_DEVICE_CHANGE_EVENT = 'devicechange'

@@ -60,7 +60,7 @@ network access, and Xcode Command Line Tools with Swift support.
 git clone https://github.com/gappd-dev/gappd.git
 cd gappd
 npm run desktop:bootstrap
-npm run desktop:dev
+npm run dev
 ```
 
 Bootstrap installs desktop dependencies, checks macOS prerequisites, downloads
@@ -69,7 +69,7 @@ llama.cpp, and builds the Go, capture, and speech-transcription artifacts.
 Useful commands:
 
 ```bash
-npm run desktop:typecheck   # Check desktop TypeScript
+npm run typecheck           # Check desktop TypeScript
 npm run desktop:build       # Build renderer, native artifacts, and Electron main
 npm run desktop:dist:dir    # Package an unpacked macOS app
 go test ./...               # Check Go packages

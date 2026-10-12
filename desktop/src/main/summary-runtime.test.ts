@@ -8,7 +8,7 @@ function runtimeFixture(provider: string, ready = true) {
   const acquisition = deferred<void>()
   const runtime = loadSourceModule(new URL('./summary-runtime.ts', import.meta.url), {
     './app-protocol': { requestCommand: async (id: string) => { assert.equal(id, 'config.show'); calls.config++; return { ai: { provider } } } },
-    './managed-runtime': { managedRuntime: {
+    './managed-runtime/runtime': { managedRuntime: {
       status: () => { calls.status++; return { activity: ready ? 'idle' : 'in_use', operation: ready ? 'ready' : 'error' } },
       using: async (_capabilities: string[], work: () => Promise<unknown>) => { calls.using++; await acquisition.promise; return work() },
     } },

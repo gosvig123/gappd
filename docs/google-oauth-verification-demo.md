@@ -2,7 +2,7 @@
 
 ## Status
 
-Google approved `calendar.events.owned.readonly` for `gappd-production` on 30 September 2026 ([approval email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0f338b636dab66)). On 1 October 2026 the Verification Center showed branding and data access as verified, publishing status **In production**, and the declared scopes as `openid`, `userinfo.email`, and `calendar.events.owned.readonly`, with no restricted scope. These match `GOOGLE_SCOPES` in `desktop/src/main/google-calendar-api.ts`.
+Google approved `calendar.events.owned.readonly` for `gappd-production` on 30 September 2026 ([approval email](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0f338b636dab66)). On 1 October 2026 the Verification Center showed branding and data access as verified, publishing status **In production**, and the declared scopes as `openid`, `userinfo.email`, and `calendar.events.owned.readonly`, with no restricted scope. These match `GOOGLE_SCOPES` in `desktop/src/main/google/calendar-api.ts`.
 
 - The 100-user cap no longer applies to Calendar-only consent. It still applies to any unapproved scope.
 - A change to branding, domains, privacy URL, or scopes requires a new verification request. Approval is not inherited by new scopes.

@@ -1,5 +1,5 @@
 import type { UpdateStatus } from '../../shared/contracts'
-import { runtimeErrorView, runtimeOperationLabel } from '../components/managed-runtime-contract'
+import { runtimeErrorView, runtimeOperationLabel } from '../components/settings/managed-runtime-contract'
 import type { AppView } from './app-view'
 
 export type AlertKind = 'blocking' | 'attention' | 'info'

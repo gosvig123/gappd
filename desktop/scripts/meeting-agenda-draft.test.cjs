@@ -6,7 +6,7 @@ const { createElement } = require('react')
 const { renderToStaticMarkup } = require('react-dom/server')
 
 function view() {
-  const result = buildSync({ entryPoints: [path.join(__dirname, '../src/renderer/components/meeting-agenda-draft.tsx')], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react-dom'], jsx: 'automatic' })
+  const result = buildSync({ entryPoints: [path.join(__dirname, '../src/renderer/components/agenda/draft.tsx')], bundle: true, write: false, platform: 'node', format: 'cjs', external: ['react', 'react-dom'], jsx: 'automatic' })
   const module = { exports: {} }
   new Function('require', 'module', result.outputFiles[0].text)(require, module)
   return module.exports.MeetingAgendaDraftView

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// The desktop pins the same literal in desktop/src/main/meeting-device.test.ts. The two
+// The desktop pins the same literal in desktop/src/main/cloud/device.test.ts. The two
 // implementations cannot share code, so a format change on either side fails its own test
 // instead of silently making every signature invalid.
 func TestDeviceMessageIsPinned(t *testing.T) {

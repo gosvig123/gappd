@@ -5,15 +5,15 @@ Status: direct desktop sign-in, a destination picker, confirmed message sending,
 ## Components
 
 - `slack-app/manifest.json`: the Gappd-owned Slack app definition (no secrets).
-- `desktop/src/main/slack-oauth.ts`: PKCE authorization, code exchange, token refresh, token parsing.
-- `desktop/src/main/slack-connection.ts`: serialized refresh, atomic token persistence, reviewed-account binding.
-- `desktop/src/main/slack-destination.ts`: validation of channel IDs and Slack channel or thread links.
-- `desktop/src/main/slack-destinations.ts`: paginated joined-channel and existing-conversation reads, with member names for DMs.
-- `desktop/src/renderer/components/slack-destination-picker.tsx`: filter loaded destinations, load more, or keep a pasted link.
-- `desktop/src/main/slack-message.ts`: message length validation, control-syntax escaping, `chat.postMessage` payload.
-- `desktop/src/main/slack-send.ts`: reviewed message store, confirmation boundary, fixed Slack request, error mapping.
-- `desktop/src/main/slack-service.ts`: Electron composition (secure store, shell, client ID, local scrolling confirmation window).
-- Settings panel: `desktop/src/renderer/components/slack-panel.tsx` with `use-slack-connection.ts`, and `slack-composer.tsx` with `use-slack-send.ts`; IPC group `slack` in `desktop/src/shared/ipc-contract.ts`.
+- `desktop/src/main/slack/oauth.ts`: PKCE authorization, code exchange, token refresh, token parsing.
+- `desktop/src/main/slack/connection.ts`: serialized refresh, atomic token persistence, reviewed-account binding.
+- `desktop/src/main/slack/destination.ts`: validation of channel IDs and Slack channel or thread links.
+- `desktop/src/main/slack/destinations.ts`: paginated joined-channel and existing-conversation reads, with member names for DMs.
+- `desktop/src/renderer/components/slack/destination-picker.tsx`: filter loaded destinations, load more, or keep a pasted link.
+- `desktop/src/main/slack/message.ts`: message length validation, control-syntax escaping, `chat.postMessage` payload.
+- `desktop/src/main/slack/send.ts`: reviewed message store, confirmation boundary, fixed Slack request, error mapping.
+- `desktop/src/main/slack/service.ts`: Electron composition (secure store, shell, client ID, local scrolling confirmation window).
+- Settings panel: `desktop/src/renderer/components/slack/panel.tsx` with `use-slack-connection.ts`, and `slack/composer.tsx` with `use-slack-send.ts`; IPC group `slack` in `desktop/src/shared/ipc-contract.ts`.
 
 ## Slack app
 
@@ -128,15 +128,15 @@ Tokens never reach the renderer. The status payload contains only `configured`, 
 | Phase | Work | Files |
 | --- | --- | --- |
 | 1 | Manifest, PKCE sign-in, encrypted storage, refresh, Settings connect/reconnect/disconnect | listed under Components |
-| 2 (this change) | Send one reviewed, confirmed plain-text message: destination validation, reviewed-account binding, `chat.postMessage`, local scrolling confirmation, friendly errors | `slack-destination.ts`, `slack-message.ts`, `slack-send.ts`, `slack-connection.ts`, `slack-service.ts`, IPC group, panel composer |
-| 3 | Destination picker with paginated membership reads, DM names, and re-authorization for added scopes | `slack-destinations.ts`, `slack-destination-picker.tsx`, manifest, OAuth scopes, IPC |
-| 4 | Slack `auth.revoke` on disconnect and user display names (workspace names already shown) | `slack-service.ts`, manifest |
-| 5 | Agenda context from existing invitee DMs and selected joined channels; no search promises | `slack-agenda.ts`, `agenda-communication.ts`, `meeting-agenda.ts` |
+| 2 (this change) | Send one reviewed, confirmed plain-text message: destination validation, reviewed-account binding, `chat.postMessage`, local scrolling confirmation, friendly errors | `slack/destination.ts`, `slack/message.ts`, `slack/send.ts`, `slack/connection.ts`, `slack/service.ts`, IPC group, panel composer |
+| 3 | Destination picker with paginated membership reads, DM names, and re-authorization for added scopes | `slack/destinations.ts`, `slack/destination-picker.tsx`, manifest, OAuth scopes, IPC |
+| 4 | Slack `auth.revoke` on disconnect and user display names (workspace names already shown) | `slack/service.ts`, manifest |
+| 5 | Agenda context from existing invitee DMs and selected joined channels; no search promises | `slack/agenda.ts`, `agenda/communication.ts`, `meeting-agenda.ts` |
 
 ## Local testing strategy
 
 - `npm --prefix desktop test` runs the main-process tests with injected fake Slack endpoints and in-process desktop callback delivery. No Slack network calls, credentials, or occupied callback port are needed.
-- Focused: `node --experimental-strip-types --test desktop/src/main/slack-oauth.test.ts desktop/src/main/slack-connection.test.ts desktop/src/main/slack-destination.test.ts desktop/src/main/slack-send.test.ts desktop/src/main/slack-send-post.test.ts`.
+- Focused: `node --experimental-strip-types --test desktop/src/main/slack/oauth.test.ts desktop/src/main/slack/connection.test.ts desktop/src/main/slack/destination.test.ts desktop/src/main/slack/send.test.ts desktop/src/main/slack/send-post.test.ts`.
 - The send tests cover destination validation, no-token and cancellation paths, one post per confirmation, concurrent sends, account change or reconnect during review and confirmation, token rotation, plain-text payload controls, thread handling, Slack error mapping, 429 `Retry-After`, delivery-unknown outcomes, and that failures never expose tokens or message text.
 - Checks: `npm --prefix desktop run typecheck`, `npm --prefix desktop run build:electron`, `npm --prefix desktop run build:renderer`.
 - Live manual test: configure the app Redirect URL and scopes in the Slack portal. The client ID is already the app default; `GAPPD_SLACK_OAUTH_CLIENT_ID` only overrides it. Run the desktop app and use Settings → Slack → Connect. Sending needs a separate live test with an approved workspace and destination; none has been run yet.

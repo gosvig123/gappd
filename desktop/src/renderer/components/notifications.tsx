@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Bell, X } from 'lucide-react'
 import type { MeetingListItem } from '../../shared/contracts'
 import type { AlertItem } from '../lib/alerts'
-import { meetingHasWork, meetingReady } from './meeting-progress'
+import { meetingHasWork, meetingReady } from './meeting/progress'
 import { Button, cx } from './ui'
 
 type MeetingNotice = { id: string; kind: 'ready' | 'working'; title: string; detail: string; meetingId?: string }

@@ -10,7 +10,7 @@ export const DEV_RUNTIME_ASSETS_SCHEMA = 1
 const MANIFEST_PATH = ['build', 'runtime-assets.json']
 const RECOVERY = 'Run `npm run dev:prepare` in desktop/.'
 
-// Repo-relative paths that the dev desktop resolves at run time (src/main/native-runtime.ts, llamacpp.ts).
+// Repo-relative paths that the dev desktop resolves at run time (src/main/native-runtime.ts, src/main/managed-runtime/llamacpp.ts).
 export function devRuntimeAssets(platform = process.platform) {
   const assets = [{ name: 'Gappd backend', path: 'build/gappd', executable: true }]
   if (platform !== 'darwin') return assets

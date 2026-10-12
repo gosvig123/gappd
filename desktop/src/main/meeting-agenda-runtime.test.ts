@@ -16,7 +16,7 @@ function fixture(provider: string) {
   }
   const runtime = loadSourceModule(new URL('./summary-runtime.ts', import.meta.url), {
     './app-protocol': { requestCommand },
-    './managed-runtime': { managedRuntime: { using: async (capabilities: string[], work: () => Promise<unknown>) => {
+    './managed-runtime/runtime': { managedRuntime: { using: async (capabilities: string[], work: () => Promise<unknown>) => {
       assert.equal(capabilities.join(','), 'summarization'); calls.push('acquire')
       try { return await work() } finally { calls.push('release') }
     } } },
@@ -31,12 +31,12 @@ function loadAgenda(f: ReturnType<typeof fixture>, persistGeneratedAgenda: (inpu
     '../shared/calendar-reconciliation': calendarReconciliation,
     '../shared/meeting-agenda': { calendarEventIsUpcoming: () => true, inviteeEmails: () => ['partner@example.com'], matchAgendaHistory: () => communicationOnly ? [] : [{ id: 'previous' }] },
     './app-protocol': { requestCommand: f.requestCommand },
-    './slack-service': { slackAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'slack:team:dm:123', kind: 'slack', title: 'Slack DM', startedAt: '2026-01-02T00:00:00Z', text: 'The launch review is completed.' }] : [] }) },
-    './slack-agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
-    './google-calendar-service': { googleAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'gmail:account:aa', kind: 'gmail', title: 'Gmail: Launch', startedAt: '2026-01-01T00:00:00Z', text: 'Please confirm the launch review date.' }] : [] }), googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
+    './slack/service': { slackAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'slack:team:dm:123', kind: 'slack', title: 'Slack DM', startedAt: '2026-01-02T00:00:00Z', text: 'The launch review is completed.' }] : [] }) },
+    './slack/agenda': { agendaSlackChannels: (ids: string[] = []) => ids },
+    './google/calendar-service': { googleAgendaCommunication: async () => ({ sources: communicationOnly ? [{ id: 'gmail:account:aa', kind: 'gmail', title: 'Gmail: Launch', startedAt: '2026-01-01T00:00:00Z', text: 'Please confirm the launch review date.' }] : [] }), googleCalendarPendingSyncIds: () => [], googleCalendarSnapshot: async () => ({ connections: [], events: [{ sourceId: 'next', title: 'Planning' }] }) },
     './participant-calendar': { savedMeetingCalendarContexts: async () => ({}) },
     './summary-runtime': f.runtime,
-    './agenda-drafts': { persistGeneratedAgenda },
+    './agenda/drafts': { persistGeneratedAgenda },
   }, { AbortSignal }).generateMeetingAgenda
 }
 

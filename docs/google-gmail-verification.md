@@ -6,11 +6,11 @@ On 6 October 2026 Google asked for an ADA-CASA AL1 security assessment by 3 Janu
 
 ## Current gate
 
-Release builds cannot request Gmail. `gmailReviewEnabled()` in `desktop/src/main/google-calendar-service.ts` enables Gmail only in an unpackaged development run with `GAPPD_GMAIL_REVIEW=1`. This follows Google's rule to trigger unverified scopes only outside production traffic. Each Gmail consent before approval shows Google's unverified-app screen and uses one place of the 100-user cap (2 used on 1 October 2026).
+Release builds cannot request Gmail. `gmailReviewEnabled()` in `desktop/src/main/google/calendar-service.ts` enables Gmail only in an unpackaged development run with `GAPPD_GMAIL_REVIEW=1`. This follows Google's rule to trigger unverified scopes only outside production traffic. Each Gmail consent before approval shows Google's unverified-app screen and uses one place of the 100-user cap (2 used on 1 October 2026).
 
 ## Data path to state in the request
 
-- Gmail is read only when the user requests an Agenda draft or Meeting enrichment: messages from, to, or copying the Meeting's Calendar invitees, up to 30 messages, plain-text bodies only, no attachments or HTML-only mail (`desktop/src/main/gmail-agenda.ts`).
+- Gmail is read only when the user requests an Agenda draft or Meeting enrichment: messages from, to, or copying the Meeting's Calendar invitees, up to 30 messages, plain-text bodies only, no attachments or HTML-only mail (`desktop/src/main/google/gmail-agenda.ts`).
 - Local AI (on-device llama.cpp) processes it. `newCalendarAIProvider` rejects Installed Codex (`cmd/gappd/app_agenda.go`). Agenda drafts and enrichment notes are stored encrypted on the Mac.
 - Cloud sync uploads only Meeting title, summary, speakers, and turns (`internal/meetingdocument/document.go`). Enrichment notes do not change the summary.
 - The desktop app exchanges and refreshes Google tokens directly with `oauth2.googleapis.com` (`desktop/src/main/oauth.ts`). Tokens are stored encrypted on the Mac. No Gappd server receives Google tokens or Gmail content. Desktop builds before 6 October 2026 used an OAuth relay on Railway (`auth.getgappd.com`) that added the client secret.

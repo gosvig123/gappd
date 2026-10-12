@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MANAGED_LLAMACPP_MODEL, isManagedLlamaCppModel, type ManagedLlamaCppModelTag } from '../../shared/managed-local-ai'
-import { getManagedRuntimeContract, toStatusError, type ManagedRuntimeSnapshot } from '../components/managed-runtime-contract'
+import { getManagedRuntimeContract, toStatusError, type ManagedRuntimeSnapshot } from '../components/settings/managed-runtime-contract'
 import { useGuardedEffect } from './use-guarded-effect'
 
 export function useManagedRuntime() {

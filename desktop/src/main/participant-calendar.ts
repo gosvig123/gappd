@@ -3,7 +3,7 @@ import type { LinkCalendarInput, ParticipantContext } from '../shared/participan
 import { requestCommand } from './app-protocol'
 import { createSecureStore } from './electron-secure-store'
 import { requestDrains } from './drain-coordinator'
-import { googleCalendarSnapshot } from './google-calendar-service'
+import { googleCalendarSnapshot } from './google/calendar-service'
 
 const STORE_FILE = 'meeting-calendar.enc'
 const EVENT_MARGIN_MS = 15 * 60 * 1000

@@ -1,6 +1,6 @@
 import type { ManagedRuntimeCapability, ManagedRuntimeSnapshot } from '../shared/managed-runtime'
 import { requestCommand } from './app-protocol'
-import { managedRuntime } from './managed-runtime'
+import { managedRuntime } from './managed-runtime/runtime'
 import { recognizePendingSpeakers } from './speaker-recognition'
 import { usingSummaryRuntime } from './summary-runtime'
 

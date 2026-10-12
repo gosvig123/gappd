@@ -13,7 +13,7 @@ function drainFixture() {
       return command === 'processing.pending' ? { capabilities: ['summarization'] } : { completed: 0, failed: 0 }
     } },
     './speaker-recognition': { recognizePendingSpeakers: async () => { calls.push('recognize') } },
-    './managed-runtime': { managedRuntime: { observe: () => () => {}, status: () => ready, using: async (_: unknown, work: () => Promise<unknown>) => work() } },
+    './managed-runtime/runtime': { managedRuntime: { observe: () => () => {}, status: () => ready, using: async (_: unknown, work: () => Promise<unknown>) => work() } },
     './summary-runtime': { usingSummaryRuntime: async (work: (env: object) => Promise<unknown>) => work({}) },
   }, { AbortController, AbortSignal, setInterval: () => 1, clearInterval: () => {}, console })
   return { calls, module }
@@ -33,7 +33,7 @@ test('startup, retry, and restart recognize before summary claims', { timeout: 2
 })
 
 test('automatic UI label exposes its correction path without embedding data', () => {
-  const source = readFileSync(new URL('../renderer/routes/speaker-row.tsx', import.meta.url), 'utf8')
+  const source = readFileSync(new URL('../renderer/components/meeting/speaker-row.tsx', import.meta.url), 'utf8')
   assert.match(source, /identityOrigin === 'automatic'/)
   assert.match(source, /Auto-filled · check label/)
   assert.match(source, /Clear label/)
