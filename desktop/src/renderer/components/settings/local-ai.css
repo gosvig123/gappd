@@ -54,6 +54,7 @@
 
 .startup-setting-copy {
   display: grid;
+  flex: 1 1 20rem;
   gap: var(--space-1);
   min-inline-size: 0;
   color: var(--color-text-soft);
