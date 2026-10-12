@@ -67,7 +67,7 @@ test('ambiguous Calendar history gives manual linking guidance and exact Meeting
   const html = render({ draft })
   assert.match(html, /Multiple Calendar events overlap/)
   assert.match(html, /Automatic matching remains unconfirmed/)
-  assert.match(html, /People in this meeting/)
+  assert.match(html, /under the Meeting title/)
   assert.doesNotMatch(html, /No previous Meetings matched/)
   let opened
   const tree = elements(Component({ ...base, draft, onOpenMeeting: id => { opened = id } }))

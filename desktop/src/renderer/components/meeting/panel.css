@@ -37,6 +37,11 @@
   font-size: var(--font-size-small);
 }
 
+.app-panel-event { display: flex; align-items: center; gap: var(--space-2) var(--space-3); flex-wrap: wrap; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-panel-event > svg { inline-size: 1rem; flex: none; }
+.app-panel-event select { min-inline-size: 0; max-inline-size: 100%; }
+.app-panel-event [role='alert'] { color: var(--color-danger); }
+
 .app-panel-body { min-block-size: 0; min-inline-size: 0; overflow: auto; display: grid; grid-auto-rows: max-content; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
 
 .app-panel-foot {

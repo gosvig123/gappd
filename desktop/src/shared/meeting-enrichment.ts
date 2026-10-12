@@ -24,8 +24,8 @@ export function enrichmentEvent(context: ParticipantContext): CalendarEventSumma
   if (context.event) return context.event
   if (!context.inferenceDisabled && context.candidates.length === 1) return context.candidates[0]!
   throw new Error(context.candidates.length > 1
-    ? 'Add Gmail and Slack context: several Calendar events overlap this Meeting. Choose its Calendar event under “People in this meeting”, then try again.'
+    ? 'Add Gmail and Slack context: several Calendar events overlap this Meeting. Choose its Calendar event under the Meeting title, then try again.'
     : context.inferenceDisabled
-      ? 'Add Gmail and Slack context: automatic Calendar matching is off for this Meeting. Choose its Calendar event under “People in this meeting”, then try again.'
+      ? 'Add Gmail and Slack context: this Meeting is marked as not a Calendar event. Choose its Calendar event under the Meeting title, then try again.'
       : 'Add Gmail and Slack context: no Calendar event matches this Meeting, so Gappd cannot find its invitees. Refresh Calendar in Settings, then try again.')
 }

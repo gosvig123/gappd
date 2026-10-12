@@ -190,6 +190,6 @@ test('Meeting context uses a confirmed Calendar link, or one unambiguous overlap
   assert.equal(enrichmentEvent({ event: event('linked'), candidates: [event('a'), event('b')] }).sourceId, 'linked')
   assert.equal(enrichmentEvent({ candidates: [event('only')] }).sourceId, 'only')
   assert.throws(() => enrichmentEvent({ candidates: [event('a'), event('b')] }), /several Calendar events/)
-  assert.throws(() => enrichmentEvent({ inferenceDisabled: true, candidates: [event('only')] }), /matching is off/)
+  assert.throws(() => enrichmentEvent({ inferenceDisabled: true, candidates: [event('only')] }), /marked as not a Calendar event/)
   assert.throws(() => enrichmentEvent({ candidates: [] }), /no Calendar event matches/)
 })

@@ -5,7 +5,10 @@ speaker name in the transcript. Play a short clip, then choose a saved person,
 select a calendar invitee, or add a name. Use another clip if the first is unclear.
 
 Starting a recording from a calendar event saves that event with the meeting.
-For other recordings, choose a suggested event near the recording time. Calendar
+For other recordings, choose a suggested event near the recording time in the
+Calendar event menu under the meeting title. Choose **Not a Calendar event** to
+stop automatic Calendar matching for that meeting. Invitees of the chosen event
+are listed first in the speaker picker. Calendar
 names and email addresses help fill the picker; an invitation does not prove
 that someone attended. Calendar access is optional.
 

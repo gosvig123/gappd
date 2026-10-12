@@ -149,5 +149,5 @@ function AgendaTopic({ index, topic, quote, readOnly, onChange, sourceId, source
 }
 
 function AmbiguousCalendarMeetings({ meetings, onOpenMeeting }: { meetings: NonNullable<MeetingAgendaDraft['ambiguousMeetings']>; onOpenMeeting: (id: string) => void }) {
-  return <section aria-label="Unconfirmed Calendar matches"><p role="status">Multiple Calendar events overlap these Meetings. Automatic matching remains unconfirmed. Open each Meeting and choose its Calendar event under People in this meeting, then generate again.</p>{meetings.map((meeting) => <Button key={meeting.id} className="compact-action" onClick={() => onOpenMeeting(meeting.id)}>Choose Calendar event: {meeting.title}</Button>)}</section>
+  return <section aria-label="Unconfirmed Calendar matches"><p role="status">Multiple Calendar events overlap these Meetings. Automatic matching remains unconfirmed. Open each Meeting and choose its Calendar event under the Meeting title, then generate again.</p>{meetings.map((meeting) => <Button key={meeting.id} className="compact-action" onClick={() => onOpenMeeting(meeting.id)}>Choose Calendar event: {meeting.title}</Button>)}</section>
 }

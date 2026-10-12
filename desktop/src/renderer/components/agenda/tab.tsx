@@ -39,7 +39,7 @@ export function AgendaPane({ view, meetingId, onOpenSettings }: { view: AppView;
     return (
       <EmptyState>
         This Meeting is not linked to a Calendar event, so it has no Agenda.
-        Link one under “People in this meeting”, then the prepared topics appear here.
+        Choose its Calendar event under the Meeting title.
       </EmptyState>
     )
   }
