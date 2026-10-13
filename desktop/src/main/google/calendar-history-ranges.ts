@@ -18,7 +18,8 @@ function appendInterval(ranges: CalendarRange[], interval: CalendarRange): void 
   let start = interval.start
   while (start < interval.end) {
     const last = ranges.at(-1)
-    if (last && start <= last.end && interval.end - last.start <= MAX_RANGE_MS) {
+    // Join every Meeting in the same 30-day window, so each window costs one Calendar request.
+    if (last && interval.end - last.start <= MAX_RANGE_MS) {
       last.end = Math.max(last.end, interval.end)
       return
     }

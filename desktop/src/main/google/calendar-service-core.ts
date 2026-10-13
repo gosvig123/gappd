@@ -107,7 +107,7 @@ export class GoogleCalendarServiceCore {
 
   private async performConnect(includeGmail: boolean, version: number): Promise<CalendarSnapshot> {
     const authorized = await this.api.authorize(includeGmail)
-    const connectionId = await this.withStore(async () => {
+    const { document, connectionId } = await this.withStore(async () => {
       if (version !== this.authorizationVersion) throw new Error('The Google connection changed during authorization. Connect again.')
       const document = await this.readDocument()
       const existing = document.connections.find((item) => item.subject === authorized.subject)
@@ -115,9 +115,11 @@ export class GoogleCalendarServiceCore {
       Object.assign(connection, { email: authorized.email, tokens: authorized.tokens, error: undefined })
       if (!existing) document.connections.push(connection)
       await this.store.write(document)
-      return connection.id
+      return { document, connectionId: connection.id }
     })
-    return this.sync(connectionId)
+    // Return the account while its first sync runs; the sync stores its own result or error.
+    void this.sync(connectionId).catch(() => undefined)
+    return this.toSnapshot(document)
   }
 
   private async performSync(connectionId: string): Promise<void> {

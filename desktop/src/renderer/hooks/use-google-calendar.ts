@@ -27,11 +27,22 @@ export function useGoogleCalendar(): GoogleCalendarController {
   const run = useCallback(async (operation: string, action: () => Promise<CalendarSnapshot>) => {
     setBusy(operation); setError(null)
     try { setSnapshot(await action()) }
-    catch (cause) { setError(errorMessage(cause)) }
+    catch (cause) {
+      setError(errorMessage(cause))
+      // A failed connect or sync can still have saved an account or its error.
+      await window.gappd.googleCalendar.snapshot().then(setSnapshot, () => undefined)
+    }
     finally { setBusy(null) }
   }, [])
 
-  const connect = useCallback((includeGmail = false) => run(CONNECT_OPERATION, () => window.gappd.googleCalendar.connect(includeGmail)), [run])
+  const connect = useCallback((includeGmail = false) => run(CONNECT_OPERATION, async () => {
+    let latest = await window.gappd.googleCalendar.connect(includeGmail)
+    for (const connection of latest.connections.filter((item) => item.status === 'syncing')) {
+      setSnapshot(latest); setBusy(`sync:${connection.id}`)
+      latest = await window.gappd.googleCalendar.sync(connection.id)
+    }
+    return latest
+  }), [run])
   const sync = useCallback((id: string) => run(`sync:${id}`, () => window.gappd.googleCalendar.sync(id)), [run])
   const disconnect = useCallback((id: string) => run(`disconnect:${id}`, () => window.gappd.googleCalendar.disconnect(id)), [run])
   const syncAll = useCallback(() => run(SYNC_ALL_OPERATION, () => refreshAll(snapshot, setSnapshot)), [run, snapshot])

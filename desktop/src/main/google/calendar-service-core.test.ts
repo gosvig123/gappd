@@ -18,7 +18,9 @@ test('keeps multiple accounts independent and disconnects only one', async () =>
   await service.connect()
   const connected = await service.connect()
   assert.deepEqual(connected.connections.map((item) => item.email).sort(), ['home@example.com', 'work@example.com'])
-  assert.equal(connected.events.length, 2)
+  const home = connected.connections.find((item) => item.email === 'home@example.com')!
+  assert.equal(home.status, 'syncing')
+  assert.equal((await service.sync(home.id)).events.length, 2)
   const work = connected.connections.find((item) => item.email === 'work@example.com')!
   const disconnected = await service.disconnect(work.id)
   assert.deepEqual(disconnected.connections.map((item) => item.email), ['home@example.com'])
@@ -100,7 +102,8 @@ test('historical cache is replaced on success, retained on failure and removed o
   const service = new GoogleCalendarServiceCore(api, memoryStore(), () => NOW)
   const connected = await service.connect()
   const id = connected.connections[0].id
-  assert.equal(connected.events.length, 1)
+  assert.equal(connected.events.length, 0)
+  assert.equal((await service.sync(id)).events.length, 1)
   fail = true
   const partial = await service.sync(id)
   assert.equal(partial.events.length, 1)
@@ -134,7 +137,7 @@ test('connecting Calendar fetches and reconciles an existing local Meeting autom
   })
   const api: CalendarApi = { configured: () => true, authorize: async () => account('work', 'work@example.com'), sync: (...args) => google.sync(...args), revoke: async () => undefined }
   const service = new GoogleCalendarServiceCore(api, memoryStore(), () => NOW)
-  const connected = await service.connect()
+  const connected = await service.sync((await service.connect()).connections[0].id)
   assert.ok(reads.some(start => Date.parse(start) === Date.parse(meeting.startedAt)))
   const history = reconcileAgendaHistory([meeting], {}, connected)
   assert.deepEqual(history[0].emails, ['partner@example.com'])

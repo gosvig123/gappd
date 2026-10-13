@@ -91,7 +91,7 @@ export class GoogleCalendarApi {
   }
 
   private async fetchProfile(tokens: OAuthTokenSet): Promise<{ subject: string; email: string }> {
-    const response = await this.fetcher(GOOGLE_USERINFO_URL, { headers: bearerHeaders(tokens) })
+    const response = await this.fetcher(GOOGLE_USERINFO_URL, { headers: bearerHeaders(tokens), signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
     if (!response.ok) throw new Error(`Google profile request failed (${response.status}).`)
     const value = await response.json() as Record<string, unknown>
     return { subject: requiredString(value.sub, 'Google account ID'), email: requiredString(value.email, 'Google account email') }

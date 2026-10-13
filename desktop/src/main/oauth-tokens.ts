@@ -1,7 +1,9 @@
 import type { OAuthTokenSet } from './oauth'
 
+const TOKEN_REQUEST_TIMEOUT_MS = 15_000
+
 export async function requestTokens(url: string, body: URLSearchParams, fetcher: typeof fetch, now: () => number): Promise<OAuthTokenSet> {
-  const response = await fetcher(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+  const response = await fetcher(url, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(TOKEN_REQUEST_TIMEOUT_MS) })
   if (!response.ok) throw await tokenResponseError(response)
   const value = await response.json() as Record<string, unknown>
   return parseTokenResponse(value, now())
