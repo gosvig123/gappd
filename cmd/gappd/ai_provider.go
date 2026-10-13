@@ -14,6 +14,9 @@ var codexCatalog = func(executable string) ([]ai.CodexModel, error) {
 	return ai.ListCodexModels(context.Background(), executable)
 }
 
+// findCodex finds the installed Codex CLI. Tests replace it.
+var findCodex = ai.FindCodex
+
 // providerGeneration is the model and reasoning effort an operation snapshot used.
 type providerGeneration struct {
 	Model  string

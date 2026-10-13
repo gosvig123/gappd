@@ -65,6 +65,7 @@ export type AppActions = {
   setLanguage: (language: string) => void
   setupRuntime: () => void
   repairRuntime: () => void
+  prepareSpeech: () => void
   syncCalendar: (id: string) => Promise<void>
   syncAllCalendars: () => Promise<void>
   connectCalendar: () => Promise<void>

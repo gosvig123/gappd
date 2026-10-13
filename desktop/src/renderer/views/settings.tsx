@@ -14,6 +14,8 @@ import { SlackPanel } from '../components/slack/panel'
 import { CodexModelFields, CodexModelStatus } from '../components/settings/codex-model-fields'
 import { codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../shared/codex-models'
 import { useCodexCatalog } from '../hooks/use-codex-catalog'
+import { useCodexInstall } from '../hooks/use-codex-install'
+import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
 import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
 import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
@@ -33,13 +35,14 @@ type SettingsViewProps = {
 
 const LOCAL_PROVIDER = 'local'
 const CODEX_PROVIDER = 'codex_exec'
-const CODEX_UNAVAILABLE = 'Installed Codex is unavailable'
+const CODEX_UNAVAILABLE = 'Codex is unavailable'
+const LOCAL_MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
 export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, slack, developerDebugEnabled, initialCategory }: SettingsViewProps) {
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /></> },
-    { label: 'Meeting processing', content: <><AIProviderPanel /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
+    { label: 'Meeting processing', content: <><AIProviderPanel runtime={localAI.status} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
     { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /><MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
@@ -65,17 +68,18 @@ function AppearancePanel({ theme, onThemeChange }: { theme: ThemeName; onThemeCh
   )
 }
 
-function AIProviderPanel() {
+function AIProviderPanel({ runtime }: { runtime: ManagedRuntimeSnapshot | null }) {
   const [status, setStatus] = useState<AIProviderStatus | null>(null)
   const [provider, setProvider] = useState<SummaryProvider>(LOCAL_PROVIDER)
-  const [executable, setExecutable] = useState('')
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const found = useCodexInstall(provider === CODEX_PROVIDER)
+  const executable = found.install ? found.install.executable : ''
   const catalog = useCodexCatalog(provider === CODEX_PROVIDER, executable)
-  useEffect(() => { void loadProviderStatus(setStatus, setProvider, setExecutable, setModel, setEffort, setError).finally(() => setLoading(false)) }, [])
+  useEffect(() => { void loadProviderStatus(setStatus, setProvider, setModel, setEffort, setError).finally(() => setLoading(false)) }, [])
   useDefaultCodexSelection(catalog.catalog, model, setModel, setEffort)
   const selectionValid = codexSelectionIsValid(catalog.catalog, model, effort)
   const save = async () => {
@@ -89,10 +93,11 @@ function AIProviderPanel() {
   const changeProvider = (next: typeof provider) => { setProvider(next); setStatus(null); setError(null) }
   const healthError = status?.provider === provider && !status.available ? status.error || CODEX_UNAVAILABLE : null
   const shownError = error || healthError
-  const note = provider === LOCAL_PROVIDER ? 'Local AI keeps transcript text and audio on this Mac.' : 'Uses existing Codex login and current Codex CLI. Update Codex if check fails. Transcript text goes through Codex; recorded audio stays on this Mac.'
-  const disabled = loading || busy || catalog.loading
-  const canSave = !disabled && (provider === LOCAL_PROVIDER || Boolean(executable.trim()) && selectionValid)
-  return <Card className="settings-section"><SectionTitle title="Meeting summaries" note="Choose where transcript text is processed." action={<StatusPill tone={shownError ? 'danger' : 'success'}>{providerStatusLabel(status)}</StatusPill>} /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="ai-provider">Provider</label><select id="ai-provider" className="settings-select" value={provider} disabled={disabled} onChange={(event) => changeProvider(event.target.value as SummaryProvider)}><option value={LOCAL_PROVIDER}>Local AI</option><option value={CODEX_PROVIDER}>Installed Codex</option></select></div>{provider === CODEX_PROVIDER ? <><div className="metric-card"><label className="label" htmlFor="codex-executable">Codex executable</label><input id="codex-executable" className="settings-select" value={executable} disabled={disabled} placeholder="/absolute/path/to/codex" onChange={(event) => setExecutable(event.target.value)} /></div><CodexModelFields catalog={catalog} model={model} effort={effort} disabled={disabled} savedModel={status?.codexModel ?? ''} savedEffort={status?.codexReasoningEffort ?? ''} onModelChange={(value) => { setModel(value); setEffort(defaultEffortForModel(catalog.catalog, value)) }} onEffortChange={setEffort} /></> : null}</div>{provider === CODEX_PROVIDER ? <CodexModelStatus catalog={catalog} model={model} executable={executable} /> : null}<div className={cx('status-note', shownError ? 'danger' : undefined)}>{shownError || note}</div><div className="actions-row"><Button variant="primary" disabled={!canSave} onClick={() => void save()}>{loading || busy ? 'Checking…' : 'Save summary provider'}</Button></div></Card>
+  const notesOn = status?.provider === CODEX_PROVIDER || runtime?.operation === 'ready'
+  const note = provider === LOCAL_PROVIDER ? `Private. Transcripts and notes stay on this Mac. If the notes model is not on this Mac yet, Gappd downloads it once (${LOCAL_MODEL_SIZE}).` : 'Uses your ChatGPT account through Codex. Gappd sends transcript text to OpenAI. Recorded audio stays on this Mac.'
+  const disabled = loading || busy || catalog.loading || found.checking
+  const canSave = !disabled && (provider === LOCAL_PROVIDER || Boolean(executable && found.install?.signedIn) && selectionValid)
+  return <Card className="settings-section"><SectionTitle title="Meeting notes" note="Choose where Gappd turns transcripts into notes." action={<StatusPill tone={shownError ? 'danger' : notesOn ? 'success' : 'idle'}>{notesOn || !status ? providerStatusLabel(status) : 'Not set up'}</StatusPill>} /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="ai-provider">Notes are made</label><select id="ai-provider" className="settings-select" value={provider} disabled={disabled} onChange={(event) => changeProvider(event.target.value as SummaryProvider)}><option value={LOCAL_PROVIDER}>On this Mac</option><option value={CODEX_PROVIDER}>With Codex</option></select></div>{provider === CODEX_PROVIDER && executable ? <CodexModelFields catalog={catalog} model={model} effort={effort} disabled={disabled} savedModel={status?.codexModel ?? ''} savedEffort={status?.codexReasoningEffort ?? ''} onModelChange={(value) => { setModel(value); setEffort(defaultEffortForModel(catalog.catalog, value)) }} onEffortChange={setEffort} /> : null}</div>{provider === CODEX_PROVIDER ? <CodexModelStatus catalog={catalog} model={model} install={found.install} finding={found.checking} /> : null}<div className={cx('status-note', shownError ? 'danger' : undefined)}>{shownError || note}</div><div className="actions-row"><Button variant="primary" disabled={!canSave} onClick={() => void save()}>{loading || busy ? 'Checking…' : 'Save'}</Button></div></Card>
 }
 
 /** Unconfigured Installed Codex selects the validated app default once the catalog loads. */
@@ -105,17 +110,17 @@ function useDefaultCodexSelection(catalog: CodexModelCatalog | null, model: stri
   }, [catalog, model, setModel, setEffort])
 }
 
-async function loadProviderStatus(setStatus: (value: AIProviderStatus) => void, setProvider: (value: SummaryProvider) => void, setExecutable: (value: string) => void, setModel: (value: string) => void, setEffort: (value: string) => void, setError: (value: string) => void) {
+async function loadProviderStatus(setStatus: (value: AIProviderStatus) => void, setProvider: (value: SummaryProvider) => void, setModel: (value: string) => void, setEffort: (value: string) => void, setError: (value: string) => void) {
   try {
     const next = await window.gappd.aiProvider.status()
-    setStatus(next); setProvider(next.provider); setExecutable(next.codexExecutable); setModel(next.codexModel); setEffort(next.codexReasoningEffort)
+    setStatus(next); setProvider(next.provider); setModel(next.codexModel); setEffort(next.codexReasoningEffort)
   } catch (cause) { setError(errorMessage(cause)) }
 }
 
 function providerStatusLabel(status: AIProviderStatus | null): string {
   if (!status) return 'Checking'
   if (status.provider === CODEX_PROVIDER && !status.available) return 'Codex unavailable'
-  return status.provider === CODEX_PROVIDER ? 'Installed Codex' : 'Local AI'
+  return status.provider === CODEX_PROVIDER ? 'Codex' : 'On this Mac'
 }
 
 function StartupPanel() {

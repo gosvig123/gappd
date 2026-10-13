@@ -1,5 +1,5 @@
 import type { CodexStatusResponse } from '../../shared/generated/contracts'
-import type { ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimePullStage, ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
+import type { CapabilitySnapshot, ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimePullStage, ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import { MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../../shared/managed-local-ai'
 import { requestCommand } from '../app-protocol'
 import { ensureAppleSpeechAsset } from './apple-speech'
@@ -29,6 +29,7 @@ const state = createObservableState<ManagedRuntimeSnapshot>(initialRuntimeSnapsh
 const providerGate = createProviderChangeGate()
 let preparePromise: Promise<ManagedRuntimeSnapshot> | null = null
 let prepareModel: string | null = null
+let speechPromise: Promise<ManagedRuntimeSnapshot> | null = null
 let refreshGeneration = 0
 let activeUses = 0
 
@@ -48,6 +49,7 @@ export async function bootstrapManagedRuntime(): Promise<void> {
   const generation = ++refreshGeneration
   const probe = await loadProviderProbe()
   const snapshot = await publishProbe(probe, false, generation)
+  void prepareSpeech()
   if (probe.config && isManagedLocal(probe.config) && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
 }
 
@@ -61,11 +63,13 @@ async function refreshStatus(providerHealth?: CodexStatusResponse, providerGener
 async function publishProbe(probe: RuntimeProbe, force: boolean, generation: number): Promise<ManagedRuntimeSnapshot> {
   const next = await probeRuntime(probe)
   if (generation !== refreshGeneration || preparePromise && !force) return state.get()
-  state.set({ ...next, activity: activeUses ? 'in_use' : 'idle' })
+  const transcription = speechPromise && next.capabilities.transcription.readiness !== 'ready' ? state.get().capabilities.transcription : next.capabilities.transcription
+  state.set({ ...next, capabilities: { ...next.capabilities, transcription }, activity: activeUses ? 'in_use' : 'idle' })
   return state.get()
 }
 
 async function prepare(mode: ManagedRuntimePrepareMode, model?: string): Promise<ManagedRuntimeSnapshot> {
+  if (mode === 'speech') return prepareSpeech()
   if (providerGate.changing()) return state.get()
   const generation = providerGate.generation()
   if (!preparePromise) {
@@ -89,6 +93,7 @@ async function runPrepare(_mode: ManagedRuntimePrepareMode, model: string, gener
     if (!await prepareAssets(model, generation)) return state.get()
     if (!setPrepareOperation(generation, 'saving_config', 'Saving Managed Runtime configuration')) return state.get()
     if (!await saveManagedConfigFor(generation, MANAGED_LLAMACPP_ENDPOINT, model)) return state.get()
+    void prepareSpeech()
     return refreshPreparedConfig(generation)
   } catch (error) {
     if (providerGate.current(generation)) state.set(runtimeErrorSnapshot(error, state.get().operation, state.get()))
@@ -100,10 +105,34 @@ async function prepareAssets(model: string, generation: number): Promise<boolean
   const modelMessage = `Downloading meeting model ${model}`
   if (!setPrepareOperation(generation, 'pulling_model', modelMessage, { pullStage: 'preparing' })) return false
   await ensureManagedLanguageModel((progress) => publishProgress(model, generation, modelMessage, progress))
-  if (!providerGate.current(generation)) return false
-  if (!setPrepareOperation(generation, 'pulling_model', 'Preparing Apple speech model', { model, pullStage: 'preparing', progress: undefined })) return false
-  await ensureAppleSpeechAsset((progress) => publishProgress(model, generation, 'Downloading Apple speech model', progress))
   return providerGate.current(generation)
+}
+
+/**
+ * Transcripts need only the Apple speech model, so it downloads on its own,
+ * without waiting for a notes choice. It changes only the transcription
+ * capability, never the notes runtime operation.
+ */
+function prepareSpeech(): Promise<ManagedRuntimeSnapshot> {
+  if (!speechPromise) speechPromise = runSpeechPrepare().finally(() => { speechPromise = null })
+  return speechPromise
+}
+
+async function runSpeechPrepare(): Promise<ManagedRuntimeSnapshot> {
+  const current = state.get()
+  if (!current.supported || current.capabilities.transcription.readiness === 'ready') return current
+  setTranscription({ readiness: 'preparing', message: 'Downloading the Apple speech model' })
+  try {
+    await ensureAppleSpeechAsset()
+    setTranscription({ readiness: 'ready' })
+  } catch (error) {
+    setTranscription({ readiness: 'missing', message: error instanceof Error ? error.message : String(error) })
+  }
+  return state.get()
+}
+
+function setTranscription(transcription: CapabilitySnapshot): void {
+  state.set({ ...state.get(), capabilities: { ...state.get().capabilities, transcription } })
 }
 
 function publishProgress(model: string, generation: number, fallback: string, progress: PrepareProgress): void {

@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
+import type { CodexInstall } from '../../shared/ipc-contract'
+import { useCodexInstall } from '../hooks/use-codex-install'
 import type { AppView } from '../lib/app-view'
 import { setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
 import { runtimeErrorView } from './settings/managed-runtime-contract'
@@ -8,6 +10,7 @@ import { Button, ProgressBar, cx } from './ui'
 import './setup-checklist.css'
 
 const CALENDAR_SKIPPED_KEY = 'gappd.setup.calendarSkipped'
+const NOTES_SKIPPED_KEY = 'gappd.setup.notesSkipped'
 const MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 
 type ButtonVariant = 'primary' | 'secondary'
@@ -18,14 +21,16 @@ type Step = { key: string; title: string; optional?: boolean; state: SetupStepSt
  * macOS asks, and it leaves once every step that applies is done or skipped.
  */
 export function SetupChecklist({ view }: { view: AppView }) {
-  const [calendarSkipped, skipCalendar] = useCalendarSkip()
-  const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, calendarSkipped)
+  const [calendarSkipped, skipCalendar] = useSkip(CALENDAR_SKIPPED_KEY)
+  const [notesSkipped, skipNotes] = useSkip(NOTES_SKIPPED_KEY)
+  const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped })
+  const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
   if (!setupVisible(steps)) return null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
   if (steps.recording) rows.push(recordingRow(steps.recording, view, primary('recording')))
-  if (steps.localAi) rows.push(localAiRow(steps.localAi, view, primary('localAi')))
+  if (steps.notes) rows.push(notesRow(steps.notes, view, notes, skipNotes))
   if (steps.calendar) rows.push(calendarRow(steps.calendar, view, skipCalendar))
   const finished = rows.filter((row) => isFinished(row.state)).length
   return (
@@ -55,7 +60,8 @@ function StepRow({ step, number, current }: { step: Step; number: number; curren
 
 function recordingRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
   const base = { key: 'recording', title: 'Allow recording', state }
-  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed.</p> }
+  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed. Transcripts are made on this Mac.</p> }
+  if (view.permissionStatus === 'granted') return speechRow(base, state, view, variant)
   const privacy = <>
     <p>Gappd records your microphone and meeting audio. By default, audio, transcripts, and notes stay on this Mac. No account needed.</p>
     <p className="setup-step-note">macOS lists meeting audio under Screen &amp; System Audio Recording. Gappd captures your screen only when you turn on Screen video.</p>
@@ -65,16 +71,73 @@ function recordingRow(state: SetupStepState, view: AppView, variant: ButtonVaria
   return { ...base, detail: privacy, actions: <Button variant={variant} disabled={state === 'working'} onClick={view.actions.requestPermissions}>{state === 'working' ? 'Waiting for macOS…' : 'Allow recording access'}</Button> }
 }
 
-function localAiRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
-  const base = { key: 'localAi', title: 'Prepare Local AI', state }
+function speechRow(base: Pick<Step, 'key' | 'title' | 'state'>, state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
+  const allowed = <p>Microphone and meeting audio are allowed.</p>
+  if (state === 'error') return { ...base, detail: <>{allowed}<p className="setup-step-warning">The Apple speech model did not download, so Gappd cannot make transcripts yet. {view.runtime?.capabilities.transcription.message}</p></>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.prepareSpeech}>Try again</Button> }
+  return { ...base, detail: <>{allowed}<p className="setup-step-note">Getting transcripts ready: a one-time download of Apple's speech model.</p></> }
+}
+
+type NotesChoice = { codex: CodexInstall | null; finding: boolean; busy: boolean; error: string | null; useCodex(): void; recheck(): void }
+
+function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, skip: () => void): Step {
+  const base = { key: 'notes', title: 'Meeting notes with AI', optional: true, state }
   const runtime = view.runtime
-  if (state === 'done') return { ...base, detail: <p>Ready. Gappd writes your notes on this Mac.</p> }
+  if (state === 'done') return { ...base, detail: <p>On. Gappd writes notes after each meeting. Change this in Settings.</p> }
+  if (state === 'skipped') return { ...base, detail: <p>Skipped. Gappd makes transcripts only. Turn on notes in Settings.</p> }
   if (state === 'working') return { ...base, detail: <LocalAiProgress message={runtime?.message} progress={runtime?.progress} /> }
-  if (state === 'error') {
-    const error = runtimeErrorView(runtime)
-    return { ...base, detail: <p className="setup-step-warning">{error?.title ?? 'Local AI setup stopped.'} {error?.detail ?? runtime?.message}</p>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.repairRuntime}>{view.runtimeBusy ? 'Repairing…' : 'Repair local AI'}</Button> }
+  const failure = state === 'error' ? runtimeErrorView(runtime) : null
+  const busy = view.runtimeBusy || choice.busy
+  return {
+    ...base,
+    detail: <>
+      <p>Gappd can turn each transcript into notes: a summary, decisions, and action items. Choose where this happens, or skip it. You can change it later in Settings.</p>
+      {failure ? <p className="setup-step-warning">{failure.title} {failure.detail}</p> : null}
+      {choice.error ? <p className="setup-step-warning">{choice.error}</p> : null}
+      <div className="setup-choices">
+        <NotesOption title="On this Mac" points={['Private. Transcripts and notes stay on this Mac.', `One-time ${MODEL_SIZE} download. Works offline.`]}>
+          <Button disabled={busy} onClick={state === 'error' ? view.actions.repairRuntime : view.actions.setupRuntime}>{state === 'error' ? 'Try again' : `Download ${MODEL_SIZE}`}</Button>
+        </NotesOption>
+        {choice.codex?.executable ? <NotesOption title="Codex" points={choice.codex.signedIn ? ['Uses your ChatGPT account. No download.', 'Sends transcript text to OpenAI. Audio stays on this Mac.', 'Agenda drafts still need notes on this Mac.'] : ['Found Codex, but it is not signed in.', 'Open the ChatGPT app or Codex and sign in, then come back.']}>
+          {choice.codex.signedIn
+            ? <Button disabled={busy} onClick={choice.useCodex}>{choice.busy ? 'Checking Codex…' : 'Use Codex'}</Button>
+            : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
+        </NotesOption> : null}
+        <NotesOption title="Not now" points={['Record and get transcripts only.', 'No notes until you choose in Settings.']}>
+          <Button disabled={busy} onClick={skip}>Not now</Button>
+        </NotesOption>
+      </div>
+      {choice.codex && !choice.codex.executable ? <p className="setup-step-note">Have the ChatGPT app or Codex? Install it and Gappd finds it here.</p> : null}
+    </>,
   }
-  return { ...base, detail: <p>Gappd downloads a {MODEL_SIZE} notes model and the Apple speech model once. After that, transcripts and notes are made on this Mac.</p>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.setupRuntime}>{view.runtimeBusy ? 'Preparing…' : 'Set up local AI'}</Button> }
+}
+
+function NotesOption({ title, points, children }: { title: string; points: string[]; children: ReactNode }) {
+  return <div className="setup-choice">
+    <strong>{title}</strong>
+    <ul>{points.map((point) => <li key={point}>{point}</li>)}</ul>
+    {children}
+  </div>
+}
+
+/** Finds Codex while the choice is open and saves it with one click. */
+function useNotesChoice(open: boolean): NotesChoice {
+  const found = useCodexInstall(open)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const useCodex = () => {
+    const executable = found.install?.executable
+    if (!executable) return
+    setBusy(true); setError(null)
+    window.gappd.aiProvider.configureCodex({ executable, model: '', reasoningEffort: '' })
+      .catch((cause) => setError(`Gappd could not use Codex. ${ipcErrorMessage(cause)}`))
+      .finally(() => setBusy(false))
+  }
+  return { codex: found.install, finding: found.checking, busy, error, useCodex, recheck: found.recheck }
+}
+
+function ipcErrorMessage(cause: unknown): string {
+  const raw = cause instanceof Error ? cause.message : String(cause)
+  return raw.replace(/^Error invoking remote method '[^']+':\s*/, '').replace(/^(?:Error:\s*)+/, '').trim()
 }
 
 function LocalAiProgress({ message, progress }: { message?: string; progress?: number }) {
@@ -105,7 +168,7 @@ function isFinished(state: SetupStepState | null): boolean {
   return state === 'done' || state === 'skipped'
 }
 
-function useCalendarSkip(): [boolean, () => void] {
-  const [skipped, setSkipped] = useState(() => window.localStorage.getItem(CALENDAR_SKIPPED_KEY) === 'true')
-  return [skipped, () => { window.localStorage.setItem(CALENDAR_SKIPPED_KEY, 'true'); setSkipped(true) }]
+function useSkip(key: string): [boolean, () => void] {
+  const [skipped, setSkipped] = useState(() => window.localStorage.getItem(key) === 'true')
+  return [skipped, () => { window.localStorage.setItem(key, 'true'); setSkipped(true) }]
 }

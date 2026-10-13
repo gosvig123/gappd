@@ -9,7 +9,7 @@ import { checkCapturePermissions, requestCapturePermissions } from './capture-pe
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
-import { configureCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
+import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda/drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
 import { connectSlack, disconnectSlack, reviewSlackMessage, sendSlackMessage, slackConnectionStatus, slackDestinations } from './slack/service'
@@ -60,6 +60,7 @@ const IPC_HANDLERS: MainHandlers = {
   },
   aiProvider: {
     status: () => refreshedProviderStatus(),
+    find: () => findCodex(),
     models: (_event, executable?: string) => providerModels(executable),
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),

@@ -14,6 +14,8 @@ export type CapturePermissions = { microphone: string; screen: string; details?:
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean }
+/** The newest Codex CLI found on this Mac. executable is empty when Codex is not installed. */
+export type CodexInstall = { executable: string; version: string; signedIn: boolean }
 export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; codexReasoningEffort: string; available: boolean; error?: string }
 export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
 export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
@@ -56,6 +58,7 @@ export type IpcInvokeContract = {
   }
   aiProvider: {
     status: OperationSpec<[], AIProviderStatus>
+    find: OperationSpec<[], CodexInstall>
     models: OperationSpec<[executable?: string], CodexModelCatalog>
     configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
     useLocal: OperationSpec<[], AIProviderStatus>
@@ -122,7 +125,7 @@ export const IPC_OPERATIONS = {
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
-  aiProvider: { status: 'aiProvider:status', models: 'aiProvider:models', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
   agenda: { load: 'agenda:load', list: 'agenda:list', save: 'agenda:save', remove: 'agenda:remove' },
   googleCalendar: {
     generateAgenda: 'googleCalendar:generateAgenda',

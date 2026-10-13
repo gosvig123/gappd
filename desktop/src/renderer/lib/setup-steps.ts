@@ -6,17 +6,21 @@ export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done' |
 
 export type SetupSteps = {
   recording: SetupStepState | null
-  localAi: SetupStepState | null
+  notes: SetupStepState | null
   calendar: SetupStepState | null
 }
+
+export type SetupSkips = { notes: boolean; calendar: boolean }
+
+const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_runtime', 'pulling_model', 'saving_config'])
 
 /**
  * The state of each first-run step, or null while it is still unknown or does
  * not apply. Unknown steps never show the checklist, so returning users do not
  * see it flash while status loads.
  */
-export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, calendarSkipped: boolean): SetupSteps {
-  return { recording: recordingStep(permission), localAi: localAiStep(runtime), calendar: calendarStep(calendar, calendarSkipped) }
+export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips): SetupSteps {
+  return { recording: recordingStep(permission, runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar) }
 }
 
 /** The checklist stays while any step that applies is not done or skipped. */
@@ -25,7 +29,7 @@ export function setupVisible(steps: SetupSteps): boolean {
 }
 
 /**
- * First-time Local AI setup belongs to the checklist. A runtime that was set up
+ * First-time notes setup belongs to the checklist. A runtime that was set up
  * before and later needs repair stays with the notifications.
  */
 export function localAiNeedsFirstSetup(runtime: ManagedRuntimeSnapshot | null): boolean {
@@ -33,23 +37,34 @@ export function localAiNeedsFirstSetup(runtime: ManagedRuntimeSnapshot | null): 
   return runtime.operation === 'needs_setup' || !runtime.configured
 }
 
-function recordingStep(permission: SetupPermissionStatus): SetupStepState | null {
+/**
+ * Recording is done when macOS allows it and the Apple speech model is ready,
+ * because transcripts need both. The speech model downloads by itself.
+ */
+function recordingStep(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null): SetupStepState | null {
   switch (permission) {
     case 'waiting': return null
     case 'checking': return 'working'
-    case 'granted': return 'done'
+    case 'granted': return speechStep(runtime)
     case 'blocked': return 'blocked'
     case 'error': return 'error'
     case 'unknown': return 'todo'
   }
 }
 
-function localAiStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState | null {
+function speechStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState {
+  const readiness = runtime?.capabilities.transcription.readiness
+  if (readiness === 'preparing' || readiness === 'missing' && runtime?.operation === 'checking') return 'working'
+  return readiness === 'missing' ? 'error' : 'done'
+}
+
+/** Notes are optional: "Not now" finishes the step until the user chooses in Settings. */
+function notesStep(runtime: ManagedRuntimeSnapshot | null, skipped: boolean): SetupStepState | null {
   if (runtime?.operation === 'ready') return 'done'
   if (!localAiNeedsFirstSetup(runtime)) return null
-  if (runtime!.operation === 'needs_setup') return 'todo'
-  if (runtime!.operation === 'error') return 'error'
-  return 'working'
+  if (NOTES_PREPARING.has(runtime!.operation)) return 'working'
+  if (skipped) return 'skipped'
+  return runtime!.operation === 'error' ? 'error' : 'todo'
 }
 
 function calendarStep(calendar: CalendarSnapshot | null, skipped: boolean): SetupStepState | null {

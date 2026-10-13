@@ -15,7 +15,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigCodexModelsCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigFindCodexCmd(), appConfigCodexModelsCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
 	return cmd
 }
 
@@ -80,6 +80,22 @@ func unavailableCodexStatus(status appprotocol.CodexStatusResponse, err error) a
 	message := err.Error()
 	status.Available, status.Error = false, &message
 	return status
+}
+
+func appConfigFindCodexCmd() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use: "find-codex", Short: "Find the newest installed Codex CLI",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if !asJSON {
+				return fmt.Errorf("app config find-codex requires --json")
+			}
+			found := findCodex()
+			return writeJSON(appprotocol.CodexFindResponse{Executable: found.Executable, Version: found.Version, SignedIn: found.SignedIn})
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
+	return cmd
 }
 
 func appConfigCodexModelsCmd() *cobra.Command {

@@ -47,9 +47,9 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const summarizationReady = usesCodex ? !input.providerError : modelReady
   const runtimeReady = usesCodex ? summarizationReady : runtime.bundled
   const configured = usesCodex || isManagedConfig(input.config)
-  const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, speechReady, configured)
+  const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, configured)
   return {
-    ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, speechReady, input.providerError)),
+    ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, input.providerError)),
     supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {
@@ -78,9 +78,10 @@ function isManagedConfig(config: AIConfig | null): boolean {
   return Boolean(config?.managed && config.provider === LOCAL_AI_PROVIDER_LLAMACPP && config.model === MANAGED_LLAMACPP_MODEL)
 }
 
-function probeOperation(supported: boolean, bundled: boolean, model: boolean, speech: boolean, configured: boolean): ManagedRuntimeOperation {
+/** The operation describes notes only. Transcription readiness is its own capability. */
+function probeOperation(supported: boolean, bundled: boolean, model: boolean, configured: boolean): ManagedRuntimeOperation {
   if (!supported || !bundled) return 'error'
-  return model && speech && configured ? 'ready' : 'needs_setup'
+  return model && configured ? 'ready' : 'needs_setup'
 }
 
 function summarizationStatus(usesCodex: boolean, ready: boolean, bundled: boolean, providerError?: string) {
@@ -91,10 +92,9 @@ function summarizationStatus(usesCodex: boolean, ready: boolean, bundled: boolea
     : { readiness: 'unavailable' as const, message: missingBundledLlamaCppMessage() }
 }
 
-function probeMessage(operation: ManagedRuntimeOperation, runtime: boolean, summary: boolean, speech: boolean, providerError?: string): string {
+function probeMessage(operation: ManagedRuntimeOperation, runtime: boolean, summary: boolean, providerError?: string): string {
   if (providerError) return providerError
   if (!runtime) return missingBundledLlamaCppMessage()
   if (!summary) return missingManagedLanguageModelMessage()
-  if (!speech) return missingAppleSpeechAssetMessage()
   return operation === 'ready' ? 'Managed Runtime is ready and starts when needed' : 'Managed Runtime setup is required'
 }

@@ -95,6 +95,7 @@ function useAppActions(input: ActionInputs): AppActions {
     setLanguage: dashboard.actions.setLanguage,
     setupRuntime: () => void runtime.prepare('setup'),
     repairRuntime: () => void runtime.prepare('repair'),
+    prepareSpeech: () => void runtime.prepare('speech'),
     syncCalendar: (id) => calendar.sync(id),
     syncAllCalendars: calendar.syncAll,
     connectCalendar: calendar.connect,

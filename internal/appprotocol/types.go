@@ -21,6 +21,14 @@ type CodexStatusResponse struct {
 	Error     *string  `json:"error,omitempty"`
 }
 
+// CodexFindResponse is the newest Codex CLI found on this Mac. Executable is
+// empty when Codex is not installed.
+type CodexFindResponse struct {
+	Executable string `json:"executable"`
+	Version    string `json:"version"`
+	SignedIn   bool   `json:"signedIn"`
+}
+
 type AIConfig struct {
 	Provider             string  `json:"provider"`
 	Model                string  `json:"model"`

@@ -23,7 +23,7 @@ export async function ensureAppleSpeechAsset(onProgress?: (update: AppleSpeechPr
 }
 
 export function missingAppleSpeechAssetMessage(): string {
-  return `Apple speech model ${speechLocale()} is not installed. Run Local AI setup to download it.`
+  return `Apple speech model ${speechLocale()} is not installed yet. Gappd downloads it when this Mac is online.`
 }
 
 function missingAppleSpeechHelperMessage(path = resolveSpeechTranscriberBinary()): string {

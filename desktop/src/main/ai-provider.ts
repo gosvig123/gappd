@@ -1,4 +1,4 @@
-import type { AIProviderStatus, CodexConfigurationInput, CodexModelCatalog } from '../shared/ipc-contract'
+import type { AIProviderStatus, CodexConfigurationInput, CodexInstall, CodexModelCatalog } from '../shared/ipc-contract'
 import type { AIConfig, CodexStatusResponse } from '../shared/generated/contracts'
 import { requestCommand } from './app-protocol'
 
@@ -10,6 +10,10 @@ type AIProviderResult = { status: AIProviderStatus; health: CodexStatusResponse 
 export async function providerStatus(): Promise<AIProviderResult> {
   const health = await requestCommand('config.codexStatus', {})
   return resultFor(health)
+}
+
+export async function findCodex(): Promise<CodexInstall> {
+  return requestCommand('config.findCodex', {})
 }
 
 export async function providerModels(executable?: string): Promise<CodexModelCatalog> {

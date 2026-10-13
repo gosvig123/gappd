@@ -67,3 +67,17 @@
   .setup-step { grid-template-columns: auto minmax(0, 1fr); }
   .setup-step-actions { grid-column: 2; justify-content: start; }
 }
+
+.setup-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--space-3); margin-block-start: var(--space-2); }
+.setup-choice {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.setup-choice strong { color: var(--color-text); font-size: var(--font-size-body); }
+.setup-choice ul { margin: 0; padding-inline-start: 1.1em; display: grid; gap: var(--space-1); }
+.setup-choice .ui-button { justify-self: start; }

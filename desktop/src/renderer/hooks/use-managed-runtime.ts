@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ManagedRuntimePrepareMode } from '../../shared/managed-runtime'
 import { MANAGED_LLAMACPP_MODEL, isManagedLlamaCppModel, type ManagedLlamaCppModelTag } from '../../shared/managed-local-ai'
 import { getManagedRuntimeContract, toStatusError, type ManagedRuntimeSnapshot } from '../components/settings/managed-runtime-contract'
 import { useGuardedEffect } from './use-guarded-effect'
@@ -12,7 +13,7 @@ export function useManagedRuntime() {
   useRuntimeSnapshot(runtime, setStatus, setLoading)
   useSelectedModel(status, busy, setSelectedModel)
 
-  async function prepare(mode: 'setup' | 'repair') {
+  async function prepare(mode: ManagedRuntimePrepareMode) {
     setBusy(true)
     try { setStatus(await runtime.prepare({ mode, model: selectedModel })) }
     catch (error) { setStatus(toStatusError(error)) }

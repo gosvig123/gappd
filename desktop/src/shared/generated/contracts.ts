@@ -228,6 +228,12 @@ export type CodexStatusResponse = {
   error?: string
 }
 
+export type CodexFindResponse = {
+  executable: string
+  version: string
+  signedIn: boolean
+}
+
 export type ConfigCodexModelsInput = {
   executable: string
 }
