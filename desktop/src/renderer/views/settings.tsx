@@ -11,6 +11,7 @@ import { SettingsLayout } from '../components/settings/layout'
 import { LocalAIErrorBanner } from '../components/settings/local-ai-error-banner'
 import { GoogleCalendarPanel } from '../components/settings/google-calendar-panel'
 import { SlackPanel } from '../components/slack/panel'
+import { COMMUNICATION_CONTEXT_ENABLED } from '../lib/features'
 import { CodexModelFields, CodexModelStatus } from '../components/settings/codex-model-fields'
 import { codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../shared/codex-models'
 import { useCodexCatalog } from '../hooks/use-codex-catalog'
@@ -43,7 +44,7 @@ export function SettingsView({ language, onLanguageChange, theme, onThemeChange,
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /></> },
     { label: 'Meeting processing', content: <><AIProviderPanel runtime={localAI.status} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
-    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><SlackPanel slack={slack} /><MeetingUploadPanel /></> },
+    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} />{COMMUNICATION_CONTEXT_ENABLED ? <SlackPanel slack={slack} /> : null}<MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
   return <SettingsLayout categories={categories} initialCategory={initialCategory} />

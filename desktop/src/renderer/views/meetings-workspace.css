@@ -5,8 +5,8 @@
 .workspace-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-6); }
 .workspace-heading h1 { margin: 0; }
 .workspace-calendar-actions { display: flex; gap: var(--space-7); flex-wrap: wrap; }
-.workspace-search { margin-block-start: var(--space-7); max-inline-size: 38rem; }
-.workspace-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: 24px; }
+.workspace-search { margin-block-start: var(--space-7); }
+.workspace-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
 .has-selection .workspace-columns { grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); }
 .workspace-list { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-4) var(--space-7) 2px; overscroll-behavior: contain; }
 .workspace-content { min-inline-size: 0; min-block-size: 0; }
@@ -36,7 +36,8 @@
 .has-selection .workspace-row-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .workspace-agenda { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; block-size: 100%; min-block-size: 0; min-inline-size: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface); }
 .workspace-agenda-body { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: clamp(16px, 3cqi, 36px); }
-.workspace-content .meeting-agenda-draft { max-inline-size: 60rem; margin-inline: auto; }
+/* The draft lines up with the text above it, not with the old Calendar settings card. */
+.workspace-content .meeting-agenda-draft { padding-inline: 0; }
 .workspace-content .meeting-agenda-draft textarea { inline-size: 100%; min-block-size: 6rem; resize: vertical; padding: var(--space-7); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-card); color: var(--color-text); font: inherit; line-height: 1.6; }
 .workspace-content .meeting-agenda-draft label { display: grid; gap: var(--space-4); }
 .workspace-content .meeting-agenda-draft :is(p, blockquote, label) { overflow-wrap: anywhere; }

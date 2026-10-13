@@ -1,6 +1,6 @@
 /* Section heads, the Today timeline, the history table, Calendar, and People. */
 
-.app-stack { display: grid; gap: var(--space-8); max-inline-size: 62rem; }
+.app-stack { display: grid; gap: var(--space-8); }
 
 .app-section-head { display: grid; gap: var(--space-1); }
 .app-section-head h1 { margin: 0; }

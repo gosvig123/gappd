@@ -94,8 +94,8 @@
 
 .app-panel-pane:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-/* One measure for the whole card, so text is not a narrow strip in a wide box. */
-.app-reading { max-inline-size: 68ch; margin-inline: auto; font-family: var(--font-reading); font-size: var(--font-size-lg); line-height: var(--line-height-reading); }
+/* One wide measure for the whole card: it fills the panel, and caps lines only on very wide windows. */
+.app-reading { max-inline-size: 110ch; margin-inline: auto; font-family: var(--font-reading); font-size: var(--font-size-lg); line-height: var(--line-height-reading); }
 .app-reading :is(h1, h2, h3) { font-family: var(--font-ui); letter-spacing: var(--tracking-tight); }
 
 @container meetings-workspace (max-width: 40rem) {

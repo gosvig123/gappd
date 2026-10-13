@@ -5,9 +5,12 @@ import { INFERRED_CALENDAR_PROVENANCE } from '../../../shared/meeting-agenda'
 import type { AgendaDraftController, AgendaSaveState } from '../../hooks/use-agenda-draft'
 import { useAgendaDraft } from '../../hooks/use-agenda-draft'
 import { Button } from '../ui'
+import { COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
 
 const HISTORY_INCOMPLETE_WARNING = 'Calendar overlap matching is incomplete. Check Calendar settings, then generate again.'
-const GENERATE_HINT = 'Checking and syncing Calendar history when needed, then reading Meeting history and connected communication, then preparing with Local AI on this Mac. Slack rate limits can add up to 10 minutes. Long histories can take a further 20 minutes…'
+const GENERATE_HINT = COMMUNICATION_CONTEXT_ENABLED
+  ? 'Checking and syncing Calendar history when needed, then reading Meeting history and connected communication, then preparing with Local AI on this Mac. Slack rate limits can add up to 10 minutes. Long histories can take a further 20 minutes…'
+  : 'Checking and syncing Calendar history when needed, then reading Meeting history, then preparing with Local AI on this Mac. Long histories can take a further 20 minutes…'
 const REGENERATE_CONFIRM = 'Replace this agenda draft?\n\nGenerating again replaces all local topic edits. Cancel to keep this draft.'
 const DELETE_CONFIRM = 'Delete this saved agenda draft?\n\nThis removes the saved topics for this event. It does not change Calendar.'
 
@@ -36,8 +39,10 @@ export function MeetingAgendaDraftPanel({ draftKey, sourceId, canGenerate, known
   useEffect(() => setChannels(''), [draftKey])
   return (
     <>
-    <p>Generation uses Local AI on this Mac with previous Meetings, Gmail when enabled, and existing Slack DMs with invitees when connected. Installed Codex cannot process Calendar-based Agenda drafts. No messages are sent.</p>
-    <label>Slack channel IDs (optional, up to three, comma-separated)<input value={channels} disabled={controller.generating} placeholder="C0123456789, C9876543210" onChange={event => setChannels(event.target.value)} /></label>
+    {COMMUNICATION_CONTEXT_ENABLED ? <>
+      <p>Generation uses Local AI on this Mac with previous Meetings, Gmail when enabled, and existing Slack DMs with invitees when connected. Installed Codex cannot process Calendar-based Agenda drafts. No messages are sent.</p>
+      <label>Slack channel IDs (optional, up to three, comma-separated)<input value={channels} disabled={controller.generating} placeholder="C0123456789, C9876543210" onChange={event => setChannels(event.target.value)} /></label>
+    </> : <p>Generation uses Local AI on this Mac with previous Meetings. Installed Codex cannot process Calendar-based Agenda drafts.</p>}
     <MeetingAgendaDraftView
       draft={controller.draft} busy={controller.generating} error={controller.error}
       canGenerate={canGenerate && controller.canGenerate} knownMeetingIds={knownMeetingIds}
