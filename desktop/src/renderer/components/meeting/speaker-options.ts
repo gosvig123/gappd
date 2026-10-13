@@ -1,6 +1,8 @@
 import type { CalendarEventSummary, CalendarParticipant } from '../../../shared/calendar-contract'
 
 import type { SavedPerson } from '../../../shared/participant-contract'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { nameFromEmail } from '../../lib/person-identity.ts'
 export type { SavedPerson, ParticipantContext } from '../../../shared/participant-contract'
 export type PersonOption = { value: string; name: string; email?: string; personId?: string; invited?: boolean; saved?: boolean }
 
@@ -21,5 +23,5 @@ function appendContact(options: PersonOption[], contact: CalendarParticipant, in
   const email = contact.email.toLowerCase()
   const saved = options.find(option => option.email?.toLowerCase() === email)
   if (saved) { if (invited) saved.invited = true; return }
-  options.push({ value: `attendee:${contact.email}`, name: contact.name || contact.email, email: contact.email, invited })
+  options.push({ value: `attendee:${contact.email}`, name: contact.name || nameFromEmail(contact.email), email: contact.email, invited })
 }

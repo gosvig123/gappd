@@ -55,6 +55,7 @@ export type AppActions = {
   closeMeeting: () => void
   retryDiarization: (id: string) => Promise<void>
   meetingUpdated: (meeting: MeetingDetail) => void
+  peopleChanged: (people: SavedPerson[]) => void
   linkMeetingCalendar: (input: LinkCalendarInput) => Promise<ParticipantContext>
   deleteMeeting: (id: string) => Promise<void>
   setDevice: (device: number) => void

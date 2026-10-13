@@ -20,6 +20,19 @@ type PeopleResponse struct {
 	People []Person `json:"people"`
 }
 
+type UpdatePersonInput struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
+}
+
+type MergePeopleInput struct {
+	KeepID  string `json:"keepId"`
+	MergeID string `json:"mergeId"`
+	Name    string `json:"name"`
+	Email   string `json:"email,omitempty"`
+}
+
 type AssignSpeakerInput struct {
 	ID         string `json:"id"`
 	SpeakerKey string `json:"speakerKey"`

@@ -10,17 +10,51 @@ import (
 
 func appPeopleCmd() *cobra.Command {
 	return meetingJSONCommand("people", nil, func(_ []string) error {
-		_, store, err := loadStore()
-		if err != nil {
-			return err
-		}
-		defer store.Close()
-		people, err := store.ListPeople()
-		if err != nil {
-			return err
-		}
-		return writeJSON(appprotocol.PeopleResponse{People: appprotocol.BuildPeople(people)})
+		return changePeople(func(*db.DB) error { return nil })
 	})
+}
+
+func appUpdatePersonCmd() *cobra.Command {
+	var person db.Person
+	cmd := meetingJSONCommand("update-person [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		person.ID = args[0]
+		return changePeople(func(store *db.DB) error { return store.UpdatePerson(person) })
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().StringVar(&person.Name, "name", "", "Person name")
+	cmd.Flags().StringVar(&person.Email, "email", "", "Person email; empty removes it")
+	return cmd
+}
+
+func appMergePeopleCmd() *cobra.Command {
+	var kept db.Person
+	var mergeID string
+	cmd := meetingJSONCommand("merge-people [keep-person-id]", cobra.ExactArgs(1), func(args []string) error {
+		kept.ID = args[0]
+		return changePeople(func(store *db.DB) error { return store.MergePeople(kept, mergeID) })
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().StringVar(&mergeID, "merge-id", "", "Person ID to merge into the kept Person")
+	cmd.Flags().StringVar(&kept.Name, "name", "", "Name of the merged Person")
+	cmd.Flags().StringVar(&kept.Email, "email", "", "Email of the merged Person; empty removes it")
+	return cmd
+}
+
+// changePeople applies one change and returns the updated People list.
+func changePeople(change func(*db.DB) error) error {
+	_, store, err := loadStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := change(store); err != nil {
+		return err
+	}
+	people, err := store.ListPeople()
+	if err != nil {
+		return err
+	}
+	return writeJSON(appprotocol.PeopleResponse{People: appprotocol.BuildPeople(people)})
 }
 
 func appAssignSpeakerCmd() *cobra.Command {

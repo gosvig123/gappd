@@ -4,7 +4,7 @@ import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, 
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
-import type { AssignSpeakerInput, LinkCalendarInput, ParticipantContext, SavedPerson, SpeakerClip, SpeakerClipInput } from './participant-contract'
+import type { AssignSpeakerInput, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 import type { SlackConnectionStatus, SlackDestinationPage, SlackSendResult, SlackSendReview, SlackSendReviewInput } from './slack-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
@@ -39,6 +39,8 @@ export type IpcInvokeContract = {
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
     people: OperationSpec<[], SavedPerson[]>
+    updatePerson: OperationSpec<[input: UpdatePersonInput], SavedPerson[]>
+    mergePeople: OperationSpec<[input: MergePeopleInput], SavedPerson[]>
     assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
@@ -119,7 +121,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
-    people: 'meetings:people', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
+    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
     enrichment: 'meetings:enrichment', enrich: 'meetings:enrich', exportRecording: 'meetings:exportRecording',
   },

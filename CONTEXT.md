@@ -45,6 +45,7 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
 - Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
+- Renaming a **Person** or merging two People refreshes the transcript and summary of each **Meeting** whose shown name changes. A merge moves speaker labels and voice evidence to the kept **Person**, which keeps one email; two People with different emails are never suggested as duplicates.
 - Explicitly labeling clean remote speech can supply local voice evidence for future **Meeting speaker** auto-fill; automatic labels never supply training evidence, and correction or removal retracts the affected evidence.
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.

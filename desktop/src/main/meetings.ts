@@ -1,5 +1,5 @@
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
-import type { AssignSpeakerInput, SpeakerClipInput } from '../shared/participant-contract'
+import type { AssignSpeakerInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
 import { requestDrains } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
@@ -42,6 +42,19 @@ export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> 
 
 export async function listPeople() {
   return (await requestCommand('meetings.people', {})).people
+}
+
+// Renaming or merging People can rewrite transcripts, so their summaries need a processing pass.
+export async function updatePerson(input: UpdatePersonInput) {
+  const { people } = await requestCommand('meetings.updatePerson', input)
+  requestDrains()
+  return people
+}
+
+export async function mergePeople(input: MergePeopleInput) {
+  const { people } = await requestCommand('meetings.mergePeople', input)
+  requestDrains()
+  return people
 }
 
 export async function assignSpeaker(input: AssignSpeakerInput): Promise<MeetingDetail> {

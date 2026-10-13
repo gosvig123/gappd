@@ -68,6 +68,19 @@ export type Person = {
   email?: string
 }
 
+export type UpdatePersonInput = {
+  id: string
+  name: string
+  email?: string
+}
+
+export type MergePeopleInput = {
+  keepId: string
+  mergeId: string
+  name: string
+  email?: string
+}
+
 export type AssignSpeakerInput = {
   id: string
   speakerKey: string

@@ -14,7 +14,7 @@ import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics 
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
 import { connectSlack, disconnectSlack, reviewSlackMessage, sendSlackMessage, slackConnectionStatus, slackDestinations } from './slack/service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
-import { assignSpeaker, getDevices, listMeetings, listPeople, retryDiarization, showMeeting, speakerClip } from './meetings'
+import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -41,6 +41,8 @@ const IPC_HANDLERS: MainHandlers = {
     retryDiarization: (_event, id: string) => retryDiarization(id),
     delete: (_event, id: string) => deleteMeetingAndCloudCopy(id),
     people: () => listPeople(),
+    updatePerson: (_event, input) => updatePerson(input),
+    mergePeople: (_event, input) => mergePeople(input),
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),

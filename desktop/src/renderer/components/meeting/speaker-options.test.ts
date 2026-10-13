@@ -36,8 +36,8 @@ test('carries the invitee email so labelling can reuse the person later', () => 
   ])
 })
 
-test('falls back to the email as the display name', () => {
-  assert.equal(personOptions([], undefined, [{ email: 'unknown@example.com' }])[0].name, 'unknown@example.com')
+test('derives a readable name from the email when the invitee has none', () => {
+  assert.equal(personOptions([], undefined, [{ email: 'maria.lopez@example.com' }])[0].name, 'Maria Lopez')
 })
 
 test('keeps saved people selectable without a Calendar connection', () => {

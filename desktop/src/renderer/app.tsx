@@ -27,9 +27,9 @@ export function App() {
   const meetingDetails = useMeetingDetails(dashboard.meetings)
   const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [drafts, reloadDrafts] = useSavedDrafts()
-  const people = useSavedPeople()
+  const [people, setPeople] = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
-  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar })
+  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar, setPeople })
   const view = buildView({ dashboard, permissions, calendar, slack, update, runtime, meetingDetails, meetingEvents, people, drafts, theme, dismissals, actions })
   return <AppShell view={view} />
 }
@@ -77,10 +77,11 @@ type ActionInputs = Pick<Inputs, 'dashboard' | 'permissions' | 'calendar' | 'upd
   reloadDrafts: () => void
   setDismissals: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void
   setTheme: (theme: ThemeName) => void
+  setPeople: AppActions['peopleChanged']
 }
 
 function useAppActions(input: ActionInputs): AppActions {
-  const { dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar } = input
+  const { dashboard, permissions, calendar, update, runtime, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar, setPeople } = input
   return useMemo(() => ({
     openMeeting: (id) => void dashboard.actions.loadMeeting(id),
     closeMeeting: dashboard.actions.clearSelectedMeeting,
@@ -103,7 +104,9 @@ function useAppActions(input: ActionInputs): AppActions {
     ...updateActions(update),
     dismissAlert: (id) => setDismissals((current) => new Set([...current, id])),
     setTheme, linkMeetingCalendar,
-  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar])
+    // Renames and merges rewrite Meeting transcripts, so reload the Meetings with the People.
+    peopleChanged: (people) => { setPeople(people); void dashboard.actions.refreshMeetings().catch(console.error) },
+  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, reloadDrafts, setDismissals, setTheme, linkMeetingCalendar, setPeople])
 }
 
 function updateActions(update: Inputs['update']) {
