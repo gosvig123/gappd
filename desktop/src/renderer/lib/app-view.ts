@@ -4,6 +4,7 @@ import type { Device, MeetingDetail, MeetingListItem, RecordingState, UpdateStat
 import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
 import { meetingProgressLabel } from '../components/meeting/progress'
+import { contactName } from './person-identity'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
 import type { SlackConnectionController } from '../hooks/use-slack-connection'
@@ -122,10 +123,12 @@ export function artifactNote(meeting: MeetingListItem): string | null {
   return line === COMPLETE_ARTIFACTS ? null : line
 }
 
-/** Who else is invited, by name: "Jordan Patel, Sam Rivera +2". */
-export function eventPeople(event: CalendarEventSummary): string {
-  const names = (event.attendees ?? []).filter((person) => !person.self).map((person) => person.name || person.email.split('@')[0])
-  return names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')
+/** Who else is invited, by People name first: "Jordan Patel, Sam Rivera +2", and every invitee with their email. */
+export function eventPeople(event: CalendarEventSummary, people: SavedPerson[]): { label: string; detail: string } {
+  const invitees = (event.attendees ?? []).filter((person) => !person.self).map((person) => ({ name: contactName(person, people), email: person.email }))
+  const names = invitees.map((person) => person.name)
+  const label = names.length > 2 ? `${names.slice(0, 2).join(', ')} +${names.length - 2}` : names.join(', ')
+  return { label, detail: invitees.map((person) => `${person.name} · ${person.email}`).join('\n') }
 }
 
 const CALL_SERVICES: Array<[RegExp, string]> = [[/meet\.google\.com|^google meet/i, 'Google Meet'], [/zoom\.us|^zoom/i, 'Zoom'], [/teams\.microsoft\.com|^microsoft teams/i, 'Microsoft Teams']]

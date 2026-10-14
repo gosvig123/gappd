@@ -50,7 +50,7 @@ function Timeline({ events, view }: { events: CalendarEventSummary[]; view: AppV
 function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next: boolean; view: AppView }) {
   const now = eventIsNow(event)
   const past = !now && new Date(event.end).getTime() < Date.now()
-  const people = eventPeople(event)
+  const people = eventPeople(event, view.people)
   const place = eventPlace(event)
   const Place = place?.call ? Video : MapPin
   return (
@@ -62,7 +62,7 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
       <div className="app-timeline-copy">
         <strong>{event.title}</strong>
         <div className="app-timeline-sub">
-          {people ? <span>{people}</span> : null}
+          {people.label ? <span title={people.detail}>{people.label}</span> : null}
           {place ? <span className="app-timeline-place"><Place aria-hidden="true" />{place.label}</span> : null}
           <EventAgendaChip view={view} event={event} />
         </div>

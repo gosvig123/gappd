@@ -17,6 +17,13 @@ export function readableName(person: SavedPerson): string {
   return isEmailName(person.name) ? nameFromEmail(person.name) : person.name
 }
 
+/** The name to show for a Calendar invitee: their People name when it is a real name, then the Calendar name, then a name from the email. */
+export function contactName(contact: { email: string; name?: string }, people: SavedPerson[]): string {
+  const email = contact.email.toLowerCase()
+  const saved = people.find((person) => person.email?.toLowerCase() === email && !isEmailName(person.name))
+  return saved?.name || contact.name || nameFromEmail(contact.email)
+}
+
 export type DuplicatePair = { id: string; first: SavedPerson; second: SavedPerson }
 
 /**

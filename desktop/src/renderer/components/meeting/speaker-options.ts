@@ -2,7 +2,7 @@ import type { CalendarEventSummary, CalendarParticipant } from '../../../shared/
 
 import type { SavedPerson } from '../../../shared/participant-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { nameFromEmail } from '../../lib/person-identity.ts'
+import { isEmailName, nameFromEmail } from '../../lib/person-identity.ts'
 export type { SavedPerson, ParticipantContext } from '../../../shared/participant-contract'
 export type PersonOption = { value: string; name: string; email?: string; personId?: string; invited?: boolean; saved?: boolean }
 
@@ -22,6 +22,7 @@ function rank(option: PersonOption): number {
 function appendContact(options: PersonOption[], contact: CalendarParticipant, invited: boolean): void {
   const email = contact.email.toLowerCase()
   const saved = options.find(option => option.email?.toLowerCase() === email)
-  if (saved) { if (invited) saved.invited = true; return }
+  // A saved Person's real name wins; a Person saved under only an email shows the Calendar name. The Person ID, not this name, is sent on assignment.
+  if (saved) { if (invited) saved.invited = true; if (isEmailName(saved.name) && contact.name) saved.name = contact.name; return }
   options.push({ value: `attendee:${contact.email}`, name: contact.name || nameFromEmail(contact.email), email: contact.email, invited })
 }
