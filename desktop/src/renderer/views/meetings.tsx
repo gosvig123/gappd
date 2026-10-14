@@ -9,7 +9,10 @@ import { WorkspaceAgenda } from '../components/agenda/workspace-agenda'
 import { searchMeetings } from '../lib/meeting-grouping'
 import { filterWorkspaceRows, workspaceRows, type AgendaTarget, type WorkspaceRow } from '../lib/meetings-workspace'
 import { WorkspaceList } from './workspace-list'
+import { AGENDA_DRAFTS_ENABLED } from '../lib/features'
 import './meetings-workspace.css'
+
+const SEARCH_LABEL = AGENDA_DRAFTS_ENABLED ? 'Search Meetings, events, and Agenda topics' : 'Search Meetings and events'
 
 type Props = { view: AppView; searchRef: React.RefObject<HTMLInputElement | null>; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void; onOpenCalendarSettings: () => void }
 
@@ -48,6 +51,6 @@ function useWorkspaceRows(view: AppView, query: string) {
 function WorkspaceHeader({ view, query, setQuery, searchRef, onOpenCalendarSettings }: Pick<Props, 'view' | 'searchRef' | 'onOpenCalendarSettings'> & { query: string; setQuery: (value: string) => void }) {
   return <header className="workspace-head"><div className="workspace-heading"><h1 className="ui-title">Meetings</h1><div className="workspace-calendar-actions"><button type="button" className="app-link" disabled={Boolean(view.calendarBusy) || !view.calendar?.connections.length} onClick={() => void view.actions.syncAllCalendars()}>{view.calendarBusy ? 'Refreshing…' : 'Refresh calendars'}</button><button type="button" className="app-link" onClick={onOpenCalendarSettings}>Calendar settings</button></div></div>
     {view.calendarError ? <p className="app-error" role="alert">{view.calendarError}</p> : null}
-    <label className="app-search workspace-search"><Search aria-hidden="true" /><input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder="Search Meetings, events, and Agenda topics" aria-label="Search Meetings, events, and Agenda topics" />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><X aria-hidden="true" /></button> : <kbd>⌘F</kbd>}</label>
+    <label className="app-search workspace-search"><Search aria-hidden="true" /><input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder={SEARCH_LABEL} aria-label={SEARCH_LABEL} />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><X aria-hidden="true" /></button> : <kbd>⌘F</kbd>}</label>
   </header>
 }

@@ -2,7 +2,7 @@ import type { CalendarConnection } from '../../../shared/calendar-contract'
 import type { GoogleCalendarController } from '../../hooks/use-google-calendar'
 import { Button, Card, cx, StatusPill } from '../ui'
 import './google-calendar.css'
-import { COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
+import { AGENDA_DRAFTS_ENABLED, COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
 
 export function GoogleCalendarPanel({ calendar }: { calendar: GoogleCalendarController }) {
   const snapshot = calendar.snapshot
@@ -16,7 +16,7 @@ export function GoogleCalendarPanel({ calendar }: { calendar: GoogleCalendarCont
 const GMAIL_DISCLOSURE = 'Optional Gmail read access lets Agenda drafts and Meeting enrichment read recent email with a Meeting’s invitees from this account. Local AI processes it on this Mac only; it is never sent to Installed Codex or a server. Choose the same account to add access.'
 
 function CalendarDisclosure() {
-  return <div className="calendar-disclosure"><strong>Before you connect</strong><span>Gappd opens Google in your browser and requests read-only access to events you own on your primary calendar. It shows upcoming events, suggests event invitees for Meetings, and uses event details in Agenda drafts you request. Agenda drafts that use Calendar context require Local AI on this Mac; Installed Codex cannot process that context. Availability-only access cannot provide these details. Gappd exchanges tokens directly with Google. Tokens and cached events are encrypted on this Mac; no Gappd server receives them.</span></div>
+  return <div className="calendar-disclosure"><strong>Before you connect</strong><span>Gappd opens Google in your browser and requests read-only access to events you own on your primary calendar. It shows upcoming events and suggests event invitees for Meetings.{AGENDA_DRAFTS_ENABLED ? ' It also uses event details in Agenda drafts you request. Agenda drafts that use Calendar context require Local AI on this Mac; Installed Codex cannot process that context.' : ''} Availability-only access cannot provide these details. Gappd exchanges tokens directly with Google. Tokens and cached events are encrypted on this Mac; no Gappd server receives them.</span></div>
 }
 
 function CalendarAccount({ connection, calendar }: { connection: CalendarConnection; calendar: GoogleCalendarController }) {

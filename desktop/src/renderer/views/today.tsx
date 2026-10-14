@@ -79,7 +79,7 @@ function UpNext({ view }: { view: AppView }) {
       <div className="app-empty">
         <CalendarDays aria-hidden="true" />
         <strong>No calendar events today</strong>
-        <span>Connect a Google Calendar connection to see the day here and ground Agenda drafts in past Meetings.</span>
+        <span>Connect a Google Calendar connection to see the day here.</span>
       </div>
     )
   }

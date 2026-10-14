@@ -21,7 +21,6 @@ const views = [
   { name: 'Today', steps: [['click-prefix', 'Today']] },
   { name: 'Meetings', steps: [['click-prefix', 'Meetings']] },
   { name: 'Meeting summary', steps: [...meeting, ['click-text', 'Summary']] },
-  { name: 'Meeting agenda', steps: [...meeting, ['click-text', 'Agenda']] },
   { name: 'Meeting transcript', steps: [...meeting, ['click-text', 'Transcript']] },
   { name: 'People', steps: [['click-prefix', 'People']] },
   { name: 'Settings general', steps: [...settings, ['click-text', 'General']] },

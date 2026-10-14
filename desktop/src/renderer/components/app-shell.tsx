@@ -59,7 +59,7 @@ function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof us
   </main>
 }
 
-/** Cmd/Ctrl+F searches local Meetings, Calendar events, and saved Agenda topics. */
+/** Cmd/Ctrl+F searches local Meetings, Calendar events, and saved Agenda topics when Agenda drafts are shown. */
 function useSearchShortcut(activate: () => void): void {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {

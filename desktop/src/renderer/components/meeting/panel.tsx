@@ -12,7 +12,7 @@ import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
 import { agendaStateForMeeting, agendaTabLabel } from '../../lib/agenda-status'
 import { AgendaPane } from '../agenda/tab'
 import { MeetingEnrichmentSection } from './enrichment'
-import { COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
+import { AGENDA_DRAFTS_ENABLED, COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
 import type { MeetingTab } from './open-scope'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
@@ -36,7 +36,7 @@ export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { vi
   const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
   const calendar = useMeetingCalendar(meeting?.id ?? null, view.actions.linkMeetingCalendar)
   // An Agenda belongs to a Calendar event, so a Meeting without one has no Agenda tab.
-  const tabs = TABS.filter(item => item.id !== 'agenda' || agendaState.kind !== 'unlinked')
+  const tabs = TABS.filter(item => item.id !== 'agenda' || AGENDA_DRAFTS_ENABLED && agendaState.kind !== 'unlinked')
   const shown = tabs.some(item => item.id === tab) ? tab : 'summary'
   useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab(initialTab ?? 'summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId, initialTab])
   return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
