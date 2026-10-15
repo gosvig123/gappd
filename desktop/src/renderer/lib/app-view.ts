@@ -1,4 +1,5 @@
 import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calendar-contract'
+import type { SavedAgendaDraft } from '../../shared/agenda-draft'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from '../../shared/contracts'
 import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
@@ -41,6 +42,7 @@ export type AppView = {
   calendarController: GoogleCalendarController
   calendarBusy: string | null
   calendarError: string | null
+  drafts: SavedAgendaDraft[]
   language: string
   theme: ThemeName
   alertDismissals: ReadonlySet<string>

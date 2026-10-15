@@ -97,7 +97,7 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
         <NotesOption title="On this Mac" points={['Private. Transcripts and notes stay on this Mac.', `One-time ${MODEL_SIZE} download. Works offline.`]}>
           <Button disabled={busy} onClick={state === 'error' ? view.actions.repairRuntime : view.actions.setupRuntime}>{state === 'error' ? 'Try again' : `Download ${MODEL_SIZE}`}</Button>
         </NotesOption>
-        {choice.codex?.executable ? <NotesOption title="Codex" points={choice.codex.signedIn ? ['Uses your ChatGPT account. No download.', 'Sends transcript text to OpenAI. Audio stays on this Mac.'] : ['Found Codex, but it is not signed in.', 'Open the ChatGPT app or Codex and sign in, then come back.']}>
+        {choice.codex?.executable ? <NotesOption title="Codex" points={choice.codex.signedIn ? ['Uses your ChatGPT account. No download.', 'Sends transcript text to OpenAI. Audio stays on this Mac.', 'Agenda drafts still need notes on this Mac.'] : ['Found Codex, but it is not signed in.', 'Open the ChatGPT app or Codex and sign in, then come back.']}>
           {choice.codex.signedIn
             ? <Button disabled={busy} onClick={choice.useCodex}>{choice.busy ? 'Checking Codex…' : 'Use Codex'}</Button>
             : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}

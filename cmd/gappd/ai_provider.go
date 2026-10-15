@@ -17,6 +17,12 @@ var codexCatalog = func(executable string) ([]ai.CodexModel, error) {
 // findCodex finds the installed Codex CLI. Tests replace it.
 var findCodex = ai.FindCodex
 
+// providerGeneration is the model and reasoning effort an operation snapshot used.
+type providerGeneration struct {
+	Model  string
+	Effort string
+}
+
 func newAIProvider(settings config.AI) (ai.Provider, error) {
 	switch settings.Provider {
 	case config.ProviderLlamaCpp:
@@ -47,4 +53,13 @@ func resolveCodexSelection(settings config.AI) (ai.CodexSelection, error) {
 		return ai.CodexSelection{}, fmt.Errorf("read installed Codex model catalog: %w; update Codex or open Settings", err)
 	}
 	return ai.ResolveCodexSelection(models, settings.CodexModel, settings.CodexReasoningEffort)
+}
+
+func providerGenerationFor(provider ai.Provider, settings config.AI) providerGeneration {
+	selected, ok := provider.(interface{ CodexSelection() ai.CodexSelection })
+	if !ok {
+		return providerGeneration{Model: settings.Model}
+	}
+	selection := selected.CodexSelection()
+	return providerGeneration{Model: selection.Model, Effort: selection.Effort}
 }

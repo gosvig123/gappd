@@ -5,6 +5,18 @@ import type { CaptureStatus, VideoState, DiarizationState, MeetingState, Process
 
 export type EmptyInput = Record<string, never>
 
+export type AgendaHistoryResponse = {
+  meetings: AgendaHistoryMeeting[]
+}
+
+export type AgendaHistoryMeeting = {
+  id: string
+  title: string
+  startedAt: string
+  endedAt: string
+  emails: string[]
+}
+
 export type MeetingTimesResponse = {
   meetings: MeetingTime[]
 }
@@ -12,6 +24,27 @@ export type MeetingTimesResponse = {
 export type MeetingTime = {
   startedAt: string
   endedAt: string
+}
+
+export type AgendaInput = {
+  title: string
+  meetingIds: string
+}
+
+export type AgendaResponse = {
+  items: AgendaItem[]
+  generation: AgendaGeneration
+}
+
+export type AgendaItem = {
+  topic: string
+  sourceId: string
+  quote: string
+}
+
+export type AgendaGeneration = {
+  model?: string
+  reasoningEffort?: string
 }
 
 export type PeopleResponse = {

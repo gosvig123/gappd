@@ -12,7 +12,7 @@ export function GoogleCalendarPanel({ calendar }: { calendar: GoogleCalendarCont
 }
 
 function CalendarDisclosure() {
-  return <div className="calendar-disclosure"><strong>Before you connect</strong><span>Gappd opens Google in your browser and requests read-only access to events you own on your primary calendar. It shows upcoming events and suggests event invitees for Meetings. Availability-only access cannot provide these details. Gappd exchanges tokens directly with Google. Tokens and cached events are encrypted on this Mac; no Gappd server receives them.</span></div>
+  return <div className="calendar-disclosure"><strong>Before you connect</strong><span>Gappd opens Google in your browser and requests read-only access to events you own on your primary calendar. It shows upcoming events and suggests event invitees for Meetings. It also uses event details in Agenda drafts you request. Agenda drafts that use Calendar context require Local AI on this Mac; Installed Codex cannot process that context. Availability-only access cannot provide these details. Gappd exchanges tokens directly with Google. Tokens and cached events are encrypted on this Mac; no Gappd server receives them.</span></div>
 }
 
 function CalendarAccount({ connection, calendar }: { connection: CalendarConnection; calendar: GoogleCalendarController }) {

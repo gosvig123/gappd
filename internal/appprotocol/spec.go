@@ -85,7 +85,9 @@ type CommandSpec struct {
 }
 
 var Commands = []CommandSpec{
+	{ID: "meetings.agendaHistory", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AgendaHistoryResponse](), Args: literalArgs("app", "meetings", "agenda-history", "--json")},
 	{ID: "meetings.times", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingTimesResponse](), Args: literalArgs("app", "meetings", "times", "--json")},
+	{ID: "meetings.agenda", Mode: CommandModeRequest, Input: typeOf[AgendaInput](), Output: typeOf[AgendaResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("agenda"), flag("title", "title", false), flag("meeting-ids", "meetingIds", false), lit("--json")}},
 	{ID: "meetings.people", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[PeopleResponse](), Args: literalArgs("app", "meetings", "people", "--json")},
 	{ID: "meetings.updatePerson", Mode: CommandModeRequest, Input: typeOf[UpdatePersonInput](), Output: typeOf[PeopleResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("update-person"), field("id"), flag("name", "name", false), flag("email", "email", true), lit("--json")}},
 	{ID: "meetings.mergePeople", Mode: CommandModeRequest, Input: typeOf[MergePeopleInput](), Output: typeOf[PeopleResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("merge-people"), field("keepId"), flag("merge-id", "mergeId", false), flag("name", "name", false), flag("email", "email", true), lit("--json")}},
