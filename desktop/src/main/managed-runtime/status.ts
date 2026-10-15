@@ -50,7 +50,7 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, configured)
   return {
     ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, input.providerError)),
-    supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
+    supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured, localModelReady: modelReady,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {
       summarization: summarizationStatus(usesCodex, summarizationReady, runtime.bundled, input.providerError),
@@ -68,7 +68,7 @@ export function runtimeErrorSnapshot(error: unknown, phase: ManagedRuntimeOperat
 export function baseSnapshot(operation: ManagedRuntimeOperation, message: string): ManagedRuntimeSnapshot {
   return {
     operation, activity: 'idle', endpoint: MANAGED_LLAMACPP_ENDPOINT, model: MANAGED_LLAMACPP_MODEL,
-    message, supported: process.platform === 'darwin', configured: false, bundled: false, running: false,
+    message, supported: process.platform === 'darwin', configured: false, bundled: false, running: false, localModelReady: false,
     canRetry: false, canRepair: false,
     capabilities: { summarization: { readiness: 'missing' }, transcription: { readiness: 'missing' }, diarization: { readiness: 'missing' } },
   }
