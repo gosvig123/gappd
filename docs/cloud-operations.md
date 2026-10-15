@@ -100,7 +100,7 @@ A production instance needs its own Google credentials. Google Cloud project `ga
 holds the Web application client `Gappd Clerk Production v2`
 (`185849256404-c3psc1m1h9rl7kknaldc5e9g06cqo87d.apps.googleusercontent.com`) with the redirect URI
 `https://clerk.getgappd.com/v1/oauth_callback`. Its secret lives only in Clerk. The `Gappd Desktop`
-client in the same project serves the app's Calendar access and cannot serve Clerk.
+client in the same project serves the app's Calendar and Gmail access and cannot serve Clerk.
 
 Clerk reports a wrong secret only as `oauth_token_exchange_error`. Check a secret before wiring it in:
 

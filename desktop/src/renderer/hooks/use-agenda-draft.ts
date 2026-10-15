@@ -17,7 +17,7 @@ const port: AgendaPort = {
 
 export type AgendaDraftController = AgendaSessionState & {
   setTopics(topics: string[]): void
-  generate(): Promise<void>
+  generate(slackChannelIds?: string[]): Promise<void>
   retrySave(): Promise<void>
   reload(): Promise<void>
   remove(): Promise<void>
@@ -39,7 +39,7 @@ export function useAgendaDraft(draftKey: string, sourceId: string): AgendaDraftC
   return {
     ...state,
     setTopics: useCallback((topics) => sessionRef.current?.setTopics(topics), []),
-    generate: useCallback(() => sessionRef.current?.generate() ?? Promise.resolve(), []),
+    generate: useCallback((slackChannelIds?: string[]) => sessionRef.current?.generate(slackChannelIds) ?? Promise.resolve(), []),
     retrySave: useCallback(() => sessionRef.current?.retrySave() ?? Promise.resolve(), []),
     reload: useCallback(() => sessionRef.current?.reload() ?? Promise.resolve(), []),
     remove: useCallback(() => sessionRef.current?.remove() ?? Promise.resolve(), []),

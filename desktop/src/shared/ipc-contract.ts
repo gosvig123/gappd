@@ -1,4 +1,5 @@
 import type { MeetingUploadStatus } from './meeting-upload-contract'
+import type { MeetingEnrichment } from './meeting-enrichment'
 import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
@@ -19,7 +20,7 @@ export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutab
 export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
 export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
 export type CodexModelCatalog = { models: CodexModelOption[]; defaultModel: string; defaultReasoningEffort: string }
-export type GenerateAgendaInput = { sourceId: string; expectedRevision: number }
+export type GenerateAgendaInput = { sourceId: string; expectedRevision: number; slackChannelIds?: string[] }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -44,6 +45,8 @@ export type IpcInvokeContract = {
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
+    enrichment: OperationSpec<[id: string], MeetingEnrichment | null>
+    enrich: OperationSpec<[id: string], MeetingEnrichment>
     exportRecording: OperationSpec<[id: string], boolean>
   }
   recording: {
@@ -72,7 +75,7 @@ export type IpcInvokeContract = {
     generateAgenda: OperationSpec<[input: GenerateAgendaInput], GeneratedAgenda>
     snapshot: OperationSpec<[], CalendarSnapshot>
     contacts: OperationSpec<[], CalendarParticipant[]>
-    connect: OperationSpec<[], CalendarSnapshot>
+    connect: OperationSpec<[includeGmail?: boolean], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
   }
@@ -120,7 +123,7 @@ export const IPC_OPERATIONS = {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
     people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
-    exportRecording: 'meetings:exportRecording',
+    enrichment: 'meetings:enrichment', enrich: 'meetings:enrich', exportRecording: 'meetings:exportRecording',
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },

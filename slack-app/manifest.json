@@ -21,7 +21,11 @@
         "groups:read",
         "im:read",
         "mpim:read",
-        "users:read"
+        "users:read",
+        "users:read.email",
+        "channels:history",
+        "groups:history",
+        "im:history"
       ]
     },
     "pkce_enabled": true

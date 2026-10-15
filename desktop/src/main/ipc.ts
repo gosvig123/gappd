@@ -1,5 +1,6 @@
 import { exportRecording } from './meeting-export'
 import { generateMeetingAgenda } from './meeting-agenda'
+import { enrichMeeting, loadMeetingEnrichment } from './meeting-enrichment'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
@@ -46,6 +47,8 @@ const IPC_HANDLERS: MainHandlers = {
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
     linkCalendar: (_event, input) => linkCalendar(input),
+    enrichment: (_event, id: string) => loadMeetingEnrichment(id),
+    enrich: (_event, id: string) => enrichMeeting(id),
     exportRecording: (_event, id: string) => exportRecording(id),
   },
   recording: {
@@ -74,7 +77,7 @@ const IPC_HANDLERS: MainHandlers = {
     generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
-    connect: () => connectGoogleCalendar(),
+    connect: (_event, includeGmail) => connectGoogleCalendar(includeGmail),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },

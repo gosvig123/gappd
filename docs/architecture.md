@@ -39,7 +39,7 @@ All inference stays on the Mac. Network access is used for application updates a
 - background processing drains and sleep handling;
 - stale-recording recovery, launch-at-login, and updates.
 
-Integrations are grouped in subfolders: `cloud/` (account authorization and Cloud upload), `google/` (Google Calendar), `slack/`, `agenda/` (Agenda draft storage), and `managed-runtime/` (Local AI: llama.cpp, Apple Speech, and diarization). Each test sits beside the module it tests.
+Integrations are grouped in subfolders: `cloud/` (account authorization and Cloud upload), `google/` (Google Calendar and Gmail), `slack/`, `agenda/` (Agenda draft storage and communication), and `managed-runtime/` (Local AI: llama.cpp, Apple Speech, and diarization). Each test sits beside the module it tests.
 
 ### Go meeting engine
 

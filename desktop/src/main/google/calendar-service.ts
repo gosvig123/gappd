@@ -1,6 +1,8 @@
 import { requestCommand } from '../app-protocol'
+import { gmailAgenda } from './gmail-agenda'
+import type { CommunicationPeriod } from '../agenda/communication'
 import { historicalCalendarRanges } from './calendar-history-ranges'
-import { shell } from 'electron'
+import { app, shell } from 'electron'
 import type { CalendarSnapshot } from '../../shared/calendar-contract'
 import { createSecureStore } from '../electron-secure-store'
 import { GoogleCalendarApi } from './calendar-api'
@@ -21,8 +23,12 @@ export function googleCalendarSnapshot(): Promise<CalendarSnapshot> {
   return calendarService().snapshot()
 }
 
-export function connectGoogleCalendar(): Promise<CalendarSnapshot> {
-  return calendarService().connect()
+export function connectGoogleCalendar(includeGmail = false): Promise<CalendarSnapshot> {
+  return calendarService().connect(includeGmail)
+}
+
+export function googleAgendaCommunication(connectionId: string, emails: string[], before: CommunicationPeriod) {
+  return calendarService().agendaCommunication(connectionId, (token, subject) => gmailAgenda(token, subject, emails, before))
 }
 
 export function syncGoogleCalendar(connectionId: string): Promise<CalendarSnapshot> {
@@ -42,6 +48,11 @@ function calendarService(): GoogleCalendarServiceCore {
     historyRanges: async () => historicalCalendarRanges((await requestCommand('meetings.times', {})).meetings),
     openExternal: (url) => shell.openExternal(url),
   })
-  instance = new GoogleCalendarServiceCore(api, createSecureStore<CalendarDocument>(CALENDAR_STORE_FILE))
+  instance = new GoogleCalendarServiceCore(api, createSecureStore<CalendarDocument>(CALENDAR_STORE_FILE), undefined, gmailReviewEnabled())
   return instance
+}
+
+/** Gmail is unverified by Google, so only unpackaged development runs may request it, for the verification demo. */
+function gmailReviewEnabled(): boolean {
+  return !app.isPackaged && process.env.GAPPD_GMAIL_REVIEW === '1'
 }
