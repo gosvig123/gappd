@@ -52,7 +52,7 @@ func TestInitWaitsForLockedLegacyDB(t *testing.T) {
 		t.Fatal("Init() did not complete after lock release")
 	}
 
-	columns, err := store.tableColumns("meetings")
+	columns, err := tableColumns(context.Background(), store.Conn, "meetings")
 	if err != nil {
 		t.Fatalf("tableColumns() error = %v", err)
 	}

@@ -42,7 +42,11 @@ func (r Recovery) RecoverStale(ctx context.Context, opts RecoveryOptions) (int, 
 	if err != nil {
 		return 0, err
 	}
-	return r.recoverMeetings(ctx, meetings, cutoff, opts)
+	recovered, err := r.recoverMeetings(ctx, meetings, cutoff, opts)
+	if err != nil {
+		return recovered, err
+	}
+	return recovered, r.recoverVideo(ctx, cutoff)
 }
 
 func (r Recovery) lifecycle() Lifecycle {

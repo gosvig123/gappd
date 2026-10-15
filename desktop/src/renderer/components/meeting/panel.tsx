@@ -1,0 +1,146 @@
+import { MeetingReplay } from './replay'
+import { useEffect, useRef, useState } from 'react'
+import { Copy, X } from 'lucide-react'
+import type { MeetingDetail } from '../../../shared/contracts'
+import { meetingStatusPillVisible, meetingStatusTone } from '../../../shared/meeting-recording-workflow'
+import { Markdown } from './markdown'
+import { meetingHasWork, meetingProgressLabel } from './progress'
+import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../ui'
+import { SpeakerLabels } from './speaker-labels'
+import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
+import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
+import { meetingDurationLabel } from '../../lib/meeting-grouping'
+import type { ConfirmController } from '../confirm'
+import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
+
+type TabId = 'summary' | 'transcript'
+const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
+  { id: 'summary', label: 'Summary' },
+  { id: 'transcript', label: 'Transcript' },
+]
+
+/** Inline Meeting content. No modal or focus trap: the list remains interactive. */
+export function MeetingPanel({ view, confirm }: { view: AppView; confirm: ConfirmController }) {
+  const [tab, setTab] = useState<TabId>('summary')
+  const [seekTo, setSeekTo] = useState<{ sec: number; request: number } | null>(null)
+  const [currentSec, setCurrentSec] = useState(0)
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const meeting = view.selectedMeeting
+  const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
+  const calendar = useMeetingCalendar(meeting?.id ?? null, view.actions.linkMeetingCalendar)
+  useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab('summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId])
+  return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
+    {meeting ? <PanelHead meeting={meeting} transcript={transcript} calendar={calendar} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
+    {meeting ? <TabBar tabs={TABS} tab={tab} onChange={setTab} /> : null}
+    <div className="app-panel-body ui-scroll">
+      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} calendar={calendar} seekTo={seekTo} onSeek={sec => setSeekTo(previous => ({ sec, request: (previous?.request ?? 0) + 1 }))} currentSec={currentSec} onTimeChange={setCurrentSec} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
+    </div>
+    {meeting ? <PanelFooter key={`${meeting.id}:${tab}`} view={view} confirm={confirm} meeting={meeting} tab={tab} transcript={transcript} /> : null}
+  </article>
+}
+
+function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; tab: TabId; transcript: string }) {
+  const [copied, setCopied] = useState(false)
+  const [error, setError] = useState('')
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(tab === 'summary' ? meeting.summary ?? '' : transcript); setCopied(true); setError('') }
+    catch { setError('Could not copy. Select the text and copy it manually.') }
+  }
+  const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
+}
+
+function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+  const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
+  const duration = meetingDurationLabel(row)
+  const note = artifactNote(row)
+  return (
+    <header className="app-panel-top">
+      <div className="app-panel-titles">
+        <h1>{meeting.title || 'Untitled meeting'}</h1>
+        <p className="app-panel-meta">
+          <span>{new Date(meeting.startedAt).toLocaleString(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
+          {duration !== '—' ? <span>{duration}</span> : null}
+          {meeting.speakers.length ? <span>{meeting.speakers.length} {meeting.speakers.length === 1 ? 'speaker' : 'speakers'}</span> : null}
+          {note ? <span>{note}</span> : null}
+          {meetingStatusPillVisible(meeting.status.state) ? <StatusPill tone={meetingStatusTone(meeting.status.state)}>{statusLabel(row)}</StatusPill> : null}
+        </p>
+        <MeetingEventPicker calendar={calendar} />
+      </div>
+      <button ref={closeRef} type="button" className="app-icon-action" aria-label="Close Meeting" onClick={onClose}><X aria-hidden="true" /></button>
+    </header>
+  )
+}
+
+function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
+  return <header className="app-panel-top"><div className="app-panel-titles"><h1>Meeting</h1></div><button ref={closeRef} type="button" className="app-icon-action" aria-label="Close Meeting" onClick={onClose}><X aria-hidden="true" /></button></header>
+}
+
+/** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
+function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; calendar: MeetingCalendar; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
+  const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
+  return (
+    <>
+      <MeetingReplay key={meeting.id} meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
+      {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
+      {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
+      <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} />
+      <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
+        {tab === 'summary' ? <SummaryPane view={view} /> : null}
+        {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} onSeek={onSeek} currentSec={currentSec} /> : null}
+      </section>
+    </>
+  )
+}
+
+function SummaryPane({ view }: { view: AppView }) {
+  const summary = view.selectedMeeting?.summary
+  if (!summary) return <EmptyState>No notes yet. Notes are created locally after recording ends.</EmptyState>
+  return <div className="app-reading"><Markdown value={summary} /></div>
+}
+
+function TranscriptPane({ view, text, onSeek, currentSec }: { view: AppView; text: string; onSeek: (sec: number) => void; currentSec: number }) {
+  const meeting = view.selectedMeeting
+  if (!meeting) return null
+  if (!text) return <EmptyState>{meetingTranscriptEmptyText(meeting)}</EmptyState>
+  return <div className="app-reading"><TranscriptText value={text} segments={meetingHasSegments(meeting) ? meeting.segments : []} onSeek={meeting.status.video.state === 'ready' || (meeting.status.video.state === 'ended' && meeting.status.video.endSec !== undefined) ? onSeek : undefined} currentSec={currentSec} /></div>
+}
+
+function DiarizationNotice({ view }: { view: AppView }) {
+  const [busy, setBusy] = useState(false)
+  const meeting = view.selectedMeeting
+  if (!meeting) return null
+  const retry = async () => {
+    setBusy(true)
+    try { await view.actions.retryDiarization(meeting.id) } finally { setBusy(false) }
+  }
+  return (
+    <div className="app-notice">
+      <span><strong>Speaker labels need a check.</strong> {meeting.diarization.error ?? 'Speaker separation was uncertain.'} Labels may not always be accurate.</span>
+      <Button className="compact-action" disabled={busy} onClick={() => void retry()}>{busy ? 'Retrying…' : 'Retry labeling'}</Button>
+    </div>
+  )
+}
+
+function TabBar({ tabs, tab, onChange }: { tabs: typeof TABS; tab: TabId; onChange: (tab: TabId) => void }) {
+  const listRef = useRef<HTMLDivElement>(null)
+  const move = (delta: number) => {
+    const index = tabs.findIndex((item) => item.id === tab)
+    const next = tabs[(index + delta + tabs.length) % tabs.length]
+    if (!next) return
+    onChange(next.id)
+    listRef.current?.querySelector<HTMLButtonElement>(`#app-tab-${next.id}`)?.focus()
+  }
+  return (
+    <div ref={listRef} className="app-tabs" role="tablist" aria-label="Meeting sections" onKeyDown={(event) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); move(1) }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); move(-1) }
+    }}>
+      {tabs.map((item) => (
+        <button key={item.id} type="button" id={`app-tab-${item.id}`} role="tab" aria-selected={tab === item.id}
+          aria-controls={`app-pane-${item.id}`} tabIndex={tab === item.id ? 0 : -1}
+          className={cx('app-tab', tab === item.id && 'is-active')} onClick={() => onChange(item.id)}>{item.label}</button>
+      ))}
+    </div>
+  )
+}

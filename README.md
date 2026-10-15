@@ -12,8 +12,9 @@ help, bug reports, and roadmap discussion.
 - Detects supported meetings and prompts you to record.
 - Captures microphone and system audio with macOS ScreenCaptureKit.
 - Produces live transcripts with Apple SpeechTranscriber.
-- Generates local meeting summaries through managed llama.cpp.
+- Generates local meeting summaries and action items after recording ends through managed llama.cpp.
 - Stores searchable meeting history in SQLite.
+- Labels speakers with saved people and calendar suggestions, with short audio previews.
 - Recovers interrupted recordings and helps stop recording when a meeting ends.
 - Supports multiple transcription languages and optional launch at login.
 - Downloads and manages required local models from the desktop app.
@@ -59,7 +60,7 @@ network access, and Xcode Command Line Tools with Swift support.
 git clone https://github.com/gappd-dev/gappd.git
 cd gappd
 npm run desktop:bootstrap
-npm run desktop:dev
+npm run dev
 ```
 
 Bootstrap installs desktop dependencies, checks macOS prerequisites, downloads
@@ -68,7 +69,7 @@ llama.cpp, and builds the Go, capture, and speech-transcription artifacts.
 Useful commands:
 
 ```bash
-npm run desktop:typecheck   # Check desktop TypeScript
+npm run typecheck           # Check desktop TypeScript
 npm run desktop:build       # Build renderer, native artifacts, and Electron main
 npm run desktop:dist:dir    # Package an unpacked macOS app
 go test ./...               # Check Go packages
@@ -89,6 +90,7 @@ More detail:
 
 - [Architecture](docs/architecture.md)
 - [macOS releases](docs/desktop-macos-release.md)
+- [Speaker labeling](docs/speaker-labeling.md)
 
 ## License
 

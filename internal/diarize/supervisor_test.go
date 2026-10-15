@@ -80,7 +80,7 @@ func writeWAV(t *testing.T, frames int64) string {
 
 func TestAudioContractRangesAndTimeouts(t *testing.T) {
 	path := writeWAV(t, 32000)
-	if got, err := wavFrames(path); err != nil || got != 32000 {
+	if got, err := audioFrames(path); err != nil || got != 32000 {
 		t.Fatalf("frames=%d err=%v", got, err)
 	}
 	good, _ := os.ReadFile(path)
@@ -88,7 +88,7 @@ func TestAudioContractRangesAndTimeouts(t *testing.T) {
 		bad, data := filepath.Join(t.TempDir(), "bad.wav"), append([]byte(nil), good...)
 		data[at] = value
 		_ = os.WriteFile(bad, data, 0600)
-		if _, err := wavFrames(bad); err == nil {
+		if _, err := audioFrames(bad); err == nil {
 			t.Fatalf("accepted invalid WAV mutation at %d", at)
 		}
 	}

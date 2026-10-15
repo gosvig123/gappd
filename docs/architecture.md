@@ -28,7 +28,7 @@ All inference stays on the Mac. Network access is used for application updates a
 
 ### Electron desktop
 
-`desktop/src/renderer` owns user interface state. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
+`desktop/src/renderer` owns user interface state: `views/` holds the top-level screens (Today, Meetings, People, Settings), `components/` holds shared pieces with `meeting/` and `settings/` subfolders, and `hooks/` and `lib/` hold state and pure helpers. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
 
 `desktop/src/main` owns operating-system integration and process orchestration:
 
@@ -38,6 +38,8 @@ All inference stays on the Mac. Network access is used for application updates a
 - managed llama.cpp and Apple Speech setup;
 - background processing drains and sleep handling;
 - stale-recording recovery, launch-at-login, and updates.
+
+Integrations are grouped in subfolders: `cloud/` (account authorization and Cloud upload), `google/` (Google Calendar), and `managed-runtime/` (Local AI: llama.cpp, Apple Speech, and diarization). Each test sits beside the module it tests.
 
 ### Go meeting engine
 
@@ -58,7 +60,7 @@ All inference stays on the Mac. Network access is used for application updates a
 
 ### Native helpers
 
-- `capture-helper/`: Swift ScreenCaptureKit application that captures microphone and system audio, writes durable WAV artifacts, and emits chunk events.
+- `capture-helper/`: Swift ScreenCaptureKit application that captures microphone and system audio, writes durable WAV artifacts, and emits chunk events. A background pass later replaces idle Meetings' WAVs with lossless FLAC copies.
 - `apple-speech-transcriber/`: Swift application that prepares Apple speech assets and transcribes audio locally.
 - `gappd-diarizer/`: Swift executable using FluidAudio and bundled models to group remote speech into meeting-local speaker labels.
 - `desktop/resources/llamacpp/`: bundled llama.cpp runtime started on demand for summarization.

@@ -142,27 +142,31 @@ func TestCommitClaimTranscriptIsAtomicAndTokenChecked(t *testing.T) {
 	}
 }
 
-func TestProcessingArtifactsCurrentSQLMatchesModel(t *testing.T) {
+func TestProcessingArtifactsCurrentSQL(t *testing.T) {
 	store := openTestDB(t)
 	defer store.Close()
-	cases := map[string]Meeting{
-		"current":            artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 2),
-		"missing transcript": artifactMeeting(nil, artifact("summary"), artifact(`{}`), 2, 2),
-		"blank transcript":   artifactMeeting(artifact(" "), artifact("summary"), artifact(`{}`), 2, 2),
-		"missing summary":    artifactMeeting(artifact("transcript"), nil, artifact(`{}`), 2, 2),
-		"blank summary":      artifactMeeting(artifact("transcript"), artifact(" "), artifact(`{}`), 2, 2),
-		"missing extraction": artifactMeeting(artifact("transcript"), artifact("summary"), nil, 2, 2),
-		"blank extraction":   artifactMeeting(artifact("transcript"), artifact("summary"), artifact(" "), 2, 2),
-		"stale summary":      artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 1),
+	cases := map[string]struct {
+		meeting Meeting
+		want    bool
+	}{
+		"current":            {artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 2), true},
+		"missing transcript": {artifactMeeting(nil, artifact("summary"), artifact(`{}`), 2, 2), false},
+		"blank transcript":   {artifactMeeting(artifact(" "), artifact("summary"), artifact(`{}`), 2, 2), false},
+		"missing summary":    {artifactMeeting(artifact("transcript"), nil, artifact(`{}`), 2, 2), false},
+		"blank summary":      {artifactMeeting(artifact("transcript"), artifact(" "), artifact(`{}`), 2, 2), false},
+		"missing extraction": {artifactMeeting(artifact("transcript"), artifact("summary"), nil, 2, 2), false},
+		"blank extraction":   {artifactMeeting(artifact("transcript"), artifact("summary"), artifact(" "), 2, 2), false},
+		"stale summary":      {artifactMeeting(artifact("transcript"), artifact("summary"), artifact(`{}`), 2, 1), false},
 	}
 	query := `SELECT ` + ProcessingArtifactsCurrentSQL("transcript", "transcript_revision") + ` FROM (SELECT ? AS transcript,? AS transcript_revision,? AS summary,? AS summary_transcript_revision,? AS extraction_json)`
-	for name, meeting := range cases {
+	for name, test := range cases {
 		t.Run(name, func(t *testing.T) {
+			meeting := test.meeting
 			var got bool
 			err := store.Conn.QueryRow(query, meeting.Transcript, meeting.TranscriptRevision, meeting.Summary,
 				meeting.SummaryTranscriptRevision, meeting.ExtractionJSON).Scan(&got)
-			if err != nil || got != processingArtifactsCurrent(meeting) {
-				t.Fatalf("SQL current = %v, model current = %v, error = %v", got, processingArtifactsCurrent(meeting), err)
+			if err != nil || got != test.want {
+				t.Fatalf("SQL current = %v, want %v, error = %v", got, test.want, err)
 			}
 		})
 	}
@@ -184,4 +188,14 @@ func queueMeeting(t *testing.T, store *DB, id, started string) *Meeting {
 		t.Fatal(err)
 	}
 	return meeting
+}
+
+// pendingStages reports the stages that the processing queue can claim now.
+func pendingStages(t *testing.T, store *DB) []QueueStage {
+	t.Helper()
+	stages, err := store.PendingStages(context.Background(), time.Now(), time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return stages
 }

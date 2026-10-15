@@ -1,0 +1,80 @@
+package service_test
+
+import (
+	"context"
+	"testing"
+
+	"github.com/gosvig123/gappd/cloud/internal/service"
+	"github.com/jackc/pgx/v5"
+)
+
+func TestMeetingCopyCannotBeRestoredAfterDeletion(t *testing.T) {
+	reader, writer := meetingDatabase(t)
+	owner := copyOwner("deleted")
+	id := uploadCopy(t, writer, owner, "local-3", 1)
+	inWriterTx(t, writer, owner, func(tx pgx.Tx) {
+		if _, err := tx.Exec(context.Background(), `UPDATE meeting_lifecycle SET deleted_at=statement_timestamp()
+ WHERE id=$1 AND owner_id=$2`, id, owner); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(context.Background(), `DELETE FROM cloud_meetings WHERE id=$1 AND owner_id=$2`, id, owner); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	})
+	if visibleCopies(t, reader, owner, id) != 0 {
+		t.Fatal("deleted copy still readable")
+	}
+	inWriterTx(t, writer, owner, func(tx pgx.Tx) {
+		if err := insertCopy(t, tx, owner, id, 9); err == nil {
+			t.Fatal("deleted copy restored by a newer revision")
+		}
+	})
+}
+
+// An identity accepted 721 hours ago is already expired, so it never receives a copy.
+func TestMeetingCopyCannotOutliveItsExpiry(t *testing.T) {
+	reader, writer := meetingDatabase(t)
+	owner := copyOwner("expired")
+	inWriterTx(t, writer, owner, func(tx pgx.Tx) {
+		id := service.MeetingCopyID(owner, "local-4")
+		if _, err := tx.Exec(context.Background(), `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
+ VALUES($1,$2,'local-4',statement_timestamp()-interval '721 hours',statement_timestamp()-interval '1 hour')`, id, owner); err != nil {
+			t.Fatal(err)
+		}
+		if err := insertCopy(t, tx, owner, id, 1); err == nil {
+			t.Fatal("expired identity accepted a copy")
+		}
+	})
+	if visibleCopies(t, reader, owner, service.MeetingCopyID(owner, "local-4")) != 0 {
+		t.Fatal("expired copy readable")
+	}
+}
+
+func TestMeetingLifecycleRejectsFutureAndRewrite(t *testing.T) {
+	_, writer := meetingDatabase(t)
+	owner := copyOwner("lifecycle")
+	id := service.MeetingCopyID(owner, "local-6")
+	inWriterTx(t, writer, owner, func(tx pgx.Tx) {
+		_, err := tx.Exec(context.Background(), `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
+ VALUES($1,$2,'local-6',statement_timestamp()+interval '1 hour',statement_timestamp()+interval '721 hours')`, id, owner)
+		if err == nil {
+			t.Fatal("future acceptance accepted")
+		}
+	})
+	inWriterTx(t, writer, owner, func(tx pgx.Tx) {
+		if _, err := tx.Exec(context.Background(), `INSERT INTO meeting_lifecycle(id,owner_id,local_id,deleted_at)
+ VALUES($1,$2,'local-6',statement_timestamp())`, id, owner); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(context.Background(), `UPDATE meeting_lifecycle SET expires_at=statement_timestamp()+interval '720 hours'
+ WHERE id=$1 AND owner_id=$2`, id, owner); err == nil {
+			t.Fatal("accepted expiry rewritten")
+		}
+		if _, err := tx.Exec(context.Background(), `UPDATE meeting_lifecycle SET deleted_at=NULL WHERE id=$1 AND owner_id=$2`, id, owner); err == nil {
+			t.Fatal("deletion marker cleared")
+		}
+	})
+}

@@ -2,8 +2,12 @@ package recording
 
 import (
 	"context"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gappd-dev/gappd/internal/capture"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -107,5 +111,69 @@ func assertCapturedMeetingWithLiveTranscript(t *testing.T, meeting *db.Meeting) 
 	}
 	if meeting.Transcript == nil || *meeting.Transcript == "" || meeting.Summary != nil {
 		t.Fatalf("Live Transcript was not committed before Pending Meeting Processing")
+	}
+}
+
+func TestVideoEarlyEndRetainsLowDiskReasonAfterFinalization(t *testing.T) {
+	setRecordingCaptureHelper(t, "complete-stream")
+	helper := filepath.Join(t.TempDir(), "video")
+	events := `#!/bin/sh
+printf '%s\n' '{"type":"video_started","sourceType":"window","hostSeconds":1000}' '{"type":"video_ended","reason":"Low disk space"}' '{"type":"video_finalized","sourceType":"window","hostSeconds":1001}'
+`
+	if err := os.WriteFile(helper, []byte(events), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GAPPD_VIDEO_HELPER_PATH", helper)
+	store := openTestDB(t)
+	defer store.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	service := New(meetinglifecycle.New(store), livetranscript.New(store, meetinglifecycle.New(store), fakeTranscriber{}))
+	service.BaseDir, service.Store, service.Out, service.ErrOut = t.TempDir(), store, io.Discard, io.Discard
+	service.Events = testEventSink(func(name EventName, _ db.Meeting, _ error) error {
+		if name == EventVideoFinalized {
+			cancel()
+		}
+		return nil
+	})
+	if err := service.run(ctx, Request{Title: "Low disk", ScreenVideoEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	meeting := latestMeeting(t, store)
+	message := ""
+	if meeting.VideoMessage != nil {
+		message = *meeting.VideoMessage
+	}
+	if meeting.CaptureStatus != db.CaptureStatusCaptured || meeting.VideoState != db.VideoStateEnded || message != "Low disk space" {
+		t.Fatalf("audio/video status and reason = %s/%s/%q", meeting.CaptureStatus, meeting.VideoState, message)
+	}
+}
+
+type testEventSink func(EventName, db.Meeting, error) error
+
+func (f testEventSink) EmitRecordingEvent(name EventName, meeting db.Meeting, err error) error {
+	return f(name, meeting, err)
+}
+
+func TestVideoHelperFailureDoesNotFailMeetingAudio(t *testing.T) {
+	setRecordingCaptureHelper(t, "complete-stream")
+	helper := filepath.Join(t.TempDir(), "video")
+	if err := os.WriteFile(helper, []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GAPPD_VIDEO_HELPER_PATH", helper)
+	store := openTestDB(t)
+	defer store.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	service := New(meetinglifecycle.New(store), livetranscript.New(store, meetinglifecycle.New(store), fakeTranscriber{}))
+	service.BaseDir, service.Store, service.Out, service.ErrOut = t.TempDir(), store, io.Discard, io.Discard
+	go func() { time.Sleep(200 * time.Millisecond); cancel() }()
+	if err := service.run(ctx, Request{Title: "Video failure", ScreenVideoEnabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	meeting := latestMeeting(t, store)
+	if meeting.CaptureStatus != db.CaptureStatusCaptured || meeting.VideoState != "failed" {
+		t.Fatalf("audio/video status = %s/%s", meeting.CaptureStatus, meeting.VideoState)
 	}
 }

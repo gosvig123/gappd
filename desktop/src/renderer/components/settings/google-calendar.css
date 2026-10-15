@@ -1,0 +1,69 @@
+.calendar-account {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.calendar-account > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.calendar-account span {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.calendar-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.calendar-account strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-tint);
+  color: var(--color-text-soft);
+  line-height: 1.5;
+}
+
+.calendar-account {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.calendar-account.has-error span {
+  color: var(--color-danger);
+}
+
+.calendar-account-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 45rem) {
+  .calendar-account {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-account-actions .ui-button {
+    flex: 1;
+  }
+}

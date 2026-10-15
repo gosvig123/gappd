@@ -20,7 +20,7 @@ func TestStitchMatching(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := stitch(test.windows)
+			got, _ := stitchWindows(test.windows)
 			for i, want := range test.want {
 				if len(got) != len(test.want) || got[i].speaker != want {
 					t.Fatalf("spans = %+v, want speakers %v", got, test.want)
@@ -31,7 +31,7 @@ func TestStitchMatching(t *testing.T) {
 }
 
 func TestStrongCentroidBeatsWeakOverlap(t *testing.T) {
-	got := stitch([]WindowReport{
+	got, _ := stitchWindows([]WindowReport{
 		window(0, 600, []LocalCluster{{"a", []float64{1, 0}}}, []LocalSpan{span("a", 580, 590, 1)}),
 		window(570, 40, []LocalCluster{{"b", []float64{.6, .8}}, {"c", []float64{.9, math.Sqrt(.19)}}}, []LocalSpan{span("b", 10, 15, 1), span("c", 20, 24, 1), span("c", 26, 30, 1)}),
 	})
@@ -63,14 +63,14 @@ func TestCentroidOverrideRequiresGroundedBestClaim(t *testing.T) {
 }
 
 func TestOwnershipAndSpanConfidence(t *testing.T) {
-	got := stitch([]WindowReport{window(0, 600, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{span("a", 560, 590, 1)}), window(570, 40, []LocalCluster{{"b", []float64{1}}}, []LocalSpan{{"b", 0, 40, .8, .2}})})
+	got, _ := stitchWindows([]WindowReport{window(0, 600, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{span("a", 560, 590, 1)}), window(570, 40, []LocalCluster{{"b", []float64{1}}}, []LocalSpan{{"b", 0, 40, .8, .2}})})
 	if len(got) != 2 || got[0].start != 560 || got[0].end != 570 || got[1].start != 570 || got[1].end != 610 || math.Abs(got[1].confidence-.2) > 1e-12 {
 		t.Fatalf("stitched spans = %+v", got)
 	}
 }
 
 func TestShortSpanConfidenceFilter(t *testing.T) {
-	got := stitch([]WindowReport{window(0, 600, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{
+	got, _ := stitchWindows([]WindowReport{window(0, 600, []LocalCluster{{"a", []float64{1}}}, []LocalSpan{
 		span("a", 0, .9, .249),
 		span("a", 1, 1.9, .25),
 		span("a", 2, 3, .1), // One-second spans existed before short-segment recall was enabled.
@@ -81,7 +81,7 @@ func TestShortSpanConfidenceFilter(t *testing.T) {
 }
 
 func TestShortSpanCannotDriveWindowMatching(t *testing.T) {
-	got := stitch([]WindowReport{
+	got, _ := stitchWindows([]WindowReport{
 		window(0, 600, []LocalCluster{{"a", []float64{1, 0}}}, []LocalSpan{span("a", 580, 580.9, .25)}),
 		window(570, 40, []LocalCluster{{"b", []float64{0, 1}}}, []LocalSpan{span("b", 10, 12, 1)}),
 	})
@@ -214,7 +214,7 @@ func TestAlignmentRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, _, _ := align([]Phrase{test.phrase}, test.spans)
+			got, _, _ := align([]Phrase{test.phrase}, test.spans, nil)
 			if got[0].Reason != test.reason || test.confidence < 0 && got[0].Confidence != nil || test.confidence >= 0 && (got[0].Confidence == nil || math.Abs(*got[0].Confidence-test.confidence) > 1e-12) {
 				t.Fatalf("assignment = %+v", got[0])
 			}
@@ -230,7 +230,7 @@ func TestSuppressedSpeakerVetoesPhraseAssignment(t *testing.T) {
 		sspan(1, 24, 27, 1),
 	}
 	phrases := []Phrase{{"mixed", 0, 10}, {"minority", 4, 10}, {"dominant", 20, 27}}
-	got, count, _ := alignWithSuppressed(phrases, spans, map[int]bool{2: true})
+	got, count, _ := align(phrases, spans, map[int]bool{2: true})
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport ||
 		got[1].Speaker != db.VisibleSpeakerOther || got[1].Reason != db.SpeakerAssignmentReasonAmbiguousSupport ||
 		got[2].Speaker != "Speaker 1" || count != 1 {
@@ -238,24 +238,24 @@ func TestSuppressedSpeakerVetoesPhraseAssignment(t *testing.T) {
 	}
 
 	highMixed := []stitchedSpan{sspan(1, 0, 8.5, 1), sspan(2, 8.5, 10, .5), sspan(1, 20, 23, 1), sspan(1, 24, 27, 1)}
-	got, count, _ = alignWithSuppressed([]Phrase{{"mixed", 0, 10}}, highMixed, map[int]bool{2: true})
+	got, count, _ = align([]Phrase{{"mixed", 0, 10}}, highMixed, map[int]bool{2: true})
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport || count != 0 {
 		t.Fatalf("high mixed assignment = %+v, count = %d", got[0], count)
 	}
 
 	lowConfidenceMixed := []stitchedSpan{sspan(1, 0, 8.9, 1), sspan(2, 8.9, 10, .05), sspan(1, 20, 23, 1), sspan(1, 24, 27, 1)}
-	got, count, _ = alignWithSuppressed([]Phrase{{"mixed", 0, 10}}, lowConfidenceMixed, map[int]bool{2: true})
+	got, count, _ = align([]Phrase{{"mixed", 0, 10}}, lowConfidenceMixed, map[int]bool{2: true})
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport || count != 0 {
 		t.Fatalf("low-confidence mixed assignment = %+v, count = %d", got[0], count)
 	}
 
-	got, count, _ = alignWithSuppressed([]Phrase{{"suppressed", 0, 2}}, []stitchedSpan{sspan(2, 0, 2, .8)}, map[int]bool{2: true})
+	got, count, _ = align([]Phrase{{"suppressed", 0, 2}}, []stitchedSpan{sspan(2, 0, 2, .8)}, map[int]bool{2: true})
 	if got[0].Speaker != db.VisibleSpeakerOther || count != 0 {
 		t.Fatalf("suppressed fallback assignment = %+v, count = %d", got[0], count)
 	}
 
 	vetoSpans := []stitchedSpan{sspan(1, 0, 4, 1), sspan(1, 20, 23, 1), sspan(1, 24, 27, 1), {speaker: 2, start: 4, end: 10, confidence: .2, vetoOnly: true}}
-	got, count, _ = alignWithSuppressed([]Phrase{{"veto", 0, 10}}, vetoSpans, nil)
+	got, count, _ = align([]Phrase{{"veto", 0, 10}}, vetoSpans, nil)
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport || count != 0 {
 		t.Fatalf("veto-only assignment = %+v, count = %d", got[0], count)
 	}
@@ -269,7 +269,7 @@ func TestWeakRivalCountsTowardPhraseSupport(t *testing.T) {
 		sspan(1, 24, 27, 1),
 	}
 
-	got, _, _ := align([]Phrase{{"p", 0, 10}}, spans)
+	got, _, _ := align([]Phrase{{"p", 0, 10}}, spans, nil)
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport || got[0].Confidence != nil {
 		t.Fatalf("assignment = %+v", got[0])
 	}
@@ -280,7 +280,7 @@ func TestOverlappingEvidenceUsesTemporalUnion(t *testing.T) {
 	for range 14 {
 		spans = append(spans, sspan(1, 0, 4, 1))
 	}
-	got, _, _ := align([]Phrase{{"p", 0, 10}}, spans)
+	got, _, _ := align([]Phrase{{"p", 0, 10}}, spans, nil)
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonAmbiguousSupport {
 		t.Fatalf("assignment = %+v", got[0])
 	}
@@ -293,7 +293,7 @@ func TestSingleTurnFallbackIgnoresUnselectedTurns(t *testing.T) {
 		sspan(2, 8, 9, .6),
 	}
 
-	got, _, _ := align([]Phrase{{"p", 0, 6}}, spans)
+	got, _, _ := align([]Phrase{{"p", 0, 6}}, spans, nil)
 	if got[0].Speaker != db.VisibleSpeakerOther || got[0].Reason != db.SpeakerAssignmentReasonInsufficientCoverage || got[0].Confidence != nil {
 		t.Fatalf("assignment = %+v", got[0])
 	}
@@ -380,7 +380,7 @@ func TestProjectionGroupsRecoverOnlyConfidentChildren(t *testing.T) {
 func TestNumberingCountAndCoverage(t *testing.T) {
 	spans := []stitchedSpan{sspan(2, 0, 3, 1), sspan(2, 4, 7, 1), sspan(1, 10, 13, 1), sspan(1, 14, 17, 1), sspan(3, 20, 21, 1)}
 	phrases := []Phrase{{"first", 0, 3}, {"second", 10, 13}, {"other", 20, 21}}
-	assignments, count, coverage := align(phrases, spans)
+	assignments, count, coverage := align(phrases, spans, nil)
 	if assignments[0].Speaker != "Speaker 1" || assignments[1].Speaker != "Speaker 2" || assignments[2].Speaker != db.VisibleSpeakerOther || count != 2 || coverage != 6.0/7 {
 		t.Fatalf("assignments=%+v count=%d coverage=%v", assignments, count, coverage)
 	}
@@ -411,4 +411,11 @@ func consensusWindow(centroids ...[]float64) WindowReport {
 		window.Spans = append(window.Spans, span(id, float64(i*10), float64(i*10+3), 1), span(id, float64(i*10+4), float64(i*10+7), 1))
 	}
 	return window
+}
+
+// align runs alignWithVisible and also returns the number of visible speakers.
+func align(phrases []Phrase, spans []stitchedSpan, suppressed map[int]bool) ([]db.SpeakerProjectionAssignment, int, float64) {
+	visible := make(map[int]db.VisibleSpeaker)
+	assignments, coverage := alignWithVisible(phrases, spans, suppressed, visible)
+	return assignments, len(visible), coverage
 }

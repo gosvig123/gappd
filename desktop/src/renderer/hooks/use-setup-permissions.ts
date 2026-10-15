@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { CapturePermissions, CapturePermissionTarget } from '../../shared/ipc-contract'
 
-export type SetupPermissionState = {
-  status: 'waiting' | 'checking' | 'granted' | 'blocked' | 'unknown' | 'error'
+export type SetupPermissionStatus = 'waiting' | 'checking' | 'granted' | 'blocked' | 'unknown' | 'error'
+
+type SetupPermissionState = {
+  status: SetupPermissionStatus
   permissions?: CapturePermissions
   error?: string
 }
@@ -24,6 +26,7 @@ export function useSetupPermissions(enabled: boolean) {
     return () => window.removeEventListener('focus', recheck)
   }, [enabled, state.status])
 
+  // Launch and focus only read status; macOS prompts wait for the user's click.
   async function check() {
     await updatePermissionState(false)
   }
@@ -32,20 +35,20 @@ export function useSetupPermissions(enabled: boolean) {
     await updatePermissionState(true)
   }
 
-  async function updatePermissionState(openWhenBlocked: boolean) {
+  async function updatePermissionState(prompt: boolean) {
     if (!enabled) return
-    setState((current) => ({ status: 'checking', permissions: current.permissions }))
+    if (prompt) setState((current) => ({ status: 'checking', permissions: current.permissions }))
     try {
-      const permissions = await window.gappd.system.requestCapturePermissions()
+      const permissions = prompt ? await window.gappd.system.requestCapturePermissions() : await window.gappd.system.checkCapturePermissions()
       const next = permissionState(permissions)
       setState(next)
-      if (openWhenBlocked && next.status !== 'granted') await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
+      if (prompt && next.status !== 'granted') await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
     } catch (err) {
       setState((current) => ({ status: 'error', permissions: current.permissions, error: err instanceof Error ? err.message : String(err) }))
     }
   }
 
-  return { state: enabled ? state : WAITING_PERMISSIONS, ready: enabled && state.status === 'granted', request }
+  return { state: enabled ? state : WAITING_PERMISSIONS, request }
 }
 
 function shouldRecheckOnFocus(status: SetupPermissionState['status']): boolean {

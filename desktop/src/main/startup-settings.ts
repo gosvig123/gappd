@@ -6,6 +6,7 @@ import type { StartupSettings } from '../shared/ipc-contract'
 const MACOS_PLATFORM = 'darwin'
 const STARTUP_MARKER_FILE = 'startup-initialized'
 const SPEAKER_LABELS_DISABLED_FILE = 'speaker-labels-disabled'
+const SCREEN_VIDEO_ENABLED_FILE = 'screen-video-enabled'
 const REQUIRES_APPROVAL_STATUS = 'requires-approval'
 
 export function initializeStartupSettings(): void {
@@ -30,15 +31,23 @@ export function shouldStartHidden(): boolean {
 
 export function getStartupSettings(): StartupSettings {
   const speakerLabelsEnabled = !fs.existsSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE))
-  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled }
+  const screenVideoEnabled = fs.existsSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE))
+  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled, screenVideoEnabled }
   const settings = app.getLoginItemSettings()
-  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled }
+  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled, screenVideoEnabled }
 }
 
 export function setSpeakerLabelsEnabled(enabled: boolean): StartupSettings {
   fs.mkdirSync(app.getPath('userData'), { recursive: true })
   if (enabled) fs.rmSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE), { force: true })
   else fs.writeFileSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE), '')
+  return getStartupSettings()
+}
+
+export function setScreenVideoEnabled(enabled: boolean): StartupSettings {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true })
+  if (enabled) fs.writeFileSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE), '', { flag: 'w', mode: 0o600 })
+  else fs.rmSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE), { force: true })
   return getStartupSettings()
 }
 

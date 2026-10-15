@@ -1,0 +1,188 @@
+.settings-stack,
+.setup-error-banner,
+.setup-error-help {
+  display: grid;
+}
+
+.settings-stack {
+  gap: var(--space-6);
+  /* Settings are hosted in a sheet, a pane, or a modal, so field layout has to
+     follow the container width, not the window width. */
+  container-type: inline-size;
+  container-name: settings;
+}
+
+.setup-error-banner,
+.setup-error-help {
+  gap: var(--space-4);
+}
+
+.setup-error-help {
+  margin-top: var(--space-4);
+}
+
+.status-note {
+  padding: var(--space-5);
+}
+
+.settings-stack h2,
+.settings-stack p {
+  margin: 0;
+}
+
+.settings-grid {
+  display: grid;
+  gap: var(--space-5);
+  /* Field tracks fit the container: one column when tight, up to four when wide.
+     min(100%, 12rem) stops a single track from overflowing a tiny container. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+
+.settings-section {
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.startup-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+
+.startup-setting-copy {
+  display: grid;
+  flex: 1 1 20rem;
+  gap: var(--space-1);
+  min-inline-size: 0;
+  color: var(--color-text-soft);
+}
+
+.startup-setting-copy strong {
+  color: var(--color-text);
+}
+
+.startup-setting input {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--color-accent);
+}
+
+.settings-select {
+  width: 100%;
+  min-height: 2.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.settings-section-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.settings-section-head p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-soft);
+}
+
+.settings-section .ui-button {
+  transition: background var(--transition-smooth), border-color var(--transition-smooth),
+    box-shadow var(--transition-smooth), transform var(--transition-smooth);
+}
+
+.settings-debug .metric-card .value {
+  font-family: var(--font-mono);
+}
+
+.settings-debug-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.settings-debug-alert svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.settings-section-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  vertical-align: -1px;
+  color: var(--color-text-muted);
+}
+
+.settings-repair-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.status-note.danger {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.status-note {
+  color: var(--color-text-soft);
+}
+
+.technical-details {
+  margin-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-3);
+}
+
+.technical-details summary {
+  cursor: pointer;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-md);
+}
+
+.technical-details pre {
+  margin: var(--space-3) 0 0;
+  color: var(--color-danger);
+  font: inherit;
+}
+
+.setup-error-summary {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.setup-error-instructions {
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font: inherit;
+}
+
+/* Narrow containers stack the section header instead of squeezing the status pill. */
+@container settings (max-width: 24rem) {
+  .settings-section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@container settings (max-width: 26rem) {
+  .calendar-account {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .calendar-account-actions .ui-button {
+    flex: 1;
+  }
+}

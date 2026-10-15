@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"sync"
 
@@ -48,13 +49,13 @@ func (b *diagnosticTail) String() string {
 	return string(b.data)
 }
 
-func drainCaptureOutput(reader io.Reader, tail *diagnosticTail, ready chan<- readySignal, stopAcknowledged chan<- struct{}, events chan<- livetranscript.Event) error {
+func drainCaptureOutput(reader io.Reader, tail *diagnosticTail, ready chan<- readySignal, stopAcknowledged chan<- struct{}, events chan<- livetranscript.Event, audioStart chan<- AudioStart) error {
 	buffered := bufio.NewReader(reader)
 	readySeen := false
 	for {
 		line, err := buffered.ReadBytes('\n')
 		if len(line) > 0 {
-			matched, lineErr := routeCaptureLine(bytes.TrimSpace(line), ready, stopAcknowledged, events, &readySeen)
+			matched, lineErr := routeCaptureLine(bytes.TrimSpace(line), ready, stopAcknowledged, events, audioStart, &readySeen)
 			if !matched {
 				_, _ = tail.Write(line)
 			}
@@ -71,7 +72,7 @@ func drainCaptureOutput(reader io.Reader, tail *diagnosticTail, ready chan<- rea
 	}
 }
 
-func routeCaptureLine(line []byte, ready chan<- readySignal, stopAcknowledged chan<- struct{}, events chan<- livetranscript.Event, readySeen *bool) (bool, error) {
+func routeCaptureLine(line []byte, ready chan<- readySignal, stopAcknowledged chan<- struct{}, events chan<- livetranscript.Event, audioStart chan<- AudioStart, readySeen *bool) (bool, error) {
 	sources, matched, err := decodeCaptureReady(line)
 	if matched {
 		if *readySeen {
@@ -85,6 +86,20 @@ func routeCaptureLine(line []byte, ready chan<- readySignal, stopAcknowledged ch
 		select {
 		case stopAcknowledged <- struct{}{}:
 		default:
+		}
+		return true, nil
+	}
+	var started struct {
+		Type        string  `json:"type"`
+		Source      string  `json:"source"`
+		HostSeconds float64 `json:"hostSeconds"`
+	}
+	if json.Unmarshal(line, &started) == nil && started.Type == "audio_source_started" {
+		if (started.Source == "mic" || started.Source == "system") && started.HostSeconds > 0 && !math.IsInf(started.HostSeconds, 0) && !math.IsNaN(started.HostSeconds) {
+			select {
+			case audioStart <- AudioStart{Source: started.Source, HostSeconds: started.HostSeconds}:
+			default:
+			}
 		}
 		return true, nil
 	}

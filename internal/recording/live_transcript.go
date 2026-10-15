@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 	"github.com/gappd-dev/gappd/internal/livetranscript"
 )
 
@@ -13,6 +14,12 @@ func (w meetingRecordingWorkflow) startLiveTranscript(events <-chan livetranscri
 		Language:  language,
 		Events:    events,
 	})
+}
+
+func (w meetingRecordingWorkflow) removeLiveTranscriptChunks(sessionDir string) {
+	if _, err := audioartifact.RemoveChunks(sessionDir); err != nil && w.errOut != nil {
+		fmt.Fprintf(w.errOut, "warning: %v\n", err)
+	}
 }
 
 func (w meetingRecordingWorkflow) finishLiveTranscript(session *livetranscript.Session) {

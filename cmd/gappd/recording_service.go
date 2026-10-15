@@ -42,6 +42,7 @@ func newRecordingWorkflowService(store *db.DB, output recordingOutput, suppressP
 		return recording.Service{}, fmt.Errorf("resolve gappd dir for session path: %w", err)
 	}
 	service.BaseDir = baseDir
+	service.Store = store
 	if output == recordingOutputEvents {
 		service.Events = appprotocol.NewRecordingEventEmitter(os.Stdout, suppressProcessingFailure)
 	}

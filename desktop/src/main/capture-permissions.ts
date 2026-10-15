@@ -6,6 +6,15 @@ import { systemPreferences } from 'electron'
 import type { CapturePermissions } from '../shared/ipc-contract'
 import { childEnv, resolveCaptureApp, resolveCaptureBinary } from './native-runtime'
 
+/**
+ * Reads the current grants without showing a macOS prompt, so the app can
+ * explain what it records before the user decides. macOS attributes the
+ * capture helper's access to this app, so the app's own status is the answer.
+ */
+export function checkCapturePermissions(): CapturePermissions {
+  return { microphone: systemPreferences.getMediaAccessStatus('microphone'), screen: systemPreferences.getMediaAccessStatus('screen') }
+}
+
 export async function requestCapturePermissions(): Promise<CapturePermissions> {
   // The capture helper runs as a child of this app, so macOS TCC attributes the
   // helper's microphone request to the responsible process — this Electron app.

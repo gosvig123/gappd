@@ -85,17 +85,6 @@ func (w meetingRecordingWorkflow) printRecorded(startedAt string) {
 	}
 }
 
-func (s Service) emit(name EventName, meeting db.Meeting, err error) error {
-	return s.recordingWorkflow().emit(name, meeting, err)
-}
-
-func (w meetingRecordingWorkflow) emit(name EventName, meeting db.Meeting, err error) error {
-	if w.events == nil {
-		return nil
-	}
-	return w.events.EmitRecordingEvent(name, meeting, err)
-}
-
 func sanitize(s string) string {
 	var b strings.Builder
 	for _, r := range s {

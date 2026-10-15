@@ -268,6 +268,7 @@ class WAVWriter {
 
 private final class MicBuffer: @unchecked Sendable {
     let pcm: AVAudioPCMBuffer
+    var hostTime: UInt64 = 0
     init?(_ format: AVAudioFormat, capacity: AVAudioFrameCount) {
         guard let pcm = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else { return nil }
         self.pcm = pcm
@@ -289,6 +290,7 @@ final class MicRecorder: @unchecked Sendable {
     private let readIndex = Atomic<Int>(0)
     private let writeIndex = Atomic<Int>(0)
     private let persistedFrames = Atomic<UInt64>(0)
+    private var reportedFirstSample = false
     private let droppedFrames = Atomic<UInt64>(0)
     private let renderError = Atomic<Int32>(0)
     private let processingFailed = Atomic<Bool>(false)
@@ -466,7 +468,10 @@ final class MicRecorder: @unchecked Sendable {
         let status = AudioUnitRender(audioUnit, flags, time, 1, frames, destination.pcm.mutableAudioBufferList)
         if status != noErr { renderError.store(status, ordering: .releasing) }
         if status == noErr && full { droppedFrames.wrappingAdd(UInt64(frames), ordering: .releasing) }
-        if status == noErr && !full { writeIndex.store(next, ordering: .releasing) }
+        if status == noErr && !full {
+            destination.hostTime = time.pointee.mFlags.contains(.hostTimeValid) ? time.pointee.mHostTime : 0
+            writeIndex.store(next, ordering: .releasing)
+        }
         return status
     }
 
@@ -483,8 +488,15 @@ final class MicRecorder: @unchecked Sendable {
         while true {
             let read = readIndex.load(ordering: .relaxed)
             guard read != writeIndex.load(ordering: .acquiring) else { return }
-            let persisted = writeConverted(buffers[read].pcm)
-            if persisted > 0 { persistedFrames.wrappingAdd(persisted, ordering: .releasing) }
+            let buffer = buffers[read]
+            let persisted = writeConverted(buffer.pcm)
+            if persisted > 0 {
+                if !reportedFirstSample && buffer.hostTime != 0 {
+                    reportedFirstSample = true
+                    emitAudioSourceStarted(source: "mic", hostSeconds: Double(AudioConvertHostTimeToNanos(buffer.hostTime)) / 1_000_000_000)
+                }
+                persistedFrames.wrappingAdd(persisted, ordering: .releasing)
+            }
             readIndex.store((read + 1) % buffers.count, ordering: .releasing)
         }
     }
@@ -546,6 +558,7 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
     private let chunkSeconds: Double?
     private let chunkOverlapSeconds: Double
     private let sampleQueue = DispatchQueue(label: "dev.gappd.capture.system-audio")
+    private var reportedFirstSample = false
 
     init(sampleRate: Double, chunkSeconds: Double?, chunkOverlapSeconds: Double) {
         self.sampleRate = sampleRate
@@ -626,6 +639,13 @@ class SystemAudioRecorder: NSObject, SCStreamOutput {
             }
         }
 
+        if !int16Data.isEmpty && !reportedFirstSample {
+            let seconds = CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sampleBuffer))
+            if seconds.isFinite && seconds > 0 {
+                reportedFirstSample = true
+                emitAudioSourceStarted(source: "system", hostSeconds: seconds)
+            }
+        }
         writerState.write(int16Data)
     }
 

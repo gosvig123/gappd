@@ -1,5 +1,5 @@
 export type ManagedRuntimeCapability = 'summarization' | 'transcription' | 'diarization'
-export type ManagedRuntimeReadiness = 'ready' | 'missing' | 'unavailable'
+type ManagedRuntimeReadiness = 'ready' | 'preparing' | 'missing' | 'unavailable'
 
 export type ManagedRuntimeOperation =
   | 'checking'
@@ -40,4 +40,4 @@ export type ManagedRuntimeSnapshot = {
   ownershipConflict?: OwnershipConflict
 }
 
-export type ManagedRuntimePrepareMode = 'setup' | 'repair'
+export type ManagedRuntimePrepareMode = 'setup' | 'repair' | 'speech'

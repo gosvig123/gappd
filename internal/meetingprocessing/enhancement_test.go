@@ -77,24 +77,6 @@ func testProcessingTime() time.Time {
 	return time.Date(2026, 4, 10, 12, 45, 0, 0, time.UTC)
 }
 
-func assertEnhanceFailure(t *testing.T, stored *db.Meeting, transcript string, providerErr string) {
-	t.Helper()
-	if stored.Transcript == nil || *stored.Transcript != transcript {
-		t.Fatalf("transcript = %v, want %q", stored.Transcript, transcript)
-	}
-	assertProcessingFailedContains(t, stored, providerErr)
-}
-
-func assertProcessingFailedContains(t *testing.T, stored *db.Meeting, providerErr string) {
-	t.Helper()
-	if stored.ProcessingStatus != db.ProcessingStatusFailed {
-		t.Fatalf("processing_status = %q, want %q", stored.ProcessingStatus, db.ProcessingStatusFailed)
-	}
-	if stored.ProcessingFailureMessage == nil || !strings.Contains(*stored.ProcessingFailureMessage, providerErr) {
-		t.Fatalf("processing_failure_message = %v, want contains %q", stored.ProcessingFailureMessage, providerErr)
-	}
-}
-
 func assertLastProcessingEvent(t *testing.T, events *testEvents, name EventName, meetingID string, eventErr error) {
 	t.Helper()
 	if len(events.events) == 0 {

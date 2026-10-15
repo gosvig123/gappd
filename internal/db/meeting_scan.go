@@ -31,6 +31,7 @@ func scanMeetingRow(row rowScanner) (Meeting, error) {
 		&m.ProcessingClaimToken, &m.ProcessingClaimExpiresAt, &m.AudioPath, &m.Transcript, &m.TranscriptRevision,
 		&m.Summary, &m.SummaryTranscriptRevision, &m.ExtractionJSON,
 		&m.DiarizationState, &m.DiarizationError, &m.DiarizationJSON, &m.Language, &m.Tags, &m.Source, &m.CreatedAt,
+		&m.VideoState, &m.VideoSourceType, &m.VideoFile, &m.VideoStartSec, &m.VideoEndSec, &m.VideoMessage, &m.VideoOriginHostSec, &m.VideoEndHostSec, &m.MicStartHostSec, &m.SystemStartHostSec,
 	)
 	if err != nil {
 		return Meeting{}, fmt.Errorf("scan meeting: %w", err)
@@ -59,6 +60,7 @@ func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
 		&entry.HasTranscript, &entry.TranscriptRevision, &entry.HasSummary, &entry.SummaryTranscriptRevision, &entry.ExtractionJSON,
 		&entry.DiarizationState, &entry.DiarizationError, &entry.DiarizationJSON,
 		&entry.Language, &entry.Tags, &entry.Source, &entry.CreatedAt,
+		&entry.VideoState, &entry.VideoSourceType, &entry.VideoFile, &entry.VideoStartSec, &entry.VideoEndSec, &entry.VideoMessage, &entry.VideoOriginHostSec, &entry.VideoEndHostSec, &entry.MicStartHostSec, &entry.SystemStartHostSec,
 	)
 	if err != nil {
 		return MeetingListEntry{}, fmt.Errorf("scan meeting list entry: %w", err)

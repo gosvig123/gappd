@@ -1,4 +1,4 @@
-export type ObservableState<T> = {
+type ObservableState<T> = {
   get(): T
   set(next: T): void
   subscribe(listener: (value: T) => void): () => void

@@ -33,7 +33,7 @@ func TestRouteCaptureLineForwardsLiveTranscriptEvent(t *testing.T) {
 	events := make(chan livetranscript.Event, 1)
 	readySeen := false
 	line := []byte(`{"type":"audio_chunk","source":"mic","path":"/tmp/mic.wav","start":0,"end":305,"canonicalStart":0,"canonicalEnd":300}`)
-	matched, err := routeCaptureLine(line, ready, stopAcknowledged, events, &readySeen)
+	matched, err := routeCaptureLine(line, ready, stopAcknowledged, events, make(chan AudioStart, 2), &readySeen)
 	if err != nil || !matched {
 		t.Fatalf("routeCaptureLine() matched=%v error=%v", matched, err)
 	}
@@ -47,7 +47,7 @@ func TestRouteCaptureLineSignalsStopAcknowledgement(t *testing.T) {
 	stopAcknowledged := make(chan struct{}, 1)
 	events := make(chan livetranscript.Event, 1)
 	readySeen := false
-	matched, err := routeCaptureLine([]byte(`{"type":"capture_stop_acknowledged"}`), ready, stopAcknowledged, events, &readySeen)
+	matched, err := routeCaptureLine([]byte(`{"type":"capture_stop_acknowledged"}`), ready, stopAcknowledged, events, make(chan AudioStart, 2), &readySeen)
 	if err != nil || !matched {
 		t.Fatalf("routeCaptureLine() matched=%v error=%v", matched, err)
 	}
@@ -64,8 +64,20 @@ func TestRouteCaptureLineConvertsInvalidEventToDrop(t *testing.T) {
 	events := make(chan livetranscript.Event, 1)
 	readySeen := false
 	line := []byte(`{"type":"audio_chunk","source":"mic","path":"x","start":0,"end":1}`)
-	_, _ = routeCaptureLine(line, ready, stopAcknowledged, events, &readySeen)
+	_, _ = routeCaptureLine(line, ready, stopAcknowledged, events, make(chan AudioStart, 2), &readySeen)
 	if event := <-events; event.Kind != livetranscript.EventDropped {
 		t.Fatalf("event kind = %q, want dropped", event.Kind)
+	}
+}
+
+func TestRouteCaptureLineRecordsMeasuredAudioStart(t *testing.T) {
+	starts := make(chan AudioStart, 2)
+	readySeen := false
+	matched, err := routeCaptureLine([]byte(`{"type":"audio_source_started","source":"mic","hostSeconds":123.5}`), make(chan readySignal, 1), make(chan struct{}, 1), make(chan livetranscript.Event, 1), starts, &readySeen)
+	if !matched || err != nil {
+		t.Fatalf("matched=%v err=%v", matched, err)
+	}
+	if got := <-starts; got.Source != "mic" || got.HostSeconds != 123.5 {
+		t.Fatalf("start=%+v", got)
 	}
 }

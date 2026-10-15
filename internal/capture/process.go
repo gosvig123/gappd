@@ -19,6 +19,7 @@ type captureProcess struct {
 	wait             <-chan error
 	drain            <-chan error
 	ready            <-chan readySignal
+	audioStart       <-chan AudioStart
 	stopAcknowledged <-chan struct{}
 	events           *eventRelay
 	stderr           *diagnosticTail
@@ -54,16 +55,17 @@ func (m Module) start(input Input) (*captureProcess, error) {
 
 	events := newEventRelay()
 	ready := make(chan readySignal, 1)
+	audioStart := make(chan AudioStart, 2)
 	stopAcknowledged := make(chan struct{}, 1)
 	tail := newDiagnosticTail(8 << 10)
 	drain := make(chan error, 1)
 	go func() {
-		drain <- drainCaptureOutput(stdoutReader, tail, ready, stopAcknowledged, events.input)
+		drain <- drainCaptureOutput(stdoutReader, tail, ready, stopAcknowledged, events.input, audioStart)
 	}()
 	wait := make(chan error, 1)
 	go func() { wait <- cmd.Wait() }()
 	return &captureProcess{cmd: cmd, stdout: stdoutReader, wait: wait, drain: drain, ready: ready,
-		stopAcknowledged: stopAcknowledged, events: events, stderr: stderr, stdoutTail: tail}, nil
+		stopAcknowledged: stopAcknowledged, audioStart: audioStart, events: events, stderr: stderr, stdoutTail: tail}, nil
 }
 
 func (p *captureProcess) awaitReady(ctx context.Context, mode CaptureMode) error {

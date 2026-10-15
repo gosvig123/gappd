@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/config"
 )
@@ -93,7 +94,7 @@ func saveCodexTestConfig(t *testing.T, executable string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyCodex(&cfg, executable, "gpt-5")
+	applyCodex(&cfg, executable, ai.CodexSelection{Model: "gpt-5.6-terra", Effort: "medium"})
 	if err := config.Save(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -149,7 +150,10 @@ func markFakeCodex(suffix string) func(*testing.T, string) {
 	}
 }
 
-const fakeCodexCommandScript = `#!/bin/sh
+const fakeCodexCatalogLine = `{"method":"fake/status"}
+{"id":2,"result":{"data":[{"id":"gpt-5.6-terra","model":"gpt-5.6-terra","displayName":"GPT-5.6-Terra","defaultReasoningEffort":"medium","hidden":false,"isDefault":false,"supportedReasoningEfforts":[{"reasoningEffort":"low","description":"Fast"},{"reasoningEffort":"medium","description":"Balanced"},{"reasoningEffort":"high","description":"Deep"}]},{"id":"gpt-6-astra","model":"gpt-6-astra","displayName":"GPT-6-Astra","defaultReasoningEffort":"medium","hidden":false,"isDefault":true,"supportedReasoningEfforts":[{"reasoningEffort":"medium","description":"Balanced"}]}]}}`
+
+var fakeCodexCommandScript = `#!/bin/sh
 if [ "$*" = "--version" ]; then echo version; exit 0; fi
 if [ "$*" = "--help" ]; then
   [ -f "$0.incompatible" ] && echo outdated || echo --config
@@ -162,6 +166,15 @@ fi
 if [ "$*" = "login status" ]; then
   [ -f "$0.logged-out" ] && exit 1
   echo 'Logged in'; exit 0
+fi
+if [ "$*" = "app-server --stdio" ]; then
+  while IFS= read -r line; do
+    case "$line" in
+      *'"method":"initialize"'*) printf '%s\n' '{"id":1,"result":{"userAgent":"fake-codex"}}' ;;
+      *'"method":"model/list"'*) printf '%s\n' '` + fakeCodexCatalogLine + `' ;;
+    esac
+  done
+  exit 0
 fi
 exit 9
 `

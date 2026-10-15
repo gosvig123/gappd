@@ -1,21 +1,30 @@
+import type { MeetingUploadStatus } from './meeting-upload-contract'
+import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
+import type { AssignSpeakerInput, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
-export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean }
+export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
-export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean }
-export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; available: boolean; error?: string }
-export type CodexConfigurationInput = { executable: string; model: string }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean }
+/** The newest Codex CLI found on this Mac. executable is empty when Codex is not installed. */
+export type CodexInstall = { executable: string; version: string; signedIn: boolean }
+export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutable: string; codexModel: string; codexReasoningEffort: string; available: boolean; error?: string }
+export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
+export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
+export type CodexModelCatalog = { models: CodexModelOption[]; defaultModel: string; defaultReasoningEffort: string }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
 export type IpcInvokeContract = {
+  meetingUpload: { status: OperationSpec<[], MeetingUploadStatus>; connect: OperationSpec<[enabled: boolean], MeetingUploadStatus>; setConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; enqueue: OperationSpec<[localId: string], MeetingUploadStatus>; sync: OperationSpec<[], MeetingUploadStatus>; setAccountDeleteConsent: OperationSpec<[subject: string, enabled: boolean], MeetingUploadStatus>; deleteAll: OperationSpec<[], MeetingUploadStatus>; allowUploads: OperationSpec<[], MeetingUploadStatus>; setRevokeConsent: OperationSpec<[subject: string, enabled: boolean, clientId: string], MeetingUploadStatus>; revokeClient: OperationSpec<[subject: string, clientId: string], MeetingUploadStatus>; knownClients: OperationSpec<[], string[]>; setDeleteConsent: OperationSpec<[subject: string, enabled: boolean, localId: string], MeetingUploadStatus>; deleteCopy: OperationSpec<[subject: string, localId: string], MeetingUploadStatus> }
   system: {
     getDevices: OperationSpec<[], Device[]>
+    checkCapturePermissions: OperationSpec<[], CapturePermissions>
     requestCapturePermissions: OperationSpec<[], CapturePermissions>
     openPermissionsSettings: OperationSpec<[target?: CapturePermissionTarget], void>
     startStaleRecordingRecovery: OperationSpec<[], number>
@@ -25,6 +34,14 @@ export type IpcInvokeContract = {
     show: OperationSpec<[id: string], MeetingDetail>
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
+    people: OperationSpec<[], SavedPerson[]>
+    updatePerson: OperationSpec<[input: UpdatePersonInput], SavedPerson[]>
+    mergePeople: OperationSpec<[input: MergePeopleInput], SavedPerson[]>
+    assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
+    speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
+    participantContext: OperationSpec<[id: string], ParticipantContext>
+    linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
+    exportRecording: OperationSpec<[id: string], boolean>
   }
   recording: {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
@@ -37,8 +54,17 @@ export type IpcInvokeContract = {
   }
   aiProvider: {
     status: OperationSpec<[], AIProviderStatus>
+    find: OperationSpec<[], CodexInstall>
+    models: OperationSpec<[executable?: string], CodexModelCatalog>
     configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
     useLocal: OperationSpec<[], AIProviderStatus>
+  }
+  googleCalendar: {
+    snapshot: OperationSpec<[], CalendarSnapshot>
+    contacts: OperationSpec<[], CalendarParticipant[]>
+    connect: OperationSpec<[], CalendarSnapshot>
+    sync: OperationSpec<[connectionId: string], CalendarSnapshot>
+    disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -51,6 +77,7 @@ export type IpcInvokeContract = {
     getSettings: OperationSpec<[], StartupSettings>
     setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
+    setScreenVideoEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
 }
 
@@ -63,16 +90,27 @@ export type IpcInvokeApi = { [G in IpcOperationGroup]: { [N in IpcOperationName<
 type IpcOperationChannels = { [G in IpcOperationGroup]: { [N in IpcOperationName<G>]: `${G}:${string}` } }
 
 export const IPC_OPERATIONS = {
+  meetingUpload: { status: 'meetingUpload:status', connect: 'meetingUpload:connect', setConsent: 'meetingUpload:setConsent', enqueue: 'meetingUpload:enqueue', sync: 'meetingUpload:sync', setAccountDeleteConsent: 'meetingUpload:setAccountDeleteConsent', deleteAll: 'meetingUpload:deleteAll', allowUploads: 'meetingUpload:allowUploads', setRevokeConsent: 'meetingUpload:setRevokeConsent', revokeClient: 'meetingUpload:revokeClient', knownClients: 'meetingUpload:knownClients', setDeleteConsent: 'meetingUpload:setDeleteConsent', deleteCopy: 'meetingUpload:deleteCopy' },
   system: {
     getDevices: 'system:getDevices',
+    checkCapturePermissions: 'system:checkCapturePermissions',
     requestCapturePermissions: 'system:requestCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
   },
-  meetings: { list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete' },
+  meetings: {
+    list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
+    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
+    participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
+    exportRecording: 'meetings:exportRecording',
+  },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
-  aiProvider: { status: 'aiProvider:status', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
+  googleCalendar: {
+    snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect', contacts: 'googleCalendar:contacts',
+    sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
+  },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',
@@ -83,7 +121,7 @@ export const IPC_OPERATIONS = {
   startup: {
     getSettings: 'startup:getSettings',
     setOpenAtLogin: 'startup:setOpenAtLogin',
-    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled',
+    setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled', setScreenVideoEnabled: 'startup:setScreenVideoEnabled',
   },
 } as const satisfies IpcOperationChannels
 

@@ -17,6 +17,9 @@ type AI struct {
 	Managed         bool    `toml:"managed"`
 	CodexExecutable string  `toml:"codex_executable,omitempty"`
 	CodexModel      string  `toml:"codex_model,omitempty"`
+	// CodexReasoningEffort is an effort advertised by the selected Codex model.
+	// An empty value resolves to the model's catalog default at operation time.
+	CodexReasoningEffort string `toml:"codex_reasoning_effort,omitempty"`
 }
 
 type Config struct {
@@ -145,6 +148,7 @@ func normalizeConfig(cfg *Config) error {
 	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
 	cfg.AI.CodexExecutable = strings.TrimSpace(cfg.AI.CodexExecutable)
 	cfg.AI.CodexModel = strings.TrimSpace(cfg.AI.CodexModel)
+	cfg.AI.CodexReasoningEffort = strings.ToLower(strings.TrimSpace(cfg.AI.CodexReasoningEffort))
 	if cfg.DBPath == "" {
 		return fmt.Errorf("config db_path must not be empty")
 	}

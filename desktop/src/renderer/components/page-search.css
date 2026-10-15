@@ -63,13 +63,12 @@
   color: var(--color-warning);
 }
 
-.page-search-match {
-  border-radius: 0.1875rem;
+::highlight(page-search-match) {
   background: var(--color-warning-bg);
   color: inherit;
 }
 
-.page-search-match.active {
+::highlight(page-search-active) {
   background: var(--color-accent);
   color: var(--color-accent-contrast);
 }
