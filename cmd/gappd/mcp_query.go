@@ -14,11 +14,14 @@ import (
 )
 
 const (
-	defaultQueryRows  = 50
-	maxQueryRows      = 100
-	maxQueryBytes     = 48 * 1024
-	queryTimeout      = 3 * time.Second
-	sqliteLimitLength = 0
+	defaultQueryRows = 50
+	maxQueryRows     = 100
+	maxQueryBytes    = 48 * 1024
+	// maxQueryValueBytes bounds memory for one SQLite value. It is above the
+	// largest stored transcript, so substr() can read long values in chunks.
+	maxQueryValueBytes = 16 * 1024 * 1024
+	queryTimeout       = 3 * time.Second
+	sqliteLimitLength  = 0
 )
 
 var forbiddenSQL = regexp.MustCompile(`(?i)\b(insert|update|delete|replace|create|drop|alter|vacuum|attach|detach|pragma|reindex|analyze|load_extension)\b`)
@@ -51,10 +54,26 @@ func executeQuery(parent context.Context, database *sql.DB, args queryArgs) (que
 	defer conn.Close()
 	rows, err := conn.QueryContext(ctx, strings.TrimSpace(args.SQL), args.Params...)
 	if err != nil {
-		return queryResult{}, fmt.Errorf("query database: %w", err)
+		return queryResult{}, queryError(err)
 	}
 	defer rows.Close()
-	return collectQueryRows(rows, queryRowLimit(args.MaxRows))
+	result, err := collectQueryRows(rows, queryRowLimit(args.MaxRows))
+	if err != nil {
+		return queryResult{}, queryError(err)
+	}
+	return result, nil
+}
+
+// queryError adds a recovery step to SQLite errors that agents hit often.
+func queryError(err error) error {
+	message := err.Error()
+	switch {
+	case strings.Contains(message, "string or blob too big"):
+		return fmt.Errorf("query database: a value is larger than %d MB: %w", maxQueryValueBytes/(1024*1024), err)
+	case strings.Contains(message, "no such table"):
+		return fmt.Errorf("query database: %w: the database is SQLite; list tables with SELECT name, sql FROM sqlite_master WHERE type = 'table'", err)
+	}
+	return fmt.Errorf("query database: %w", err)
 }
 
 func limitedQueryConnection(ctx context.Context, database *sql.DB) (*sql.Conn, error) {
@@ -62,7 +81,7 @@ func limitedQueryConnection(ctx context.Context, database *sql.DB) (*sql.Conn, e
 	if err != nil {
 		return nil, fmt.Errorf("acquire query connection: %w", err)
 	}
-	if _, err := sqlite.Limit(conn, sqliteLimitLength, maxQueryBytes); err != nil {
+	if _, err := sqlite.Limit(conn, sqliteLimitLength, maxQueryValueBytes); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("limit query values: %w", err)
 	}

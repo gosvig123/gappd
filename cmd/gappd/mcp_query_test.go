@@ -72,7 +72,7 @@ func TestExecuteQueryRejectsOversizedGeneratedValue(t *testing.T) {
 	store := openMCPTestDB(t)
 	defer store.Close()
 	_, err := executeQuery(context.Background(), store.Conn, queryArgs{
-		SQL: "SELECT zeroblob(?)", Params: []any{float64(maxQueryBytes * 2)},
+		SQL: "SELECT zeroblob(?)", Params: []any{float64(maxQueryValueBytes * 2)},
 	})
 	if err == nil {
 		t.Fatal("oversized generated value succeeded")
