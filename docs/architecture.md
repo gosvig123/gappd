@@ -28,7 +28,7 @@ All inference stays on the Mac. Network access is used for application updates a
 
 ### Electron desktop
 
-`desktop/src/renderer` owns user interface state: `views/` holds the top-level screens (Today, Meetings, People, Settings), `components/` holds shared pieces with `meeting/`, `agenda/`, `settings/`, and `slack/` subfolders, and `hooks/` and `lib/` hold state and pure helpers. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
+`desktop/src/renderer` owns user interface state: `views/` holds the top-level screens (Today, Meetings, People, Settings), `components/` holds shared pieces with `meeting/` and `settings/` subfolders, and `hooks/` and `lib/` hold state and pure helpers. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
 
 `desktop/src/main` owns operating-system integration and process orchestration:
 
@@ -39,7 +39,7 @@ All inference stays on the Mac. Network access is used for application updates a
 - background processing drains and sleep handling;
 - stale-recording recovery, launch-at-login, and updates.
 
-Integrations are grouped in subfolders: `cloud/` (account authorization and Cloud upload), `google/` (Google Calendar and Gmail), `slack/`, `agenda/` (Agenda draft storage and communication), and `managed-runtime/` (Local AI: llama.cpp, Apple Speech, and diarization). Each test sits beside the module it tests.
+Integrations are grouped in subfolders: `cloud/` (account authorization and Cloud upload), `google/` (Google Calendar), and `managed-runtime/` (Local AI: llama.cpp, Apple Speech, and diarization). Each test sits beside the module it tests.
 
 ### Go meeting engine
 
