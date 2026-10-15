@@ -3,6 +3,8 @@ package diarize
 import (
 	"math"
 	"sort"
+
+	"github.com/gappd-dev/gappd/internal/db"
 )
 
 func stitchWindows(windows []WindowReport) ([]stitchedSpan, map[int][]float64) {
@@ -14,7 +16,7 @@ func stitchWindows(windows []WindowReport) ([]stitchedSpan, map[int][]float64) {
 		sort.Slice(clusters, func(i, j int) bool { return clusters[i].ID < clusters[j].ID })
 		matches := matchWindow(window, clusters, globals, previous)
 		next = mergeWindowClusters(clusters, matches, globals, next)
-		markUncleanClusters(window, matches, globals)
+		markVanishedClusters(window, matches, globals)
 		canonicalEnd := window.StartSeconds + window.DurationSeconds
 		if wi+1 < len(windows) {
 			canonicalEnd = window.StartSeconds + WindowSeconds - WindowOverlapSeconds
@@ -57,7 +59,8 @@ func projectWindowSpans(window WindowReport, matches map[string]clusterMatch, ca
 		}
 		start, end = math.Max(start, window.StartSeconds), math.Min(end, canonicalEnd)
 		if end > start {
-			out = append(out, stitchedSpan{speaker: match.speaker, start: start, end: end, confidence: confidence, vetoOnly: vetoOnly})
+			voiceClean := span.Quality >= db.MinimumVoiceQuality && match.continuity >= db.MinimumVoiceQuality
+			out = append(out, stitchedSpan{speaker: match.speaker, start: start, end: end, confidence: confidence, vetoOnly: vetoOnly, voiceClean: voiceClean})
 		}
 	}
 	return out, previous

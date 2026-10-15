@@ -1,26 +1,27 @@
 package diarize
 
-import (
-	"github.com/gappd-dev/gappd/internal/db"
-	"math"
-)
+import "math"
 
 const minimumVoiceConsistency = 0.85
 
-// The centroid uses all cluster speech. Reject the entire cluster if any of it is unclean.
+// Voice evidence counts only clean speech: high quality and continuity, no overlap, not suppressed.
+// Per-span identity is not required: in calls with several speakers it is rarely high, and a
+// manual label confirms who the cluster is. Returns clean seconds and their share of the speech.
 func cleanClusterSpeech(speaker int, spans []stitchedSpan) (float64, float64) {
-	seconds, quality := 0.0, 1.0
+	total, clean := 0.0, 0.0
 	for i, span := range spans {
 		if span.speaker != speaker {
 			continue
 		}
-		if span.vetoOnly || overlapsSpeech(i, spans) {
-			return 0, 0
+		total += span.end - span.start
+		if span.voiceClean && !span.vetoOnly && !overlapsSpeech(i, spans) {
+			clean += span.end - span.start
 		}
-		seconds += span.end - span.start
-		quality = math.Min(quality, span.confidence)
 	}
-	return seconds, quality
+	if total == 0 {
+		return 0, 0
+	}
+	return clean, clean / total
 }
 
 func overlapsSpeech(index int, spans []stitchedSpan) bool {
@@ -43,25 +44,15 @@ func checkVoiceConsistency(cluster *globalCluster, vector []float64) {
 	cluster.evidence = append(cluster.evidence, vector)
 }
 
-// Check full windows too: stitched spans omit duplicate overlap, while centroids use it.
-func markUncleanClusters(window WindowReport, matches map[string]clusterMatch, globals map[int]*globalCluster) {
+// A window centroid without any span cannot be checked against speech; reject its cluster.
+func markVanishedClusters(window WindowReport, matches map[string]clusterMatch, globals map[int]*globalCluster) {
 	seen := map[string]bool{}
-	for i, span := range window.Spans {
+	for _, span := range window.Spans {
 		seen[span.ClusterID] = true
-		unclean := span.Quality < db.MinimumVoiceQuality || span.Identity < db.MinimumVoiceQuality || matches[span.ClusterID].continuity < db.MinimumVoiceQuality
-		for j, other := range window.Spans {
-			if i != j && math.Min(span.EndSeconds, other.EndSeconds) > math.Max(span.StartSeconds, other.StartSeconds) {
-				unclean = true
-			}
-		}
-		if unclean {
-			globals[matches[span.ClusterID].speaker].unclean = true
-		}
 	}
 	for _, cluster := range window.Clusters {
 		if !seen[cluster.ID] {
 			globals[matches[cluster.ID].speaker].unclean = true
 		}
 	}
-
 }

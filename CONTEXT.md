@@ -16,6 +16,9 @@ A saved identity that can be assigned to speakers in multiple meetings.
 **Meeting speaker**:
 A voice identified within one meeting, optionally linked to a saved person.
 
+**Voice suggestion**:
+A likely **Person** for an unlabeled **Meeting speaker**, based on voice similarity, that the user confirms or ignores.
+
 **Calendar invitee**:
 A person listed on a calendar event whose attendance and voice identity still need confirmation.
 
@@ -38,6 +41,8 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - Renaming a **Person** or merging two People refreshes the transcript and summary of each **Meeting** whose shown name changes. A merge moves speaker labels and voice evidence to the kept **Person**, which keeps one email; two People with different emails are never suggested as duplicates.
 - Explicitly labeling clean remote speech can supply local voice evidence for future **Meeting speaker** auto-fill; automatic labels never supply training evidence, and correction or removal retracts the affected evidence.
+- Voice evidence needs at least 15 seconds of clean speech (good quality, no overlap) and comes from the whole speaker's voice; one unclear span no longer rejects the speaker.
+- A **Voice suggestion** considers every Person with voice evidence, but never labels a speaker, changes the transcript, or adds voice evidence; confirming it is a manual label. Closer voices are auto-filled instead.
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain.

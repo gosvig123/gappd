@@ -55,12 +55,18 @@ func loadCandidateProfiles(tx *sql.Tx, meetingID string, emails []string, calend
 	if err != nil || len(ids) == 0 {
 		return nil, err
 	}
-	query, args := inQuery(`SELECT v.person_id,e.centroid FROM voice_samples v
+	query, args := inQuery(voiceProfilesSQL+` AND v.person_id IN (%s)`, ids)
+	return queryProfiles(tx, query, append([]any{VoiceModel, meetingID, meetingID}, args...)...)
+}
+
+// Profiles from other Meetings, excluding people the user already labeled in this Meeting.
+const voiceProfilesSQL = `SELECT v.person_id,e.centroid FROM voice_samples v
  JOIN meeting_speaker_embeddings e USING(meeting_id,speaker_key)
- WHERE v.person_id IN (%s) AND e.model=? AND v.meeting_id<>? AND NOT EXISTS(
+ WHERE e.model=? AND v.meeting_id<>? AND NOT EXISTS(
  SELECT 1 FROM meeting_speakers ms WHERE ms.meeting_id=? AND ms.person_id=v.person_id
- AND NOT EXISTS(SELECT 1 FROM speaker_identity_state st WHERE st.meeting_id=ms.meeting_id AND st.speaker_key=ms.speaker_key AND st.origin='automatic'))`, ids)
-	args = append(args, VoiceModel, meetingID, meetingID)
+ AND NOT EXISTS(SELECT 1 FROM speaker_identity_state st WHERE st.meeting_id=ms.meeting_id AND st.speaker_key=ms.speaker_key AND st.origin='automatic'))`
+
+func queryProfiles(tx *sql.Tx, query string, args ...any) ([]voiceProfile, error) {
 	rows, err := tx.Query(query, args...)
 	if err != nil {
 		return nil, err

@@ -93,7 +93,7 @@ export const APP_COMMANDS = {
   'record.recoverStale': { mode: 'request', args: (_input: EmptyInput) => ['app', 'record', 'recover-stale', '--json'], env: [], terminal: [] },
   'record.start': { mode: 'stream', args: (input: RecordStartInput) => ['app', 'record', 'start', '--title', String(input.title), '--device', String(input.device), '--mode', String(input.mode), '--language', String(input.language), ...(input.speakerLabelsEnabled === undefined ? [] : ['--speaker-labels-enabled=' + String(input.speakerLabelsEnabled)]), ...(input.screenVideoEnabled === undefined ? [] : ['--screen-video-enabled=' + String(input.screenVideoEnabled)])], env: ['GAPPD_CAPTURE_HELPER_PATH'], terminal: ['recording.captured', 'recording.failed'] },
   'meetings.voiceTargets': { mode: 'request', args: (input: VoiceTargetsInput) => ['app', 'meetings', 'voice-targets', '--after', String(input.after), '--json'], env: [], terminal: [] },
-  'meetings.recognizeSpeakers': { mode: 'request', args: (input: RecognizeSpeakersInput) => ['app', 'meetings', 'recognize-speakers', String(input.id), '--revision', String(input.revision), '--emails', String(input.emails), '--calendar', String(input.calendar), '--json'], env: [], terminal: [] },
+  'meetings.recognizeSpeakers': { mode: 'request', args: (input: RecognizeSpeakersInput) => ['app', 'meetings', 'recognize-speakers', String(input.id), '--revision', String(input.revision), '--emails', String(input.emails), '--calendar=' + String(input.calendar), '--json'], env: [], terminal: [] },
 } as const satisfies AppCommandDefinitions
 
 export type AppCommandID = keyof typeof APP_COMMANDS

@@ -18,8 +18,11 @@ are regenerated from the named transcript. If processing fails, the assignment
 remains saved and the normal processing recovery flow can retry.
 
 Saved people remain available across calls. An explicit person label can enroll
-clean, sufficient remote speech for local speaker auto-fill. Automatic labels
-never train voice profiles. **You** and **Other** do not enroll in this version.
+clean, sufficient remote speech for local voice suggestions and auto-fill:
+at least 15 seconds of clean speech, and at least half of that speaker's speech.
+Clean speech has good quality, matches the speaker across 10-minute windows,
+and does not overlap other speech. Automatic labels and suggestions never train
+voice profiles. **You** and **Other** do not enroll in this version.
 Email addresses reuse existing people; names alone do not merge people.
 
 After speaker processing, the desktop can fill names before summarization.
@@ -29,6 +32,15 @@ come from a current manually labeled remote person and previous manually
 confirmed coattendance. Global history and automatic labels cannot seed a group.
 Unknown or ambiguous voices stay unnamed. Score and margin thresholds are
 conservative rules, not measured accuracy guarantees.
+
+When an unlabeled speaker's voice is similar to one saved person's voice
+samples (similarity 0.75 or more, clearly ahead of every other person) but not
+close enough to fill the name, the speaker shows **Sounds like NAME?** and the
+panel summary counts the suggestions. Choose **Yes, NAME** to confirm, or pick
+someone else. Suggestions consider every person with voice samples, without a
+Calendar constraint, because you confirm each one. They do not change the
+transcript. Labeling the speaker, or labeling the suggested person on another
+speaker, removes the suggestion.
 
 **Auto-filled · check label** marks automatic names. Use the person menu to
 correct or clear a label. Clearing a remote label stops automatic filling for
@@ -85,4 +97,6 @@ eligible Meetings (use an empty `--after` for the first page). It calls
 snapshot it passes `--calendar=false` and an empty email list. The backend rejects
 stale revisions and active processing claims. Neither history reads nor Meeting
 detail reads run recognition. Speaker views expose `identityOrigin` as `manual`
-or `automatic` when a Person is assigned.
+or `automatic` when a Person is assigned, and `suggestedPersonId` when an
+unlabeled speaker has a voice suggestion. The same recognition call stores
+suggestions; history and Meeting detail reads only read them.

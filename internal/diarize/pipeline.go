@@ -81,6 +81,7 @@ type stitchedSpan struct {
 	speaker                int
 	start, end, confidence float64
 	vetoOnly               bool
+	voiceClean             bool // Quality and window continuity are high enough for voice evidence.
 }
 type clusterMatch struct {
 	speaker    int

@@ -98,6 +98,7 @@ export type MeetingSpeaker = {
   key: string
   name: string
   personId?: string
+  suggestedPersonId?: string
 }
 
 export type MeetingSegment = {

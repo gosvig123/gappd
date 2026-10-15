@@ -83,5 +83,8 @@ func applySpeakerIdentity(tx *sql.Tx, meetingID, key string, person Person) erro
 	if err := enrollAssignedSpeaker(tx, meetingID, key); err != nil {
 		return err
 	}
+	if err := retractSuggestions(tx, meetingID, key); err != nil {
+		return err
+	}
 	return refreshSpeakerTranscript(tx, meetingID)
 }
