@@ -2,38 +2,34 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import type { AppView } from '../lib/app-view'
 import type { ConfirmController } from '../components/confirm'
-import type { MeetingTab } from '../components/meeting/open-scope'
-import { useOpenMeeting } from '../components/meeting/open-scope'
 import { MeetingPanel } from '../components/meeting/panel'
-import { WorkspaceAgenda } from '../components/agenda/workspace-agenda'
+import { WorkspaceEvent } from '../components/meeting/workspace-event'
 import { searchMeetings } from '../lib/meeting-grouping'
-import { filterWorkspaceRows, workspaceRows, type AgendaTarget, type WorkspaceRow } from '../lib/meetings-workspace'
+import { filterWorkspaceRows, workspaceRows, type CalendarTarget, type WorkspaceRow } from '../lib/meetings-workspace'
 import { WorkspaceList } from './workspace-list'
-import { AGENDA_DRAFTS_ENABLED } from '../lib/features'
 import './meetings-workspace.css'
 
-const SEARCH_LABEL = AGENDA_DRAFTS_ENABLED ? 'Search Meetings, events, and Agenda topics' : 'Search Meetings and events'
+const SEARCH_LABEL = 'Search Meetings and events'
 
-type Props = { view: AppView; searchRef: React.RefObject<HTMLInputElement | null>; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void; onOpenCalendarSettings: () => void }
+type Props = { view: AppView; searchRef: React.RefObject<HTMLInputElement | null>; confirm: ConfirmController; onOpenCalendarSettings: () => void }
 
-export function MeetingsView({ view, searchRef, confirm, initialTab, onOpenSettings, onOpenCalendarSettings }: Props) {
+export function MeetingsView({ view, searchRef, confirm, onOpenCalendarSettings }: Props) {
   const [query, setQuery] = useState('')
-  const [agenda, setAgenda] = useState<AgendaTarget | null>(null)
+  const [event, setEvent] = useState<CalendarTarget | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
-  const openMeeting = useOpenMeeting(view.actions.openMeeting)
   const rows = useWorkspaceRows(view, query)
-  const close = () => { setAgenda(null); view.actions.closeMeeting(); requestAnimationFrame(() => (trigger.current?.isConnected ? trigger.current : searchRef.current)?.focus()) }
+  const close = () => { setEvent(null); view.actions.closeMeeting(); requestAnimationFrame(() => (trigger.current?.isConnected ? trigger.current : searchRef.current)?.focus()) }
   const select = (row: WorkspaceRow, button: HTMLButtonElement) => {
     trigger.current = button; setQuery('')
-    if (row.kind === 'meeting') { setAgenda(null); openMeeting(row.meeting.id) }
-    else { view.actions.closeMeeting(); setAgenda(row.target) }
+    if (row.kind === 'meeting') { setEvent(null); view.actions.openMeeting(row.meeting.id) }
+    else { view.actions.closeMeeting(); setEvent(row.target) }
   }
-  useEffect(() => { if (view.selectedMeetingId) setAgenda(null) }, [view.selectedMeetingId])
-  const selectedKey = view.selectedMeetingId ? `meeting:${view.selectedMeetingId}` : agenda ? `agenda:${agenda.draftKey}` : null
+  useEffect(() => { if (view.selectedMeetingId) setEvent(null) }, [view.selectedMeetingId])
+  const selectedKey = view.selectedMeetingId ? `meeting:${view.selectedMeetingId}` : event ? `event:${event.key}` : null
   return <div className={`meetings-workspace ${selectedKey ? 'has-selection' : ''} ${query.trim() ? 'is-searching' : ''}`}>
     <WorkspaceHeader view={view} query={query} setQuery={setQuery} searchRef={searchRef} onOpenCalendarSettings={onOpenCalendarSettings} />
     <div className="workspace-columns"><div className="workspace-list ui-scroll"><WorkspaceList {...rows} selectedKey={selectedKey} searching={Boolean(query.trim())} onSelect={select} /></div>
-      {selectedKey ? <div className="workspace-content">{view.selectedMeetingId ? <MeetingPanel view={{ ...view, actions: { ...view.actions, closeMeeting: close } }} confirm={confirm} initialTab={initialTab} onOpenSettings={onOpenSettings} /> : agenda ? <WorkspaceAgenda target={agenda} view={view} onClose={close} onOpenSettings={onOpenSettings} /> : null}</div> : null}
+      {selectedKey ? <div className="workspace-content">{view.selectedMeetingId ? <MeetingPanel view={{ ...view, actions: { ...view.actions, closeMeeting: close } }} confirm={confirm} /> : event ? <WorkspaceEvent target={event} view={view} onClose={close} /> : null}</div> : null}
     </div>
   </div>
 }
@@ -45,7 +41,7 @@ function useWorkspaceRows(view: AppView, query: string) {
     const rows = workspaceRows(view, now)
     const matches = new Set(searchMeetings(view.meetings, view.meetingDetails, query).map(hit => hit.meeting.id))
     return { upcoming: filterWorkspaceRows(rows.upcoming, query, matches), history: filterWorkspaceRows(rows.history, query, matches) }
-  }, [view.meetings, view.meetingDetails, view.meetingEvents, view.calendar, view.drafts, query, now])
+  }, [view.meetings, view.meetingDetails, view.meetingEvents, view.calendar, query, now])
 }
 
 function WorkspaceHeader({ view, query, setQuery, searchRef, onOpenCalendarSettings }: Pick<Props, 'view' | 'searchRef' | 'onOpenCalendarSettings'> & { query: string; setQuery: (value: string) => void }) {

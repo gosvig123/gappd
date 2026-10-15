@@ -1,5 +1,6 @@
 import type { CalendarHistoryRange } from '../../shared/calendar-contract'
-import type { MeetingInterval } from '../../shared/calendar-reconciliation'
+
+type MeetingInterval = { startedAt: string; endedAt?: string }
 
 const MAX_RANGE_MS = 30 * 24 * 60 * 60 * 1000
 const MAX_HISTORY_RANGES = 120

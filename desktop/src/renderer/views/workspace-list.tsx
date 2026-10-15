@@ -30,8 +30,8 @@ function DayGroups({ rows, ...props }: Pick<Props, 'selectedKey' | 'onSelect'> &
 function WorkspaceRowButton({ row, next = false, selectedKey, onSelect }: Pick<Props, 'selectedKey' | 'onSelect'> & { row: WorkspaceRow; next?: boolean }) {
   const failed = row.kind === 'meeting' && meetingFailed(row.meeting)
   // Only unusual states get a label; a finished Meeting or a planned event stays quiet.
-  const note = row.kind === 'meeting' ? (failed ? 'Failed' : artifactNote(row.meeting)) : row.kind === 'draft' ? 'Saved draft' : next ? dayLabel(row.start) : null
-  const detail = row.kind === 'meeting' ? undefined : row.kind === 'planned' ? 'Calendar event; not recorded' : 'Saved Agenda draft; no recording'
+  const note = row.kind === 'meeting' ? (failed ? 'Failed' : artifactNote(row.meeting)) : next ? dayLabel(row.start) : null
+  const detail = row.kind === 'meeting' ? undefined : 'Calendar event; not recorded'
   return <button type="button" className={cx('workspace-row', next && 'is-next')} data-workspace-key={row.key} aria-current={row.key === selectedKey ? 'true' : undefined} onClick={event => onSelect(row, event.currentTarget)} title={detail}>
     <strong className="workspace-row-title">{row.title || 'Untitled meeting'}</strong>
     <span className="workspace-row-time">{new Date(row.start).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>

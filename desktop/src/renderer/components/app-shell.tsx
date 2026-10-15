@@ -6,7 +6,6 @@ import { PeopleView } from '../views/people'
 import { TodayView } from '../views/today'
 import { AppSidebar, type SectionKey } from './app-sidebar'
 import { useConfirm } from './confirm'
-import { OpenMeetingScope, type MeetingTab, type OpenMeeting } from './meeting/open-scope'
 import { NotificationStack, useMeetingReadyNotices } from './notifications'
 import { PageSearch } from './page-search'
 import { RecordBar } from './record-bar'
@@ -37,29 +36,28 @@ function useShellController(view: AppView) {
   const [section, setSection] = useState<SectionKey>('today')
   const [settingsCategory, setSettingsCategory] = useState<string | null>(null)
   const [wantsSearch, setWantsSearch] = useState(false)
-  const [pendingTab, setPendingTab] = useState<MeetingTab | null>(null)
   const [notices, dismissNotice] = useMeetingReadyNotices(view.meetings)
   const searchRef = useRef<HTMLInputElement>(null)
   const confirm = useConfirm()
   const alerts = buildAlerts(view)
   const focusMeetingsSearch = useCallback(() => { setSection('meetings'); setWantsSearch(true) }, [])
-  const openMeeting = useCallback<OpenMeeting>((id, tab) => { setSection('meetings'); setPendingTab(tab ?? null); view.actions.openMeeting(id) }, [view.actions])
+  const openMeeting = useCallback((id: string) => { setSection('meetings'); view.actions.openMeeting(id) }, [view.actions])
   useSearchShortcut(focusMeetingsSearch)
   usePendingSearchFocus(wantsSearch, section, searchRef, () => setWantsSearch(false))
-  return { section, setSection, settingsCategory, setSettingsCategory, pendingTab, notices, dismissNotice, searchRef, confirm, alerts, openMeeting }
+  return { section, setSection, settingsCategory, setSettingsCategory, notices, dismissNotice, searchRef, confirm, alerts, openMeeting }
 }
 
 function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof useShellController> }) {
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
-    <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}><OpenMeetingScope open={shell.openMeeting}>
+    <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
-      {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} initialTab={shell.pendingTab} onOpenSettings={() => shell.setSettingsCategory('Meeting processing')} onOpenCalendarSettings={() => shell.setSettingsCategory('Connections')} /> : null}
+      {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} onOpenCalendarSettings={() => shell.setSettingsCategory('Connections')} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}
-    </OpenMeetingScope></div>
+    </div>
   </main>
 }
 
-/** Cmd/Ctrl+F searches local Meetings, Calendar events, and saved Agenda topics when Agenda drafts are shown. */
+/** Cmd/Ctrl+F searches local Meetings and Calendar events. */
 function useSearchShortcut(activate: () => void): void {
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {

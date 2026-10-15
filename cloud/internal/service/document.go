@@ -44,7 +44,7 @@ type DocumentTurn struct {
 }
 
 // MeetingDocument is the complete uploaded text of one Meeting. It carries no audio,
-// no Person identity, no voice evidence, no local path and no Saved Agenda draft.
+// no Person identity, no voice evidence and no local path.
 type MeetingDocument struct {
 	Version   int               `json:"version"`
 	MeetingID string            `json:"meeting_id"`

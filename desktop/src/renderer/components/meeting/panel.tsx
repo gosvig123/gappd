@@ -9,43 +9,33 @@ import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../ui'
 import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
 import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
-import { agendaStateForMeeting, agendaTabLabel } from '../../lib/agenda-status'
-import { AgendaPane } from '../agenda/tab'
-import { MeetingEnrichmentSection } from './enrichment'
-import { AGENDA_DRAFTS_ENABLED, COMMUNICATION_CONTEXT_ENABLED } from '../../lib/features'
-import type { MeetingTab } from './open-scope'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
 
-const TABS: ReadonlyArray<{ id: MeetingTab; label: string }> = [
+type TabId = 'summary' | 'transcript'
+const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Summary' },
-  { id: 'agenda', label: 'Agenda' },
   { id: 'transcript', label: 'Transcript' },
 ]
-type TabId = MeetingTab
 
 /** Inline Meeting content. No modal or focus trap: the list remains interactive. */
-export function MeetingPanel({ view, confirm, initialTab, onOpenSettings }: { view: AppView; confirm: ConfirmController; initialTab?: MeetingTab | null; onOpenSettings: () => void }) {
-  const [tab, setTab] = useState<TabId>(initialTab ?? 'summary')
+export function MeetingPanel({ view, confirm }: { view: AppView; confirm: ConfirmController }) {
+  const [tab, setTab] = useState<TabId>('summary')
   const [seekTo, setSeekTo] = useState<{ sec: number; request: number } | null>(null)
   const [currentSec, setCurrentSec] = useState(0)
   const closeRef = useRef<HTMLButtonElement>(null)
   const meeting = view.selectedMeeting
   const transcript = meeting ? meetingTranscript(meeting, view.transcript) : ''
-  const agendaState = meeting ? agendaStateForMeeting(view, meeting.id) : { kind: 'unlinked' as const }
   const calendar = useMeetingCalendar(meeting?.id ?? null, view.actions.linkMeetingCalendar)
-  // An Agenda belongs to a Calendar event, so a Meeting without one has no Agenda tab.
-  const tabs = TABS.filter(item => item.id !== 'agenda' || AGENDA_DRAFTS_ENABLED && agendaState.kind !== 'unlinked')
-  const shown = tabs.some(item => item.id === tab) ? tab : 'summary'
-  useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab(initialTab ?? 'summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId, initialTab])
+  useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab('summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId])
   return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
     {meeting ? <PanelHead meeting={meeting} transcript={transcript} calendar={calendar} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
-    {meeting ? <TabBar tabs={tabs} tab={shown} onChange={setTab} labels={{ agenda: agendaTabLabel(agendaState) }} /> : null}
+    {meeting ? <TabBar tabs={TABS} tab={tab} onChange={setTab} /> : null}
     <div className="app-panel-body ui-scroll">
-      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={shown} calendar={calendar} onOpenSettings={onOpenSettings} seekTo={seekTo} onSeek={sec => setSeekTo(previous => ({ sec, request: (previous?.request ?? 0) + 1 }))} currentSec={currentSec} onTimeChange={setCurrentSec} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
+      {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} calendar={calendar} seekTo={seekTo} onSeek={sec => setSeekTo(previous => ({ sec, request: (previous?.request ?? 0) + 1 }))} currentSec={currentSec} onTimeChange={setCurrentSec} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
     </div>
-    {meeting ? <PanelFooter key={`${meeting.id}:${shown}`} view={view} confirm={confirm} meeting={meeting} tab={shown} transcript={transcript} /> : null}
+    {meeting ? <PanelFooter key={`${meeting.id}:${tab}`} view={view} confirm={confirm} meeting={meeting} tab={tab} transcript={transcript} /> : null}
   </article>
 }
 
@@ -53,11 +43,11 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
   const copy = async () => {
-    try { await navigator.clipboard.writeText(copySourceFor(tab, meeting, transcript)); setCopied(true); setError('') }
+    try { await navigator.clipboard.writeText(tab === 'summary' ? meeting.summary ?? '' : transcript); setCopied(true); setError('') }
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}{copyLabelFor(tab) ? <Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : copyLabelFor(tab)}</Button> : null}</footer>
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
 }
 
 function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -87,41 +77,26 @@ function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HT
 }
 
 /** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
-function PanelContent({ view, meeting, transcript, tab, calendar, onOpenSettings, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; calendar: MeetingCalendar; onOpenSettings: () => void; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
+function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; calendar: MeetingCalendar; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
-  const meetingLevel = tab !== 'agenda'
   return (
     <>
       <MeetingReplay key={meeting.id} meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
-      {meetingLevel && meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
-      {meetingLevel && meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
-      {meetingLevel ? <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} /> : null}
+      {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
+      {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
+      <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} />
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} /> : null}
-        {tab === 'agenda' ? <AgendaPane view={view} meetingId={meeting.id} onOpenSettings={onOpenSettings} /> : null}
         {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} onSeek={onSeek} currentSec={currentSec} /> : null}
       </section>
     </>
   )
 }
 
-function copySourceFor(tab: TabId, meeting: MeetingDetail | null, transcript: string): string {
-  if (!meeting) return ''
-  if (tab === 'summary') return meeting.summary ?? ''
-  if (tab === 'transcript') return transcript
-  return ''
-}
-
-function copyLabelFor(tab: TabId): string {
-  if (tab === 'summary') return 'Copy notes'
-  if (tab === 'transcript') return 'Copy transcript'
-  return ''
-}
-
 function SummaryPane({ view }: { view: AppView }) {
   const summary = view.selectedMeeting?.summary
   if (!summary) return <EmptyState>No notes yet. Notes are created locally after recording ends.</EmptyState>
-  return <div className="app-reading"><Markdown value={summary} />{COMMUNICATION_CONTEXT_ENABLED && view.selectedMeeting ? <MeetingEnrichmentSection meetingId={view.selectedMeeting.id} /> : null}</div>
+  return <div className="app-reading"><Markdown value={summary} /></div>
 }
 
 function TranscriptPane({ view, text, onSeek, currentSec }: { view: AppView; text: string; onSeek: (sec: number) => void; currentSec: number }) {
@@ -147,7 +122,7 @@ function DiarizationNotice({ view }: { view: AppView }) {
   )
 }
 
-function TabBar({ tabs, tab, onChange, labels = {} }: { tabs: typeof TABS; tab: TabId; onChange: (tab: TabId) => void; labels?: Partial<Record<TabId, string>> }) {
+function TabBar({ tabs, tab, onChange }: { tabs: typeof TABS; tab: TabId; onChange: (tab: TabId) => void }) {
   const listRef = useRef<HTMLDivElement>(null)
   const move = (delta: number) => {
     const index = tabs.findIndex((item) => item.id === tab)
@@ -164,7 +139,7 @@ function TabBar({ tabs, tab, onChange, labels = {} }: { tabs: typeof TABS; tab: 
       {tabs.map((item) => (
         <button key={item.id} type="button" id={`app-tab-${item.id}`} role="tab" aria-selected={tab === item.id}
           aria-controls={`app-pane-${item.id}`} tabIndex={tab === item.id ? 0 : -1}
-          className={cx('app-tab', tab === item.id && 'is-active')} onClick={() => onChange(item.id)}>{labels[item.id] ?? item.label}</button>
+          className={cx('app-tab', tab === item.id && 'is-active')} onClick={() => onChange(item.id)}>{item.label}</button>
       ))}
     </div>
   )

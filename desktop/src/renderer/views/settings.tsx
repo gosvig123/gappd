@@ -10,8 +10,6 @@ import { runtimeErrorView, runtimeOperationLabel, runtimeStatusTone, type Manage
 import { SettingsLayout } from '../components/settings/layout'
 import { LocalAIErrorBanner } from '../components/settings/local-ai-error-banner'
 import { GoogleCalendarPanel } from '../components/settings/google-calendar-panel'
-import { SlackPanel } from '../components/slack/panel'
-import { COMMUNICATION_CONTEXT_ENABLED } from '../lib/features'
 import { CodexModelFields, CodexModelStatus } from '../components/settings/codex-model-fields'
 import { codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../shared/codex-models'
 import { useCodexCatalog } from '../hooks/use-codex-catalog'
@@ -20,7 +18,6 @@ import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
 import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
 import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
-import type { SlackConnectionController } from '../hooks/use-slack-connection'
 
 type SettingsViewProps = {
   initialCategory?: string
@@ -30,7 +27,6 @@ type SettingsViewProps = {
   onThemeChange: (theme: ThemeName) => void
   localAI: { status: ManagedRuntimeSnapshot | null; loading: boolean; busy: boolean; onRepair: () => void }
   calendar: GoogleCalendarController
-  slack: SlackConnectionController
   developerDebugEnabled: boolean
 }
 
@@ -40,11 +36,11 @@ const CODEX_UNAVAILABLE = 'Codex is unavailable'
 const LOCAL_MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 type SummaryProvider = typeof LOCAL_PROVIDER | typeof CODEX_PROVIDER
 
-export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, slack, developerDebugEnabled, initialCategory }: SettingsViewProps) {
+export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, developerDebugEnabled, initialCategory }: SettingsViewProps) {
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /></> },
     { label: 'Meeting processing', content: <><AIProviderPanel runtime={localAI.status} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
-    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} />{COMMUNICATION_CONTEXT_ENABLED ? <SlackPanel slack={slack} /> : null}<MeetingUploadPanel /></> },
+    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
   return <SettingsLayout categories={categories} initialCategory={initialCategory} />

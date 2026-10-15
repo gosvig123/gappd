@@ -1,5 +1,4 @@
 import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calendar-contract'
-import type { SavedAgendaDraft } from '../../shared/agenda-draft'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from '../../shared/contracts'
 import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
@@ -7,7 +6,6 @@ import { meetingProgressLabel } from '../components/meeting/progress'
 import { contactName } from './person-identity'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
-import type { SlackConnectionController } from '../hooks/use-slack-connection'
 import type { ThemeName } from '../hooks/use-theme'
 
 /**
@@ -41,10 +39,8 @@ export type AppView = {
   update: UpdateStatus | null
   calendar: CalendarSnapshot | null
   calendarController: GoogleCalendarController
-  slackController: SlackConnectionController
   calendarBusy: string | null
   calendarError: string | null
-  drafts: SavedAgendaDraft[]
   language: string
   theme: ThemeName
   alertDismissals: ReadonlySet<string>

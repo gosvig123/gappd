@@ -12,17 +12,11 @@ import { stopActiveRecordingForQuit } from './recording-process'
 import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { startStorageCompaction, stopStorageCompaction } from './storage-compaction'
-import { completeSlackAuthorization } from './slack/oauth'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
-
-app.on('open-url', (event, url) => {
-  event.preventDefault()
-  if (completeSlackAuthorization(url) && app.isReady()) showMainWindow()
-})
 
 const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
 

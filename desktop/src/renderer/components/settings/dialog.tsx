@@ -21,7 +21,7 @@ export function SettingsDialog({ view, onClose, initialCategory }: { view: AppVi
           <SettingsView initialCategory={initialCategory} language={view.language} onLanguageChange={view.actions.setLanguage}
             theme={view.theme} onThemeChange={view.actions.setTheme as (theme: ThemeName) => void}
             localAI={{ status: view.runtime, loading: view.runtimeLoading, busy: view.runtimeBusy, onRepair: view.actions.repairRuntime }}
-            calendar={view.calendarController} slack={view.slackController} developerDebugEnabled={import.meta.env.DEV} />
+            calendar={view.calendarController} developerDebugEnabled={import.meta.env.DEV} />
         </div>
       </div>
     </div>

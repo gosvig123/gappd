@@ -50,24 +50,6 @@ test('preserves cached events and records a safe account-local sync error', asyn
   assert.equal(snapshot.events.length, 1)
 })
 
-test('Gmail grants and reads stay disabled in the shipping Calendar service', async () => {
-  let authorizations = 0
-  const api: CalendarApi = {
-    configured: () => true,
-    authorize: async () => { authorizations++; return account('work', 'work@example.com') },
-    sync: async (_id, _email, tokens) => ({ tokens, events: [] }), revoke: async () => undefined,
-  }
-  const service = new GoogleCalendarServiceCore(api, memoryStore())
-  assert.throws(() => service.connect(true), /unavailable pending separate approval/)
-  assert.equal(authorizations, 0)
-  const connected = await service.connect()
-  assert.equal(connected.connections.length, 1)
-  let reads = 0
-  const result = await service.agendaCommunication(connected.connections[0].id, async () => { reads++; return { sources: [] } })
-  assert.match(result.warning!, /unavailable pending separate approval/)
-  assert.equal(reads, 0)
-})
-
 function memoryStore(initial: CalendarDocument | null = null): CalendarStore {
   let document = initial
   return {
@@ -120,10 +102,8 @@ test('historical cache is replaced on success, retained on failure and removed o
 import { GoogleCalendarApi } from './calendar-api.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { historicalCalendarRanges } from './calendar-history-ranges.ts'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { reconcileAgendaHistory } from '../../shared/calendar-reconciliation.ts'
 
-test('connecting Calendar fetches and reconciles an existing local Meeting automatically', async () => {
+test('connecting Calendar fetches the history range of an existing local Meeting automatically', async () => {
   const meeting = { id: 'old', title: 'Old recording', startedAt: '2025-01-01T12:00:00Z', endedAt: '2025-01-01T13:00:00Z', emails: [] }
   const reads: string[] = []
   const google = new GoogleCalendarApi({
@@ -139,9 +119,5 @@ test('connecting Calendar fetches and reconciles an existing local Meeting autom
   const service = new GoogleCalendarServiceCore(api, memoryStore(), () => NOW)
   const connected = await service.sync((await service.connect()).connections[0].id)
   assert.ok(reads.some(start => Date.parse(start) === Date.parse(meeting.startedAt)))
-  const history = reconcileAgendaHistory([meeting], {}, connected)
-  assert.deepEqual(history[0].emails, ['partner@example.com'])
-  assert.equal(history[0].calendarProvenance, 'inferred')
-  const disconnected = await service.disconnect(connected.connections[0].id)
-  assert.deepEqual(reconcileAgendaHistory([meeting], {}, disconnected)[0].emails, [])
+  assert.ok(connected.events.some(event => event.eventId === 'old-event'))
 })

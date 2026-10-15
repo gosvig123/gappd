@@ -59,7 +59,7 @@ test('navigation rejects a previous Meeting response and an older list refresh t
   assert.equal(f.state().selectedMeeting.id, 'b')
 })
 
-test('background polling does not reopen the last recording after selecting an Agenda draft', async () => {
+test('background polling does not reopen the last recording after selecting a Calendar event', async () => {
   const f = dashboardFixture()
   await f.actions.loadMeeting('a')
   f.actions.clearSelectedMeeting()

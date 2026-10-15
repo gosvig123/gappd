@@ -1,6 +1,4 @@
 import { exportRecording } from './meeting-export'
-import { generateMeetingAgenda } from './meeting-agenda'
-import { enrichMeeting, loadMeetingEnrichment } from './meeting-enrichment'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
@@ -10,9 +8,7 @@ import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
-import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda/drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
-import { connectSlack, disconnectSlack, reviewSlackMessage, sendSlackMessage, slackConnectionStatus, slackDestinations } from './slack/service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
@@ -47,8 +43,6 @@ const IPC_HANDLERS: MainHandlers = {
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
     linkCalendar: (_event, input) => linkCalendar(input),
-    enrichment: (_event, id: string) => loadMeetingEnrichment(id),
-    enrich: (_event, id: string) => enrichMeeting(id),
     exportRecording: (_event, id: string) => exportRecording(id),
   },
   recording: {
@@ -67,29 +61,14 @@ const IPC_HANDLERS: MainHandlers = {
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),
   },
-  agenda: {
-    load: (_event, draftKey: string) => loadSavedAgenda(draftKey),
-    list: () => listSavedAgendas(),
-    save: (_event, input) => saveAgendaTopics(input),
-    remove: (_event, draftKey: string) => removeSavedAgenda(draftKey),
-  },
   googleCalendar: {
-    generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
-    connect: (_event, includeGmail) => connectGoogleCalendar(includeGmail),
+    connect: () => connectGoogleCalendar(),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
   meetingUpload: { status: () => meetingUpload().status(), connect: (_event, enabled) => meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setAccountDeleteConsent: (_event, subject, enabled) => meetingUpload().setAccountDeleteConsent(subject, enabled), deleteAll: () => meetingUpload().deleteAll(), allowUploads: () => meetingUpload().allowUploads(), setRevokeConsent: (_event, subject, enabled, clientId) => meetingUpload().setRevokeConsent(subject, enabled, clientId), revokeClient: (_event, subject, clientId) => meetingUpload().revokeClient(subject, clientId), knownClients: () => meetingUpload().knownClients(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
-  slack: {
-    status: () => slackConnectionStatus(),
-    connect: () => connectSlack(),
-    disconnect: () => disconnectSlack(),
-    destinations: (_event, cursor) => slackDestinations(cursor),
-    review: (_event, input) => reviewSlackMessage(input),
-    send: (_event, reviewId) => sendSlackMessage(reviewId),
-  },
   update: {
     getStatus: () => getUpdateStatus(),
     checkNow: () => checkForUpdate(),

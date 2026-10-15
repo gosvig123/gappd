@@ -1,6 +1,4 @@
 import type { CalendarRange } from './calendar-history-ranges'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { GMAIL_READ_SCOPE } from '../agenda/communication.ts'
 import type { CalendarEventSummary } from '../../shared/calendar-contract'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { mapGoogleEvent, type GoogleEventItem } from './calendar-model.ts'
@@ -51,10 +49,8 @@ export class GoogleCalendarApi {
     return Boolean(this.clientId && this.clientSecret)
   }
 
-  async authorize(includeGmail = false): Promise<GoogleAuthorizedAccount> {
-    const config = this.oauthConfig()
-    if (includeGmail) config.scopes = [...config.scopes, GMAIL_READ_SCOPE]
-    const tokens = await authorizeOAuth(config, { openExternal: this.openExternal, fetcher: this.fetcher, now: this.now })
+  async authorize(): Promise<GoogleAuthorizedAccount> {
+    const tokens = await authorizeOAuth(this.oauthConfig(), { openExternal: this.openExternal, fetcher: this.fetcher, now: this.now })
     return { ...await this.fetchProfile(tokens), tokens }
   }
 

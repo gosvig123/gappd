@@ -1,11 +1,8 @@
 import type { MeetingUploadStatus } from './meeting-upload-contract'
-import type { MeetingEnrichment } from './meeting-enrichment'
-import type { GeneratedAgenda, AgendaDraftWriteResult, AgendaDraftRemoveResult, AgendaDraftSaveInput, SavedAgendaDraft } from './agenda-draft'
 import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AssignSpeakerInput, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
-import type { SlackConnectionStatus, SlackDestinationPage, SlackSendResult, SlackSendReview, SlackSendReviewInput } from './slack-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -20,7 +17,6 @@ export type AIProviderStatus = { provider: 'local' | 'codex_exec'; codexExecutab
 export type CodexConfigurationInput = { executable: string; model: string; reasoningEffort: string }
 export type CodexModelOption = { id: string; displayName: string; defaultReasoningEffort: string; reasoningEfforts: string[]; isDefault: boolean }
 export type CodexModelCatalog = { models: CodexModelOption[]; defaultModel: string; defaultReasoningEffort: string }
-export type GenerateAgendaInput = { sourceId: string; expectedRevision: number; slackChannelIds?: string[] }
 
 type OperationSpec<Args extends unknown[], Result> = { args: Args; result: Result }
 
@@ -45,8 +41,6 @@ export type IpcInvokeContract = {
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
-    enrichment: OperationSpec<[id: string], MeetingEnrichment | null>
-    enrich: OperationSpec<[id: string], MeetingEnrichment>
     exportRecording: OperationSpec<[id: string], boolean>
   }
   recording: {
@@ -65,27 +59,12 @@ export type IpcInvokeContract = {
     configureCodex: OperationSpec<[input: CodexConfigurationInput], AIProviderStatus>
     useLocal: OperationSpec<[], AIProviderStatus>
   }
-  agenda: {
-    load: OperationSpec<[draftKey: string], SavedAgendaDraft | null>
-    list: OperationSpec<[], SavedAgendaDraft[]>
-    save: OperationSpec<[input: AgendaDraftSaveInput], AgendaDraftWriteResult>
-    remove: OperationSpec<[draftKey: string], AgendaDraftRemoveResult>
-  }
   googleCalendar: {
-    generateAgenda: OperationSpec<[input: GenerateAgendaInput], GeneratedAgenda>
     snapshot: OperationSpec<[], CalendarSnapshot>
     contacts: OperationSpec<[], CalendarParticipant[]>
-    connect: OperationSpec<[includeGmail?: boolean], CalendarSnapshot>
+    connect: OperationSpec<[], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
-  }
-  slack: {
-    status: OperationSpec<[], SlackConnectionStatus>
-    connect: OperationSpec<[], SlackConnectionStatus>
-    disconnect: OperationSpec<[], SlackConnectionStatus>
-    destinations: OperationSpec<[cursor?: string], SlackDestinationPage>
-    review: OperationSpec<[input: SlackSendReviewInput], SlackSendReview>
-    send: OperationSpec<[reviewId: string], SlackSendResult>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -123,18 +102,15 @@ export const IPC_OPERATIONS = {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
     people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
-    enrichment: 'meetings:enrichment', enrich: 'meetings:enrich', exportRecording: 'meetings:exportRecording',
+    exportRecording: 'meetings:exportRecording',
   },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureCodex: 'aiProvider:configureCodex', useLocal: 'aiProvider:useLocal' },
-  agenda: { load: 'agenda:load', list: 'agenda:list', save: 'agenda:save', remove: 'agenda:remove' },
   googleCalendar: {
-    generateAgenda: 'googleCalendar:generateAgenda',
     snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect', contacts: 'googleCalendar:contacts',
     sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
   },
-  slack: { status: 'slack:status', connect: 'slack:connect', disconnect: 'slack:disconnect', destinations: 'slack:destinations', review: 'slack:review', send: 'slack:send' },
   update: {
     getStatus: 'update:getStatus',
     checkNow: 'update:checkNow',

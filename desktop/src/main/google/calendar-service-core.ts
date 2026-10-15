@@ -1,7 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import type { AgendaCommunication } from '../agenda/communication'
-// @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { GMAIL_READ_SCOPE } from '../agenda/communication.ts'
 import type { CalendarConnection, CalendarEventSummary, CalendarSnapshot, CalendarHistoryRange } from '../../shared/calendar-contract'
 import type { OAuthTokenSet } from '../oauth'
 
@@ -27,7 +24,7 @@ export type CalendarStore = {
 }
 export type CalendarApi = {
   configured(): boolean
-  authorize(includeGmail?: boolean): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
+  authorize(): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
   refresh?(tokens: OAuthTokenSet): Promise<OAuthTokenSet>
   sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarHistoryRange[]; historyError?: string }>
   revoke(tokens: OAuthTokenSet): Promise<void>
@@ -41,17 +38,11 @@ export class GoogleCalendarServiceCore {
   private readonly api: CalendarApi
   private readonly store: CalendarStore
   private readonly now: () => Date
-  private readonly gmailAvailable: boolean
 
-  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date(), gmailAvailable = false) {
+  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date()) {
     this.api = api
     this.store = store
     this.now = now
-    this.gmailAvailable = gmailAvailable
-  }
-
-  pendingSyncIds(): string[] {
-    return [...this.syncing.keys()]
   }
 
   async snapshot(): Promise<CalendarSnapshot> {
@@ -59,10 +50,8 @@ export class GoogleCalendarServiceCore {
     return this.toSnapshot(await this.readDocument())
   }
 
-  connect(includeGmail = false): Promise<CalendarSnapshot> {
-    if (typeof includeGmail !== 'boolean') throw new Error('Invalid Gmail connection choice.')
-    if (includeGmail && !this.gmailAvailable) throw new Error('Gmail access is unavailable pending separate approval.')
-    if (!this.connecting) this.connecting = this.performConnect(includeGmail, ++this.authorizationVersion).finally(() => { this.connecting = null })
+  connect(): Promise<CalendarSnapshot> {
+    if (!this.connecting) this.connecting = this.performConnect(++this.authorizationVersion).finally(() => { this.connecting = null })
     return this.connecting
   }
 
@@ -87,26 +76,8 @@ export class GoogleCalendarServiceCore {
     })
   }
 
-  agendaCommunication(connectionId: string, read: (token: string, subject: string) => Promise<AgendaCommunication>): Promise<AgendaCommunication> {
-    if (!this.gmailAvailable) return Promise.resolve({ sources: [], warning: 'Gmail access is unavailable pending separate approval.' })
-    const version = this.authorizationVersion
-    const assertCurrent = () => { if (version !== this.authorizationVersion) throw new Error('The Google connection changed. Generate the agenda again.') }
-    return this.withStore(async () => {
-      assertCurrent()
-      const document = await this.readDocument()
-      const connection = requiredConnection(document, connectionId)
-      if (!connection.tokens.scope?.split(' ').includes(GMAIL_READ_SCOPE)) return { sources: [], warning: 'Gmail was not read. Connect this Google account with Gmail read access in Calendar settings.' }
-      if (!this.api.refresh) throw new Error('Gmail token refresh is unavailable.')
-      connection.tokens = await this.api.refresh(connection.tokens)
-      await this.store.write(document)
-      const result = await read(connection.tokens.accessToken, connection.subject)
-      assertCurrent()
-      return { ...result, assertCurrent }
-    })
-  }
-
-  private async performConnect(includeGmail: boolean, version: number): Promise<CalendarSnapshot> {
-    const authorized = await this.api.authorize(includeGmail)
+  private async performConnect(version: number): Promise<CalendarSnapshot> {
+    const authorized = await this.api.authorize()
     const { document, connectionId } = await this.withStore(async () => {
       if (version !== this.authorizationVersion) throw new Error('The Google connection changed during authorization. Connect again.')
       const document = await this.readDocument()
@@ -145,14 +116,13 @@ export class GoogleCalendarServiceCore {
     const connections = document.connections.map((connection) => this.toConnection(connection))
     const events = document.connections.flatMap((connection) => [...new Map([...(connection.historicalEvents ?? []), ...connection.events].map(event => [event.sourceId, event])).values()])
       .sort((left, right) => left.start.localeCompare(right.start))
-    return { configured: this.api.configured(), gmailAvailable: this.gmailAvailable, connections, events }
+    return { configured: this.api.configured(), connections, events }
   }
 
   private toConnection(connection: StoredCalendarConnection): CalendarConnection {
     const status = this.syncing.has(connection.id) ? SYNCING_STATUS : connection.error ? ERROR_STATUS : READY_STATUS
     return {
       id: connection.id, email: connection.email, status,
-      gmailEnabled: this.gmailAvailable && (connection.tokens.scope?.split(' ').includes(GMAIL_READ_SCOPE) ?? false),
       historyRanges: connection.historyRanges, lastSyncedAt: connection.lastSyncedAt, error: connection.error,
     }
   }

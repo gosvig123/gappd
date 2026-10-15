@@ -34,21 +34,16 @@
 /* Beside an open Meeting the list is narrow: title on its own line, time and note under it. */
 .has-selection .workspace-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "title title" "time note"; row-gap: var(--space-1); column-gap: var(--space-4); }
 .has-selection .workspace-row-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.workspace-agenda { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; block-size: 100%; min-block-size: 0; min-inline-size: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface); }
-.workspace-agenda-body { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: clamp(16px, 3cqi, 36px); }
+.workspace-event { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; block-size: 100%; min-block-size: 0; min-inline-size: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface); }
+.workspace-event-body { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: clamp(16px, 3cqi, 36px); }
 /* The draft lines up with the text above it, not with the old Calendar settings card. */
-.workspace-content .meeting-agenda-draft { padding-inline: 0; }
-.workspace-content .meeting-agenda-draft textarea { inline-size: 100%; min-block-size: 6rem; resize: vertical; padding: var(--space-7); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-card); color: var(--color-text); font: inherit; line-height: 1.6; }
-.workspace-content .meeting-agenda-draft label { display: grid; gap: var(--space-4); }
-.workspace-content .meeting-agenda-draft :is(p, blockquote, label) { overflow-wrap: anywhere; }
-.workspace-content .meeting-agenda-draft section[aria-label="Saved agenda draft"] > div { margin-block: var(--space-8); }
 .workspace-content .app-panel-top { background: transparent; }
 .workspace-content .app-panel-titles h1 { font-size: clamp(1.4rem, 2.4cqi, 2rem); }
 .workspace-content .app-reading { font-size: 1rem; line-height: 1.75; }
 .workspace-content .app-panel-pane { padding: clamp(16px, 3cqi, 36px); }
 .app-panel-body { grid-row: 3; }
 .app-panel-foot { grid-row: 4; }
-.workspace-agenda > .app-panel-foot { grid-row: 3; }
+.workspace-event > .app-panel-foot { grid-row: 3; }
 @container meetings-workspace (max-width: 800px) {
   .has-selection .workspace-columns { grid-template-columns: minmax(0, 1fr); }
   .has-selection .workspace-list { display: none; }
@@ -66,5 +61,5 @@
   .workspace-content .app-panel-top { padding: var(--space-4); }
 }
 @container meetings-workspace (max-width: 400px) {
-  .workspace-agenda-body { padding: var(--space-5); }
+  .workspace-event-body { padding: var(--space-5); }
 }

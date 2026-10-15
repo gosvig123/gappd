@@ -8,7 +8,6 @@ function meetings(deleteResult: () => Promise<unknown>, cleanup: () => Promise<v
     './app-protocol': { requestCommand: deleteResult },
     './drain-coordinator': { requestDrains() {} },
     './participant-calendar': { forgetMeetingCalendar: cleanup },
-    './meeting-enrichment': { forgetMeetingEnrichment: async () => {} },
   }, { console: { error() {} } })
 }
 
