@@ -2,8 +2,11 @@ package audioartifact
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -101,6 +104,14 @@ func compactMeetingAudio(ctx context.Context, store *db.DB, id, dir string, pair
 		if flac, err := ReadPCM16(pair.flac); err != nil || flac != wav {
 			return result, fmt.Errorf("compact Meeting audio %s: FLAC copy does not match the WAV", pair.wav)
 		}
+		if err := verifySamples(ctx, pair); err != nil {
+			if ctx.Err() != nil {
+				return CompactResult{}, ctx.Err()
+			}
+			// Readers prefer the FLAC, so a copy that cannot be proven equal is removed and not made again.
+			cleanup := errors.Join(os.Remove(pair.flac), os.WriteFile(filepath.Join(dir, compactionFailedMarker), nil, 0o600))
+			return result, fmt.Errorf("compact Meeting audio %s: %w (%v)", pair.wav, err, cleanup)
+		}
 		meeting, err := store.GetMeeting(id)
 		if err != nil || !idle(*meeting) {
 			return result, err // A later pass deletes the WAV.
@@ -139,6 +150,59 @@ func encodeFLAC(ctx context.Context, dir string, pair audioPair, wav PCM16) erro
 		return fmt.Errorf("FLAC copy has a different format or length than the WAV")
 	}
 	return os.Rename(temp, pair.flac)
+}
+
+// verifySamples decodes the FLAC again and compares its samples with the WAV, so the WAV is deleted
+// only when the FLAC holds exactly the same audio.
+func verifySamples(ctx context.Context, pair audioPair) error {
+	decoded := strings.TrimSuffix(pair.flac, ".flac") + ".verifying.wav"
+	defer os.Remove(decoded)
+	if output, err := exec.CommandContext(ctx, afconvertPath, "-f", "WAVE", "-d", "LEI16", pair.flac, decoded).CombinedOutput(); err != nil {
+		return fmt.Errorf("decode FLAC copy: %w: %s", err, output)
+	}
+	want, err := wavDataDigest(pair.wav)
+	if err != nil {
+		return err
+	}
+	got, err := wavDataDigest(decoded)
+	if err != nil {
+		return err
+	}
+	if want != got {
+		return errors.New("FLAC copy has different samples than the WAV")
+	}
+	return nil
+}
+
+// wavDataDigest hashes the samples in a WAV file's data chunk. It skips other chunks, because the
+// decoder may write a different header than the capture helper.
+func wavDataDigest(path string) ([sha256.Size]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return [sha256.Size]byte{}, err
+	}
+	defer file.Close()
+	var riff [12]byte
+	if _, err := io.ReadFull(file, riff[:]); err != nil || string(riff[0:4]) != "RIFF" || string(riff[8:12]) != "WAVE" {
+		return [sha256.Size]byte{}, errUnsupportedAudio
+	}
+	for {
+		var chunk [8]byte
+		if _, err := io.ReadFull(file, chunk[:]); err != nil {
+			return [sha256.Size]byte{}, errUnsupportedAudio
+		}
+		size := int64(binary.LittleEndian.Uint32(chunk[4:]))
+		if string(chunk[0:4]) == "data" {
+			digest := sha256.New()
+			if n, err := io.Copy(digest, io.LimitReader(file, size)); err != nil || n != size {
+				return [sha256.Size]byte{}, errUnsupportedAudio
+			}
+			return [sha256.Size]byte(digest.Sum(nil)), nil
+		}
+		if _, err := file.Seek(size+size%2, io.SeekCurrent); err != nil {
+			return [sha256.Size]byte{}, err
+		}
+	}
 }
 
 func replacedBytes(pair audioPair) (int64, error) {
