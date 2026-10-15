@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"crypto/rsa"
 	"errors"
 	"io"
@@ -14,6 +13,9 @@ import (
 
 const keyTTL = 5 * time.Minute
 const maxJWKSBytes = 128 << 10
+
+// keyRetry bounds how often a failed fetch is retried, so an issuer outage does not get one fetch per request.
+const keyRetry = 10 * time.Second
 
 type Keys struct {
 	URL    string
@@ -30,17 +32,17 @@ func NewKeys(issuer string) *Keys {
 	}}
 }
 
-func (k *Keys) lookup(ctx context.Context, id string) (*rsa.PublicKey, error) {
+// lookup keeps the last good key set when a refresh fails. The fetch does not use the request
+// context, so one caller that disconnects cannot fail the refresh for everyone else.
+func (k *Keys) lookup(id string) (*rsa.PublicKey, error) {
 	k.mu.Lock()
 	defer k.mu.Unlock()
 	if time.Now().After(k.next) {
-		k.next = time.Now().Add(keyTTL)
-		k.set = nil
-		set, err := k.fetch(ctx)
-		if err != nil {
-			return nil, err
+		if set, err := k.fetch(); err == nil {
+			k.set, k.next = set, time.Now().Add(keyTTL)
+		} else {
+			k.next = time.Now().Add(keyRetry)
 		}
-		k.set = set
 	}
 	if k.set == nil {
 		return nil, errors.New("keys unavailable")
@@ -64,8 +66,8 @@ func rsaKey(key jwk.Key) (*rsa.PublicKey, error) {
 	return raw, nil
 }
 
-func (k *Keys) fetch(ctx context.Context) (jwk.Set, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, k.URL, nil)
+func (k *Keys) fetch() (jwk.Set, error) {
+	req, err := http.NewRequest(http.MethodGet, k.URL, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -51,7 +50,7 @@ func TestKeyFetchBounds(t *testing.T) {
 	defer host.Close()
 	keys := NewKeys(host.URL)
 	for range 3 {
-		if _, err := keys.lookup(context.Background(), "unknown"); err == nil {
+		if _, err := keys.lookup("unknown"); err == nil {
 			t.Fatal("invalid keys accepted")
 		}
 	}
@@ -60,7 +59,7 @@ func TestKeyFetchBounds(t *testing.T) {
 	}
 	keys.next = time.Time{}
 	keys.Client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	if _, err := keys.lookup(context.Background(), "unknown"); err == nil || calls != 2 {
+	if _, err := keys.lookup("unknown"); err == nil || calls != 2 {
 		t.Fatal("cache expiry")
 	}
 }
@@ -70,7 +69,7 @@ func TestKeyRedirectRejected(t *testing.T) {
 	defer target.Close()
 	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, target.URL, 302) }))
 	defer source.Close()
-	if _, err := NewKeys(source.URL).lookup(context.Background(), "key"); err == nil {
+	if _, err := NewKeys(source.URL).lookup("key"); err == nil {
 		t.Fatal("redirect accepted")
 	}
 }

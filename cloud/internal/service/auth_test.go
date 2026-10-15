@@ -53,7 +53,7 @@ func tokenFor(t *testing.T, a *Auth, key *rsa.PrivateKey, change func(jwt.MapCla
 
 func TestAuthBoundaries(t *testing.T) {
 	a, key := testAuth(t)
-	if _, err := a.Keys.lookup(context.Background(), "test"); err != nil {
+	if _, err := a.Keys.lookup("test"); err != nil {
 		t.Fatal(err)
 	}
 	cases := invalidClaims(a)

@@ -45,7 +45,7 @@ func (a *Auth) verify(ctx context.Context, raw string) (caller, error) {
 		if (typ != "at+jwt" && typ != "application/at+jwt") || kid == "" {
 			return nil, errors.New("not an access token")
 		}
-		return a.Keys.lookup(ctx, kid)
+		return a.Keys.lookup(kid)
 	}, jwt.WithValidMethods([]string{"RS256"}), jwt.WithIssuer(a.Issuer),
 		jwt.WithAudience(a.Resource), jwt.WithExpirationRequired(), jwt.WithIssuedAt())
 	if err != nil || !token.Valid {
