@@ -148,7 +148,8 @@ which is every account before its first deletion, has uploads open and nothing t
 Two properties to keep in mind:
 
 - A deletion is permanent per identity. Consent reopens uploads for **new** Meetings only; an erased
-  Meeting cannot be uploaded again at any revision.
+  Meeting cannot be uploaded again at any revision. Such an upload, like one for an expired copy,
+  answers 410.
 - The generation is not a token claim, so the client must carry it. A client that ignores it can
   still not upload while the account is blocked.
 

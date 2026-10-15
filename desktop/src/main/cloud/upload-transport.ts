@@ -10,7 +10,7 @@ import { accepted, deletedAcknowledged } from './upload-ack.ts'
 export type PauseReason = 'uploads-off' | 'not-authorized' | 'stale-generation' | 'storage-full' | 'rate-limited'
 
 /** The outcome of one upload attempt. Only `unavailable` spends a retry attempt. */
-type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'paused'; reason: PauseReason } | { kind: 'unavailable' }
+type SendOutcome = { kind: 'accepted'; expiresAt: string } | { kind: 'refused' } | { kind: 'closed' } | { kind: 'paused'; reason: PauseReason } | { kind: 'unavailable' }
 
 const PAUSE_STATUSES: Record<number, PauseReason> = { 403: 'not-authorized', 409: 'stale-generation', 413: 'storage-full', 429: 'rate-limited' }
 // The server's one 403 that is about the account, not this Mac's token or signature.
@@ -32,6 +32,8 @@ export async function sendDocument(fetcher: typeof fetch, resource: string, cred
     })
     // A refusal is about this document, so retrying it can never help.
     if (response.status === 400) return { kind: 'refused' }
+    // The cloud copy was deleted or expired, and the server never writes that identity again.
+    if (response.status === 410) return { kind: 'closed' }
     const reason = PAUSE_STATUSES[response.status]
     if (reason === 'not-authorized' && (await response.text()).trim() === UPLOADS_OFF_BODY) return { kind: 'paused', reason: 'uploads-off' }
     if (reason) return { kind: 'paused', reason }

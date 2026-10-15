@@ -170,14 +170,13 @@ volumes afterwards; Railway completes volume deletion within 48 hours.
 A restore must stay offline until current deletion markers and expiry rules are applied: a snapshot
 cannot know about deletions made after it.
 
-## Why a re-upload of a deleted Meeting fails with 503
+## Why a re-upload of a deleted or expired Meeting answers 410
 
 The cloud copy ID is derived (`meeting_copy_id(owner_id, local_id)`), deletion is permanent
 (`meeting_lifecycle.deleted_at` is only ever set), and `guard_cloud_meeting_insert` requires a live
-accepted lifecycle row. A re-upload of a deleted Meeting therefore fails in `verifyStored`, and
-`writeUploadRefusal` falls through to `503 cloud copy unavailable`. The desktop queue stops after
-`MAX_SYNC_ATTEMPTS`, so this is a diagnosability problem, not a retry loop. A dedicated sentinel and
-a permanent status would make it clear.
+accepted lifecycle row. A re-upload of a deleted or expired Meeting therefore fails in
+`verifyStored` with `410 cloud copy deleted or expired`. The desktop settles that revision like an
+acceptance, so it spends no retry and does not queue the same content again.
 
 To see which local Meetings are spent for an account, read the lifecycle table over the private
 tunnel. Never clear `deleted_at` to revive a copy; the permanence is the guarantee.

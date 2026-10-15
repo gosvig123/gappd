@@ -9,6 +9,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// errCopyClosed refuses a write to a copy that was deleted or has expired. That identity is never
+// written again, so the refusal is permanent rather than an outage.
+var errCopyClosed = errors.New("cloud copy deleted or expired")
+
 // UploadMeeting stores one validated document as this account's cloud copy. A retry never
 // extends the fixed expiry, an older revision never replaces a newer one, and a copy that is
 // deleted or expired is never written again.
@@ -41,6 +45,9 @@ func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document Meetin
 		id, owner, document.MeetingID); err != nil {
 		return errors.New("cloud copy unavailable")
 	}
+	if err := checkCopyOpen(ctx, tx, owner, id); err != nil {
+		return err
+	}
 	if err := checkCapacity(ctx, tx, owner, id, len(data)); err != nil {
 		return err
 	}
@@ -48,6 +55,21 @@ func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document Meetin
 		return err
 	}
 	return verifyStored(ctx, tx, owner, id, document, data)
+}
+
+// checkCopyOpen refuses a deleted or expired identity before any write. The insert guard refuses it
+// too, but only with an error that cannot be told apart from an outage.
+func checkCopyOpen(ctx context.Context, tx pgx.Tx, owner, id string) error {
+	var open bool
+	err := tx.QueryRow(ctx, `SELECT deleted_at IS NULL AND expires_at>clock_timestamp() FROM meeting_lifecycle
+ WHERE id=$1 AND owner_id=$2`, id, owner).Scan(&open)
+	if err != nil {
+		return errors.New("cloud copy unavailable")
+	}
+	if !open {
+		return errCopyClosed
+	}
+	return nil
 }
 
 // writeCopy replaces the whole copy. An equal or older revision changes no row.

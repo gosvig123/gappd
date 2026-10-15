@@ -69,6 +69,12 @@ async function sendOne(context: UploadContext, credential: CloudCredential, cont
     context.setResult('The server refused one Meeting document. Other queued Meetings are unaffected.')
     return true
   }
+  if (outcome.kind === 'closed') {
+    // Settled like an acceptance, so the same content is not queued again and no retry is spent.
+    await context.queue.succeed(work.localId, work.revision)
+    context.setResult('One Meeting was not uploaded because its cloud copy expired or was deleted. Cloud copies are never recreated.')
+    return true
+  }
   if (outcome.kind === 'paused') {
     context.setResult(PAUSE_MESSAGES[outcome.reason])
     return false

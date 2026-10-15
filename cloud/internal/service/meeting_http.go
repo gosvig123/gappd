@@ -66,6 +66,8 @@ func writeUploadRefusal(w http.ResponseWriter, err error) {
 		http.Error(w, "uploads are off for this account", http.StatusForbidden)
 	case errors.Is(err, errGenerationMismatch):
 		http.Error(w, "stale account generation", http.StatusConflict)
+	case errors.Is(err, errCopyClosed):
+		http.Error(w, "cloud copy deleted or expired", http.StatusGone)
 	default:
 		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
 	}
