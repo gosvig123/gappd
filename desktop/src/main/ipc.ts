@@ -11,6 +11,7 @@ import { isManagedLocal } from './managed-runtime/status'
 import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda/drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
+import { connectSlack, disconnectSlack, reviewSlackMessage, sendSlackMessage, slackConnectionStatus, slackDestinations } from './slack/service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
@@ -78,6 +79,14 @@ const IPC_HANDLERS: MainHandlers = {
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
   },
   meetingUpload: { status: () => meetingUpload().status(), connect: (_event, enabled) => meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setAccountDeleteConsent: (_event, subject, enabled) => meetingUpload().setAccountDeleteConsent(subject, enabled), deleteAll: () => meetingUpload().deleteAll(), allowUploads: () => meetingUpload().allowUploads(), setRevokeConsent: (_event, subject, enabled, clientId) => meetingUpload().setRevokeConsent(subject, enabled, clientId), revokeClient: (_event, subject, clientId) => meetingUpload().revokeClient(subject, clientId), knownClients: () => meetingUpload().knownClients(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
+  slack: {
+    status: () => slackConnectionStatus(),
+    connect: () => connectSlack(),
+    disconnect: () => disconnectSlack(),
+    destinations: (_event, cursor) => slackDestinations(cursor),
+    review: (_event, input) => reviewSlackMessage(input),
+    send: (_event, reviewId) => sendSlackMessage(reviewId),
+  },
   update: {
     getStatus: () => getUpdateStatus(),
     checkNow: () => checkForUpdate(),
