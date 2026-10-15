@@ -27,7 +27,7 @@ test('agenda shows idle, loading and recoverable model errors', () => {
 })
 
 test('agenda distinguishes no matching evidence from no supported topics', () => {
-  assert.match(render({ draft: { items: [], sources: [] } }), /No Meeting evidence matched/)
+  assert.match(render({ draft: { items: [], sources: [] } }), /No Meeting or communication evidence matched/)
   assert.match(render({ draft: { items: [], sources: [source] } }), /No supported follow-up topics/)
 })
 

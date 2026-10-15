@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { AgendaDraftView } from '../../../shared/agenda-draft'
 import type { MeetingAgendaDraft } from '../../../shared/meeting-agenda'
 import { INFERRED_CALENDAR_PROVENANCE } from '../../../shared/meeting-agenda'
@@ -6,7 +7,7 @@ import { useAgendaDraft } from '../../hooks/use-agenda-draft'
 import { Button } from '../ui'
 
 const HISTORY_INCOMPLETE_WARNING = 'Calendar overlap matching is incomplete. Check Calendar settings, then generate again.'
-const GENERATE_HINT = 'Checking and syncing Calendar history when needed, then reading Meeting history, then preparing with Local AI on this Mac. Long histories can take a further 20 minutes…'
+const GENERATE_HINT = 'Checking and syncing Calendar history when needed, then reading Meeting history and connected communication, then preparing with Local AI on this Mac. Slack rate limits can add up to 10 minutes. Long histories can take a further 20 minutes…'
 const REGENERATE_CONFIRM = 'Replace this agenda draft?\n\nGenerating again replaces all local topic edits. Cancel to keep this draft.'
 const DELETE_CONFIRM = 'Delete this saved agenda draft?\n\nThis removes the saved topics for this event. It does not change Calendar.'
 
@@ -31,14 +32,17 @@ type ViewProps = {
 
 export function MeetingAgendaDraftPanel({ draftKey, sourceId, canGenerate, knownMeetingIds, onOpenMeeting, onOpenSettings }: PanelProps) {
   const controller = useAgendaDraft(draftKey, sourceId)
+  const [channels, setChannels] = useState('')
+  useEffect(() => setChannels(''), [draftKey])
   return (
     <>
-    <p>Generation uses Local AI on this Mac with previous Meetings. Installed Codex cannot process Calendar-based Agenda drafts.</p>
+    <p>Generation uses Local AI on this Mac with previous Meetings, Gmail when enabled, and existing Slack DMs with invitees when connected. Installed Codex cannot process Calendar-based Agenda drafts. No messages are sent.</p>
+    <label>Slack channel IDs (optional, up to three, comma-separated)<input value={channels} disabled={controller.generating} placeholder="C0123456789, C9876543210" onChange={event => setChannels(event.target.value)} /></label>
     <MeetingAgendaDraftView
       draft={controller.draft} busy={controller.generating} error={controller.error}
       canGenerate={canGenerate && controller.canGenerate} knownMeetingIds={knownMeetingIds}
       saveState={controller.saveState} loadingSaved={controller.loading}
-      onGenerate={() => void controller.generate()} onChange={(next) => controller.setTopics(next.items.map((item) => item.topic))}
+      onGenerate={() => void controller.generate(channels.split(',').map(value => value.trim()).filter(Boolean))} onChange={(next) => controller.setTopics(next.items.map((item) => item.topic))}
       onRetrySave={() => void controller.retrySave()} onReloadSaved={() => void controller.reload()}
       onDeleteSaved={confirmRemove(controller)} onOpenMeeting={onOpenMeeting} onOpenSettings={onOpenSettings}
     />
@@ -118,7 +122,7 @@ function DraftContent({ draft, busy, onChange, onOpenMeeting, knownMeetingIds, o
 function DraftNotice({ draft }: { draft: MeetingAgendaDraft }) {
   if (!draft.sources.length && draft.historyIncomplete) return <p role="status">{draft.historyWarning ?? HISTORY_INCOMPLETE_WARNING}</p>
   if (!draft.sources.length && draft.ambiguousMeetings?.length) return null
-  if (!draft.sources.length) return <p role="status">No Meeting evidence matched. Check the invitee email addresses, or link a previous Meeting to its Calendar event.</p>
+  if (!draft.sources.length) return <p role="status">No Meeting or communication evidence matched. Check the invitee email addresses and communication connections, or link a previous Meeting to its Calendar event.</p>
   if (!draft.items.length) return <p role="status">No supported follow-up topics found in {draft.sources.length} matched sources.{draft.historyIncomplete ? ` ${draft.historyWarning ?? HISTORY_INCOMPLETE_WARNING}` : ''}</p>
   return null
 }
@@ -126,7 +130,7 @@ function DraftNotice({ draft }: { draft: MeetingAgendaDraft }) {
 function AgendaTopics({ draft, busy, onChange, onOpenMeeting, knownMeetingIds }: { draft: MeetingAgendaDraft; busy: boolean; onChange: (draft: MeetingAgendaDraft) => void; onOpenMeeting: (id: string) => void; knownMeetingIds?: ReadonlySet<string> }) {
   return (
     <>
-      <p>Saved on this Mac for this event only. The draft is not sent or added to Calendar. Based on up to 12 matched Meetings; history may be incomplete. Confirm current status before use.</p>
+      <p>Saved on this Mac for this event only. The draft is not sent or added to Calendar. Based on up to 12 matched Meetings and 16 recent messages per connected communication service from the last 30 days; history may be incomplete. Confirm current status before use.</p>
       {draft.historyIncomplete ? <p role="status">{draft.historyWarning ?? HISTORY_INCOMPLETE_WARNING}</p> : null}
       {draft.sources.filter((source) => source.calendarProvenance).map((source) => <p key={source.id}>{source.title}: {source.calendarProvenance === INFERRED_CALENDAR_PROVENANCE ? 'Inferred Calendar overlap (attendance unconfirmed)' : 'Confirmed Calendar link'} — {source.calendarTitle}</p>)}
       {draft.items.map((item, index) => <AgendaTopic key={`${item.sourceId}:${index}`} index={index} topic={item.topic} quote={item.quote} readOnly={busy} onChange={(topic) => onChange({ ...draft, items: draft.items.map((value, position) => position === index ? { ...value, topic } : value) })} sourceId={item.sourceId} sourceLabel={draft.sources.find((source) => source.id === item.sourceId)?.title ?? item.sourceId} kind={draft.sources.find(source => source.id === item.sourceId)?.kind} removed={Boolean(knownMeetingIds && !knownMeetingIds.has(item.sourceId))} onOpenMeeting={onOpenMeeting} />)}

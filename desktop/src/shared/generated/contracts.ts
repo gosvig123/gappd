@@ -29,6 +29,7 @@ export type MeetingTime = {
 export type AgendaInput = {
   title: string
   meetingIds: string
+  communicationInput?: string
 }
 
 export type AgendaResponse = {
@@ -45,6 +46,25 @@ export type AgendaItem = {
 export type AgendaGeneration = {
   model?: string
   reasoningEffort?: string
+}
+
+export type EnrichInput = {
+  id: string
+  communicationInput: string
+}
+
+export type EnrichResponse = {
+  notes: EnrichmentNote[]
+  trimmed: boolean
+  generation: AgendaGeneration
+}
+
+export type EnrichmentNote = {
+  actionItem: string
+  status: string
+  note: string
+  sourceId: string
+  quote: string
 }
 
 export type PeopleResponse = {

@@ -40,32 +40,35 @@ test('refreshes directly at Google with the Desktop client secret and fetches ow
   assert.match(eventsUrl.searchParams.get('fields') || '', /items/)
 })
 
-test('authorization exchanges the code with PKCE and keeps the scope through a refresh without returned scopes', async () => {
-  const scope = 'https://www.googleapis.com/auth/calendar.events.owned.readonly'
-  let codeBody = new URLSearchParams()
-  const api = new GoogleCalendarApi({
-    clientId: CLIENT_ID,
-    clientSecret: CLIENT_SECRET,
-    now: () => NOW,
-    fetcher: async (input, init) => {
-      if (String(input) !== TOKEN_URL) return Response.json({ sub: 'fixture-subject', email: 'fixture@example.com' })
-      const body = new URLSearchParams(String(init?.body))
-      if (body.get('grant_type') === 'authorization_code') codeBody = body
-      return Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 3599 })
-    },
-    openExternal: async input => {
-      const url = new URL(input)
-      const callback = new URL(url.searchParams.get('redirect_uri')!)
-      callback.searchParams.set('state', url.searchParams.get('state')!)
-      callback.searchParams.set('code', 'synthetic-code')
-      await fetch(callback)
-    },
-  })
-  assert.equal((await api.authorize()).subject, 'fixture-subject')
-  assert.equal(codeBody.get('code'), 'synthetic-code')
-  assert.equal(codeBody.get('client_secret'), CLIENT_SECRET)
-  assert.match(codeBody.get('code_verifier') || '', /^[A-Za-z0-9_-]{43}$/)
-  assert.equal((await api.refresh({ ...expiredTokens(), scope })).scope, scope)
+test('Gmail permission is requested only on explicit opt-in and survives refresh without returned scopes', async () => {
+  const scope = 'https://www.googleapis.com/auth/gmail.readonly'
+  for (const includeGmail of [false, true]) {
+    let codeBody = new URLSearchParams()
+    const api = new GoogleCalendarApi({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+      now: () => NOW,
+      fetcher: async (input, init) => {
+        if (String(input) !== TOKEN_URL) return Response.json({ sub: 'fixture-subject', email: 'fixture@example.com' })
+        const body = new URLSearchParams(String(init?.body))
+        if (body.get('grant_type') === 'authorization_code') codeBody = body
+        return Response.json({ access_token: 'access', refresh_token: 'refresh', expires_in: 3599 })
+      },
+      openExternal: async input => {
+        const url = new URL(input)
+        assert.equal(url.searchParams.get('scope')!.split(' ').includes(scope), includeGmail)
+        const callback = new URL(url.searchParams.get('redirect_uri')!)
+        callback.searchParams.set('state', url.searchParams.get('state')!)
+        callback.searchParams.set('code', 'synthetic-code')
+        await fetch(callback)
+      },
+    })
+    assert.equal((await api.authorize(includeGmail)).subject, 'fixture-subject')
+    assert.equal(codeBody.get('code'), 'synthetic-code')
+    assert.equal(codeBody.get('client_secret'), CLIENT_SECRET)
+    assert.match(codeBody.get('code_verifier') || '', /^[A-Za-z0-9_-]{43}$/)
+    assert.equal((await api.refresh({ ...expiredTokens(), scope })).scope, scope)
+  }
 })
 
 test('is not configured without both client ID and client secret', () => {

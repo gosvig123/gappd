@@ -14,6 +14,7 @@ node_modules/
 !/docs/cloud-meeting-document.md
 !/docs/cloud-data-lifecycle.md
 !/docs/cloud-operations.md
+!/docs/google-gmail-verification.md
 # Go
 vendor/
 

@@ -4,6 +4,7 @@ export type CalendarConnection = {
   id: string
   email: string
   status: 'ready' | 'syncing' | 'error'
+  gmailEnabled?: boolean
   historyRanges?: CalendarHistoryRange[]
   lastSyncedAt?: string
   error?: string
@@ -31,6 +32,7 @@ export type CalendarEventSummary = {
 
 export type CalendarSnapshot = {
   configured: boolean
+  gmailAvailable?: boolean
   connections: CalendarConnection[]
   events: CalendarEventSummary[]
 }

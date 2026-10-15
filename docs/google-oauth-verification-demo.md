@@ -6,6 +6,7 @@ Google approved `calendar.events.owned.readonly` for `gappd-production` on 30 Se
 
 - The 100-user cap no longer applies to Calendar-only consent. It still applies to any unapproved scope.
 - A change to branding, domains, privacy URL, or scopes requires a new verification request. Approval is not inherited by new scopes.
+- `gmail.readonly` is restricted and not approved. Keep the Gmail option blocked in release builds until it has its own verification; see [Gmail verification](google-gmail-verification.md).
 
 The rest of this document records how the approved demo was prepared. Reuse it for a future scope request.
 
@@ -17,7 +18,7 @@ The [September 5 verification email](https://mail.google.com/mail/u/?authuser=le
 
 - Use a clean macOS test profile and a Google test account with a primary calendar. Keep real Meetings and emails out of the recording. Create one upcoming event with a harmless title, time, and two test invitees. Do not create a second Calendar OAuth client or alter the submitted scopes.
 - Use an isolated development profile with the same Calendar flow as the signed beta app, not the owner's existing app data. Confirm the Google OAuth desktop client points to the submitted `gappd-production` project. Ensure the consent screen language is **English**.
-- Use **Local AI** for the demo. Do not connect Cloud sync; it is not needed to prove Calendar access. Close unrelated windows and notifications.
+- Use **Local AI** for the demo. Do not connect Gmail or Cloud sync: Gmail is a separate restricted scope and Cloud sync is not needed to prove Calendar access. Close unrelated windows and notifications.
 - Run `bash scripts/record-calendar-verification.sh 240` from the project root. The script starts a screen recording after five seconds; the user performs browser sign-in and consent. It never enters a password or clicks consent.
 
 ## Recording sequence
