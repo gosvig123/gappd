@@ -7,6 +7,7 @@ import { meetingProgressLabel } from '../components/meeting/progress'
 import { contactName } from './person-identity'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
+import type { SlackConnectionController } from '../hooks/use-slack-connection'
 import type { ThemeName } from '../hooks/use-theme'
 
 /**
@@ -40,6 +41,7 @@ export type AppView = {
   update: UpdateStatus | null
   calendar: CalendarSnapshot | null
   calendarController: GoogleCalendarController
+  slackController: SlackConnectionController
   calendarBusy: string | null
   calendarError: string | null
   drafts: SavedAgendaDraft[]
