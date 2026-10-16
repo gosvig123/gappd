@@ -18,7 +18,9 @@ import (
 const (
 	compactingFile = "screen.compacting.mov"
 	// compactedMarker records that the managed movie needs no more compaction, so later passes skip it.
-	compactedMarker       = "screen.compacted"
+	compactedMarker = "screen.compacted"
+	// compactedVersion names the helper settings in the marker. A movie with an older marker gets one more pass.
+	compactedVersion      = "keyframes-10s\n"
 	compactFreeMargin     = 1 << 30
 	activeRecordingWindow = 5 * time.Minute
 	compactCandidateLimit = 100
@@ -45,7 +47,7 @@ func CompactNext(ctx context.Context, store *db.DB, root string, now time.Time) 
 		if err != nil {
 			continue
 		}
-		if _, err := os.Lstat(filepath.Join(filepath.Dir(movie), compactedMarker)); err == nil {
+		if marker, err := os.ReadFile(filepath.Join(filepath.Dir(movie), compactedMarker)); err == nil && string(marker) == compactedVersion {
 			continue
 		}
 		return compactMovie(ctx, movie)
@@ -100,13 +102,13 @@ func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
 }
 
 func markCompacted(dir string) error {
-	if err := os.WriteFile(filepath.Join(dir, compactedMarker), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, compactedMarker), []byte(compactedVersion), 0o600); err != nil {
 		return fmt.Errorf("record Screen video compaction: %w", err)
 	}
 	return nil
 }
 
-// Compact encodes source again as HEVC into destination. It returns false when source is already HEVC.
+// Compact encodes source again as HEVC into destination. It returns false when source is already HEVC with sparse keyframes.
 func Compact(ctx context.Context, source, destination string) (bool, error) {
 	binary, err := Binary()
 	if err != nil {

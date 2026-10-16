@@ -3,20 +3,23 @@ import CoreMedia
 
 enum CompactError: Error { case noVideo, unreadable, unwritable, durationChanged }
 
-/// Encodes a finished Screen video again as HEVC at a fixed quality.
+/// Encodes a finished Screen video again as HEVC at a fixed quality with sparse keyframes.
 /// ScreenCaptureKit picks one bitrate for any codec, so a quality target, not the codec, makes the movie smaller.
+/// The encoder's default keyframe every 2 s is most of a static screen's size, and a replayed movie does not need it.
 /// The movie timeline stays identical, so replay and export keep their measured start times.
 enum Compactor {
     static let quality = 0.65
+    static let keyFrameSeconds = 10.0
 
-    /// Returns false when the source is already HEVC and needs no work.
+    /// Returns false when the source is already HEVC with sparse keyframes and needs no work.
     nonisolated static func compact(source: URL, destination: URL) async throws -> Bool {
         let asset = AVURLAsset(url: source)
         guard let track = try await asset.loadTracks(withMediaType: .video).first else { throw CompactError.noVideo }
         let (formats, size, transform, timescale) = try await track.load(.formatDescriptions, .naturalSize, .preferredTransform, .naturalTimeScale)
         guard let format = formats.first else { throw CompactError.noVideo }
-        if CMFormatDescriptionGetMediaSubType(format) == kCMVideoCodecType_HEVC { return false }
         let duration = try await asset.load(.duration)
+        if CMFormatDescriptionGetMediaSubType(format) == kCMVideoCodecType_HEVC,
+           try await averageKeyFrameSeconds(track, duration: duration) >= keyFrameSeconds / 2 { return false }
 
         let reader = try AVAssetReader(asset: asset)
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange])
@@ -27,7 +30,7 @@ enum Compactor {
             AVVideoCodecKey: AVVideoCodecType.hevc,
             AVVideoWidthKey: Int(size.width),
             AVVideoHeightKey: Int(size.height),
-            AVVideoCompressionPropertiesKey: [AVVideoQualityKey: quality],
+            AVVideoCompressionPropertiesKey: [AVVideoQualityKey: quality, AVVideoMaxKeyFrameIntervalDurationKey: keyFrameSeconds],
         ]
         if let colors = colorProperties(format) { settings[AVVideoColorPropertiesKey] = colors }
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
@@ -52,6 +55,17 @@ enum Compactor {
         let written = try await AVURLAsset(url: destination).load(.duration)
         guard abs(CMTimeGetSeconds(written) - CMTimeGetSeconds(duration)) < 0.1 else { throw CompactError.durationChanged }
         return true
+    }
+
+    /// Measures the mean time between keyframes from sample metadata, without reading frame data.
+    private static func averageKeyFrameSeconds(_ track: AVAssetTrack, duration: CMTime) async throws -> Double {
+        guard try await track.load(.canProvideSampleCursors),
+              let cursor = track.makeSampleCursorAtFirstSampleInDecodeOrder() else { return 0 }
+        var keyFrames = 0
+        repeat {
+            if cursor.currentSampleSyncInfo.sampleIsFullSync.boolValue { keyFrames += 1 }
+        } while cursor.stepInDecodeOrder(byCount: 1) == 1
+        return CMTimeGetSeconds(duration) / Double(max(keyFrames, 1))
     }
 
     /// Copies the source colour tags so the new movie does not shift colours.
