@@ -26,6 +26,7 @@ const COMPATIBILITY_LIMITS = {
   'capture helper binary': DEFAULT_MACOS_MIN_VERSION,
   'video helper': DEFAULT_MACOS_MIN_VERSION,
   'recording export helper': DEFAULT_MACOS_MIN_VERSION,
+  'AV1 video encoder': DEFAULT_MACOS_MIN_VERSION,
 }
 
 async function main() {

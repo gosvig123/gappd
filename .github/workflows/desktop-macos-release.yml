@@ -103,6 +103,21 @@ jobs:
           path: ${{ steps.llamacpp-cache.outputs.path }}
           key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.llamacpp-cache.outputs.key }}
 
+      - name: Install AV1 encoder build tools
+        run: brew install meson ninja nasm
+
+      - name: Plan AV1 encoder cache
+        id: ffmpeg-cache
+        env:
+          GAPPD_MAC_BUILD: universal
+        run: node desktop/scripts/prepare-ffmpeg-bundle.mjs --print-cache-plan >> "$GITHUB_OUTPUT"
+
+      - name: Restore AV1 encoder cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.ffmpeg-cache.outputs.path }}
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ steps.ffmpeg-cache.outputs.key }}
+
       - name: Plan diarizer build cache
         id: diarizer-cache
         env:

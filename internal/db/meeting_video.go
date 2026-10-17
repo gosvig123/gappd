@@ -10,6 +10,10 @@ import (
 const VideoFile = "screen.mov"
 const VideoPartialFile = "screen.in-progress.mov"
 
+// VideoCompactedFile is the AV1 copy that storage compaction writes beside VideoFile and then keeps alone.
+// video_file still records VideoFile: it marks the movie as finalized, and readers prefer this copy.
+const VideoCompactedFile = "screen.mp4"
+
 type VideoUpdate struct {
 	State         VideoState
 	SourceType    *string

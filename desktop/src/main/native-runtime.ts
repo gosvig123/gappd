@@ -43,6 +43,7 @@ export function resolveSpeechTranscriberBinary(): string {
   })
 }
 
+export const resolveFfmpegBinary = (): string => resolveBinary({ envVar: 'GAPPD_FFMPEG_PATH', packaged: ['ffmpeg', 'gappd-ffmpeg'], dev: ['resources', 'ffmpeg', 'gappd-ffmpeg'] })
 export const resolveVideoHelperBinary = (): string => resolveBinary({ envVar: 'GAPPD_VIDEO_HELPER_PATH', packaged: ['GappdVideo.app', 'Contents', 'MacOS', 'gappd-video'], dev: ['..', 'build', 'GappdVideo.app', 'Contents', 'MacOS', 'gappd-video'] })
 export const resolveDiarizerBinary = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZER_BIN', packaged: ['bin', 'gappd-diarizer'], dev: ['..', 'build', 'gappd-diarizer'] })
 export const resolveDiarizationModels = (): string => resolveBinary({ envVar: 'GAPPD_DIARIZATION_MODELS', packaged: ['diarization-models'], dev: ['..', 'gappd-diarizer', 'models'] })

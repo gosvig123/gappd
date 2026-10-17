@@ -35,7 +35,7 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
 - **Screen video** is enabled before a Meeting and requires a fresh source choice for each Meeting; video failure does not stop its audio recording, and deleting the Meeting removes its managed video but not any exported copy.
-- A finalized **Screen video** is encoded again as HEVC in the background (AC power, no Meeting recording) with the same timeline; the managed movie is replaced only when the new one is complete and smaller.
+- A finalized **Screen video** is encoded again as AV1 in the background (AC power, no Meeting recording) with the same timeline; the AV1 copy (`screen.mp4`) replaces the captured movie only when it is complete and smaller. Movies compacted earlier as HEVC stay as they are. Replay and export never need an AV1 hardware decoder, so M1 and M2 Macs play and export AV1 too.
 - Live Transcript chunks are provisional copies of the Meeting audio; they are deleted when the recording ends, and a background pass deletes leftovers of interrupted recordings.
 - Once a Meeting is idle (captured, processing finished, speaker labeling not waiting or running), its `mic.wav` and `system.wav` are replaced by lossless `mic.flac` and `system.flac` copies with the same frame count; readers prefer the FLAC when it exists.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.

@@ -22,6 +22,7 @@ export function devRuntimeAssets(platform = process.platform) {
     { name: 'Diarization helper', path: 'build/gappd-diarizer', executable: true },
     { name: 'Diarization models', path: 'gappd-diarizer/models/speaker-diarization/SHA256SUMS', executable: false },
     { name: 'Bundled llama.cpp runtime', path: 'desktop/resources/llamacpp/llama-server', executable: true },
+    { name: 'Bundled AV1 video encoder', path: 'desktop/resources/ffmpeg/gappd-ffmpeg', executable: true },
   ])
 }
 

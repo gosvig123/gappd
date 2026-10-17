@@ -14,6 +14,7 @@ test('export failure keeps managed file paths out of renderer errors', async () 
     'electron': { dialog: { showSaveDialog() { openedSaveDialog = true } } },
     './binaries': { resolveBinary() {} },
     './meeting-media': { meetingMediaPath: async () => { throw new Error('ENOENT: /private/tmp/managed/system.wav') } },
+    './native-runtime': { resolveFfmpegBinary() {} },
     './meetings': { showMeeting: async () => ({ title: 'Test Meeting', status: { video: { state: 'ready', endSec: 10, videoStartHostSec: 1, micStartHostSec: 2, systemStartHostSec: 3 } } }) },
   }, { console: { error() {} } })
   await assert.rejects(module.exportRecording('test-meeting'), (error: Error) => {

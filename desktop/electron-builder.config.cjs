@@ -25,6 +25,7 @@ module.exports = {
     { from: '../build/GappdVideo.app', to: 'GappdVideo.app' },
     { from: '../build/gappd-export', to: 'bin/gappd-export' },
     { from: 'resources/llamacpp', to: 'llamacpp' },
+    { from: 'resources/ffmpeg', to: 'ffmpeg' },
   ],
   afterPack: hooks.afterPack,
   afterSign: hooks.afterSign,

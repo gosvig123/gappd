@@ -14,7 +14,7 @@ const COMMANDS = {
   'test.request': { args: () => ['request'], env: [], terminal: [] },
   'test.stream': { args: () => ['stream'], env: [], terminal: ['recording.completed'] },
 }
-const NATIVE = { childEnv: (overrides: unknown) => overrides, resolveCaptureApp: () => null, resolveCaptureBinary: () => '', resolveDiarizationModels: () => '', resolveDiarizerBinary: () => '', resolveGappdBinary: () => 'gappd', resolveSpeechTranscriberBinary: () => '', resolveVideoHelperBinary: () => '' }
+const NATIVE = { childEnv: (overrides: unknown) => overrides, resolveCaptureApp: () => null, resolveCaptureBinary: () => '', resolveDiarizationModels: () => '', resolveDiarizerBinary: () => '', resolveFfmpegBinary: () => '', resolveGappdBinary: () => 'gappd', resolveSpeechTranscriberBinary: () => '', resolveVideoHelperBinary: () => '' }
 
 function protocol(child: FakeChild) {
   return loadSourceModule(new URL('./app-protocol.ts', import.meta.url), {
