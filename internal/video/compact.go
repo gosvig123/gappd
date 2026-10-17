@@ -99,6 +99,9 @@ func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
 	}
 	defer os.Remove(temp)
 	err = EncodeAV1(ctx, encoder, movie, temp)
+	if err == nil {
+		err = VerifyAV1(ctx, encoder, movie, temp)
+	}
 	if ctx.Err() != nil {
 		return CompactResult{}, ctx.Err()
 	}
@@ -106,7 +109,7 @@ func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
 		return CompactResult{Attempted: true}, nil // The Meeting was deleted during compaction.
 	}
 	if err != nil {
-		// Keep the original and do not retry a movie the encoder cannot read.
+		// Keep the original and do not retry a movie the encoder cannot read or copy completely.
 		return CompactResult{Attempted: true}, errors.Join(err, markCompacted(dir))
 	}
 	result := CompactResult{Attempted: true}
