@@ -45,7 +45,7 @@
 .notes-icon-tile { display: grid; place-items: center; inline-size: 2.5rem; block-size: 2.5rem; border-radius: var(--radius-md); }
 .notes-icon-tile svg { inline-size: 1.35rem; block-size: 1.35rem; }
 .notes-icon-tile.local { background: var(--color-success-bg); color: var(--color-success); }
-.notes-icon-tile.codex { background: var(--color-accent-tint-strong); color: var(--color-accent); }
+.notes-icon-tile.agent { background: var(--color-accent-tint-strong); color: var(--color-accent); }
 
 .notes-radio { inline-size: 1rem; block-size: 1rem; border: 2px solid var(--color-border-strong); border-radius: 50%; flex: none; }
 .notes-card.selected .notes-radio,

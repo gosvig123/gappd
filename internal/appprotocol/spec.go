@@ -30,17 +30,19 @@ type ConfigUseManagedLocalAIInput struct {
 	Temperature *float64 `json:"temperature,omitempty"`
 }
 
-type ConfigUseCodexInput struct {
+type ConfigUseAgentInput struct {
+	Agent           string `json:"agent"`
 	Executable      string `json:"executable"`
 	Model           string `json:"model"`
 	ReasoningEffort string `json:"reasoningEffort"`
 }
 
-type ConfigCodexModelsInput struct {
+type ConfigAgentModelsInput struct {
+	Agent      string `json:"agent"`
 	Executable string `json:"executable"`
 }
 
-type CodexModelInfo struct {
+type AgentModelInfo struct {
 	ID                     string   `json:"id"`
 	DisplayName            string   `json:"displayName"`
 	DefaultReasoningEffort string   `json:"defaultReasoningEffort"`
@@ -48,8 +50,8 @@ type CodexModelInfo struct {
 	IsDefault              bool     `json:"isDefault"`
 }
 
-type CodexModelsResponse struct {
-	Models                 []CodexModelInfo `json:"models"`
+type AgentModelsResponse struct {
+	Models                 []AgentModelInfo `json:"models"`
 	DefaultModel           string           `json:"defaultModel"`
 	DefaultReasoningEffort string           `json:"defaultReasoningEffort"`
 }
@@ -99,11 +101,11 @@ var Commands = []CommandSpec{
 	{ID: "meetings.retryDiarization", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("retry-diarization"), field("id"), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
-	{ID: "config.codexStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[CodexStatusResponse](), Args: literalArgs("app", "config", "codex-status", "--json")},
-	{ID: "config.findCodex", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[CodexFindResponse](), Args: literalArgs("app", "config", "find-codex", "--json")},
-	{ID: "config.codexModels", Mode: CommandModeRequest, Input: typeOf[ConfigCodexModelsInput](), Output: typeOf[CodexModelsResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("codex-models"), flag("executable", "executable", true), lit("--json")}},
+	{ID: "config.aiStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AIStatusResponse](), Args: literalArgs("app", "config", "ai-status", "--json")},
+	{ID: "config.findAgents", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AgentFindResponse](), Args: literalArgs("app", "config", "find-agents", "--json")},
+	{ID: "config.agentModels", Mode: CommandModeRequest, Input: typeOf[ConfigAgentModelsInput](), Output: typeOf[AgentModelsResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("agent-models"), flag("agent", "agent", false), flag("executable", "executable", true), lit("--json")}},
 	{ID: "config.useManagedLocalAI", Mode: CommandModeRequest, Input: typeOf[ConfigUseManagedLocalAIInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-managed-local-ai"), flag("endpoint", "endpoint", false), flag("model", "model", false), flag("temperature", "temperature", true)}},
-	{ID: "config.useCodex", Mode: CommandModeRequest, Input: typeOf[ConfigUseCodexInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-codex"), flag("executable", "executable", false), flag("model", "model", false), flag("reasoning-effort", "reasoningEffort", false)}},
+	{ID: "config.useAgent", Mode: CommandModeRequest, Input: typeOf[ConfigUseAgentInput](), Output: typeOf[ConfigResponse](), Args: []CommandArg{lit("app"), lit("config"), lit("use-agent"), flag("agent", "agent", false), flag("executable", "executable", false), flag("model", "model", false), flag("reasoning-effort", "reasoningEffort", false)}},
 	{ID: "processing.pending", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ProcessingPendingResponse](), Args: literalArgs("app", "processing", "pending", "--json")},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},

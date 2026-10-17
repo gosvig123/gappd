@@ -36,13 +36,13 @@ func TestUseCodexCommandPreflightsAndSaves(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	executable := fakeCodexCommand(t)
-	cmd := appConfigUseCodexCmd()
-	cmd.SetArgs([]string{"--executable", executable, "--model", "gpt-5.6-terra", "--reasoning-effort", "medium"})
+	cmd := appConfigUseAgentCmd()
+	cmd.SetArgs([]string{"--agent", config.ProviderCodexExec, "--executable", executable, "--model", "gpt-5.6-terra", "--reasoning-effort", "medium"})
 	if err := cmd.Execute(); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := config.Load()
-	if err != nil || cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.CodexModel != "gpt-5.6-terra" || cfg.AI.CodexReasoningEffort != "medium" {
+	if err != nil || cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.AgentModel != "gpt-5.6-terra" || cfg.AI.AgentReasoningEffort != "medium" {
 		t.Fatalf("Load() = %+v, %v", cfg.AI, err)
 	}
 }
@@ -53,8 +53,8 @@ func TestApplyCodexPreservesLocalSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyCodex(&cfg, "/opt/codex", ai.CodexSelection{Model: "gpt-5", Effort: "medium"})
-	if cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.CodexModel != "gpt-5" {
+	applyAgent(&cfg, config.ProviderCodexExec, "/opt/codex", ai.AgentSelection{Model: "gpt-5", Effort: "medium"})
+	if cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.AgentModel != "gpt-5" {
 		t.Fatalf("AI config = %+v", cfg.AI)
 	}
 	if cfg.AI.Model != config.DefaultLlamaCppModel || cfg.AI.Endpoint != config.DefaultLlamaCppEndpoint {

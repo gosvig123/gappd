@@ -25,6 +25,9 @@ A person listed on a calendar event whose attendance and voice identity still ne
 **Google Calendar connection**:
 Read-only authorization for one Google account's primary calendar, with independent synchronization, errors, reconnect, and disconnect behavior.
 
+**Installed agent**:
+An AI agent CLI on this Mac (Codex, Claude Code, or Pi) that Gappd runs headless with the user's own sign-in to make Meeting notes.
+
 **Cloud upload consent**:
 Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
 
@@ -48,9 +51,10 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain.
 - The renderer receives Calendar snapshots and account operations, never Google tokens.
 - The desktop app exchanges and refreshes Google tokens directly with Google; no Gappd server receives Google tokens or Google user data.
-- Meeting notes are optional. Every **Meeting** gets a transcript from the Apple speech model, which downloads by itself; notes need a chosen AI provider: Local AI on this Mac or Installed Codex. Skipping notes leaves transcripts only.
-- Gappd finds Installed Codex itself (the newest install, including the copy inside the ChatGPT app); users never type its path.
-- Installed Codex operations use one model and one reasoning effort from the installed Codex model catalog; an unset model uses the app default, and Gappd never substitutes a model or effort the catalog does not advertise.
+- Meeting notes are optional. Every **Meeting** gets a transcript from the Apple speech model, which downloads by itself; notes need a chosen AI provider: Local AI on this Mac or one **Installed agent**. Skipping notes leaves transcripts only.
+- Gappd finds each **Installed agent** itself (the newest install, including the Codex copy inside the ChatGPT app); users never type its path.
+- **Installed agent** operations use one model and one reasoning effort from that agent's model catalog (Codex: its app-server catalog; Claude Code: its model aliases; Pi: `pi --list-models`). An unset model uses the catalog default (Codex `gpt-5.6-terra`/medium, Claude Code `sonnet`/medium, Pi the user's own Pi default), and Gappd never substitutes a model or effort the catalog does not advertise.
+- Gappd runs an **Installed agent** without tools, in an empty folder, with a minimal environment. Codex and Claude Code also ignore the user's own customizations; Pi keeps the user's Pi extensions, so extension model providers stay available.
 - Gappd suggests Calendar events that overlap a **Meeting**; only the user's choice links one, and a suggestion never confirms attendance or identifies a **Meeting speaker**.
 
 ## Example dialogue

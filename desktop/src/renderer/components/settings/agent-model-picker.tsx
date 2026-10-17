@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import type { CodexModelCatalog } from '../../../shared/ipc-contract'
-import { codexEffortChoices, codexModelChoices } from '../../../shared/codex-models'
+import type { AgentModelCatalog } from '../../../shared/ipc-contract'
+import { agentEffortChoices, agentModelChoices } from '../../../shared/agent-models'
 import { cx } from '../ui'
 
 const SHORT_LIST = 3
 
 type Props = {
-  catalog: CodexModelCatalog
+  catalog: AgentModelCatalog
   model: string
   effort: string
   savedModel: string
@@ -16,18 +16,18 @@ type Props = {
   onEffortChange: (effort: string) => void
 }
 
-/** Model list and reasoning-effort scale from the installed Codex model catalog. */
-export function CodexModelPicker({ catalog, model, effort, savedModel, savedEffort, disabled, onModelChange, onEffortChange }: Props) {
+/** Model list and reasoning-effort scale from an installed agent's model catalog. */
+export function AgentModelPicker({ catalog, model, effort, savedModel, savedEffort, disabled, onModelChange, onEffortChange }: Props) {
   const [showAll, setShowAll] = useState(false)
-  const choices = codexModelChoices(catalog, savedModel)
+  const choices = agentModelChoices(catalog, savedModel)
   const shown = showAll ? choices : choices.filter((choice, index) => index < SHORT_LIST || choice.value === model)
-  const efforts = codexEffortChoices(catalog, model, savedEffort)
+  const efforts = agentEffortChoices(catalog, model, savedEffort)
   const modelDefault = catalog.models.find((option) => option.id === model)?.defaultReasoningEffort
   return (
     <>
       <div className="notes-field">
-        <p className="notes-field-label" id="codex-model-label">Model</p>
-        <div className="notes-models" role="radiogroup" aria-labelledby="codex-model-label">
+        <p className="notes-field-label" id="agent-model-label">Model</p>
+        <div className="notes-models" role="radiogroup" aria-labelledby="agent-model-label">
           {shown.map((choice) => {
             const option = catalog.models.find((item) => item.id === choice.value)
             return (
@@ -45,8 +45,8 @@ export function CodexModelPicker({ catalog, model, effort, savedModel, savedEffo
       </div>
       {efforts.length ? (
         <div className="notes-field">
-          <p className="notes-field-label" id="codex-effort-label">Reasoning effort</p>
-          <div className="notes-effort" role="radiogroup" aria-labelledby="codex-effort-label" style={{ gridTemplateColumns: `repeat(${efforts.length}, minmax(0, 1fr))` }}>
+          <p className="notes-field-label" id="agent-effort-label">Reasoning effort</p>
+          <div className="notes-effort" role="radiogroup" aria-labelledby="agent-effort-label" style={{ gridTemplateColumns: `repeat(${efforts.length}, minmax(0, 1fr))` }}>
             {efforts.map((value, index) => (
               <button key={value} type="button" role="radio" aria-checked={value === effort} disabled={disabled}
                 className={cx('notes-effort-step', value === effort && 'selected', value === modelDefault && 'model-default')}

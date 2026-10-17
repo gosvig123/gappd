@@ -187,34 +187,40 @@ export type AIConfig = {
   endpoint: string
   temperature: number
   managed: boolean
-  codexExecutable: string
-  codexModel: string
-  codexReasoningEffort: string
+  agentExecutable: string
+  agentModel: string
+  agentReasoningEffort: string
 }
 
-export type CodexStatusResponse = {
+export type AIStatusResponse = {
   ai: AIConfig
   available: boolean
   error?: string
 }
 
-export type CodexFindResponse = {
+export type AgentFindResponse = {
+  agents: AgentInstall[]
+}
+
+export type AgentInstall = {
+  agent: string
   executable: string
   version: string
   signedIn: boolean
 }
 
-export type ConfigCodexModelsInput = {
+export type ConfigAgentModelsInput = {
+  agent: string
   executable: string
 }
 
-export type CodexModelsResponse = {
-  models: CodexModelInfo[]
+export type AgentModelsResponse = {
+  models: AgentModelInfo[]
   defaultModel: string
   defaultReasoningEffort: string
 }
 
-export type CodexModelInfo = {
+export type AgentModelInfo = {
   id: string
   displayName: string
   defaultReasoningEffort: string
@@ -228,7 +234,8 @@ export type ConfigUseManagedLocalAIInput = {
   temperature?: number
 }
 
-export type ConfigUseCodexInput = {
+export type ConfigUseAgentInput = {
+  agent: string
   executable: string
   model: string
   reasoningEffort: string

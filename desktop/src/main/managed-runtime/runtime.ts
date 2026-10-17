@@ -1,4 +1,4 @@
-import type { CodexStatusResponse } from '../../shared/generated/contracts'
+import type { AIStatusResponse } from '../../shared/generated/contracts'
 import type { CapabilitySnapshot, ManagedRuntimeCapability, ManagedRuntimePrepareMode, ManagedRuntimePullStage, ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import { MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL, MANAGED_LLAMACPP_MODEL_OPTIONS, isManagedLlamaCppModel } from '../../shared/managed-local-ai'
 import { requestCommand } from '../app-protocol'
@@ -14,7 +14,7 @@ type ManagedRuntime = {
   status(): ManagedRuntimeSnapshot
   observe(listener: (snapshot: ManagedRuntimeSnapshot) => void): () => void
   prepare(mode: ManagedRuntimePrepareMode, model?: string): Promise<ManagedRuntimeSnapshot>
-  refresh(providerHealth?: CodexStatusResponse, providerGeneration?: number): Promise<ManagedRuntimeSnapshot>
+  refresh(providerHealth?: AIStatusResponse, providerGeneration?: number): Promise<ManagedRuntimeSnapshot>
   providerGeneration(): number
   beginProviderChange(): Promise<RuntimeProviderChange>
   endProviderChange(change: RuntimeProviderChange, resumeRepair: boolean): void
@@ -53,7 +53,7 @@ export async function bootstrapManagedRuntime(): Promise<void> {
   if (probe.config && isManagedLocal(probe.config) && snapshot.operation !== 'ready') void prepare('repair', probe.config.model)
 }
 
-async function refreshStatus(providerHealth?: CodexStatusResponse, providerGeneration = providerGate.generation()): Promise<ManagedRuntimeSnapshot> {
+async function refreshStatus(providerHealth?: AIStatusResponse, providerGeneration = providerGate.generation()): Promise<ManagedRuntimeSnapshot> {
   if (!providerGate.current(providerGeneration) || preparePromise && !providerHealth && !providerGate.changing()) return state.get()
   const generation = ++refreshGeneration
   const force = Boolean(providerHealth) || providerGate.changing()
@@ -212,7 +212,7 @@ async function resumeManagedRepair(change: RuntimeProviderChange): Promise<void>
   const generation = change.gate.generation
   await change.prepare?.catch(() => undefined)
   if (!providerGate.current(generation)) return
-  const health = await requestCommand('config.codexStatus', {})
+  const health = await requestCommand('config.aiStatus', {})
   if (!providerGate.current(generation) || !isManagedLocal(health.ai)) return
   const snapshot = await refreshStatus(health, generation)
   if (snapshot.operation !== 'ready') void prepare('repair', change.model || health.ai.model)

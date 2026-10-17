@@ -3,48 +3,50 @@ package main
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/gappd-dev/gappd/internal/ai"
 	"github.com/gappd-dev/gappd/internal/config"
 )
 
-// codexCatalog reads the installed Codex model catalog. Tests replace it.
-var codexCatalog = func(executable string) ([]ai.CodexModel, error) {
-	return ai.ListCodexModels(context.Background(), executable)
+// agentCatalog reads an installed agent's model catalog. Tests replace it.
+var agentCatalog = func(agent, executable string) (ai.AgentCatalog, error) {
+	return ai.ListAgentModels(context.Background(), agent, executable)
 }
 
-// findCodex finds the installed Codex CLI. Tests replace it.
-var findCodex = ai.FindCodex
+// findAgents finds the installed agent CLIs. Tests replace it.
+var findAgents = ai.FindAgents
 
 func newAIProvider(settings config.AI) (ai.Provider, error) {
-	switch settings.Provider {
-	case config.ProviderLlamaCpp:
+	switch {
+	case settings.Provider == config.ProviderLlamaCpp:
 		return ai.NewOpenAICompat(settings.Endpoint, settings.Model), nil
-	case config.ProviderCodexExec:
-		return newCodexExecProvider(settings)
+	case config.IsAgentProvider(settings.Provider):
+		provider, err := newAgentProvider(settings)
+		if err != nil {
+			return nil, err
+		}
+		return provider, nil
 	default:
 		return nil, fmt.Errorf("unsupported AI provider %q", settings.Provider)
 	}
 }
 
-func newCodexExecProvider(settings config.AI) (ai.Provider, error) {
-	selection, err := resolveCodexSelection(settings)
+func newAgentProvider(settings config.AI) (*ai.AgentProvider, error) {
+	selection, err := resolveAgentSelection(settings)
 	if err != nil {
 		return nil, err
 	}
-	return ai.NewCodexExec(settings.CodexExecutable, selection.Model, selection.Effort), nil
+	return ai.NewAgentProvider(settings.Provider, settings.AgentExecutable, selection)
 }
 
-// resolveCodexSelection validates saved Installed Codex settings against the
-// installed Codex model catalog. Discovery failures and unavailable selections
-// fail the operation instead of falling back to another model.
-func resolveCodexSelection(settings config.AI) (ai.CodexSelection, error) {
-	settings.CodexModel = strings.TrimSpace(settings.CodexModel)
-	settings.CodexReasoningEffort = strings.ToLower(strings.TrimSpace(settings.CodexReasoningEffort))
-	models, err := codexCatalog(settings.CodexExecutable)
+// resolveAgentSelection validates saved agent settings against the installed
+// agent's model catalog. Discovery failures and unavailable selections fail
+// the operation instead of falling back to another model.
+func resolveAgentSelection(settings config.AI) (ai.AgentSelection, error) {
+	catalog, err := agentCatalog(settings.Provider, settings.AgentExecutable)
 	if err != nil {
-		return ai.CodexSelection{}, fmt.Errorf("read installed Codex model catalog: %w; update Codex or open Settings", err)
+		name := ai.AgentName(settings.Provider)
+		return ai.AgentSelection{}, fmt.Errorf("read installed %s model catalog: %w; update %s or open Settings", name, err, name)
 	}
-	return ai.ResolveCodexSelection(models, settings.CodexModel, settings.CodexReasoningEffort)
+	return ai.ResolveAgentSelection(settings.Provider, catalog, settings.AgentModel, settings.AgentReasoningEffort)
 }

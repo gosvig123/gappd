@@ -3,6 +3,8 @@ import { test } from 'node:test'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import * as localAi from '../../shared/managed-local-ai.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import * as agents from '../../shared/agents.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { loadSourceModule } from '../source-module-test-helper.ts'
 
 const MANAGED_CONFIG = { provider: localAi.LOCAL_AI_PROVIDER_LLAMACPP, managed: true, model: localAi.MANAGED_LLAMACPP_MODEL }
@@ -10,6 +12,7 @@ const MANAGED_CONFIG = { provider: localAi.LOCAL_AI_PROVIDER_LLAMACPP, managed: 
 function status(assets: { llamacpp: boolean; speech: boolean; diarization: boolean }) {
   return loadSourceModule(new URL('./status.ts', import.meta.url), {
     '../../shared/managed-local-ai': localAi,
+    '../../shared/agents': agents,
     '../app-protocol': { requestCommand: async () => assert.fail('probe input is supplied directly') },
     './apple-speech': { appleSpeechAssetAvailable: async () => assets.speech, missingAppleSpeechAssetMessage: () => 'speech missing' },
     './language-model': { managedLanguageModelAvailable: async () => true, missingManagedLanguageModelMessage: () => 'model missing' },

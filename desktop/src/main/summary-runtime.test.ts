@@ -16,8 +16,8 @@ function runtimeFixture(provider: string, ready = true) {
   return { calls, acquisition, using: runtime.usingSummaryRuntime }
 }
 
-test('summary runtime reads config once and Codex bypasses the local readiness guard', async () => {
-  const f = runtimeFixture('codex_exec', false)
+test('summary runtime reads config once and agents bypass the local readiness guard', async () => {
+  const f = runtimeFixture('claude_code', false)
   assert.equal(await f.using(async () => 'draft', true), 'draft')
   assert.deepEqual(f.calls, { config: 1, status: 0, using: 0 })
 })

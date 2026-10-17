@@ -2,27 +2,28 @@ import './notes-provider.css'
 
 import { type ReactNode, useEffect, useState } from 'react'
 import { ArrowLeftRight, Cloud, Download, Laptop, Lock, Send, SlidersHorizontal, UserRound, WifiOff } from 'lucide-react'
-import type { AIProviderStatus, CodexModelCatalog } from '../../../shared/ipc-contract'
-import { codexSelectionIsUnavailable, codexSelectionIsValid, defaultCodexSelection, defaultEffortForModel } from '../../../shared/codex-models'
+import type { AgentId, AgentInstall, AgentModelCatalog, AIProviderStatus } from '../../../shared/ipc-contract'
+import { AGENTS, agentInfo, type AgentInfo } from '../../../shared/agents'
+import { agentModelName, agentSelectionIsUnavailable, agentSelectionIsValid, defaultAgentSelection, defaultEffortForModel } from '../../../shared/agent-models'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../../shared/managed-local-ai'
-import { type CodexCatalogState, useCodexCatalog } from '../../hooks/use-codex-catalog'
-import { type CodexInstallState, useCodexInstall } from '../../hooks/use-codex-install'
+import { type AgentCatalogState, useAgentCatalog } from '../../hooks/use-agent-catalog'
+import { type AgentInstallsState, useAgentInstalls } from '../../hooks/use-agent-installs'
 import { Button, Card, cx, ProgressBar, StatusPill } from '../ui'
 import { AlertCircleIcon } from '../icons'
-import { CodexModelPicker } from './codex-model-picker'
+import { AgentModelPicker } from './agent-model-picker'
 import { LocalAIErrorBanner } from './local-ai-error-banner'
 import { runtimeErrorView, type ManagedRuntimeSnapshot } from './managed-runtime-contract'
 
 type Provider = AIProviderStatus['provider']
 type Readiness = { tone: string; label: string; progress?: number | null }
 type Props = { runtime: ManagedRuntimeSnapshot | null; onRepair: () => void }
+type Selection = { model: string; effort: string }
 
-const LOCAL: Provider = 'local'
-const CODEX: Provider = 'codex_exec'
+const LOCAL = 'local' satisfies Provider
 const MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 const SETTING_UP: ManagedRuntimeSnapshot['operation'][] = ['starting_runtime', 'pulling_model', 'saving_config']
 
-/** Settings section that chooses where Meeting notes are made: Local AI on this Mac or Installed Codex. */
+/** Settings section that chooses where Meeting notes are made: Local AI on this Mac or an installed agent. */
 export function NotesProviderPanel({ runtime, onRepair }: Props) {
   const [status, setStatus] = useState<AIProviderStatus | null>(null)
   const [choice, setChoice] = useState<Provider>(LOCAL)
@@ -31,35 +32,44 @@ export function NotesProviderPanel({ runtime, onRepair }: Props) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const found = useCodexInstall(true)
-  const executable = found.install?.executable ?? ''
-  const catalog = useCodexCatalog(choice === CODEX, executable)
+  const found = useAgentInstalls(true)
+  const agent = choice === LOCAL ? null : choice
+  const install = agent ? installFor(found.installs, agent) : null
+  const executable = install?.executable ?? ''
+  const catalog = useAgentCatalog(agent, executable)
   useEffect(() => {
     window.gappd.aiProvider.status()
-      .then((next) => { setStatus(next); setChoice(next.provider); setModel(next.codexModel); setEffort(next.codexReasoningEffort) })
+      .then((next) => { setStatus(next); setChoice(next.provider); setModel(next.agentModel); setEffort(next.agentReasoningEffort) })
       .catch((cause) => setError(errorMessage(cause)))
       .finally(() => setLoading(false))
   }, [])
-  useDefaultCodexSelection(catalog.catalog, model, setModel, setEffort)
+  useDefaultAgentSelection(catalog.catalog, model, setModel, setEffort)
 
-  const saved = savedCodexSelection(status, catalog.catalog)
+  const saved = savedAgentSelection(status, choice, catalog.catalog)
   const switching = status !== null && choice !== status.provider
-  const modelChanged = status?.provider === CODEX && choice === CODEX && (model !== saved.model || effort !== saved.effort)
+  const modelChanged = agent !== null && status?.provider === agent && (model !== saved.model || effort !== saved.effort)
   const localNeedsSetup = status?.provider === LOCAL && choice === LOCAL && runtime?.operation === 'needs_setup'
-  const codexUsable = Boolean(executable && found.install?.signedIn && codexSelectionIsValid(catalog.catalog, model, effort))
+  const agentUsable = Boolean(executable && install?.signedIn && agentSelectionIsValid(catalog.catalog, model, effort))
+  // Each agent has its own catalog, so a new choice starts from its saved or default selection.
+  const choose = (next: Provider) => {
+    setChoice(next); setError(null)
+    const keep = next !== LOCAL && next === status?.provider
+    setModel(keep ? status.agentModel : ''); setEffort(keep ? status.agentReasoningEffort : '')
+  }
   const save = async () => {
     setBusy(true); setError(null)
-    try { setStatus(choice === LOCAL ? await window.gappd.aiProvider.useLocal() : await window.gappd.aiProvider.configureCodex({ executable, model, reasoningEffort: effort })) }
+    try { setStatus(agent ? await window.gappd.aiProvider.configureAgent({ agent, executable, model, reasoningEffort: effort }) : await window.gappd.aiProvider.useLocal()) }
     catch (cause) { setError(errorMessage(cause)) }
     finally { setBusy(false) }
   }
   const cancel = () => {
-    if (status) setChoice(status.provider)
-    setModel(saved.model); setEffort(saved.effort); setError(null)
+    if (status) choose(status.provider)
   }
   const header = headerStatus(status, runtime, loading)
-  const codexBlocked = choice === CODEX && !found.install?.signedIn
-  const pending = (switching || modelChanged || localNeedsSetup) && !codexBlocked
+  const agentBlocked = agent !== null && !install?.signedIn
+  const pending = (switching || modelChanged || localNeedsSetup) && !agentBlocked
+  const shown = shownAgents(found.installs, status?.provider ?? LOCAL)
+  const missing = found.installs ? AGENTS.filter((info) => !shown.includes(info)) : []
 
   return (
     <Card className="settings-section notes-provider">
@@ -68,38 +78,58 @@ export function NotesProviderPanel({ runtime, onRepair }: Props) {
         <StatusPill tone={header.tone}>{header.label}</StatusPill>
       </div>
       <div className="notes-cards" role="radiogroup" aria-label="Where notes are made">
-        <ProviderCard id={LOCAL} choice={choice} inUse={status?.provider === LOCAL && runtime?.operation !== 'needs_setup'} disabled={loading || busy} onChoose={setChoice}
+        <ProviderCard id={LOCAL} choice={choice} inUse={status?.provider === LOCAL && runtime?.operation !== 'needs_setup'} disabled={loading || busy} onChoose={choose}
           icon={<Laptop />} title="On this Mac" tagline="Private · works offline" readiness={localReadiness(runtime, status?.provider === LOCAL)} meta={MANAGED_LLAMACPP_MODEL_ARTIFACT.label}
           facts={[
             { icon: <Lock />, good: true, text: 'Transcripts and notes stay on this Mac' },
             { icon: <WifiOff />, good: true, text: 'Works without internet' },
             { icon: <Download />, good: false, text: runtime?.localModelReady ? `Notes model is on this Mac (${MODEL_SIZE})` : `One-time ${MODEL_SIZE} download` },
           ]} />
-        <ProviderCard id={CODEX} choice={choice} inUse={status?.provider === CODEX} disabled={loading || busy} onChoose={setChoice}
-          icon={<Cloud />} title="With Codex" tagline="Your ChatGPT account · OpenAI" readiness={codexReadiness(found, status)} meta={found.install?.version ?? ''}
-          facts={[
-            { icon: <UserRound />, good: true, text: 'Uses your ChatGPT account. No download.' },
-            { icon: <SlidersHorizontal />, good: true, text: 'Choose the model and reasoning effort' },
-            { icon: <Send />, good: false, text: 'Sends transcript text to OpenAI. Audio stays on this Mac.' },
-          ]} />
+        {shown.map((info) => {
+          const agentInstall = installFor(found.installs, info.id)
+          return (
+            <ProviderCard key={info.id} id={info.id} choice={choice} inUse={status?.provider === info.id} disabled={loading || busy} onChoose={choose}
+              icon={<Cloud />} title={`With ${info.name}`} tagline={info.tagline} readiness={agentReadiness(info, found, agentInstall, status)} meta={agentInstall?.version ?? ''}
+              facts={[
+                { icon: <UserRound />, good: true, text: info.account },
+                { icon: <SlidersHorizontal />, good: true, text: 'Choose the model and reasoning effort' },
+                { icon: <Send />, good: false, text: info.sendsTo },
+              ]} />
+          )
+        })}
       </div>
-      {choice === CODEX
-        ? <CodexDetails found={found} catalog={catalog} status={status} model={model} effort={effort} saved={saved} disabled={busy}
+      {found.checking && !found.installs ? <p className="notes-footnote">Looking for {nameList(AGENTS)} on this Mac…</p> : null}
+      {missing.length && !found.checking ? <p className="notes-footnote">Gappd also works with {nameList(missing)}. Install one and Gappd finds it here. <button type="button" className="notes-link" onClick={found.recheck}>Check again</button></p> : null}
+      {agent
+        ? <AgentDetails info={agentInfo(agent)} found={found} install={install} catalog={catalog} status={status} model={model} effort={effort} saved={saved} disabled={busy}
             onModelChange={(value) => { setModel(value); setEffort(defaultEffortForModel(catalog.catalog, value)) }} onEffortChange={setEffort} />
         : <LocalDetails runtime={runtime} inUse={status?.provider === LOCAL} onRepair={onRepair} />}
       {error ? <div className="status-note danger">{error}</div> : null}
       {pending ? (
         <div className="notes-change-bar">
           <ArrowLeftRight aria-hidden="true" />
-          <span>{changeSummary(choice, runtime, catalog.catalog, model, effort)}</span>
+          <span>{changeSummary(agent, runtime, catalog.catalog, model, effort)}</span>
           {switching || modelChanged ? <Button disabled={busy} onClick={cancel}>Cancel</Button> : null}
-          <Button variant="primary" disabled={busy || loading || (choice === CODEX && !codexUsable)} onClick={() => void save()}>
-            {busy ? 'Saving…' : changeAction(choice, runtime, switching)}
+          <Button variant="primary" disabled={busy || loading || (agent !== null && !agentUsable)} onClick={() => void save()}>
+            {busy ? 'Saving…' : changeAction(agent, runtime, switching)}
           </Button>
         </div>
       ) : null}
     </Card>
   )
+}
+
+/** Agents show when installed, or when saved so a moved install stays visible. */
+function shownAgents(installs: AgentInstall[] | null, saved: Provider): AgentInfo[] {
+  return AGENTS.filter((info) => info.id === saved || Boolean(installFor(installs, info.id)?.executable))
+}
+
+function nameList(infos: readonly AgentInfo[]): string {
+  return new Intl.ListFormat('en', { type: 'conjunction' }).format(infos.map((info) => info.name))
+}
+
+function installFor(installs: AgentInstall[] | null, agent: AgentId): AgentInstall | null {
+  return installs?.find((install) => install.agent === agent) ?? null
 }
 
 type Fact = { icon: ReactNode; good: boolean; text: string }
@@ -111,7 +141,7 @@ function ProviderCard({ id, choice, inUse, disabled, onChoose, icon, title, tagl
       <input type="radio" name="notes-provider" value={id} checked={choice === id} disabled={disabled} onChange={() => onChoose(id)} />
       {inUse ? <span className="notes-in-use">In use now</span> : null}
       <span className="notes-card-head">
-        <span className={cx('notes-icon-tile', id === LOCAL ? 'local' : 'codex')} aria-hidden="true">{icon}</span>
+        <span className={cx('notes-icon-tile', id === LOCAL ? 'local' : 'agent')} aria-hidden="true">{icon}</span>
         <span><strong>{title}</strong><small>{tagline}</small></span>
         <span className="notes-radio" aria-hidden="true" />
       </span>
@@ -139,26 +169,25 @@ function LocalDetails({ runtime, inUse, onRepair }: { runtime: ManagedRuntimeSna
   )
 }
 
-type CodexDetailsProps = {
-  found: CodexInstallState; catalog: CodexCatalogState; status: AIProviderStatus | null
-  model: string; effort: string; saved: { model: string; effort: string }; disabled: boolean
+type AgentDetailsProps = {
+  info: AgentInfo; found: AgentInstallsState; install: AgentInstall | null; catalog: AgentCatalogState; status: AIProviderStatus | null
+  model: string; effort: string; saved: Selection; disabled: boolean
   onModelChange: (model: string) => void; onEffortChange: (effort: string) => void
 }
 
-function CodexDetails({ found, catalog, status, model, effort, saved, disabled, onModelChange, onEffortChange }: CodexDetailsProps) {
-  const install = found.install
-  if (found.checking || !install) return <div className="status-note">Looking for Codex on this Mac…</div>
-  if (!install.executable) return <Problem text="Codex is not on this Mac. Install the ChatGPT app or Codex, and Gappd finds it here." onRecheck={found.recheck} />
-  if (!install.signedIn) return <Problem text="Codex is not signed in. Open the ChatGPT app or Codex and sign in, then come back." onRecheck={found.recheck} />
-  if (catalog.loading) return <div className="status-note">Loading Codex models…</div>
-  if (catalog.error || !catalog.catalog) return <Problem text={catalog.error || 'Could not read the installed Codex model catalog.'} onRecheck={catalog.refresh} />
-  const unavailable = status?.provider === CODEX && !status.available ? status.error || 'Codex is unavailable.' : null
+function AgentDetails({ info, found, install, catalog, status, model, effort, saved, disabled, onModelChange, onEffortChange }: AgentDetailsProps) {
+  if (found.checking || !found.installs) return <div className="status-note">Looking for {info.name} on this Mac…</div>
+  if (!install?.executable) return <Problem text={`${info.name} is not on this Mac. ${info.install}, and Gappd finds it here.`} onRecheck={found.recheck} />
+  if (!install.signedIn) return <Problem text={`${info.name} is not signed in. ${info.signIn}, then come back.`} onRecheck={found.recheck} />
+  if (catalog.loading) return <div className="status-note">Loading {info.name} models…</div>
+  if (catalog.error || !catalog.catalog) return <Problem text={catalog.error || `Could not read the installed ${info.name} model catalog.`} onRecheck={catalog.refresh} />
+  const unavailable = status?.provider === info.id && !status.available ? status.error || `${info.name} is unavailable.` : null
   return (
     <div className="notes-details">
       {unavailable ? <div className="status-note danger">{unavailable}</div> : null}
-      {codexSelectionIsUnavailable(catalog.catalog, model) ? <div className="status-note danger">The saved model {model} is not in the installed Codex model catalog. Choose an available model.</div> : null}
-      <CodexModelPicker catalog={catalog.catalog} model={model} effort={effort} savedModel={saved.model} savedEffort={saved.effort} disabled={disabled} onModelChange={onModelChange} onEffortChange={onEffortChange} />
-      <p className="notes-footnote">Applies to every Gappd AI task that uses Codex. <button type="button" className="notes-link" onClick={catalog.refresh}>Refresh models</button></p>
+      {agentSelectionIsUnavailable(catalog.catalog, model) ? <div className="status-note danger">The saved model {model} is not in the installed {info.name} model catalog. Choose an available model.</div> : null}
+      <AgentModelPicker catalog={catalog.catalog} model={model} effort={effort} savedModel={saved.model} savedEffort={saved.effort} disabled={disabled} onModelChange={onModelChange} onEffortChange={onEffortChange} />
+      <p className="notes-footnote">Applies to every Gappd AI task that uses {info.name}. <button type="button" className="notes-link" onClick={catalog.refresh}>Refresh models</button></p>
     </div>
   )
 }
@@ -167,25 +196,28 @@ function Problem({ text, onRecheck }: { text: string; onRecheck: () => void }) {
   return <div className="notes-problem"><AlertCircleIcon aria-hidden="true" /><span>{text}</span><Button className="compact-action" onClick={onRecheck}>Check again</Button></div>
 }
 
-/** Unconfigured Installed Codex selects the validated app default once the catalog loads. */
-function useDefaultCodexSelection(catalog: CodexModelCatalog | null, model: string, setModel: (value: string) => void, setEffort: (value: string) => void) {
+/** An unconfigured agent selects the validated catalog default once the catalog loads. */
+function useDefaultAgentSelection(catalog: AgentModelCatalog | null, model: string, setModel: (value: string) => void, setEffort: (value: string) => void) {
   useEffect(() => {
     if (!catalog || model) return
-    const selection = defaultCodexSelection(catalog)
+    const selection = defaultAgentSelection(catalog)
     setModel(selection.model)
     setEffort(selection.effort)
   }, [catalog, model, setModel, setEffort])
 }
 
-/** An empty saved model means the app default, so compare against that default. */
-function savedCodexSelection(status: AIProviderStatus | null, catalog: CodexModelCatalog | null): { model: string; effort: string } {
-  if (status?.codexModel) return { model: status.codexModel, effort: status.codexReasoningEffort }
-  return defaultCodexSelection(catalog)
+/** An empty saved model means the catalog default, so compare against that default. */
+function savedAgentSelection(status: AIProviderStatus | null, choice: Provider, catalog: AgentModelCatalog | null): Selection {
+  if (status?.provider === choice && status.agentModel) return { model: status.agentModel, effort: status.agentReasoningEffort }
+  return defaultAgentSelection(catalog)
 }
 
 function headerStatus(status: AIProviderStatus | null, runtime: ManagedRuntimeSnapshot | null, loading: boolean): Readiness {
   if (!status) return loading ? { tone: 'neutral', label: 'Checking' } : { tone: 'error', label: 'Unknown' }
-  if (status.provider === CODEX) return status.available ? { tone: 'completed', label: 'On · Codex' } : { tone: 'error', label: 'Codex unavailable' }
+  if (status.provider !== LOCAL) {
+    const name = agentInfo(status.provider).name
+    return status.available ? { tone: 'completed', label: `On · ${name}` } : { tone: 'error', label: `${name} unavailable` }
+  }
   if (!runtime) return { tone: 'neutral', label: 'Checking' }
   if (runtime.operation === 'ready') return { tone: 'completed', label: 'On · This Mac' }
   if (SETTING_UP.includes(runtime.operation)) return { tone: 'processing', label: 'Setting up' }
@@ -205,25 +237,25 @@ function localReadiness(runtime: ManagedRuntimeSnapshot | null, inUse: boolean):
   return { tone: 'neutral', label: `Needs ${MODEL_SIZE} download` }
 }
 
-function codexReadiness(found: CodexInstallState, status: AIProviderStatus | null): Readiness {
-  if (found.checking || !found.install) return { tone: 'neutral', label: 'Looking for Codex' }
-  if (!found.install.executable) return { tone: 'error', label: 'Not on this Mac' }
-  if (!found.install.signedIn) return { tone: 'error', label: 'Not signed in' }
-  if (status?.provider === CODEX && !status.available) return { tone: 'error', label: 'Unavailable' }
+function agentReadiness(info: AgentInfo, found: AgentInstallsState, install: AgentInstall | null, status: AIProviderStatus | null): Readiness {
+  if (found.checking || !found.installs) return { tone: 'neutral', label: `Looking for ${info.name}` }
+  if (!install?.executable) return { tone: 'error', label: 'Not on this Mac' }
+  if (!install.signedIn) return { tone: 'error', label: 'Not signed in' }
+  if (status?.provider === info.id && !status.available) return { tone: 'error', label: 'Unavailable' }
   return { tone: 'completed', label: 'Signed in' }
 }
 
-function changeSummary(choice: Provider, runtime: ManagedRuntimeSnapshot | null, catalog: CodexModelCatalog | null, model: string, effort: string): string {
-  if (choice === LOCAL) return runtime?.localModelReady
+function changeSummary(agent: AgentId | null, runtime: ManagedRuntimeSnapshot | null, catalog: AgentModelCatalog | null, model: string, effort: string): string {
+  if (!agent) return runtime?.localModelReady
     ? 'From now on, Gappd makes notes on this Mac.'
     : `Gappd downloads the notes model once (${MODEL_SIZE}), then makes notes on this Mac. You can keep using Gappd while it downloads.`
-  const name = catalog?.models.find((option) => option.id === model)?.displayName || model
-  return `From now on, Gappd makes notes with ${name} at ${effort} reasoning effort.`
+  const name = agentModelName(catalog, model)
+  return effort ? `From now on, Gappd makes notes with ${name} at ${effort} reasoning effort.` : `From now on, Gappd makes notes with ${name}.`
 }
 
-function changeAction(choice: Provider, runtime: ManagedRuntimeSnapshot | null, switching: boolean): string {
-  if (choice === LOCAL) return runtime?.localModelReady ? 'Use this Mac' : `Download ${MODEL_SIZE} and use`
-  return switching ? 'Use Codex' : 'Save model'
+function changeAction(agent: AgentId | null, runtime: ManagedRuntimeSnapshot | null, switching: boolean): string {
+  if (!agent) return runtime?.localModelReady ? 'Use this Mac' : `Download ${MODEL_SIZE} and use`
+  return switching ? `Use ${agentInfo(agent).name}` : 'Save model'
 }
 
 function errorMessage(cause: unknown): string {

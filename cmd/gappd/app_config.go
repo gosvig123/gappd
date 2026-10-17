@@ -15,7 +15,7 @@ func appConfigCmd() *cobra.Command {
 		Use:   "config",
 		Short: "Machine-readable config access",
 	}
-	cmd.AddCommand(appConfigShowCmd(), appConfigCodexStatusCmd(), appConfigFindCodexCmd(), appConfigCodexModelsCmd(), appConfigUseManagedLocalAICmd(), appConfigUseCodexCmd())
+	cmd.AddCommand(appConfigShowCmd(), appConfigAIStatusCmd(), appConfigFindAgentsCmd(), appConfigAgentModelsCmd(), appConfigUseManagedLocalAICmd(), appConfigUseAgentCmd())
 	return cmd
 }
 
@@ -39,104 +39,118 @@ func appConfigShowCmd() *cobra.Command {
 	return cmd
 }
 
-func appConfigCodexStatusCmd() *cobra.Command {
+func appConfigAIStatusCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
-		Use: "codex-status", Short: "Check saved Installed Codex health",
+		Use: "ai-status", Short: "Check the saved AI provider's health",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !asJSON {
-				return fmt.Errorf("app config codex-status requires --json")
+				return fmt.Errorf("app config ai-status requires --json")
 			}
 			cfg, err := loadAppConfig()
 			if err != nil {
 				return err
 			}
-			return writeJSON(codexStatusFor(cfg))
+			return writeJSON(aiStatusFor(cfg))
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
 
-func codexStatusFor(cfg config.Config) appprotocol.CodexStatusResponse {
-	status := appprotocol.CodexStatusResponse{AI: appAIConfigFor(cfg), Available: true}
-	if cfg.AI.Provider != config.ProviderCodexExec {
+// aiStatusFor checks a saved agent provider. Local AI health belongs to the
+// desktop managed runtime, so it is always reported available here.
+func aiStatusFor(cfg config.Config) appprotocol.AIStatusResponse {
+	status := appprotocol.AIStatusResponse{AI: appAIConfigFor(cfg), Available: true}
+	if !config.IsAgentProvider(cfg.AI.Provider) {
 		return status
 	}
-	if err := ai.ValidateCodexExecutable(cfg.AI.CodexExecutable); err != nil {
-		return unavailableCodexStatus(status, err)
+	if err := ai.ValidateAgentExecutable(cfg.AI.Provider, cfg.AI.AgentExecutable); err != nil {
+		return unavailableAIStatus(status, err)
 	}
-	selection, err := resolveCodexSelection(cfg.AI)
+	provider, err := newAgentProvider(cfg.AI)
 	if err != nil {
-		return unavailableCodexStatus(status, err)
+		return unavailableAIStatus(status, err)
 	}
-	if err := ai.NewCodexExec(cfg.AI.CodexExecutable, selection.Model, selection.Effort).Available(); err != nil {
-		return unavailableCodexStatus(status, err)
+	if err := provider.Available(); err != nil {
+		return unavailableAIStatus(status, err)
 	}
 	return status
 }
 
-func unavailableCodexStatus(status appprotocol.CodexStatusResponse, err error) appprotocol.CodexStatusResponse {
+func unavailableAIStatus(status appprotocol.AIStatusResponse, err error) appprotocol.AIStatusResponse {
 	message := err.Error()
 	status.Available, status.Error = false, &message
 	return status
 }
 
-func appConfigFindCodexCmd() *cobra.Command {
+func appConfigFindAgentsCmd() *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
-		Use: "find-codex", Short: "Find the newest installed Codex CLI",
+		Use: "find-agents", Short: "Find the newest install of each supported agent CLI",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !asJSON {
-				return fmt.Errorf("app config find-codex requires --json")
+				return fmt.Errorf("app config find-agents requires --json")
 			}
-			found := findCodex()
-			return writeJSON(appprotocol.CodexFindResponse{Executable: found.Executable, Version: found.Version, SignedIn: found.SignedIn})
+			found := findAgents()
+			agents := make([]appprotocol.AgentInstall, len(found))
+			for index, install := range found {
+				agents[index] = appprotocol.AgentInstall{Agent: install.Agent, Executable: install.Executable, Version: install.Version, SignedIn: install.SignedIn}
+			}
+			return writeJSON(appprotocol.AgentFindResponse{Agents: agents})
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
 	return cmd
 }
 
-func appConfigCodexModelsCmd() *cobra.Command {
+func appConfigAgentModelsCmd() *cobra.Command {
 	var asJSON bool
-	var entered string
+	var agent, entered string
 	cmd := &cobra.Command{
-		Use: "codex-models", Short: "List the installed Codex model catalog",
+		Use: "agent-models", Short: "List an installed agent's model catalog",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !asJSON {
-				return fmt.Errorf("app config codex-models requires --json")
+				return fmt.Errorf("app config agent-models requires --json")
 			}
 			cfg, err := loadAppConfig()
 			if err != nil {
 				return err
 			}
+			agent = strings.TrimSpace(agent)
 			executable := strings.TrimSpace(entered)
-			if executable == "" {
-				executable = cfg.AI.CodexExecutable
+			if executable == "" && cfg.AI.Provider == agent {
+				executable = cfg.AI.AgentExecutable
 			}
-			models, err := codexCatalog(executable)
+			catalog, err := agentCatalog(agent, executable)
 			if err != nil {
-				return fmt.Errorf("read installed Codex model catalog: %w; update Codex or open Settings", err)
+				name := ai.AgentName(agent)
+				return fmt.Errorf("read installed %s model catalog: %w; update %s or open Settings", name, err, name)
 			}
-			return writeJSON(codexModelsFor(models))
+			return writeJSON(agentModelsFor(catalog))
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Output JSON")
-	cmd.Flags().StringVar(&entered, "executable", "", "Codex executable to inspect; defaults to the saved one")
+	cmd.Flags().StringVar(&agent, "agent", "", "Agent provider: "+strings.Join(config.AgentProviders, ", "))
+	cmd.Flags().StringVar(&entered, "executable", "", "Agent executable to inspect; defaults to the saved one")
+	_ = cmd.MarkFlagRequired("agent")
 	return cmd
 }
 
-func codexModelsFor(models []ai.CodexModel) appprotocol.CodexModelsResponse {
-	infos := make([]appprotocol.CodexModelInfo, 0, len(models))
-	for _, model := range models {
-		infos = append(infos, appprotocol.CodexModelInfo{
+func agentModelsFor(catalog ai.AgentCatalog) appprotocol.AgentModelsResponse {
+	infos := make([]appprotocol.AgentModelInfo, 0, len(catalog.Models))
+	for _, model := range catalog.Models {
+		efforts := model.ReasoningEfforts
+		if efforts == nil {
+			efforts = []string{}
+		}
+		infos = append(infos, appprotocol.AgentModelInfo{
 			ID: model.ID, DisplayName: model.DisplayName,
 			DefaultReasoningEffort: model.DefaultReasoningEffort,
-			ReasoningEfforts:       model.ReasoningEfforts, IsDefault: model.IsDefault,
+			ReasoningEfforts:       efforts, IsDefault: model.IsDefault,
 		})
 	}
-	return appprotocol.CodexModelsResponse{Models: infos, DefaultModel: ai.DefaultCodexModel, DefaultReasoningEffort: ai.DefaultCodexReasoningEffort}
+	return appprotocol.AgentModelsResponse{Models: infos, DefaultModel: catalog.DefaultModel, DefaultReasoningEffort: catalog.DefaultReasoningEffort}
 }
 
 func appConfigUseManagedLocalAICmd() *cobra.Command {
@@ -165,41 +179,48 @@ func appConfigUseManagedLocalAICmd() *cobra.Command {
 	return cmd
 }
 
-func appConfigUseCodexCmd() *cobra.Command {
-	var executable, model, reasoningEffort string
+func appConfigUseAgentCmd() *cobra.Command {
+	var agent, executable, model, reasoningEffort string
 	cmd := &cobra.Command{
-		Use: "use-codex", Short: "Use an installed Codex CLI for summaries",
+		Use: "use-agent", Short: "Use an installed agent CLI for summaries",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadAppConfig()
 			if err != nil {
 				return err
 			}
-			selection, err := resolveCodexSelection(config.AI{CodexExecutable: strings.TrimSpace(executable), CodexModel: model, CodexReasoningEffort: reasoningEffort})
+			agent = strings.TrimSpace(agent)
+			if !config.IsAgentProvider(agent) {
+				return fmt.Errorf("unsupported agent %q (supported: %s)", agent, strings.Join(config.AgentProviders, ", "))
+			}
+			settings := config.AI{Provider: agent, AgentExecutable: strings.TrimSpace(executable), AgentModel: model, AgentReasoningEffort: reasoningEffort}
+			provider, err := newAgentProvider(settings)
 			if err != nil {
 				return err
 			}
-			applyCodex(&cfg, executable, selection)
-			if err := ai.NewCodexExec(cfg.AI.CodexExecutable, selection.Model, selection.Effort).Available(); err != nil {
-				return fmt.Errorf("preflight Installed Codex: %w", err)
+			if err := provider.Available(); err != nil {
+				return fmt.Errorf("preflight %s: %w", ai.AgentName(agent), err)
 			}
+			applyAgent(&cfg, agent, executable, provider.Selection())
 			if err := config.Save(cfg); err != nil {
 				return fmt.Errorf("save config: %w", err)
 			}
 			return writeJSON(appConfigResponseFor(cfg))
 		},
 	}
-	cmd.Flags().StringVar(&executable, "executable", "", "Absolute Codex executable path")
-	cmd.Flags().StringVar(&model, "model", "", "Codex model from the installed catalog")
+	cmd.Flags().StringVar(&agent, "agent", "", "Agent provider: "+strings.Join(config.AgentProviders, ", "))
+	cmd.Flags().StringVar(&executable, "executable", "", "Absolute agent executable path")
+	cmd.Flags().StringVar(&model, "model", "", "Model from the agent's installed catalog")
 	cmd.Flags().StringVar(&reasoningEffort, "reasoning-effort", "", "Reasoning effort supported by that model")
+	_ = cmd.MarkFlagRequired("agent")
 	_ = cmd.MarkFlagRequired("executable")
 	return cmd
 }
 
-func applyCodex(cfg *config.Config, executable string, selection ai.CodexSelection) {
-	cfg.AI.Provider = config.ProviderCodexExec
-	cfg.AI.CodexExecutable = strings.TrimSpace(executable)
-	cfg.AI.CodexModel = selection.Model
-	cfg.AI.CodexReasoningEffort = selection.Effort
+func applyAgent(cfg *config.Config, agent, executable string, selection ai.AgentSelection) {
+	cfg.AI.Provider = agent
+	cfg.AI.AgentExecutable = strings.TrimSpace(executable)
+	cfg.AI.AgentModel = selection.Model
+	cfg.AI.AgentReasoningEffort = selection.Effort
 }
 
 func loadAppConfig() (config.Config, error) {
@@ -245,7 +266,7 @@ func appAIConfigFor(cfg config.Config) appprotocol.AIConfig {
 	return appprotocol.AIConfig{
 		Provider: cfg.AI.Provider, Model: cfg.AI.Model, Endpoint: cfg.AI.Endpoint,
 		Temperature: cfg.AI.Temp, Managed: cfg.AI.Managed,
-		CodexExecutable: cfg.AI.CodexExecutable, CodexModel: cfg.AI.CodexModel,
-		CodexReasoningEffort: cfg.AI.CodexReasoningEffort,
+		AgentExecutable: cfg.AI.AgentExecutable, AgentModel: cfg.AI.AgentModel,
+		AgentReasoningEffort: cfg.AI.AgentReasoningEffort,
 	}
 }

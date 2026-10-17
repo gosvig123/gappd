@@ -2,12 +2,12 @@ import { exportRecording } from './meeting-export'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
-import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type CodexConfigurationInput, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
+import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
-import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
+import { configureAgent, findAgents, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, onGoogleCalendarChange, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
@@ -56,9 +56,9 @@ const IPC_HANDLERS: MainHandlers = {
   },
   aiProvider: {
     status: () => refreshedProviderStatus(),
-    find: () => findCodex(),
-    models: (_event, executable?: string) => providerModels(executable),
-    configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
+    find: () => findAgents(),
+    models: (_event, agent: AgentId, executable?: string) => providerModels(agent, executable),
+    configureAgent: (_event, input: AgentConfigurationInput) => providerChanged(() => configureAgent(input)),
     useLocal: () => providerChanged(useLocalProvider),
   },
   googleCalendar: {
@@ -91,10 +91,10 @@ async function refreshedProviderStatus() {
   return result.status
 }
 
-async function providerChanged(action: () => ReturnType<typeof configureCodex>) {
+async function providerChanged(action: () => ReturnType<typeof configureAgent>) {
   const change = await managedRuntime.beginProviderChange()
   let resumeRepair = false
-  let result: Awaited<ReturnType<typeof configureCodex>>
+  let result: Awaited<ReturnType<typeof configureAgent>>
   try {
     result = await action()
     await managedRuntime.refresh(result.health, change.gate.generation)

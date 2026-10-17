@@ -91,7 +91,7 @@ func TestLoadAcceptsCodexWithAbsoluteExecutable(t *testing.T) {
 	t.Setenv("HOME", home)
 	writeConfigFile(t, home, "[ai]\nprovider = \"codex_exec\"\nmodel = \"local\"\nendpoint = \"http://local\"\ncodex_executable = \"/opt/codex\"\ncodex_model = \"gpt-5\"\ntemperature = 0.3\n")
 	cfg, err := Load()
-	if err != nil || cfg.AI.CodexExecutable != "/opt/codex" {
+	if err != nil || cfg.AI.AgentExecutable != "/opt/codex" || cfg.AI.AgentModel != "gpt-5" || cfg.AI.LegacyCodexExecutable != "" {
 		t.Fatalf("Load() = %+v, %v", cfg.AI, err)
 	}
 }
@@ -99,7 +99,7 @@ func TestLoadAcceptsCodexWithAbsoluteExecutable(t *testing.T) {
 func TestLoadRejectsRelativeCodexExecutable(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	writeConfigFile(t, home, "[ai]\nprovider = \"codex_exec\"\nmodel = \"local\"\nendpoint = \"http://local\"\ncodex_executable = \"bin/codex\"\ntemperature = 0.3\n")
+	writeConfigFile(t, home, "[ai]\nprovider = \"codex_exec\"\nmodel = \"local\"\nendpoint = \"http://local\"\nagent_executable = \"bin/codex\"\ntemperature = 0.3\n")
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "absolute path") {
 		t.Fatalf("Load() error = %v", err)
