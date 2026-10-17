@@ -134,7 +134,7 @@ func valid(e Event) bool {
 }
 
 func ManagedFile(dir string, name string) (string, error) {
-	if name != db.VideoFile && name != db.VideoPartialFile {
+	if name != db.VideoFile && name != db.VideoPartialFile && name != db.VideoCompactedFile {
 		return "", errors.New("invalid managed video filename")
 	}
 	path := filepath.Join(dir, name)
@@ -199,6 +199,9 @@ func AssetPath(root string, meeting db.Meeting) (string, error) {
 	realRelative, err := filepath.Rel(realRoot, realDir)
 	if err != nil || realRelative != relative {
 		return "", errors.New("movie directory uses a symlink")
+	}
+	if path, err := ManagedFile(dir, db.VideoCompactedFile); err == nil {
+		return path, nil
 	}
 	return ManagedFile(dir, db.VideoFile)
 }

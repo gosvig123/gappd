@@ -28,6 +28,8 @@ export type ManagedRuntimeSnapshot = {
   configured: boolean
   bundled: boolean
   running: boolean
+  /** The Local AI notes model is on this Mac, whichever provider is in use. */
+  localModelReady: boolean
   canRetry: boolean
   canRepair: boolean
   progress?: number

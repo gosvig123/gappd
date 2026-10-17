@@ -112,6 +112,10 @@ func argExpr(input reflect.Type, arg appprotocol.CommandArg) string {
 	if arg.Optional {
 		return optionalFlagExpr(input, arg)
 	}
+	// Cobra bool flags take a value only as --flag=value; a separate value is a positional argument.
+	if commandFieldType(input, arg.Field).Kind() == reflect.Bool {
+		return quote("--"+arg.Flag+"=") + " + " + fieldExpr(arg)
+	}
 	return quote("--"+arg.Flag) + ", " + fieldExpr(arg)
 }
 

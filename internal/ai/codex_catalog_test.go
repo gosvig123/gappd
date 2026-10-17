@@ -7,62 +7,64 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gappd-dev/gappd/internal/config"
 )
 
-func catalogFixtures() []CodexModel {
-	return []CodexModel{
+func catalogFixtures() []AgentModel {
+	return []AgentModel{
 		{ID: DefaultCodexModel, DisplayName: "GPT-5.6-Terra", DefaultReasoningEffort: "medium", ReasoningEfforts: []string{"low", "medium", "high"}},
 		{ID: "gpt-5.5", DisplayName: "GPT-5.5", DefaultReasoningEffort: "medium", ReasoningEfforts: []string{"low", "medium", "xhigh"}, IsDefault: true},
 	}
 }
 
 func TestResolveCodexSelectionUsesRequiredDefaultWhenUnset(t *testing.T) {
-	selection, err := ResolveCodexSelection(catalogFixtures(), "", "")
-	if err != nil || selection != (CodexSelection{Model: DefaultCodexModel, Effort: DefaultCodexReasoningEffort}) {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+	selection, err := resolveCodex(catalogFixtures(), "", "")
+	if err != nil || selection != (AgentSelection{Model: DefaultCodexModel, Effort: DefaultCodexReasoningEffort}) {
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestResolveCodexSelectionKeepsExplicitModel(t *testing.T) {
-	selection, err := ResolveCodexSelection(catalogFixtures(), "gpt-5.5", "xhigh")
-	if err != nil || selection != (CodexSelection{Model: "gpt-5.5", Effort: "xhigh"}) {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+	selection, err := resolveCodex(catalogFixtures(), "gpt-5.5", "xhigh")
+	if err != nil || selection != (AgentSelection{Model: "gpt-5.5", Effort: "xhigh"}) {
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestResolveCodexSelectionUsesCatalogDefaultEffortForExplicitModel(t *testing.T) {
 	models := catalogFixtures()
 	models[1].DefaultReasoningEffort = "low"
-	selection, err := ResolveCodexSelection(models, "gpt-5.5", "")
-	if err != nil || selection != (CodexSelection{Model: "gpt-5.5", Effort: "low"}) {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+	selection, err := resolveCodex(models, "gpt-5.5", "")
+	if err != nil || selection != (AgentSelection{Model: "gpt-5.5", Effort: "low"}) {
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestResolveCodexSelectionRejectsUnavailableModel(t *testing.T) {
-	selection, err := ResolveCodexSelection(catalogFixtures(), "gpt-retired", "medium")
+	selection, err := resolveCodex(catalogFixtures(), "gpt-retired", "medium")
 	if err == nil || selection.Model != "" || !strings.Contains(err.Error(), "not in the installed Codex model catalog") {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestResolveCodexSelectionRejectsUnsupportedEffort(t *testing.T) {
-	selection, err := ResolveCodexSelection(catalogFixtures(), "gpt-5.5", "ultra")
+	selection, err := resolveCodex(catalogFixtures(), "gpt-5.5", "ultra")
 	if err == nil || selection.Model != "" || !strings.Contains(err.Error(), "does not support reasoning effort") {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestResolveCodexSelectionRejectsMissingDefaultPair(t *testing.T) {
-	models := []CodexModel{{ID: "gpt-6-astra", DefaultReasoningEffort: "medium", ReasoningEfforts: []string{"medium"}}}
-	selection, err := ResolveCodexSelection(models, "", "")
+	models := []AgentModel{{ID: "gpt-6-astra", DefaultReasoningEffort: "medium", ReasoningEfforts: []string{"medium"}}}
+	selection, err := resolveCodex(models, "", "")
 	if err == nil || selection.Model != "" || !strings.Contains(err.Error(), DefaultCodexModel) {
-		t.Fatalf("ResolveCodexSelection() = %+v, %v", selection, err)
+		t.Fatalf("resolveCodex() = %+v, %v", selection, err)
 	}
 }
 
 func TestListCodexModelsReadsCatalogAndSkipsHiddenEntries(t *testing.T) {
-	models, err := ListCodexModels(context.Background(), fakeCatalogCodex(t, fakeCatalogScript))
+	models, err := listCodexModels(context.Background(), codexCLI(fakeCatalogCodex(t, fakeCatalogScript)))
 	if err != nil {
 		t.Fatalf("ListCodexModels() error = %v", err)
 	}
@@ -75,7 +77,7 @@ func TestListCodexModelsReadsCatalogAndSkipsHiddenEntries(t *testing.T) {
 }
 
 func TestListCodexModelsFollowsPagination(t *testing.T) {
-	models, err := ListCodexModels(context.Background(), fakeCatalogCodex(t, fakeCatalogPagedScript))
+	models, err := listCodexModels(context.Background(), codexCLI(fakeCatalogCodex(t, fakeCatalogPagedScript)))
 	if err != nil || len(models) != 2 || models[1].ID != "gpt-5.5" {
 		t.Fatalf("ListCodexModels() = %+v, %v", models, err)
 	}
@@ -86,7 +88,7 @@ func TestListCodexModelsFailsWithoutCatalogSupport(t *testing.T) {
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\nexit 9\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	models, err := ListCodexModels(context.Background(), executable)
+	models, err := listCodexModels(context.Background(), codexCLI(executable))
 	if err == nil || models != nil || !strings.Contains(err.Error(), "initialize Codex model catalog") {
 		t.Fatalf("ListCodexModels() = %+v, %v", models, err)
 	}
@@ -97,7 +99,7 @@ func TestListCodexModelsStopsWhenPageLimitExceeded(t *testing.T) {
 		t.Skip("page limit too large to exercise")
 	}
 	executable := fakeCatalogCodex(t, fakeCatalogLoopScript)
-	models, err := ListCodexModels(context.Background(), executable)
+	models, err := listCodexModels(context.Background(), codexCLI(executable))
 	if err == nil || models != nil || !strings.Contains(err.Error(), "pages") {
 		t.Fatalf("ListCodexModels() = %+v, %v", models, err)
 	}
@@ -109,7 +111,7 @@ func TestListCodexModelsKillsStalledAppServer(t *testing.T) {
 	t.Cleanup(func() { codexCatalogTimeout = previous })
 	executable := fakeCatalogCodex(t, "#!/bin/sh\nsleep 30\n")
 	started := time.Now()
-	models, err := ListCodexModels(context.Background(), executable)
+	models, err := listCodexModels(context.Background(), codexCLI(executable))
 	if err == nil || models != nil || !strings.Contains(err.Error(), "timed out") || time.Since(started) > 5*time.Second {
 		t.Fatalf("ListCodexModels() = %+v, %v after %s", models, err, time.Since(started))
 	}
@@ -164,7 +166,7 @@ done
 // A dead child can be noticed while writing or while reading. Both paths must name the same
 // step, so the reported failure does not depend on which syscall loses the race.
 func TestCodexCatalogNamesTheStepWhenTheWriteFails(t *testing.T) {
-	session, err := startCodexCatalog(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n"))
+	session, err := startCodexCatalog(codexCLI(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,7 +181,7 @@ func TestCodexCatalogNamesTheStepWhenTheWriteFails(t *testing.T) {
 }
 
 func TestCodexCatalogNamesTheStepWhenTheReadFails(t *testing.T) {
-	session, err := startCodexCatalog(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n"))
+	session, err := startCodexCatalog(codexCLI(fakeCatalogCodex(t, "#!/bin/sh\nexit 9\n")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,4 +190,13 @@ func TestCodexCatalogNamesTheStepWhenTheReadFails(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "initialize Codex model catalog") {
 		t.Fatalf("readModels() error = %v", err)
 	}
+}
+
+func resolveCodex(models []AgentModel, model, effort string) (AgentSelection, error) {
+	catalog := AgentCatalog{Models: models, DefaultModel: DefaultCodexModel, DefaultReasoningEffort: DefaultCodexReasoningEffort}
+	return ResolveAgentSelection(config.ProviderCodexExec, catalog, model, effort)
+}
+
+func codexCLI(executable string) cli {
+	return newCLI(codexAgent{}, executable)
 }

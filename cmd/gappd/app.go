@@ -188,7 +188,11 @@ func appMeetingDetailFor(store *db.DB, id string) (appprotocol.MeetingDetail, er
 	if err != nil {
 		return appprotocol.MeetingDetail{}, err
 	}
-	return appprotocol.BuildAppMeetingDetail(*meeting, segments), nil
+	suggestions, err := store.SpeakerSuggestions(id)
+	if err != nil {
+		return appprotocol.MeetingDetail{}, fmt.Errorf("load speaker suggestions for Meeting %s: %w", id, err)
+	}
+	return appprotocol.WithSpeakerSuggestions(appprotocol.BuildAppMeetingDetail(*meeting, segments), suggestions), nil
 }
 
 func loadMeetingDetail(store *db.DB, id string) (*db.Meeting, []db.Segment, error) {

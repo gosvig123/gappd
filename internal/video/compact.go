@@ -2,13 +2,10 @@ package video
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -16,13 +13,18 @@ import (
 )
 
 const (
-	compactingFile = "screen.compacting.mov"
+	compactingFile = "screen.compacting.mp4"
 	// compactedMarker records that the managed movie needs no more compaction, so later passes skip it.
-	compactedMarker       = "screen.compacted"
+	compactedMarker = "screen.compacted"
+	// compactedVersion names the encoder settings in the marker. A movie with an older marker gets one more pass.
+	compactedVersion      = "av1-crf40\n"
 	compactFreeMargin     = 1 << 30
 	activeRecordingWindow = 5 * time.Minute
 	compactCandidateLimit = 100
 )
+
+// finalVersions are markers of HEVC movies that stay as they are: another lossy pass would cost quality.
+var finalVersions = []string{compactedVersion, "keyframes-10s\n", "keyframes-30s\n"}
 
 type CompactResult struct {
 	Attempted  bool
@@ -45,7 +47,15 @@ func CompactNext(ctx context.Context, store *db.DB, root string, now time.Time) 
 		if err != nil {
 			continue
 		}
-		if _, err := os.Lstat(filepath.Join(filepath.Dir(movie), compactedMarker)); err == nil {
+		dir := filepath.Dir(movie)
+		if filepath.Base(movie) == db.VideoCompactedFile {
+			// Only compaction writes the AV1 copy. Finish a pass that stopped before it removed the original.
+			if err := finishCompaction(dir); err != nil {
+				return CompactResult{}, err
+			}
+			continue
+		}
+		if isFinal(dir) {
 			continue
 		}
 		return compactMovie(ctx, movie)
@@ -53,7 +63,24 @@ func CompactNext(ctx context.Context, store *db.DB, root string, now time.Time) 
 	return CompactResult{}, nil
 }
 
+func isFinal(dir string) bool {
+	marker, err := os.ReadFile(filepath.Join(dir, compactedMarker))
+	if err != nil {
+		return false
+	}
+	for _, version := range finalVersions {
+		if string(marker) == version {
+			return true
+		}
+	}
+	return false
+}
+
 func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
+	encoder, err := EncoderBinary()
+	if err != nil {
+		return CompactResult{}, err // Retry when the encoder is installed.
+	}
 	dir := filepath.Dir(movie)
 	temp := filepath.Join(dir, compactingFile)
 	if err := os.Remove(temp); err != nil && !os.IsNotExist(err) {
@@ -71,7 +98,10 @@ func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
 		return CompactResult{}, nil // Retry when the disk has room.
 	}
 	defer os.Remove(temp)
-	compacted, err := Compact(ctx, movie, temp)
+	err = EncodeAV1(ctx, encoder, movie, temp)
+	if err == nil {
+		err = VerifyAV1(ctx, encoder, movie, temp)
+	}
 	if ctx.Err() != nil {
 		return CompactResult{}, ctx.Err()
 	}
@@ -79,55 +109,39 @@ func compactMovie(ctx context.Context, movie string) (CompactResult, error) {
 		return CompactResult{Attempted: true}, nil // The Meeting was deleted during compaction.
 	}
 	if err != nil {
-		// Keep the original and do not retry a movie the helper cannot encode.
+		// Keep the original and do not retry a movie the encoder cannot read or copy completely.
 		return CompactResult{Attempted: true}, errors.Join(err, markCompacted(dir))
 	}
 	result := CompactResult{Attempted: true}
-	if compacted {
-		smaller, err := os.Lstat(temp)
-		if err != nil {
-			return result, err
-		}
-		if smaller.Size() < original.Size() {
-			// Rename is atomic on one volume. A reader that holds the old file keeps it until it closes.
-			if err := os.Rename(temp, movie); err != nil {
-				return result, fmt.Errorf("replace Screen video with compacted movie: %w", err)
-			}
-			result.SavedBytes = original.Size() - smaller.Size()
-		}
+	smaller, err := os.Lstat(temp)
+	if err != nil {
+		return result, err
 	}
-	return result, markCompacted(dir)
+	if smaller.Size() >= original.Size() {
+		return result, markCompacted(dir)
+	}
+	// Readers prefer the AV1 copy as soon as it exists. A reader that holds the original keeps it until it closes.
+	if err := os.Rename(temp, filepath.Join(dir, db.VideoCompactedFile)); err != nil {
+		return result, fmt.Errorf("move compacted Screen video into place: %w", err)
+	}
+	result.SavedBytes = original.Size() - smaller.Size()
+	return result, finishCompaction(dir)
+}
+
+// finishCompaction removes the original movie that the AV1 copy replaced and records the pass.
+func finishCompaction(dir string) error {
+	if err := os.Remove(filepath.Join(dir, db.VideoFile)); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("remove Screen video replaced by its AV1 copy: %w", err)
+	}
+	if isFinal(dir) {
+		return nil
+	}
+	return markCompacted(dir)
 }
 
 func markCompacted(dir string) error {
-	if err := os.WriteFile(filepath.Join(dir, compactedMarker), nil, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, compactedMarker), []byte(compactedVersion), 0o600); err != nil {
 		return fmt.Errorf("record Screen video compaction: %w", err)
 	}
 	return nil
-}
-
-// Compact encodes source again as HEVC into destination. It returns false when source is already HEVC.
-func Compact(ctx context.Context, source, destination string) (bool, error) {
-	binary, err := Binary()
-	if err != nil {
-		return false, err
-	}
-	cmd := exec.CommandContext(ctx, binary, "--compact", source, destination)
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
-	output, err := cmd.Output()
-	if err != nil {
-		return false, fmt.Errorf("compact Screen video: %w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	var event Event
-	if err := json.Unmarshal(output, &event); err != nil {
-		return false, fmt.Errorf("read Screen video compaction result: %w", err)
-	}
-	switch event.Type {
-	case "video_compacted":
-		return true, nil
-	case "video_compact_unneeded":
-		return false, nil
-	}
-	return false, fmt.Errorf("unexpected Screen video compaction result %q", event.Type)
 }

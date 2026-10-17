@@ -138,7 +138,7 @@ func rejectedVoiceEvidence() []SpeakerEmbedding {
 	tests := []SpeakerEmbedding{base, base, base, base, base, base, base}
 	tests[0].Model = "other-version"
 	tests[1].Seconds = 2
-	tests[2].Quality = .7
+	tests[2].Quality = .4
 	tests[3].Vector = []float64{1, 0}
 	tests[4].Key = SpeakerOther
 	tests[5].Key = SpeakerYou

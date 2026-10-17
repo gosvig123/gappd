@@ -54,6 +54,7 @@ Thumbs.db
 /main.js
 desktop/.cache/
 desktop/resources/llamacpp/
+desktop/resources/ffmpeg/
 desktop/resources/ollama/
 desktop/assets/test-media/
 desktop/release/

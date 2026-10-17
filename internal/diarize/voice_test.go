@@ -31,29 +31,26 @@ func TestVoiceEmbeddingsExcludeVanishedCompactedClusters(t *testing.T) {
 	}
 }
 
-func TestVoiceQualityRejectsOverlapAndUncleanSpeech(t *testing.T) {
-	spans := []stitchedSpan{{speaker: 1, start: 0, end: 20, confidence: .9}}
-	seconds, quality := cleanClusterSpeech(1, spans)
-	if seconds != 20 || quality != .9 {
+func TestVoiceQualityCountsOnlyCleanSpeech(t *testing.T) {
+	spans := []stitchedSpan{{speaker: 1, start: 0, end: 20, voiceClean: true}}
+	if seconds, share := cleanClusterSpeech(1, spans); seconds != 20 || share != 1 {
 		t.Fatal("clean evidence lost")
 	}
-	spans = append(spans, stitchedSpan{speaker: 2, start: 10, end: 15, confidence: 1})
-	if seconds, _ := cleanClusterSpeech(1, spans); seconds != 0 {
-		t.Fatal("overlapping speech accepted")
-	}
-	spans = spans[:1]
-	spans[0].vetoOnly = true
-	if seconds, _ := cleanClusterSpeech(1, spans); seconds != 0 {
-		t.Fatal("suppressed speech accepted")
+	spans = append(spans,
+		stitchedSpan{speaker: 2, start: 10, end: 15, voiceClean: true},
+		stitchedSpan{speaker: 1, start: 30, end: 40, voiceClean: true},
+		stitchedSpan{speaker: 1, start: 40, end: 50},
+		stitchedSpan{speaker: 1, start: 50, end: 60, voiceClean: true, vetoOnly: true})
+	if seconds, share := cleanClusterSpeech(1, spans); seconds != 10 || share != 0.2 {
+		t.Fatalf("overlapping, low-quality or suppressed speech counted: %v %v", seconds, share)
 	}
 }
 
-func TestFullWindowQualityRejectsDiscardedOverlapEvidence(t *testing.T) {
+func TestWindowCentroidWithoutSpeechCannotEnroll(t *testing.T) {
 	globals := map[int]*globalCluster{1: {centroid: []float64{1, 0}}}
 	matches := map[string]clusterMatch{"remote": {speaker: 1, continuity: 1}}
-	window := WindowReport{Clusters: []LocalCluster{{ID: "remote"}}, Spans: []LocalSpan{{ClusterID: "remote", StartSeconds: 590, EndSeconds: 600, Quality: .5, Identity: 1}}}
-	markUncleanClusters(window, matches, globals)
+	markVanishedClusters(WindowReport{Clusters: []LocalCluster{{ID: "remote"}}}, matches, globals)
 	if len(clusterVectors(globals)) != 0 {
-		t.Fatal("discarded overlap contaminated enrolled centroid")
+		t.Fatal("centroid without speech became voice evidence")
 	}
 }

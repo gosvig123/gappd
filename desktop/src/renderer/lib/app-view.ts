@@ -103,7 +103,7 @@ const COMPLETE_ARTIFACTS = 'Notes and transcript available'
 export function artifactLine(meeting: MeetingListItem): string {
   if (meeting.status.state === 'recording') return 'Recording now · transcript follows after stop'
   if (meeting.status.processing.state === 'processing' && !meeting.hasTranscript) return 'Transcribing audio locally…'
-  if (meeting.status.processing.state === 'processing' && !meeting.hasSummary) return 'Creating summary locally…'
+  if (meeting.status.processing.state === 'processing' && !meeting.hasSummary) return 'Creating summary…'
   if (meeting.status.processing.state === 'processing') return 'Finalizing notes…'
   if (meeting.status.state === 'failed') return meeting.status.processing.failureMessage ?? meeting.status.capture.failureMessage ?? 'Recording failed'
   if (meeting.status.state === 'pending') return 'Audio captured · waiting to process'

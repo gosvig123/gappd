@@ -1,4 +1,5 @@
-import type { AIConfig, CodexStatusResponse } from '../../shared/generated/contracts'
+import type { AIConfig, AIStatusResponse } from '../../shared/generated/contracts'
+import { agentInfo, isAgentId } from '../../shared/agents'
 import type { ManagedRuntimeOperation, ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
 import { LOCAL_AI_PROVIDER_LLAMACPP, MANAGED_LLAMACPP_ENDPOINT, MANAGED_LLAMACPP_MODEL } from '../../shared/managed-local-ai'
 import { requestCommand } from '../app-protocol'
@@ -10,17 +11,15 @@ import { diarizationAssetsAvailable, missingDiarizationAssetsMessage } from './d
 
 export type RuntimeProbe = { config: AIConfig | null; error?: string; providerError?: string }
 
-const CODEX_PROVIDER = 'codex_exec'
-const CODEX_STATUS_FALLBACK = 'Installed Codex is unavailable'
-
-export async function loadProviderProbe(providerHealth?: CodexStatusResponse): Promise<RuntimeProbe> {
-  try { return probeFor(providerHealth ?? await requestCommand('config.codexStatus', {})) }
+export async function loadProviderProbe(providerHealth?: AIStatusResponse): Promise<RuntimeProbe> {
+  try { return probeFor(providerHealth ?? await requestCommand('config.aiStatus', {})) }
   catch (error) { return { config: null, error: error instanceof Error ? error.message : String(error) } }
 }
 
-function probeFor(status: CodexStatusResponse): RuntimeProbe {
-  const providerError = status.ai.provider === CODEX_PROVIDER && !status.available
-    ? status.error || CODEX_STATUS_FALLBACK : undefined
+function probeFor(status: AIStatusResponse): RuntimeProbe {
+  const provider = status.ai.provider
+  const providerError = isAgentId(provider) && !status.available
+    ? status.error || `${agentInfo(provider).name} is unavailable` : undefined
   return { config: status.ai, ...(providerError ? { providerError } : {}) }
 }
 
@@ -43,17 +42,17 @@ async function buildProbeSnapshot(input: RuntimeProbe): Promise<ManagedRuntimeSn
   const modelReady = runtime.bundled && await managedLanguageModelAvailable(MANAGED_LLAMACPP_MODEL)
   const speechReady = runtime.supported && await appleSpeechAssetAvailable()
   const diarizationReady = runtime.supported && await diarizationAssetsAvailable()
-  const usesCodex = input.config?.provider === CODEX_PROVIDER
-  const summarizationReady = usesCodex ? !input.providerError : modelReady
-  const runtimeReady = usesCodex ? summarizationReady : runtime.bundled
-  const configured = usesCodex || isManagedConfig(input.config)
+  const usesAgent = isAgentId(input.config?.provider ?? '')
+  const summarizationReady = usesAgent ? !input.providerError : modelReady
+  const runtimeReady = usesAgent ? summarizationReady : runtime.bundled
+  const configured = usesAgent || isManagedConfig(input.config)
   const operation = probeOperation(runtime.supported, runtimeReady, summarizationReady, configured)
   return {
     ...baseSnapshot(operation, probeMessage(operation, runtimeReady, summarizationReady, input.providerError)),
-    supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured,
+    supported: runtime.supported, bundled: runtime.bundled, running: runtime.running, configured, localModelReady: modelReady,
     endpoint: runtime.endpoint, canRetry: operation !== 'ready', canRepair: runtime.supported,
     capabilities: {
-      summarization: summarizationStatus(usesCodex, summarizationReady, runtime.bundled, input.providerError),
+      summarization: summarizationStatus(usesAgent, summarizationReady, runtime.bundled, input.providerError),
       transcription: { readiness: speechReady ? 'ready' : 'missing', message: speechReady ? undefined : missingAppleSpeechAssetMessage() },
       diarization: { readiness: diarizationReady ? 'ready' : 'missing', message: diarizationReady ? undefined : missingDiarizationAssetsMessage() },
     },
@@ -68,7 +67,7 @@ export function runtimeErrorSnapshot(error: unknown, phase: ManagedRuntimeOperat
 export function baseSnapshot(operation: ManagedRuntimeOperation, message: string): ManagedRuntimeSnapshot {
   return {
     operation, activity: 'idle', endpoint: MANAGED_LLAMACPP_ENDPOINT, model: MANAGED_LLAMACPP_MODEL,
-    message, supported: process.platform === 'darwin', configured: false, bundled: false, running: false,
+    message, supported: process.platform === 'darwin', configured: false, bundled: false, running: false, localModelReady: false,
     canRetry: false, canRepair: false,
     capabilities: { summarization: { readiness: 'missing' }, transcription: { readiness: 'missing' }, diarization: { readiness: 'missing' } },
   }
@@ -84,9 +83,9 @@ function probeOperation(supported: boolean, bundled: boolean, model: boolean, co
   return model && configured ? 'ready' : 'needs_setup'
 }
 
-function summarizationStatus(usesCodex: boolean, ready: boolean, bundled: boolean, providerError?: string) {
+function summarizationStatus(usesAgent: boolean, ready: boolean, bundled: boolean, providerError?: string) {
   if (ready) return { readiness: 'ready' as const }
-  if (usesCodex) return { readiness: 'unavailable' as const, message: providerError }
+  if (usesAgent) return { readiness: 'unavailable' as const, message: providerError }
   return bundled
     ? { readiness: 'missing' as const, message: missingManagedLanguageModelMessage() }
     : { readiness: 'unavailable' as const, message: missingBundledLlamaCppMessage() }

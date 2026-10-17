@@ -8,6 +8,8 @@ import (
 const (
 	profileMatchSimilarity = 0.90
 	profileMatchMargin     = 0.12
+	// Below auto-fill, a match is only suggested; the user confirms it.
+	profileSuggestSimilarity = 0.75
 )
 
 type voiceProfile struct {
@@ -26,10 +28,14 @@ type scoredMatch struct {
 }
 
 func matchProfiles(samples []SpeakerEmbedding, profiles []voiceProfile) []speakerMatch {
+	return rankMatches(samples, profiles, profileMatchSimilarity)
+}
+
+func rankMatches(samples []SpeakerEmbedding, profiles []voiceProfile, minimum float64) []speakerMatch {
 	ranked := make([]scoredMatch, 0, len(samples))
 	for _, sample := range samples {
 		person, score, margin := bestProfile(sample.Vector, profiles)
-		if person != "" && score >= profileMatchSimilarity && margin >= profileMatchMargin && clusterMargin(sample, person, score, samples, profiles) >= profileMatchMargin {
+		if person != "" && score >= minimum && margin >= profileMatchMargin && clusterMargin(sample, person, score, samples, profiles) >= profileMatchMargin {
 			ranked = append(ranked, scoredMatch{sample.Key, person, score})
 		}
 	}

@@ -7,7 +7,8 @@ import { requestCommand } from './app-protocol'
 
 const ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 // Audio is the capture WAV until storage compaction replaces it with a verified lossless FLAC copy.
-const FILES = { video: ['screen.mov'], mic: ['mic.flac', 'mic.wav'], system: ['system.flac', 'system.wav'] } as const
+// Video is the captured movie until storage compaction replaces it with an AV1 MP4 copy.
+const FILES = { video: ['screen.mp4', 'screen.mov'], mic: ['mic.flac', 'mic.wav'], system: ['system.flac', 'system.wav'] } as const
 export type MediaKind = keyof typeof FILES
 
 // The Go request owns Meeting lookup and validates its managed movie. Never give its path to the renderer.
@@ -15,7 +16,7 @@ export async function meetingMediaPath(id: string, kind: MediaKind): Promise<str
   if (!ID.test(id) || !Object.hasOwn(FILES, kind)) throw new Error('Invalid Meeting media request')
   const asset = await requestCommand('meetings.videoAsset', { id })
   const directory = path.dirname(asset.path)
-  if (path.basename(asset.path) !== FILES.video[0]) throw new Error('Invalid managed movie')
+  if (!(FILES.video as readonly string[]).includes(path.basename(asset.path))) throw new Error('Invalid managed movie')
   const realDirectory = await fs.realpath(directory)
   if (realDirectory !== directory) throw new Error('Invalid managed media')
   for (const name of FILES[kind]) {
@@ -29,7 +30,7 @@ export async function meetingMediaPath(id: string, kind: MediaKind): Promise<str
 }
 
 function contentType(file: string): string {
-  return file.endsWith('.mov') ? 'video/quicktime' : file.endsWith('.flac') ? 'audio/flac' : 'audio/wav'
+  return file.endsWith('.mp4') ? 'video/mp4' : file.endsWith('.mov') ? 'video/quicktime' : file.endsWith('.flac') ? 'audio/flac' : 'audio/wav'
 }
 
 export function registerMeetingMedia(): void {

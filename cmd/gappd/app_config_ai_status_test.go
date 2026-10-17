@@ -26,8 +26,8 @@ type codexStatusCase struct {
 }
 
 func TestCodexStatusSkipsProbeForLocalAI(t *testing.T) {
-	cfg := config.Config{AI: config.AI{Provider: config.ProviderLlamaCpp, CodexExecutable: "/missing/codex"}}
-	status := codexStatusFor(cfg)
+	cfg := config.Config{AI: config.AI{Provider: config.ProviderLlamaCpp, AgentExecutable: "/missing/codex"}}
+	status := aiStatusFor(cfg)
 	if !status.Available || status.Error != nil || status.AI.Provider != config.ProviderLlamaCpp {
 		t.Fatalf("local status = %+v", status)
 	}
@@ -57,13 +57,13 @@ func assertCodexStatusCase(t *testing.T, test codexStatusCase) {
 	}
 	status := executeCodexStatus(t)
 	assertCodexStatus(t, status.Available, status.Error, test)
-	if status.AI.Provider != config.ProviderCodexExec || status.AI.CodexExecutable != executable {
+	if status.AI.Provider != config.ProviderCodexExec || status.AI.AgentExecutable != executable {
 		t.Fatalf("status config = %+v", status.AI)
 	}
 	assertCodexConfigUnchanged(t, home, before, executable)
 }
 
-func executeCodexStatus(t *testing.T) appprotocol.CodexStatusResponse {
+func executeCodexStatus(t *testing.T) appprotocol.AIStatusResponse {
 	t.Helper()
 	reader, writer, err := os.Pipe()
 	if err != nil {
@@ -71,7 +71,7 @@ func executeCodexStatus(t *testing.T) appprotocol.CodexStatusResponse {
 	}
 	original := os.Stdout
 	os.Stdout = writer
-	cmd := appConfigCodexStatusCmd()
+	cmd := appConfigAIStatusCmd()
 	cmd.SetArgs([]string{"--json"})
 	executeErr := cmd.Execute()
 	os.Stdout = original
@@ -79,9 +79,9 @@ func executeCodexStatus(t *testing.T) appprotocol.CodexStatusResponse {
 	output, readErr := io.ReadAll(reader)
 	_ = reader.Close()
 	if executeErr != nil || readErr != nil {
-		t.Fatalf("codex-status command = %v, read = %v", executeErr, readErr)
+		t.Fatalf("ai-status command = %v, read = %v", executeErr, readErr)
 	}
-	var status appprotocol.CodexStatusResponse
+	var status appprotocol.AIStatusResponse
 	if err := json.Unmarshal(output, &status); err != nil {
 		t.Fatalf("decode status %q: %v", output, err)
 	}
@@ -94,7 +94,7 @@ func saveCodexTestConfig(t *testing.T, executable string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	applyCodex(&cfg, executable, ai.CodexSelection{Model: "gpt-5.6-terra", Effort: "medium"})
+	applyAgent(&cfg, config.ProviderCodexExec, executable, ai.AgentSelection{Model: "gpt-5.6-terra", Effort: "medium"})
 	if err := config.Save(cfg); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func assertCodexConfigUnchanged(t *testing.T, home string, before []byte, execut
 		t.Fatalf("config changed during health check\nbefore:\n%s\nafter:\n%s", before, after)
 	}
 	cfg, err := config.Load()
-	if err != nil || cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.CodexExecutable != executable {
+	if err != nil || cfg.AI.Provider != config.ProviderCodexExec || cfg.AI.AgentExecutable != executable {
 		t.Fatalf("saved provider = %+v, %v", cfg.AI, err)
 	}
 }

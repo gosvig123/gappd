@@ -18,8 +18,15 @@ func (d *DB) RecognizeSpeakers(meetingID string, revision int, emails []string, 
 	if err != nil {
 		return err
 	}
+	suggestions, err := suggestionMatches(tx, meetingID, matches)
+	if err != nil {
+		return err
+	}
 	changed, err := saveVoiceMatches(tx, meetingID, matches)
 	if err != nil {
+		return err
+	}
+	if err := saveSuggestions(tx, meetingID, suggestions); err != nil {
 		return err
 	}
 	if changed {

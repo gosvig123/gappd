@@ -10,16 +10,23 @@ import (
 )
 
 type AI struct {
-	Provider        string  `toml:"provider"`
-	Model           string  `toml:"model"`
-	Endpoint        string  `toml:"endpoint"`
-	Temp            float64 `toml:"temperature"`
-	Managed         bool    `toml:"managed"`
-	CodexExecutable string  `toml:"codex_executable,omitempty"`
-	CodexModel      string  `toml:"codex_model,omitempty"`
-	// CodexReasoningEffort is an effort advertised by the selected Codex model.
+	Provider string  `toml:"provider"`
+	Model    string  `toml:"model"`
+	Endpoint string  `toml:"endpoint"`
+	Temp     float64 `toml:"temperature"`
+	Managed  bool    `toml:"managed"`
+	// AgentExecutable, AgentModel, and AgentReasoningEffort configure the
+	// installed agent CLI named by an agent Provider.
+	AgentExecutable string `toml:"agent_executable,omitempty"`
+	AgentModel      string `toml:"agent_model,omitempty"`
+	// AgentReasoningEffort is an effort advertised by the selected agent model.
 	// An empty value resolves to the model's catalog default at operation time.
-	CodexReasoningEffort string `toml:"codex_reasoning_effort,omitempty"`
+	AgentReasoningEffort string `toml:"agent_reasoning_effort,omitempty"`
+	// Legacy Installed Codex keys. Loading moves them to the agent keys, so
+	// saving never writes them again.
+	LegacyCodexExecutable      string `toml:"codex_executable,omitempty"`
+	LegacyCodexModel           string `toml:"codex_model,omitempty"`
+	LegacyCodexReasoningEffort string `toml:"codex_reasoning_effort,omitempty"`
 }
 
 type Config struct {
@@ -28,9 +35,13 @@ type Config struct {
 }
 
 const (
-	ProviderLlamaCpp  = "llamacpp"
-	ProviderCodexExec = "codex_exec"
-	legacyProviderPi  = "pi"
+	ProviderLlamaCpp = "llamacpp"
+	// Agent providers run an installed agent CLI. ProviderPiAgent is not "pi",
+	// because "pi" is a legacy name for Local AI.
+	ProviderCodexExec  = "codex_exec"
+	ProviderClaudeCode = "claude_code"
+	ProviderPiAgent    = "pi_agent"
+	legacyProviderPi   = "pi"
 
 	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
 	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
@@ -114,10 +125,10 @@ func validate(cfg *Config) error {
 		return err
 	}
 	if !supportedProvider(cfg.AI.Provider) {
-		return fmt.Errorf("unsupported AI provider %q (supported: %s, %s)", cfg.AI.Provider, ProviderLlamaCpp, ProviderCodexExec)
+		return fmt.Errorf("unsupported AI provider %q (supported: %s, %s)", cfg.AI.Provider, ProviderLlamaCpp, strings.Join(AgentProviders, ", "))
 	}
-	if cfg.AI.Provider == ProviderCodexExec && !filepath.IsAbs(cfg.AI.CodexExecutable) {
-		return fmt.Errorf("config ai.codex_executable must be an absolute path for Installed Codex")
+	if IsAgentProvider(cfg.AI.Provider) && !filepath.IsAbs(cfg.AI.AgentExecutable) {
+		return fmt.Errorf("config ai.agent_executable must be an absolute path for provider %s", cfg.AI.Provider)
 	}
 	if cfg.AI.Model == "" {
 		return fmt.Errorf("config ai.model must not be empty")
@@ -146,9 +157,10 @@ func normalizeConfig(cfg *Config) error {
 	}
 	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
 	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
-	cfg.AI.CodexExecutable = strings.TrimSpace(cfg.AI.CodexExecutable)
-	cfg.AI.CodexModel = strings.TrimSpace(cfg.AI.CodexModel)
-	cfg.AI.CodexReasoningEffort = strings.ToLower(strings.TrimSpace(cfg.AI.CodexReasoningEffort))
+	migrateLegacyCodexKeys(&cfg.AI)
+	cfg.AI.AgentExecutable = strings.TrimSpace(cfg.AI.AgentExecutable)
+	cfg.AI.AgentModel = strings.TrimSpace(cfg.AI.AgentModel)
+	cfg.AI.AgentReasoningEffort = strings.ToLower(strings.TrimSpace(cfg.AI.AgentReasoningEffort))
 	if cfg.DBPath == "" {
 		return fmt.Errorf("config db_path must not be empty")
 	}
@@ -167,8 +179,29 @@ func validateTemperature(temp float64) error {
 	return nil
 }
 
+// AgentProviders lists the providers that run an installed agent CLI.
+var AgentProviders = []string{ProviderCodexExec, ProviderClaudeCode, ProviderPiAgent}
+
+func IsAgentProvider(provider string) bool {
+	for _, agent := range AgentProviders {
+		if provider == agent {
+			return true
+		}
+	}
+	return false
+}
+
 func supportedProvider(provider string) bool {
-	return provider == ProviderLlamaCpp || provider == ProviderCodexExec
+	return provider == ProviderLlamaCpp || IsAgentProvider(provider)
+}
+
+// migrateLegacyCodexKeys moves Installed Codex settings saved before agent
+// keys existed. Agent keys win when both are present.
+func migrateLegacyCodexKeys(ai *AI) {
+	if ai.AgentExecutable == "" && ai.AgentModel == "" && ai.AgentReasoningEffort == "" {
+		ai.AgentExecutable, ai.AgentModel, ai.AgentReasoningEffort = ai.LegacyCodexExecutable, ai.LegacyCodexModel, ai.LegacyCodexReasoningEffort
+	}
+	ai.LegacyCodexExecutable, ai.LegacyCodexModel, ai.LegacyCodexReasoningEffort = "", "", ""
 }
 
 func normalizeDBPath(path string) (string, error) {

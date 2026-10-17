@@ -129,6 +129,13 @@ CREATE TABLE IF NOT EXISTS voice_samples (
     FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speakers(meeting_id,speaker_key) ON DELETE CASCADE,
     FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speaker_embeddings(meeting_id,speaker_key) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS speaker_suggestions (
+    meeting_id TEXT NOT NULL,
+    speaker_key TEXT NOT NULL,
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    PRIMARY KEY(meeting_id,speaker_key),
+    FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speaker_embeddings(meeting_id,speaker_key) ON DELETE CASCADE
+);
 CREATE TRIGGER IF NOT EXISTS retract_voice_assignment AFTER UPDATE OF person_id ON meeting_speakers
 WHEN old.person_id IS NOT new.person_id BEGIN
     DELETE FROM voice_samples WHERE meeting_id=old.meeting_id AND speaker_key=old.speaker_key;

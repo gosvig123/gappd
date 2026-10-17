@@ -12,6 +12,7 @@ import { stopActiveRecordingForQuit } from './recording-process'
 import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { startStorageCompaction, stopStorageCompaction } from './storage-compaction'
+import { startCalendarRefresh, stopCalendarRefresh } from './google/calendar-refresh'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 
@@ -90,6 +91,7 @@ app.whenReady().then(async () => {
   onMeetingProcessingFinished(() => { void meetingUpload().syncNew().catch((error) => console.error('Meeting upload after processing failed', error)) })
   startMeetingPresence(showMainWindow)
   startStorageCompaction()
+  startCalendarRefresh()
   startAutoUpdateChecks()
   logMainProcessMemory('ready')
 
@@ -118,6 +120,7 @@ async function shutdown(): Promise<void> {
   logMainProcessMemory('shutdown:start')
   stopStaleRecordingRecovery()
   stopStorageCompaction()
+  stopCalendarRefresh()
   await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()

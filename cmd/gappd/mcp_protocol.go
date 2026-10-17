@@ -111,7 +111,7 @@ func queryToolList() map[string]any {
 		"max_rows": map[string]any{"type": "integer", "minimum": 1, "maximum": maxQueryRows},
 	}
 	tool := map[string]any{
-		"name": "query", "description": "Run a bounded read-only query against the configured Gappd database.",
+		"name": "query", "description": "Run one bounded read-only SELECT or WITH query against the local Gappd SQLite database. List tables and columns with SELECT name, sql FROM sqlite_master WHERE type = 'table' (no information_schema or PRAGMA). Results stop at 48 KB (truncation_reason byte_limit): size long text with length(column) and read it in chunks with substr(column, start, 20000).",
 		"inputSchema": map[string]any{"type": "object", "properties": properties, "required": []string{"sql"}, "additionalProperties": false},
 	}
 	return map[string]any{"tools": []any{tool}}

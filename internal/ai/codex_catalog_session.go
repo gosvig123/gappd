@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
 	"strconv"
 	"syscall"
@@ -54,10 +53,8 @@ type codexCatalogSession struct {
 	done chan error
 }
 
-func startCodexCatalog(executable string) (*codexCatalogSession, error) {
-	cmd := exec.Command(executable, "app-server", "--stdio")
-	cmd.Env = codexEnvironment(os.Environ())
-	processgroup.Configure(cmd)
+func startCodexCatalog(c cli) (*codexCatalogSession, error) {
+	cmd := c.command("", "app-server", "--stdio")
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("open Codex model catalog input: %w", err)
@@ -66,7 +63,7 @@ func startCodexCatalog(executable string) (*codexCatalogSession, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open Codex model catalog output: %w", err)
 	}
-	cmd.Stderr = &cappedWriter{remaining: codexCaptureLimit}
+	cmd.Stderr = &cappedWriter{remaining: agentCaptureLimit}
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start Codex model catalog: %w", err)
 	}
@@ -83,13 +80,13 @@ func startCodexCatalog(executable string) (*codexCatalogSession, error) {
 func (s *codexCatalogSession) close() {
 	_ = s.in.Close()
 	_ = processgroup.Signal(s.cmd, syscall.SIGTERM)
-	if !waitForProcess(s.done, codexKillGrace) {
+	if !waitForProcess(s.done, agentKillGrace) {
 		_ = processgroup.Signal(s.cmd, syscall.SIGKILL)
-		_ = waitForProcess(s.done, codexKillGrace)
+		_ = waitForProcess(s.done, agentKillGrace)
 	}
 }
 
-func (s *codexCatalogSession) readModels() ([]CodexModel, error) {
+func (s *codexCatalogSession) readModels() ([]AgentModel, error) {
 	init := map[string]any{"clientInfo": map[string]any{"name": "gappd", "version": "1"}}
 	// Both the write and the read name the same step, so the reported failure does not depend
 	// on whether a broken child is noticed while writing or while reading.
@@ -100,7 +97,7 @@ func (s *codexCatalogSession) readModels() ([]CodexModel, error) {
 		return nil, fmt.Errorf("initialize Codex model catalog: %w", err)
 	}
 	cursor := ""
-	models := []CodexModel(nil)
+	models := []AgentModel(nil)
 	for page := 0; page < codexCatalogMaxPages; page++ {
 		next, err := s.readPage(cursor)
 		if err != nil {

@@ -14,19 +14,19 @@ import (
 
 func TestNewAIProviderBuildsCodexExec(t *testing.T) {
 	stubCodexCatalog(t, "gpt-5.6-terra", "gpt-5.6-terra", "medium", "medium", "high")
-	provider, err := newAIProvider(config.AI{Provider: config.ProviderCodexExec, CodexExecutable: "/opt/codex"})
+	provider, err := newAIProvider(config.AI{Provider: config.ProviderCodexExec, AgentExecutable: "/opt/codex"})
 	if err != nil || provider == nil {
 		t.Fatalf("newAIProvider() = %T, %v", provider, err)
 	}
-	selection := provider.(interface{ CodexSelection() ai.CodexSelection }).CodexSelection()
-	if selection != (ai.CodexSelection{Model: "gpt-5.6-terra", Effort: "medium"}) {
+	selection := provider.(*ai.AgentProvider).Selection()
+	if selection != (ai.AgentSelection{Model: "gpt-5.6-terra", Effort: "medium"}) {
 		t.Fatalf("selection = %+v", selection)
 	}
 }
 
 func TestNewAIProviderRejectsUnavailableSavedModel(t *testing.T) {
 	stubCodexCatalog(t, "gpt-5.6-terra", "gpt-5.6-terra", "medium", "medium")
-	settings := config.AI{Provider: config.ProviderCodexExec, CodexExecutable: "/opt/codex", CodexModel: "gpt-retired"}
+	settings := config.AI{Provider: config.ProviderCodexExec, AgentExecutable: "/opt/codex", AgentModel: "gpt-retired"}
 	provider, err := newAIProvider(settings)
 	if provider != nil || err == nil || !strings.Contains(err.Error(), "not in the installed Codex model catalog") {
 		t.Fatalf("newAIProvider() = %v, %v", provider, err)
@@ -35,7 +35,7 @@ func TestNewAIProviderRejectsUnavailableSavedModel(t *testing.T) {
 
 func TestNewAIProviderFailsWhenCatalogDiscoveryFails(t *testing.T) {
 	stubCodexCatalogError(t, "catalog offline")
-	provider, err := newAIProvider(config.AI{Provider: config.ProviderCodexExec, CodexExecutable: "/opt/codex"})
+	provider, err := newAIProvider(config.AI{Provider: config.ProviderCodexExec, AgentExecutable: "/opt/codex"})
 	if provider != nil || err == nil || !strings.Contains(err.Error(), "read installed Codex model catalog") {
 		t.Fatalf("newAIProvider() = %v, %v", provider, err)
 	}
@@ -44,21 +44,23 @@ func TestNewAIProviderFailsWhenCatalogDiscoveryFails(t *testing.T) {
 // stubCodexCatalog replaces catalog discovery with one model for the test.
 func stubCodexCatalog(t *testing.T, id, displayName, defaultEffort string, efforts ...string) {
 	t.Helper()
-	stubCodexCatalogModels(t, []ai.CodexModel{{ID: id, DisplayName: displayName, DefaultReasoningEffort: defaultEffort, ReasoningEfforts: efforts}})
+	stubCodexCatalogModels(t, []ai.AgentModel{{ID: id, DisplayName: displayName, DefaultReasoningEffort: defaultEffort, ReasoningEfforts: efforts}})
 }
 
-func stubCodexCatalogModels(t *testing.T, models []ai.CodexModel) {
+func stubCodexCatalogModels(t *testing.T, models []ai.AgentModel) {
 	t.Helper()
-	previous := codexCatalog
-	codexCatalog = func(string) ([]ai.CodexModel, error) { return models, nil }
-	t.Cleanup(func() { codexCatalog = previous })
+	previous := agentCatalog
+	agentCatalog = func(string, string) (ai.AgentCatalog, error) {
+		return ai.AgentCatalog{Models: models, DefaultModel: ai.DefaultCodexModel, DefaultReasoningEffort: ai.DefaultCodexReasoningEffort}, nil
+	}
+	t.Cleanup(func() { agentCatalog = previous })
 }
 
 func stubCodexCatalogError(t *testing.T, message string) {
 	t.Helper()
-	previous := codexCatalog
-	codexCatalog = func(string) ([]ai.CodexModel, error) { return nil, errors.New(message) }
-	t.Cleanup(func() { codexCatalog = previous })
+	previous := agentCatalog
+	agentCatalog = func(string, string) (ai.AgentCatalog, error) { return ai.AgentCatalog{}, errors.New(message) }
+	t.Cleanup(func() { agentCatalog = previous })
 }
 
 func TestProcessingPipelineSkipsAIForLocalCapabilities(t *testing.T) {
@@ -75,9 +77,9 @@ func TestProcessingPipelinePreflightsCodex(t *testing.T) {
 	if err := os.WriteFile(executable, []byte("#!/bin/sh\necho moved-or-logged-out >&2\nexit 9\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.Config{AI: config.AI{Provider: config.ProviderCodexExec, CodexExecutable: executable}}
+	cfg := config.Config{AI: config.AI{Provider: config.ProviderCodexExec, AgentExecutable: executable}}
 	pipeline, err := processingPipeline(cfg, meetingprocessing.CapabilitySummarization)
-	if pipeline != nil || err == nil || !strings.Contains(err.Error(), "preflight Installed Codex before summarization") {
+	if pipeline != nil || err == nil || !strings.Contains(err.Error(), "preflight Codex before summarization") {
 		t.Fatalf("processingPipeline() = %v, %v", pipeline, err)
 	}
 }

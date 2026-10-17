@@ -5,6 +5,8 @@ import type { OAuthTokenSet } from '../oauth'
 const READY_STATUS = 'ready'
 const SYNCING_STATUS = 'syncing'
 const ERROR_STATUS = 'error'
+// Background syncs fetch past Meeting windows again only this often; they rarely change.
+const HISTORY_REFRESH_MS = 24 * 60 * 60 * 1000
 
 export type StoredCalendarConnection = {
   id: string
@@ -13,6 +15,8 @@ export type StoredCalendarConnection = {
   tokens: OAuthTokenSet
   historyRanges?: CalendarHistoryRange[]
   historicalEvents?: CalendarEventSummary[]
+  historyCheckedAt?: string
+  historyError?: string
   events: CalendarEventSummary[]
   lastSyncedAt?: string
   error?: string
@@ -26,7 +30,7 @@ export type CalendarApi = {
   configured(): boolean
   authorize(): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
   refresh?(tokens: OAuthTokenSet): Promise<OAuthTokenSet>
-  sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarHistoryRange[]; historyError?: string }>
+  sync(connectionId: string, email: string, tokens: OAuthTokenSet, includeHistory?: boolean): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarHistoryRange[]; historyError?: string }>
   revoke(tokens: OAuthTokenSet): Promise<void>
 }
 
@@ -34,7 +38,8 @@ export class GoogleCalendarServiceCore {
   private connecting: Promise<CalendarSnapshot> | null = null
   private authorizationVersion = 0
   private queue = Promise.resolve()
-  private readonly syncing = new Map<string, Promise<CalendarSnapshot>>()
+  private readonly syncing = new Map<string, { history: boolean; request: Promise<CalendarSnapshot> }>()
+  private readonly listeners = new Set<(snapshot: CalendarSnapshot) => void>()
   private readonly api: CalendarApi
   private readonly store: CalendarStore
   private readonly now: () => Date
@@ -55,13 +60,31 @@ export class GoogleCalendarServiceCore {
     return this.connecting
   }
 
-  sync(connectionId: string): Promise<CalendarSnapshot> {
+  subscribe(listener: (snapshot: CalendarSnapshot) => void): () => void {
+    this.listeners.add(listener)
+    return () => { this.listeners.delete(listener) }
+  }
+
+  /** Syncs every account in turn; failures stay on their account, and history is fetched only when it is due. */
+  async backgroundSync(): Promise<void> {
+    await this.queue
+    const document = await this.readDocument()
+    for (const connection of document.connections) {
+      await this.sync(connection.id, this.historyDue(connection)).catch(() => undefined)
+    }
+  }
+
+  sync(connectionId: string, includeHistory = true): Promise<CalendarSnapshot> {
     const current = this.syncing.get(connectionId)
-    if (current) return current
-    const operation = this.withStore(() => this.performSync(connectionId))
-    const request = operation.finally(() => this.syncing.delete(connectionId)).then(() => this.snapshot())
-    this.syncing.set(connectionId, request)
-    return request
+    // A background sync without history does not answer a manual Refresh; that sync runs next.
+    if (current && (current.history || !includeHistory)) return current.request
+    const operation = this.withStore(() => this.performSync(connectionId, includeHistory))
+    const entry = {
+      history: includeHistory,
+      request: operation.finally(() => { if (this.syncing.get(connectionId) === entry) this.syncing.delete(connectionId); this.publish() }).then(() => this.snapshot()),
+    }
+    this.syncing.set(connectionId, entry)
+    return entry.request
   }
 
   disconnect(connectionId: string): Promise<CalendarSnapshot> {
@@ -73,7 +96,7 @@ export class GoogleCalendarServiceCore {
       document.connections = document.connections.filter((item) => item.id !== connectionId)
       await this.store.write(document)
       return this.toSnapshot(document)
-    })
+    }).finally(() => this.publish())
   }
 
   private async performConnect(version: number): Promise<CalendarSnapshot> {
@@ -93,17 +116,31 @@ export class GoogleCalendarServiceCore {
     return this.toSnapshot(document)
   }
 
-  private async performSync(connectionId: string): Promise<void> {
+  private publish(): void {
+    if (!this.listeners.size) return
+    void this.snapshot().then((snapshot) => { for (const listener of this.listeners) listener(snapshot) }, () => undefined)
+  }
+
+  private historyDue(connection: StoredCalendarConnection): boolean {
+    const checkedAt = Date.parse(connection.historyCheckedAt ?? '')
+    return !Number.isFinite(checkedAt) || this.now().getTime() - checkedAt >= HISTORY_REFRESH_MS
+  }
+
+  private async performSync(connectionId: string, includeHistory: boolean): Promise<void> {
     const document = await this.readDocument()
     const connection = requiredConnection(document, connectionId)
     try {
-      const result = await this.api.sync(connection.id, connection.email, connection.tokens)
-      Object.assign(connection, {
-        tokens: result.tokens, events: result.events,
-        historicalEvents: result.historicalEvents ?? connection.historicalEvents,
-        historyRanges: result.historyRanges ?? connection.historyRanges,
-        lastSyncedAt: this.now().toISOString(), error: result.historyError,
-      })
+      const result = await this.api.sync(connection.id, connection.email, connection.tokens, includeHistory)
+      const syncedAt = this.now().toISOString()
+      if (includeHistory) {
+        Object.assign(connection, {
+          historicalEvents: result.historicalEvents ?? connection.historicalEvents,
+          historyRanges: result.historyRanges ?? connection.historyRanges,
+          historyCheckedAt: syncedAt, historyError: result.historyError,
+        })
+      }
+      // An incomplete history stays visible until a later history fetch succeeds.
+      Object.assign(connection, { tokens: result.tokens, events: result.events, lastSyncedAt: syncedAt, error: connection.historyError })
       await this.store.write(document)
     } catch (error) {
       connection.error = safeError(error)

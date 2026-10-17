@@ -10,7 +10,7 @@ import {
 } from '../shared/generated/app-protocol'
 import { RECORDING_PROTOCOL_EVENT_TYPES } from '../shared/generated/protocol'
 import { missingRuntimeAssetMessage } from './binaries'
-import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveGappdBinary, resolveSpeechTranscriberBinary, resolveVideoHelperBinary } from './native-runtime'
+import { childEnv, resolveCaptureApp, resolveCaptureBinary, resolveDiarizationModels, resolveDiarizerBinary, resolveFfmpegBinary, resolveGappdBinary, resolveSpeechTranscriberBinary, resolveVideoHelperBinary } from './native-runtime'
 
 type StreamHandlers<ID extends AppStreamID> = {
   onEvent(event: AppStreamEvent<ID>): void
@@ -34,7 +34,7 @@ export function streamCommand<ID extends AppStreamID>(id: ID, input: AppCommandI
 }
 
 export function commandEnv(overrides: CommandEnv = {}): CommandEnv {
-  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), GAPPD_VIDEO_HELPER_PATH: resolveVideoHelperBinary(), ...overrides, ...selectedFixtureBackendEnv() })
+  return childEnv({ GAPPD_CAPTURE_APP_PATH: resolveCaptureApp() ?? '', GAPPD_CAPTURE_HELPER_PATH: resolveCaptureBinary(), GAPPD_APPLE_SPEECH_BIN: resolveSpeechTranscriberBinary(), GAPPD_DIARIZER_BIN: resolveDiarizerBinary(), GAPPD_DIARIZATION_MODELS: resolveDiarizationModels(), GAPPD_VIDEO_HELPER_PATH: resolveVideoHelperBinary(), GAPPD_FFMPEG_PATH: resolveFfmpegBinary(), ...overrides, ...selectedFixtureBackendEnv() })
 }
 
 function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommandInput[ID]): string[] {

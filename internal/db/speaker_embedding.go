@@ -10,16 +10,17 @@ import (
 // Pinned offline WeSpeaker model; changing the model requires a new identity.
 const VoiceModel = "fluidaudio-offline-vbx/300165b240c45375add402265f62410b6df33cf1+gappd.1/wespeaker-256/v1"
 const SpeakerEmbeddingDimension = 256
-const MinimumVoiceSeconds = 15.0
-const MinimumVoiceQuality = 0.8
+const MinimumVoiceSeconds = 15.0 // Clean speech, not total speech.
+const MinimumVoiceQuality = 0.8  // Per-span quality and window continuity for clean speech.
+const MinimumCleanVoiceShare = 0.5
 
 type SpeakerEmbedding struct {
 	Key     string
 	Vector  []float64
 	Model   string
 	Source  string
-	Seconds float64
-	Quality float64
+	Seconds float64 // Clean speech seconds.
+	Quality float64 // Share of the speaker's speech that is clean.
 }
 
 func replaceSpeakerEmbeddings(tx *sql.Tx, meetingID string, embeddings []SpeakerEmbedding) error {
@@ -37,7 +38,7 @@ func replaceSpeakerEmbeddings(tx *sql.Tx, meetingID string, embeddings []Speaker
 func insertSpeakerEmbedding(tx *sql.Tx, meetingID string, e SpeakerEmbedding) error {
 	if !numberedSpeaker.MatchString(e.Key) || e.Model != VoiceModel || e.Source == "" ||
 		!finiteVector([]float64{e.Seconds, e.Quality}) || e.Seconds < MinimumVoiceSeconds ||
-		e.Quality < MinimumVoiceQuality || e.Quality > 1 {
+		e.Quality < MinimumCleanVoiceShare || e.Quality > 1 {
 		return nil
 	}
 	raw, err := encodeCentroid(e.Vector)

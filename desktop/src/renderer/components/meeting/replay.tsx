@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { MeetingDetail } from '../../../shared/contracts'
-import { ChevronDown, ChevronUp, Download, Maximize, Monitor, Pause, Play, RotateCcw, RotateCw } from 'lucide-react'
+import { ChevronDown, ChevronUp, Download, Maximize, Minimize, Monitor, Pause, Play, RotateCcw, RotateCw } from 'lucide-react'
 import { Button } from '../ui'
 import './replay.css'
 
@@ -12,6 +12,9 @@ const url = (id: string, kind: string) => `gappd-media://meeting/${encodeURIComp
 
 export function MeetingReplay({ meeting, seekTo, onTimeChange }: { meeting: MeetingDetail; seekTo: { sec: number; request: number } | null; onTimeChange: (sec: number) => void }) {
   const panel = useRef<HTMLElement>(null)
+  const player = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const [ratio, setRatio] = useState(16 / 9)
   const [expanded, setExpanded] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exported, setExported] = useState(false)
@@ -73,6 +76,11 @@ export function MeetingReplay({ meeting, seekTo, onTimeChange }: { meeting: Meet
     }, 200)
     return () => { window.clearInterval(timer); clock.current.time = Math.min(duration, clock.current.time + (performance.now() - clock.current.started) / 1000); clock.current.playing = false; video.current?.pause(); mic.current?.pause(); system.current?.pause() }
   }, [playing, meeting.id, duration])
+  useEffect(() => {
+    const change = () => setFullscreen(document.fullscreenElement !== null && document.fullscreenElement === player.current)
+    document.addEventListener('fullscreenchange', change)
+    return () => document.removeEventListener('fullscreenchange', change)
+  }, [])
   useEffect(() => { setPlaying(false); clock.current = { time: 0, started: 0, playing: false }; setTime(0); setError('') }, [meeting.id])
 
   const exportVideo = async () => {
@@ -80,6 +88,10 @@ export function MeetingReplay({ meeting, seekTo, onTimeChange }: { meeting: Meet
     try { setExported(await window.gappd.meetings.exportRecording(meeting.id)) }
     catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
     finally { setExporting(false) }
+  }
+  const toggleFullscreen = () => {
+    const request = fullscreen ? document.exitFullscreen() : player.current?.requestFullscreen()
+    void request?.catch(() => setError(fullscreen ? 'Could not leave full screen. Press Escape.' : 'Could not open full screen. Try again.'))
   }
   const togglePlayback = () => {
     if (!playing && time >= duration) move(0)
@@ -95,20 +107,24 @@ export function MeetingReplay({ meeting, seekTo, onTimeChange }: { meeting: Meet
       {ready ? <button type="button" className="meeting-replay-toggle" aria-label={expanded ? 'Collapse recording' : 'Show recording'} aria-expanded={expanded} onClick={() => { setExpanded(!expanded); setPlaying(false) }}>{expanded ? 'Hide' : 'Watch'}{expanded ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}</button> : null}
     </header>
     {ready ? <div hidden={!expanded}>
-      <div className="meeting-replay-stage">
-        <video ref={video} src={url(meeting.id, 'video')} preload="metadata" playsInline onLoadedMetadata={() => sync(clock.current.time)} onError={() => setError('Screen video is unavailable. Reopen this Meeting to retry.')} aria-label="Meeting Screen video" />
-        {gap ? <div className="meeting-replay-gap"><Monitor aria-hidden="true" /><strong>{time < videoStart ? 'Screen video starts later' : 'Screen video has ended'}</strong><span>{playing ? 'Meeting audio continues.' : 'You can still play the Meeting audio.'}</span>{time < videoStart ? <Button onClick={() => move(videoStart)}>Jump to video · {timestamp(videoStart)}</Button> : null}</div> : null}
-      </div>
-      {state.micStartHostSec !== undefined ? <audio ref={mic} src={url(meeting.id, 'mic')} preload="metadata" onError={() => setError('Microphone audio is unavailable. Reopen this Meeting to retry.')} /> : null}
-      {state.systemStartHostSec !== undefined ? <audio ref={system} src={url(meeting.id, 'system')} preload="metadata" onError={() => setError('System audio is unavailable. Reopen this Meeting to retry.')} /> : null}
-      <div className="meeting-replay-transport">
-        <input type="range" min={0} max={Math.max(0, duration)} step="0.1" value={time} aria-label="Meeting timeline" aria-valuetext={`${timestamp(time)} of ${timestamp(duration)}`} onChange={event => move(Number(event.target.value))} />
-        <div className="meeting-replay-controls">
-          <Button className="compact-action" aria-label={playing ? 'Pause recording' : 'Play recording'} onClick={togglePlayback}>{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}{playing ? 'Pause' : 'Play'}</Button>
-          <button type="button" className="app-icon-action" aria-label="Back 10 seconds" onClick={() => move(time - 10)}><RotateCcw aria-hidden="true" /></button>
-          <button type="button" className="app-icon-action" aria-label="Forward 10 seconds" onClick={() => move(time + 10)}><RotateCw aria-hidden="true" /></button>
-          <span className="meeting-replay-time">{timestamp(time)} / {timestamp(duration)}</span>
-          <button type="button" className="app-icon-action" aria-label="Full screen recording" onClick={() => { void panel.current?.requestFullscreen().catch(() => setError('Could not open full screen. Try again.')) }}><Maximize aria-hidden="true" /></button>
+      <div ref={player} className="meeting-replay-player">
+        <div className="meeting-replay-stage">
+          <div className="meeting-replay-frame" style={{ '--replay-ratio': ratio } as CSSProperties}>
+            <video ref={video} src={url(meeting.id, 'video')} preload="metadata" playsInline onLoadedMetadata={event => { const { videoWidth, videoHeight } = event.currentTarget; if (videoWidth && videoHeight) setRatio(videoWidth / videoHeight); sync(clock.current.time) }} onError={() => setError('Screen video is unavailable. Reopen this Meeting to retry.')} aria-label="Meeting Screen video" />
+            {gap ? <div className="meeting-replay-gap"><Monitor aria-hidden="true" /><strong>{time < videoStart ? 'Screen video starts later' : 'Screen video has ended'}</strong><span>{playing ? 'Meeting audio continues.' : 'You can still play the Meeting audio.'}</span>{time < videoStart ? <Button onClick={() => move(videoStart)}>Jump to video · {timestamp(videoStart)}</Button> : null}</div> : null}
+          </div>
+        </div>
+        {state.micStartHostSec !== undefined ? <audio ref={mic} src={url(meeting.id, 'mic')} preload="metadata" onError={() => setError('Microphone audio is unavailable. Reopen this Meeting to retry.')} /> : null}
+        {state.systemStartHostSec !== undefined ? <audio ref={system} src={url(meeting.id, 'system')} preload="metadata" onError={() => setError('System audio is unavailable. Reopen this Meeting to retry.')} /> : null}
+        <div className="meeting-replay-transport">
+          <input type="range" min={0} max={Math.max(0, duration)} step="0.1" value={time} aria-label="Meeting timeline" aria-valuetext={`${timestamp(time)} of ${timestamp(duration)}`} onChange={event => move(Number(event.target.value))} />
+          <div className="meeting-replay-controls">
+            <Button className="compact-action" aria-label={playing ? 'Pause recording' : 'Play recording'} onClick={togglePlayback}>{playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}{playing ? 'Pause' : 'Play'}</Button>
+            <button type="button" className="app-icon-action" aria-label="Back 10 seconds" onClick={() => move(time - 10)}><RotateCcw aria-hidden="true" /></button>
+            <button type="button" className="app-icon-action" aria-label="Forward 10 seconds" onClick={() => move(time + 10)}><RotateCw aria-hidden="true" /></button>
+            <span className="meeting-replay-time">{timestamp(time)} / {timestamp(duration)}</span>
+            <button type="button" className="app-icon-action" aria-label={fullscreen ? 'Exit full screen' : 'Full screen recording'} onClick={toggleFullscreen}>{fullscreen ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}</button>
+          </div>
         </div>
       </div>
       <footer className="meeting-replay-foot"><span>{exported ? 'Recording exported.' : 'Saved on this Mac. Select a transcript time to seek.'}</span>{meeting.status.capture.state === 'captured' ? <Button className="compact-action" disabled={exporting} onClick={() => void exportVideo()}><Download aria-hidden="true" />{exporting ? 'Exporting…' : 'Export recording'}</Button> : null}</footer>

@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
-import type { CodexInstall } from '../../shared/ipc-contract'
-import { useCodexInstall } from '../hooks/use-codex-install'
+import type { AgentId, AgentInstall } from '../../shared/ipc-contract'
+import { AGENTS, agentInfo } from '../../shared/agents'
+import { useAgentInstalls } from '../hooks/use-agent-installs'
 import type { AppView } from '../lib/app-view'
 import { setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
 import { runtimeErrorView } from './settings/managed-runtime-contract'
@@ -77,7 +78,7 @@ function speechRow(base: Pick<Step, 'key' | 'title' | 'state'>, state: SetupStep
   return { ...base, detail: <>{allowed}<p className="setup-step-note">Getting transcripts ready: a one-time download of Apple's speech model.</p></> }
 }
 
-type NotesChoice = { codex: CodexInstall | null; finding: boolean; busy: boolean; error: string | null; useCodex(): void; recheck(): void }
+type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; useAgent(install: AgentInstall): void; recheck(): void }
 
 function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, skip: () => void): Step {
   const base = { key: 'notes', title: 'Meeting notes with AI', optional: true, state }
@@ -86,7 +87,8 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
   if (state === 'skipped') return { ...base, detail: <p>Skipped. Gappd makes transcripts only. Turn on notes in Settings.</p> }
   if (state === 'working') return { ...base, detail: <LocalAiProgress message={runtime?.message} progress={runtime?.progress} /> }
   const failure = state === 'error' ? runtimeErrorView(runtime) : null
-  const busy = view.runtimeBusy || choice.busy
+  const busy = view.runtimeBusy || choice.busy !== null
+  const found = (choice.installs ?? []).filter((install) => install.executable)
   return {
     ...base,
     detail: <>
@@ -97,16 +99,19 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
         <NotesOption title="On this Mac" points={['Private. Transcripts and notes stay on this Mac.', `One-time ${MODEL_SIZE} download. Works offline.`]}>
           <Button disabled={busy} onClick={state === 'error' ? view.actions.repairRuntime : view.actions.setupRuntime}>{state === 'error' ? 'Try again' : `Download ${MODEL_SIZE}`}</Button>
         </NotesOption>
-        {choice.codex?.executable ? <NotesOption title="Codex" points={choice.codex.signedIn ? ['Uses your ChatGPT account. No download.', 'Sends transcript text to OpenAI. Audio stays on this Mac.'] : ['Found Codex, but it is not signed in.', 'Open the ChatGPT app or Codex and sign in, then come back.']}>
-          {choice.codex.signedIn
-            ? <Button disabled={busy} onClick={choice.useCodex}>{choice.busy ? 'Checking Codex…' : 'Use Codex'}</Button>
-            : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
-        </NotesOption> : null}
+        {found.map((install) => {
+          const info = agentInfo(install.agent)
+          return <NotesOption key={install.agent} title={info.name} points={install.signedIn ? [info.account, info.sendsTo] : [`Found ${info.name}, but it is not signed in.`, `${info.signIn}, then come back.`]}>
+            {install.signedIn
+              ? <Button disabled={busy} onClick={() => choice.useAgent(install)}>{choice.busy === install.agent ? `Checking ${info.name}…` : `Use ${info.name}`}</Button>
+              : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
+          </NotesOption>
+        })}
         <NotesOption title="Not now" points={['Record and get transcripts only.', 'No notes until you choose in Settings.']}>
           <Button disabled={busy} onClick={skip}>Not now</Button>
         </NotesOption>
       </div>
-      {choice.codex && !choice.codex.executable ? <p className="setup-step-note">Have the ChatGPT app or Codex? Install it and Gappd finds it here.</p> : null}
+      {choice.installs && !found.length ? <p className="setup-step-note">Have {new Intl.ListFormat('en', { type: 'disjunction' }).format(AGENTS.map((agent) => agent.name))}? Install one and Gappd finds it here.</p> : null}
     </>,
   }
 }
@@ -119,20 +124,19 @@ function NotesOption({ title, points, children }: { title: string; points: strin
   </div>
 }
 
-/** Finds Codex while the choice is open and saves it with one click. */
+/** Finds the installed agents while the choice is open and saves one with one click. */
 function useNotesChoice(open: boolean): NotesChoice {
-  const found = useCodexInstall(open)
-  const [busy, setBusy] = useState(false)
+  const found = useAgentInstalls(open)
+  const [busy, setBusy] = useState<AgentId | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const useCodex = () => {
-    const executable = found.install?.executable
-    if (!executable) return
-    setBusy(true); setError(null)
-    window.gappd.aiProvider.configureCodex({ executable, model: '', reasoningEffort: '' })
-      .catch((cause) => setError(`Gappd could not use Codex. ${ipcErrorMessage(cause)}`))
-      .finally(() => setBusy(false))
+  const useAgent = (install: AgentInstall) => {
+    if (!install.executable) return
+    setBusy(install.agent); setError(null)
+    window.gappd.aiProvider.configureAgent({ agent: install.agent, executable: install.executable, model: '', reasoningEffort: '' })
+      .catch((cause) => setError(`Gappd could not use ${agentInfo(install.agent).name}. ${ipcErrorMessage(cause)}`))
+      .finally(() => setBusy(null))
   }
-  return { codex: found.install, finding: found.checking, busy, error, useCodex, recheck: found.recheck }
+  return { installs: found.installs, finding: found.checking, busy, error, useAgent, recheck: found.recheck }
 }
 
 function ipcErrorMessage(cause: unknown): string {

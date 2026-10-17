@@ -1,4 +1,7 @@
-.meeting-replay { min-width: 0; overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-card); }
+.meeting-replay {
+  /* The panel body is a size container. The video leaves about 11rem for its header and controls, stays at least 12rem tall, and uses at most 70% of the visible body. */
+  --replay-max-height: clamp(12rem, 100cqb - 11rem, 70cqb);
+  min-width: 0; overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-card); }
 .meeting-replay-head, .meeting-replay-head > div, .meeting-replay-controls, .meeting-replay-foot { display: flex; align-items: center; gap: var(--space-3); }
 .meeting-replay-head { justify-content: space-between; padding: var(--space-3) var(--space-5); }
 .meeting-replay-head > div { flex-wrap: wrap; min-width: 0; }
@@ -7,8 +10,10 @@
 .meeting-replay-head strong { font-size: var(--font-size-body); }
 .meeting-replay-head span, .meeting-replay-foot, .meeting-replay-notice { color: var(--color-text-soft); font-size: var(--font-size-small); }
 .meeting-replay svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
-.meeting-replay-stage { position: relative; background: #000; }
-.meeting-replay video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; max-height: 30vh; object-fit: contain; }
+.meeting-replay-stage { display: grid; place-items: center; padding: 0 var(--space-5); }
+/* The frame takes the video's own shape, so a window capture gets no black bars. */
+.meeting-replay-frame { position: relative; inline-size: min(100%, var(--replay-max-height) * var(--replay-ratio)); aspect-ratio: var(--replay-ratio); overflow: hidden; border-radius: var(--radius-md); background: #000; }
+.meeting-replay video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
 .meeting-replay-gap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-5); background: var(--color-surface-sunken); text-align: center; font-size: var(--font-size-small); }
 .meeting-replay-transport { padding: var(--space-4) var(--space-5); }
 .meeting-replay-transport input { display: block; width: 100%; margin: 0 0 var(--space-3); accent-color: var(--color-accent); cursor: pointer; }
@@ -19,6 +24,8 @@
 .meeting-replay-notice { margin: 0; padding: var(--space-4) var(--space-5); }
 .meeting-replay-notice[role="alert"] { color: var(--color-danger); }
 .meeting-replay :is(button, input, summary):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.meeting-replay:fullscreen { overflow: auto; border: 0; border-radius: 0; }
-.meeting-replay:fullscreen video { max-height: calc(100vh - 190px); }
+/* Full screen shows only the video and its controls; the stage is the size container. */
+.meeting-replay-player:fullscreen { display: flex; flex-direction: column; background: var(--color-card); }
+.meeting-replay-player:fullscreen .meeting-replay-stage { flex: 1 1 auto; min-block-size: 0; padding: 0; container-type: size; background: #000; }
+.meeting-replay-player:fullscreen .meeting-replay-frame { inline-size: min(100cqi, 100cqb * var(--replay-ratio)); border-radius: 0; }
 .transcript-turn[aria-current="true"] { outline: 1px solid var(--color-accent); }

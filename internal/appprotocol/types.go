@@ -15,18 +15,26 @@ type ConfigResponse struct {
 	AI AIConfig `json:"ai"`
 }
 
-type CodexStatusResponse struct {
+// AIStatusResponse is the saved AI provider and, for an agent provider,
+// whether it can make notes now.
+type AIStatusResponse struct {
 	AI        AIConfig `json:"ai"`
 	Available bool     `json:"available"`
 	Error     *string  `json:"error,omitempty"`
 }
 
-// CodexFindResponse is the newest Codex CLI found on this Mac. Executable is
-// empty when Codex is not installed.
-type CodexFindResponse struct {
+// AgentInstall is the newest install of one agent CLI found on this Mac.
+// Executable is empty when the agent is not installed.
+type AgentInstall struct {
+	Agent      string `json:"agent"`
 	Executable string `json:"executable"`
 	Version    string `json:"version"`
 	SignedIn   bool   `json:"signedIn"`
+}
+
+// AgentFindResponse lists every supported agent in display order.
+type AgentFindResponse struct {
+	Agents []AgentInstall `json:"agents"`
 }
 
 type AIConfig struct {
@@ -35,9 +43,9 @@ type AIConfig struct {
 	Endpoint             string  `json:"endpoint"`
 	Temperature          float64 `json:"temperature"`
 	Managed              bool    `json:"managed"`
-	CodexExecutable      string  `json:"codexExecutable"`
-	CodexModel           string  `json:"codexModel"`
-	CodexReasoningEffort string  `json:"codexReasoningEffort"`
+	AgentExecutable      string  `json:"agentExecutable"`
+	AgentModel           string  `json:"agentModel"`
+	AgentReasoningEffort string  `json:"agentReasoningEffort"`
 }
 
 type DevicesResponse struct {

@@ -62,10 +62,21 @@ type RecognizeSpeakersInput struct {
 }
 
 type MeetingSpeaker struct {
-	IdentityOrigin string  `json:"identityOrigin,omitempty"`
-	Key            string  `json:"key"`
-	Name           string  `json:"name"`
-	PersonID       *string `json:"personId,omitempty"`
+	IdentityOrigin    string  `json:"identityOrigin,omitempty"`
+	Key               string  `json:"key"`
+	Name              string  `json:"name"`
+	PersonID          *string `json:"personId,omitempty"`
+	SuggestedPersonID *string `json:"suggestedPersonId,omitempty"`
+}
+
+// WithSpeakerSuggestions adds voice suggestions to unlabeled speakers.
+func WithSpeakerSuggestions(detail MeetingDetail, suggestions map[string]string) MeetingDetail {
+	for i, speaker := range detail.Speakers {
+		if person, ok := suggestions[speaker.Key]; ok && speaker.PersonID == nil {
+			detail.Speakers[i].SuggestedPersonID = &person
+		}
+	}
+	return detail
 }
 
 func buildSpeakerViews(segments []db.Segment) []MeetingSpeaker {
