@@ -39,7 +39,7 @@ type Turn struct {
 }
 
 // Document is the complete uploaded text of one Meeting. Audio, Person identity, voice
-// evidence, local paths, credentials and Calendar caches stay local.
+// evidence, local paths, credentials, Calendar caches and Agenda drafts stay local.
 type Document struct {
 	Version   int       `json:"version"`
 	MeetingID string    `json:"meeting_id"`

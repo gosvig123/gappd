@@ -1,4 +1,5 @@
 import { exportRecording } from './meeting-export'
+import { generateMeetingAgenda } from './meeting-agenda'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
@@ -8,6 +9,7 @@ import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
+import { listSavedAgendas, loadSavedAgenda, removeSavedAgenda, saveAgendaTopics } from './agenda/drafts'
 import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
@@ -61,7 +63,14 @@ const IPC_HANDLERS: MainHandlers = {
     configureCodex: (_event, input: CodexConfigurationInput) => providerChanged(() => configureCodex(input)),
     useLocal: () => providerChanged(useLocalProvider),
   },
+  agenda: {
+    load: (_event, draftKey: string) => loadSavedAgenda(draftKey),
+    list: () => listSavedAgendas(),
+    save: (_event, input) => saveAgendaTopics(input),
+    remove: (_event, draftKey: string) => removeSavedAgenda(draftKey),
+  },
   googleCalendar: {
+    generateAgenda: (_event, input) => generateMeetingAgenda(input),
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
     connect: () => connectGoogleCalendar(),

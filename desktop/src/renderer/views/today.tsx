@@ -6,6 +6,8 @@ import { meetingHasWork, meetingProgressLabel } from '../components/meeting/prog
 import { Button, ProgressBar, StatusPill, cx } from '../components/ui'
 import { artifactLine, artifactNote, eventIsNow, eventPeople, eventPlace, eventTimeRange, upcomingEvents, type AppView } from '../lib/app-view'
 import { dayLabel, durationLabel, meetingDurationLabel } from '../lib/meeting-grouping'
+import { EventAgendaChip, MeetingAgendaChip } from '../components/agenda/tab'
+import { useOpenMeeting } from '../components/meeting/open-scope'
 
 type TodayProps = { view: AppView; onOpenMeetings: () => void }
 
@@ -62,6 +64,7 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
         <div className="app-timeline-sub">
           {people.label ? <span title={people.detail}>{people.label}</span> : null}
           {place ? <span className="app-timeline-place"><Place aria-hidden="true" />{place.label}</span> : null}
+          <EventAgendaChip view={view} event={event} />
         </div>
       </div>
       {past ? null : <Button variant={now || next ? 'primary' : 'secondary'} className={cx('compact-action', !(now || next) && 'app-reveal')} disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>}
@@ -76,7 +79,7 @@ function UpNext({ view }: { view: AppView }) {
       <div className="app-empty">
         <CalendarDays aria-hidden="true" />
         <strong>No calendar events today</strong>
-        <span>Connect a Google Calendar connection to see the day here.</span>
+        <span>Connect a Google Calendar connection to see the day here and ground Agenda drafts in past Meetings.</span>
       </div>
     )
   }
@@ -126,14 +129,16 @@ function RecentDays({ meetings, view }: { meetings: MeetingListItem[]; view: App
 }
 
 function RecentRow({ meeting, view }: { meeting: MeetingListItem; view: AppView }) {
+  const open = useOpenMeeting(view.actions.openMeeting)
   const note = artifactNote(meeting)
   const failed = meeting.status.state === 'failed'
   return (
     <li className="app-recent-row">
       <span className="app-recent-time">{new Date(meeting.startedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}</span>
-      <button type="button" className="app-recent-title" onClick={() => view.actions.openMeeting(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
+      <button type="button" className="app-recent-title" onClick={() => open(meeting.id)}>{meeting.title || 'Untitled meeting'}</button>
       <span className="app-recent-meta">
         {note ? <span className={cx('app-recent-note', failed && 'is-failed')}>{failed ? <CircleAlert aria-hidden="true" /> : null}{note}</span> : null}
+        <MeetingAgendaChip view={view} meetingId={meeting.id} onOpen={() => open(meeting.id, 'agenda')} />
         <span className="app-recent-duration">{meetingDurationLabel(meeting)}</span>
       </span>
     </li>

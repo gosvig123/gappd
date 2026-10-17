@@ -60,7 +60,7 @@ decoded document is always valid UTF-8.
 1. Unknown fields are rejected at every level. The document is the privacy boundary, so a
    caller cannot add a field and rely on the cloud ignoring it.
 2. Audio, Person identity, voice samples and embeddings, speaker audio previews, local
-   filesystem paths, credentials and Calendar caches must be absent.
+   filesystem paths, credentials, Calendar caches and Saved Agenda drafts must be absent.
    A document that carries one is invalid, not silently trimmed.
 3. The cloud replaces a Meeting's document atomically. Row-by-row transcript sync is not
    used in version 1.

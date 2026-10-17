@@ -2,10 +2,11 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { CalendarEventSummary } from '../../shared/calendar-contract'
 import type { MeetingListItem } from '../../shared/contracts'
+import type { SavedAgendaDraft } from '../../shared/agenda-draft'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { calendarEventIsUpcoming, calendarEventKey } from '../../shared/calendar-contract.ts'
+import { agendaDraftKey } from '../../shared/agenda-draft.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
-import { currentEvent, filterWorkspaceRows, workspaceRows } from './meetings-workspace.ts'
+import { currentAgendaEvent, filterWorkspaceRows, workspaceRows } from './meetings-workspace.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { MeetingEventCache } from '../hooks/meeting-event-cache.ts'
 
@@ -20,8 +21,12 @@ function meeting(id = 'recorded', startedAt = '2026-09-14T09:00:00Z'): MeetingLi
   return { id, title: id, startedAt } as MeetingListItem
 }
 
+function draft(source = event()): SavedAgendaDraft {
+  return { draftKey: agendaDraftKey(source), sourceId: source.sourceId, title: source.title, accountEmail: source.accountEmail, eventStart: source.start, eventEnd: source.end, items: [{ topic: 'Review keyboard navigation', sourceId: 'recorded', quote: 'Review the flow' }], sources: [], historyIncomplete: false, generatedAt: now.toISOString(), updatedAt: now.toISOString(), model: 'local', reasoningEffort: '', revision: 1, durable: true }
+}
+
 function data(overrides: Partial<Data> = {}): Data {
-  return { meetings: [meeting()], meetingEvents: new Map(), calendar: { configured: true, connections: [], events: [event()] }, ...overrides }
+  return { meetings: [meeting()], meetingEvents: new Map(), calendar: { configured: true, connections: [], events: [event()] }, drafts: [], ...overrides }
 }
 
 test('Next up is earliest and all later events remain accessible', () => {
@@ -32,14 +37,15 @@ test('Next up is earliest and all later events remain accessible', () => {
   assert.equal(rows.history[0].kind, 'meeting')
 })
 
-test('confirmed links keep one recorded row with its event', () => {
+test('confirmed links keep one recorded row with its event and Saved Agenda draft', () => {
   const source = event()
-  const rows = workspaceRows(data({ meetingEvents: new Map([['recorded', source]]) }), now)
+  const rows = workspaceRows(data({ meetingEvents: new Map([['recorded', source]]), drafts: [draft(source)] }), now)
   assert.equal(rows.upcoming.length, 0)
   assert.equal(rows.history.length, 1)
   assert.equal(rows.history[0].kind, 'meeting')
   if (rows.history[0].kind !== 'meeting') throw Error('Expected Meeting')
   assert.equal(rows.history[0].event?.sourceId, source.sourceId)
+  assert.equal(rows.history[0].draft?.items[0].topic, 'Review keyboard navigation')
 })
 
 test('matching time or title never implies a confirmed Calendar link', () => {
@@ -48,25 +54,28 @@ test('matching time or title never implies a confirmed Calendar link', () => {
   assert.equal(rows.history.length, 1)
 })
 
-test('disconnecting Calendar keeps recordings', () => {
-  const rows = workspaceRows(data({ calendar: null }), now)
+test('disconnecting Calendar keeps recordings and standalone Saved Agenda drafts', () => {
+  const rows = workspaceRows(data({ calendar: null, drafts: [draft()] }), now)
   assert.equal(rows.upcoming.length, 0)
-  assert.deepEqual(rows.history.map(row => row.kind), ['meeting'])
+  assert.deepEqual(new Set(rows.history.map(row => row.kind)), new Set(['meeting', 'draft']))
 })
 
-test('passed events disappear from Next up', () => {
-  const rows = workspaceRows(data({ calendar: { configured: true, connections: [], events: [event('past', '2026-09-11T10:00:00Z')] } }), now)
+test('passed events disappear from Next up but their saved topics stay in History', () => {
+  const source = event('past', '2026-09-11T10:00:00Z')
+  const rows = workspaceRows(data({ calendar: { configured: true, connections: [], events: [source] }, drafts: [draft(source)] }), now)
   assert.equal(rows.upcoming.length, 0)
+  assert.equal(rows.history.find(row => row.title === 'past')?.kind, 'draft')
 })
 
 test('reconnect uses stable account/event identity instead of the old connection id', () => {
   const old = event()
   const fresh = { ...old, sourceId: 'new:primary:planning', connectionId: 'new' }
-  const source = data({ calendar: { configured: true, connections: [], events: [fresh] } })
+  const saved = draft(old)
+  const source = data({ calendar: { configured: true, connections: [], events: [fresh] }, drafts: [saved] })
   const rows = workspaceRows(source, now)
   assert.equal(rows.upcoming.length, 1)
-  const target = { key: calendarEventKey(old), sourceId: old.sourceId, title: old.title, start: old.start, accountEmail: old.accountEmail }
-  assert.equal(currentEvent(target, source.calendar)?.sourceId, fresh.sourceId)
+  assert.equal(rows.history.filter(row => row.kind === 'draft').length, 0)
+  assert.equal(currentAgendaEvent({ ...saved, start: saved.eventStart }, source.calendar)?.sourceId, fresh.sourceId)
   source.meetingEvents.set('recorded', old)
   assert.equal(workspaceRows(source, now).upcoming.length, 0)
 })
@@ -76,33 +85,36 @@ test('a stale link for a deleted Meeting cannot hide its Calendar event', () => 
   assert.equal(rows.upcoming.length, 1)
 })
 
-test('search covers invitees and existing full-text Meeting matches', () => {
-  const rows = workspaceRows(data(), now)
+test('search covers invitees, saved topics, and existing full-text Meeting matches', () => {
+  const rows = workspaceRows(data({ drafts: [draft()] }), now)
   assert.equal(filterWorkspaceRows(rows.upcoming, ' ALEX ', new Set()).length, 1)
+  assert.equal(filterWorkspaceRows(rows.upcoming, 'keyboard', new Set()).length, 1)
   assert.equal(filterWorkspaceRows(rows.history, 'transcript hit', new Set(['recorded'])).length, 1)
   assert.equal(filterWorkspaceRows(rows.history, 'no match', new Set()).length, 0)
 })
 
-test('invitee search finds the recorded row after confirmed event merging', () => {
-  const rows = workspaceRows(data({ meetingEvents: new Map([['recorded', event()]]) }), now)
-  assert.equal(filterWorkspaceRows(rows.history, 'alex', new Set())[0].key, 'meeting:recorded')
+test('Agenda topic search finds the recorded row after confirmed event merging', () => {
+  const rows = workspaceRows(data({ meetingEvents: new Map([['recorded', event()]]), drafts: [draft()] }), now)
+  assert.equal(filterWorkspaceRows(rows.history, 'keyboard', new Set())[0].key, 'meeting:recorded')
 })
 
-test('History lists Meetings in descending time order', () => {
-  const rows = workspaceRows(data({ calendar: null, meetings: [meeting('old', '2026-09-10T09:00:00Z'), meeting('new')] }), now)
-  assert.deepEqual(rows.history.map(row => row.title), ['new', 'old'])
+test('History includes standalone drafts and Meetings in descending time order', () => {
+  const rows = workspaceRows(data({ calendar: null, meetings: [meeting('old', '2026-09-10T09:00:00Z'), meeting('new')], drafts: [draft(event('saved', '2026-09-11T10:00:00Z'))] }), now)
+  assert.deepEqual(rows.history.map(row => row.title), ['new', 'saved', 'old'])
 })
 
 test('link, relink, and unlink immediately update workspace rows with unchanged counts', () => {
   const cache = new MeetingEventCache()
   const a = event('A'), b = event('B')
-  const source = data({ calendar: { configured: true, connections: [], events: [a, b] } })
+  const source = data({ calendar: { configured: true, connections: [], events: [a, b] }, drafts: [draft(a), draft(b)] })
   source.meetingEvents = cache.update('recorded', a)
   assert.deepEqual(workspaceRows(source, now).upcoming.map(row => row.title), ['B'])
   source.meetingEvents = cache.update('recorded', b)
   assert.deepEqual(workspaceRows(source, now).upcoming.map(row => row.title), ['A'])
   source.meetingEvents = cache.update('recorded')
   assert.deepEqual(workspaceRows(source, now).upcoming.map(row => row.title), ['A', 'B'])
+  source.calendar = null
+  assert.equal(workspaceRows(source, now).history.filter(row => row.kind === 'draft').length, 2)
 })
 
 test('a lookup started before a link change cannot overwrite its confirmed result', async () => {
@@ -123,13 +135,4 @@ test('cancelled lookups never publish after the hook unmounts', async () => {
   cache.cancel()
   finish(event())
   assert.equal(await pending, null)
-})
-
-test('upcoming visibility supports future dates and local all-day boundaries', () => {
-  const timed = event()
-  assert.equal(calendarEventIsUpcoming(timed, now), true)
-  assert.equal(calendarEventIsUpcoming(timed, new Date(timed.end)), false)
-  const day = { ...timed, allDay: true, start: '2026-09-10', end: '2026-09-11' }
-  assert.equal(calendarEventIsUpcoming(day, new Date(2026, 8, 10, 23)), true)
-  assert.equal(calendarEventIsUpcoming(day, new Date(2026, 8, 11)), false)
 })

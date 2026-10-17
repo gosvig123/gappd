@@ -1,5 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import type { SavedAgendaDraft } from '../../shared/agenda-draft'
 import type { SavedPerson } from '../../shared/participant-contract'
+
+export function useSavedDrafts(): [SavedAgendaDraft[], () => void] {
+  const [drafts, setDrafts] = useState<SavedAgendaDraft[]>([])
+  const reload = useCallback(() => { void window.gappd.agenda.list().then(setDrafts).catch(() => setDrafts([])) }, [])
+  useEffect(() => { reload() }, [reload])
+  return [drafts, reload]
+}
 
 export function useSavedPeople(): [SavedPerson[], (people: SavedPerson[]) => void] {
   const [people, setPeople] = useState<SavedPerson[]>([])

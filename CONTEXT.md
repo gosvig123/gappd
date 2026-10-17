@@ -22,6 +22,12 @@ A likely **Person** for an unlabeled **Meeting speaker**, based on voice similar
 **Calendar invitee**:
 A person listed on a calendar event whose attendance and voice identity still need confirmation.
 
+**Agenda draft**:
+Editable preparation for an upcoming calendar event, grounded in matched Meetings.
+
+**Saved Agenda draft**:
+An Agenda draft that Gappd keeps encrypted on this Mac for one Calendar event, together with the topics the user edited.
+
 **Google Calendar connection**:
 Read-only authorization for one Google account's primary calendar, with independent synchronization, errors, reconnect, and disconnect behavior.
 
@@ -45,13 +51,17 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - A **Voice suggestion** considers every Person with voice evidence, but never labels a speaker, changes the transcript, or adds voice evidence; confirming it is a manual label. Closer voices are auto-filled instead.
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
-- Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain.
+- Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain, but that account no longer supplies inferred overlap context. Saved Agenda drafts are local user work and remain.
 - The renderer receives Calendar snapshots and account operations, never Google tokens.
 - The desktop app exchanges and refreshes Google tokens directly with Google; no Gappd server receives Google tokens or Google user data.
+- An **Agenda draft** uses the **Meeting** history of the event's **Calendar invitees**. Local AI processes it on this Mac. Generation does not change Calendar, and saved drafts retain source labels and exact quotes rather than complete transcripts.
+- A **Saved Agenda draft** stays readable and editable after its event leaves the upcoming Calendar window or its **Google Calendar connection** becomes unavailable; regenerating it requires the event to be upcoming.
 - Meeting notes are optional. Every **Meeting** gets a transcript from the Apple speech model, which downloads by itself; notes need a chosen AI provider: Local AI on this Mac or Installed Codex. Skipping notes leaves transcripts only.
 - Gappd finds Installed Codex itself (the newest install, including the copy inside the ChatGPT app); users never type its path.
 - Installed Codex operations use one model and one reasoning effort from the installed Codex model catalog; an unset model uses the app default, and Gappd never substitutes a model or effort the catalog does not advertise.
-- Gappd suggests Calendar events that overlap a **Meeting**; only the user's choice links one, and a suggestion never confirms attendance or identifies a **Meeting speaker**.
+- An **Agenda draft** checks later **Meetings** for resolutions and superseded commitments. Topics ask users to confirm status; missing resolution evidence does not prove that work remains open. Long histories select useful candidates across bounded chronological history partitions, merge them into at most eight topics, then check all source sections for resolutions and explicit reopenings in original evidence order. Topic prioritization is intentional, not lossless evidence extraction, and processing limits fail without returning a partial draft.
+- A past **Meeting** can supply **Calendar invitee** email context through a confirmed Calendar link or a unique, meaningful timed overlap; inferred overlap does not confirm attendance or identify a **Meeting speaker**, and ambiguous overlaps remain unresolved until the user chooses a Calendar event.
+- A confirmed Calendar link takes precedence over inferred overlap, and explicitly unlinking a **Meeting** disables automatic Calendar matching for its **Agenda draft** context.
 
 ## Example dialogue
 

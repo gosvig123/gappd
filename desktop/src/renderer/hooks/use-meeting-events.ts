@@ -4,7 +4,7 @@ import type { MeetingListItem } from '../../shared/contracts'
 import type { LinkCalendarInput } from '../../shared/participant-contract'
 import { MeetingEventCache } from './meeting-event-cache'
 
-/** Confirmed Calendar links drive workspace row merging. */
+/** Shared confirmed links drive both Agenda content and workspace row merging. */
 export function useMeetingEvents(meetings: MeetingListItem[], calendar: CalendarSnapshot | null) {
   const [events, setEvents] = useState<Map<string, CalendarEventSummary>>(() => new Map())
   const [revision, setRevision] = useState(0)
