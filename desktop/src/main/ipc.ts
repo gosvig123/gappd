@@ -8,7 +8,7 @@ import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureCodex, findCodex, providerModels, providerStatus, useLocalProvider } from './ai-provider'
-import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, syncGoogleCalendar } from './google/calendar-service'
+import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, onGoogleCalendarChange, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
@@ -123,6 +123,7 @@ export function registerIpc(mainWindow: BrowserWindow): void {
   const disposers = [
     forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
     forwardToWindow(mainWindow, IPC_EVENTS.managedRuntime.changed, managedRuntime.observe),
+    forwardToWindow(mainWindow, IPC_EVENTS.googleCalendar.changed, onGoogleCalendarChange),
     forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
   ]
   windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))

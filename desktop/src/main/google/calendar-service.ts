@@ -29,6 +29,16 @@ export function disconnectGoogleCalendar(connectionId: string): Promise<Calendar
   return calendarService().disconnect(connectionId)
 }
 
+export function backgroundSyncGoogleCalendar(): Promise<void> {
+  if (selectedFixtureProfile()) return Promise.resolve()
+  return calendarService().backgroundSync()
+}
+
+export function onGoogleCalendarChange(listener: (snapshot: CalendarSnapshot) => void): () => void {
+  if (selectedFixtureProfile()) return () => undefined
+  return calendarService().subscribe(listener)
+}
+
 function calendarService(): GoogleCalendarServiceCore {
   if (instance) return instance
   const config = serviceConfig()

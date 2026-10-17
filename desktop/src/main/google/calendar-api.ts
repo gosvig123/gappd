@@ -54,9 +54,10 @@ export class GoogleCalendarApi {
     return { ...await this.fetchProfile(tokens), tokens }
   }
 
-  async sync(connectionId: string, email: string, tokens: OAuthTokenSet): Promise<GoogleSyncResult> {
+  async sync(connectionId: string, email: string, tokens: OAuthTokenSet, includeHistory = true): Promise<GoogleSyncResult> {
     const currentTokens = await this.refresh(tokens)
     const events = await this.fetchEvents(connectionId, email, currentTokens)
+    if (!includeHistory) return { tokens: currentTokens, events }
     const history = await this.fetchHistory(connectionId, email, currentTokens)
     return { tokens: currentTokens, events, ...history }
   }

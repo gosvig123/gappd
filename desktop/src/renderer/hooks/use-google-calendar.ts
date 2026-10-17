@@ -23,6 +23,8 @@ export function useGoogleCalendar(): GoogleCalendarController {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => loadSnapshot(setSnapshot, setError, setLoading), [])
+  // Background syncs in the main process send each new snapshot here.
+  useEffect(() => window.gappd.googleCalendar.onChanged(setSnapshot), [])
 
   const run = useCallback(async (operation: string, action: () => Promise<CalendarSnapshot>) => {
     setBusy(operation); setError(null)

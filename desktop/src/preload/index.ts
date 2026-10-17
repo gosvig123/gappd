@@ -44,6 +44,7 @@ const api: GappdApi = {
   ...operationApi,
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
   managedRuntime: { ...operationApi.managedRuntime, observe: subscribe(IPC_EVENTS.managedRuntime.changed) },
+  googleCalendar: { ...operationApi.googleCalendar, onChanged: subscribe(IPC_EVENTS.googleCalendar.changed) },
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
 

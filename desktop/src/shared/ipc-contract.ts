@@ -132,6 +132,9 @@ export const IPC_EVENTS = {
   managedRuntime: {
     changed: 'managedRuntime:changed',
   },
+  googleCalendar: {
+    changed: 'googleCalendar:changed',
+  },
   update: {
     statusChanged: 'update:status-changed',
   },
@@ -143,6 +146,9 @@ export type GappdApi = IpcInvokeApi & {
   }
   managedRuntime: IpcInvokeApi['managedRuntime'] & {
     observe(listener: (state: ManagedRuntimeSnapshot) => void): () => void
+  }
+  googleCalendar: IpcInvokeApi['googleCalendar'] & {
+    onChanged(listener: (snapshot: CalendarSnapshot) => void): () => void
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void
