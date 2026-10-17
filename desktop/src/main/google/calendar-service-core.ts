@@ -38,7 +38,7 @@ export class GoogleCalendarServiceCore {
   private connecting: Promise<CalendarSnapshot> | null = null
   private authorizationVersion = 0
   private queue = Promise.resolve()
-  private readonly syncing = new Map<string, Promise<CalendarSnapshot>>()
+  private readonly syncing = new Map<string, { history: boolean; request: Promise<CalendarSnapshot> }>()
   private readonly listeners = new Set<(snapshot: CalendarSnapshot) => void>()
   private readonly api: CalendarApi
   private readonly store: CalendarStore
@@ -76,11 +76,15 @@ export class GoogleCalendarServiceCore {
 
   sync(connectionId: string, includeHistory = true): Promise<CalendarSnapshot> {
     const current = this.syncing.get(connectionId)
-    if (current) return current
+    // A background sync without history does not answer a manual Refresh; that sync runs next.
+    if (current && (current.history || !includeHistory)) return current.request
     const operation = this.withStore(() => this.performSync(connectionId, includeHistory))
-    const request = operation.finally(() => { this.syncing.delete(connectionId); this.publish() }).then(() => this.snapshot())
-    this.syncing.set(connectionId, request)
-    return request
+    const entry = {
+      history: includeHistory,
+      request: operation.finally(() => { if (this.syncing.get(connectionId) === entry) this.syncing.delete(connectionId); this.publish() }).then(() => this.snapshot()),
+    }
+    this.syncing.set(connectionId, entry)
+    return entry.request
   }
 
   disconnect(connectionId: string): Promise<CalendarSnapshot> {
