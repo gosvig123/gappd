@@ -42,7 +42,7 @@
 .app-panel-event select { min-inline-size: 0; max-inline-size: 100%; }
 .app-panel-event [role='alert'] { color: var(--color-danger); }
 
-.app-panel-body { min-block-size: 0; min-inline-size: 0; overflow: auto; display: grid; grid-auto-rows: max-content; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
+.app-panel-body { container-type: size; min-block-size: 0; min-inline-size: 0; overflow: auto; display: grid; grid-auto-rows: max-content; gap: var(--space-6); align-content: start; padding: var(--space-6) var(--space-8) var(--space-7); }
 
 .app-panel-foot {
   display: flex;
