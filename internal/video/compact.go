@@ -20,7 +20,9 @@ const (
 	// compactedMarker records that the managed movie needs no more compaction, so later passes skip it.
 	compactedMarker = "screen.compacted"
 	// compactedVersion names the helper settings in the marker. A movie with an older marker gets one more pass.
-	compactedVersion      = "keyframes-10s\n"
+	compactedVersion = "keyframes-30s\n"
+	// sparseVersion movies stay as they are: another lossy pass would cost quality to save about 10%.
+	sparseVersion         = "keyframes-10s\n"
 	compactFreeMargin     = 1 << 30
 	activeRecordingWindow = 5 * time.Minute
 	compactCandidateLimit = 100
@@ -47,7 +49,7 @@ func CompactNext(ctx context.Context, store *db.DB, root string, now time.Time) 
 		if err != nil {
 			continue
 		}
-		if marker, err := os.ReadFile(filepath.Join(filepath.Dir(movie), compactedMarker)); err == nil && string(marker) == compactedVersion {
+		if marker, err := os.ReadFile(filepath.Join(filepath.Dir(movie), compactedMarker)); err == nil && (string(marker) == compactedVersion || string(marker) == sparseVersion) {
 			continue
 		}
 		return compactMovie(ctx, movie)

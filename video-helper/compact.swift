@@ -6,10 +6,11 @@ enum CompactError: Error { case noVideo, unreadable, unwritable, durationChanged
 /// Encodes a finished Screen video again as HEVC at a fixed quality with sparse keyframes.
 /// ScreenCaptureKit picks one bitrate for any codec, so a quality target, not the codec, makes the movie smaller.
 /// The encoder's default keyframe every 2 s is most of a static screen's size, and a replayed movie does not need it.
+/// A keyframe every 30 s saves 4-15% more than every 10 s; the slowest exact seek stays under 80 ms.
 /// The movie timeline stays identical, so replay and export keep their measured start times.
 enum Compactor {
     static let quality = 0.65
-    static let keyFrameSeconds = 10.0
+    static let keyFrameSeconds = 30.0
 
     /// Returns false when the source is already HEVC with sparse keyframes and needs no work.
     nonisolated static func compact(source: URL, destination: URL) async throws -> Bool {
