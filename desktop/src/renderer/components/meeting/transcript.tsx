@@ -130,7 +130,7 @@ function segmentKey(segment: MeetingSegment, index: number): string {
   return segment.id || `${segment.startSec}-${segment.endSec}-${segment.speaker}-${index}`
 }
 
-function speakerStyle(speaker: string): CSSProperties {
+export function speakerStyle(speaker: string): CSSProperties {
   return { '--speaker-hue': speakerHue(speaker) } as CSSProperties
 }
 

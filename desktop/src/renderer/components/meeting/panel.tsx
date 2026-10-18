@@ -1,4 +1,4 @@
-import { MeetingReplay } from './replay'
+import { MeetingReplay, ReplayNote, replayReady } from './replay'
 import { useEffect, useRef, useState } from 'react'
 import { Copy, X } from 'lucide-react'
 import type { MeetingDetail } from '../../../shared/contracts'
@@ -13,10 +13,10 @@ import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
 
-type TabId = 'summary' | 'transcript'
+type TabId = 'summary' | 'recording'
 const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
   { id: 'summary', label: 'Summary' },
-  { id: 'transcript', label: 'Transcript' },
+  { id: 'recording', label: 'Recording' },
 ]
 
 /** Inline Meeting content. No modal or focus trap: the list remains interactive. */
@@ -31,7 +31,7 @@ export function MeetingPanel({ view, confirm }: { view: AppView; confirm: Confir
   useEffect(() => { setSeekTo(null); setCurrentSec(0); setTab('summary'); closeRef.current?.focus({ preventScroll: true }) }, [view.selectedMeetingId])
   return <article className="app-panel" aria-label={meeting ? `${meeting.title} Meeting` : 'Meeting'}>
     {meeting ? <PanelHead meeting={meeting} transcript={transcript} calendar={calendar} closeRef={closeRef} onClose={view.actions.closeMeeting} /> : <PanelHeadFallback closeRef={closeRef} onClose={view.actions.closeMeeting} />}
-    {meeting ? <TabBar tabs={TABS} tab={tab} onChange={setTab} /> : null}
+    {meeting ? <TabBar tabs={TABS} tab={tab} onChange={next => { setSeekTo(null); setTab(next) }} /> : null}
     <div className="app-panel-body ui-scroll">
       {meeting ? <PanelContent view={view} meeting={meeting} transcript={transcript} tab={tab} calendar={calendar} seekTo={seekTo} onSeek={sec => setSeekTo(previous => ({ sec, request: (previous?.request ?? 0) + 1 }))} currentSec={currentSec} onTimeChange={setCurrentSec} /> : <EmptyState>{view.selectedMeetingLoading ? 'Opening Meeting…' : view.selectedMeetingError || 'This Meeting is no longer available.'}</EmptyState>}
     </div>
@@ -81,13 +81,12 @@ function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
   return (
     <>
-      <MeetingReplay key={meeting.id} meeting={meeting} seekTo={seekTo} onTimeChange={onTimeChange} />
       {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
       {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
       <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} />
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} /> : null}
-        {tab === 'transcript' ? <TranscriptPane view={view} text={transcript} onSeek={onSeek} currentSec={currentSec} /> : null}
+        {tab === 'recording' ? <RecordingPane meeting={meeting} text={transcript} seekTo={seekTo} onSeek={onSeek} currentSec={currentSec} onTimeChange={onTimeChange} /> : null}
       </section>
     </>
   )
@@ -99,11 +98,12 @@ function SummaryPane({ view }: { view: AppView }) {
   return <div className="app-reading"><Markdown value={summary} /></div>
 }
 
-function TranscriptPane({ view, text, onSeek, currentSec }: { view: AppView; text: string; onSeek: (sec: number) => void; currentSec: number }) {
-  const meeting = view.selectedMeeting
-  if (!meeting) return null
-  if (!text) return <EmptyState>{meetingTranscriptEmptyText(meeting)}</EmptyState>
-  return <div className="app-reading"><TranscriptText value={text} segments={meetingHasSegments(meeting) ? meeting.segments : []} onSeek={meeting.status.video.state === 'ready' || (meeting.status.video.state === 'ended' && meeting.status.video.endSec !== undefined) ? onSeek : undefined} currentSec={currentSec} /></div>
+/** The recording and its transcript. Without a playable Screen video, the transcript fills the tab. */
+function RecordingPane({ meeting, text, seekTo, onSeek, currentSec, onTimeChange }: { meeting: MeetingDetail; text: string; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
+  const ready = replayReady(meeting)
+  const transcript = text ? <div className="app-reading"><TranscriptText value={text} segments={meetingHasSegments(meeting) ? meeting.segments : []} onSeek={ready ? onSeek : undefined} currentSec={ready ? currentSec : undefined} /></div> : <EmptyState>{meetingTranscriptEmptyText(meeting)}</EmptyState>
+  if (ready) return <MeetingReplay key={meeting.id} meeting={meeting} seekTo={seekTo} startSec={currentSec} onTimeChange={onTimeChange}>{transcript}</MeetingReplay>
+  return <div className="app-recording-text"><ReplayNote meeting={meeting} />{transcript}</div>
 }
 
 function DiarizationNotice({ view }: { view: AppView }) {

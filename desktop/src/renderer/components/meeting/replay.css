@@ -1,31 +1,94 @@
-.meeting-replay {
-  /* The panel body is a size container. The video leaves about 11rem for its header and controls, stays at least 12rem tall, and uses at most 70% of the visible body. */
-  --replay-max-height: clamp(12rem, 100cqb - 11rem, 70cqb);
-  min-width: 0; overflow: hidden; border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-card); }
-.meeting-replay-head, .meeting-replay-head > div, .meeting-replay-controls, .meeting-replay-foot { display: flex; align-items: center; gap: var(--space-3); }
-.meeting-replay-head { justify-content: space-between; padding: var(--space-3) var(--space-5); }
-.meeting-replay-head > div { flex-wrap: wrap; min-width: 0; }
-.meeting-replay-toggle { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 0 auto; padding: var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-accent); font-size: var(--font-size-small); }
-.meeting-replay-toggle:hover { background: var(--surface-hover); }
-.meeting-replay-head strong { font-size: var(--font-size-body); }
-.meeting-replay-head span, .meeting-replay-foot, .meeting-replay-notice { color: var(--color-text-soft); font-size: var(--font-size-small); }
-.meeting-replay svg { width: 1rem; height: 1rem; flex: 0 0 auto; }
-.meeting-replay-stage { display: grid; place-items: center; padding: 0 var(--space-5); }
-/* The frame takes the video's own shape, so a window capture gets no black bars. */
-.meeting-replay-frame { position: relative; inline-size: min(100%, var(--replay-max-height) * var(--replay-ratio)); aspect-ratio: var(--replay-ratio); overflow: hidden; border-radius: var(--radius-md); background: #000; }
-.meeting-replay video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
-.meeting-replay-gap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-5); background: var(--color-surface-sunken); text-align: center; font-size: var(--font-size-small); }
-.meeting-replay-transport { padding: var(--space-4) var(--space-5); }
-.meeting-replay-transport input { display: block; width: 100%; margin: 0 0 var(--space-3); accent-color: var(--color-accent); cursor: pointer; }
-.meeting-replay .compact-action { display: inline-flex; align-items: center; gap: var(--space-3); }
-.meeting-replay-time { flex: 1; font-size: var(--font-size-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.meeting-replay-foot { justify-content: space-between; flex-wrap: wrap; padding: var(--space-4) var(--space-5); border-top: 1px solid var(--color-border); }
-.meeting-replay-foot > span { flex: 1 1 12rem; }
-.meeting-replay-notice { margin: 0; padding: var(--space-4) var(--space-5); }
-.meeting-replay-notice[role="alert"] { color: var(--color-danger); }
-.meeting-replay :is(button, input, summary):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* The Recording tab fills the panel body. The transcript scrolls in its own column, so the video stays in view. */
+.app-panel-body:has(> .app-panel-pane > .meeting-review) { display: flex; flex-direction: column; }
+/* It fills the space under the speaker labels, and is never shorter than the body, so a short window scrolls once past the labels.
+   More specific than the reading padding in meetings-workspace.css: the review uses the full body width. */
+.app-panel-body > .app-panel-pane:has(> .meeting-review) { flex: 1 1 0; min-block-size: min(20rem, 100cqb); display: grid; padding: var(--space-2) 0 0; }
+.meeting-review { container: meeting-review / size; min-block-size: 0; min-inline-size: 0; }
+.meeting-review-grid {
+  block-size: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(15rem, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "player transcript" "notes transcript";
+  column-gap: var(--space-8);
+}
+.meeting-review-player { grid-area: player; display: grid; gap: var(--space-3); min-inline-size: 0; }
+.meeting-review-player svg, .meeting-replay-note svg { inline-size: 1rem; block-size: 1rem; flex: none; }
+.meeting-review-stage { display: grid; place-items: center; }
+/* The frame takes the video's own shape, so a window capture gets no black bars. It leaves room for the timeline and controls. */
+.meeting-replay-frame { position: relative; inline-size: min(100%, (100cqb - 6rem) * var(--replay-ratio)); aspect-ratio: var(--replay-ratio); overflow: hidden; border-radius: var(--radius-md); background: #000; container: replay-frame / inline-size; }
+.meeting-replay-frame video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
+
+/* Without a screen, the frame shows what is being said. */
+.meeting-replay-gap { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-3); padding: var(--space-7) clamp(var(--space-7), 7%, 2.5rem); overflow: hidden; background: var(--color-surface-sunken); }
+.meeting-replay-gap-tag { display: inline-flex; align-items: center; gap: var(--space-3); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.meeting-replay-gap-previous { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--color-text-muted); font-family: var(--font-reading); font-size: var(--font-size-md); line-height: var(--line-height-base); }
+.meeting-replay-gap-speaker { color: hsl(var(--speaker-hue, 210) 48% var(--speaker-ink-lightness)); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); }
+.meeting-replay-gap-line { display: -webkit-box; margin: 0; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; font-family: var(--font-reading); font-size: clamp(.95rem, 3.4cqi, 1.5rem); line-height: 1.4; text-wrap: pretty; }
+/* A small frame shows only the line being spoken. */
+@container replay-frame (max-width: 26rem) {
+  .meeting-replay-gap { gap: var(--space-2); padding: var(--space-5); }
+  .meeting-replay-gap-previous { display: none; }
+}
+
+/* Timeline: the Screen video span, a tick where each speaker turn starts, and the played part. */
+.meeting-review-scrub { position: relative; block-size: 1.25rem; }
+.meeting-review-scrub::before, .meeting-review-scrub::after, .meeting-review-coverage { content: ""; position: absolute; top: 50%; block-size: 4px; margin-block-start: -2px; border-radius: 2px; }
+.meeting-review-scrub::before { inset-inline: 0; background: color-mix(in srgb, var(--color-text) 12%, transparent); }
+.meeting-review-coverage { background: color-mix(in srgb, var(--color-text) 48%, transparent); }
+.meeting-review-scrub::after { inset-inline-start: 0; inline-size: var(--replay-progress); background: var(--color-accent); }
+.meeting-review-tick { position: absolute; z-index: 1; top: calc(50% - 5px); inline-size: 2px; block-size: 10px; margin-inline-start: -1px; border-radius: 1px; background: hsl(var(--speaker-hue, 210) 55% 58%); opacity: .85; pointer-events: none; }
+.meeting-review-scrub input { position: relative; z-index: 2; display: block; inline-size: 100%; block-size: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; appearance: none; cursor: pointer; }
+.meeting-review-scrub input:focus { box-shadow: none; }
+.meeting-review-scrub input::-webkit-slider-runnable-track { block-size: 100%; background: transparent; }
+.meeting-review-scrub input::-webkit-slider-thumb { inline-size: .875rem; block-size: .875rem; margin-block-start: .1875rem; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 3px var(--color-card); appearance: none; }
+
+.meeting-review-controls { display: flex; align-items: center; gap: var(--space-2); min-inline-size: 0; }
+.meeting-review-play { display: grid; place-items: center; inline-size: 2.25rem; block-size: 2.25rem; flex: none; border: 0; border-radius: 50%; background: var(--gradient-accent); color: var(--color-accent-contrast); box-shadow: inset 0 1px 0 var(--highlight-strong), var(--shadow-accent); }
+.meeting-review-play:hover { background: var(--gradient-accent-hover); }
+.meeting-review-play svg { fill: currentColor; }
+.meeting-review-icon { display: grid; place-items: center; inline-size: 1.9rem; block-size: 1.9rem; flex: none; padding: 0; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); }
+.meeting-review-icon:hover:not(:disabled) { color: var(--color-text); background: var(--surface-hover); }
+.meeting-review-icon:disabled { opacity: .5; }
+.meeting-review-time { flex: 1 1 auto; margin-inline-start: var(--space-2); color: var(--color-text-soft); font-family: var(--font-mono); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.meeting-review-speaking { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; min-inline-size: 0; overflow: hidden; color: hsl(var(--speaker-hue, 210) 48% var(--speaker-ink-lightness)); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); white-space: nowrap; text-overflow: ellipsis; }
+.meeting-review-speaking .transcript-chip-dot { flex: none; }
+.meeting-review-speaking > span:last-child { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.meeting-review-notes { grid-area: notes; display: grid; align-content: start; gap: var(--space-2); min-block-size: 0; overflow: auto; padding-block-start: var(--space-4); color: var(--color-text-soft); font-size: var(--font-size-small); }
+.meeting-review-notes p { margin: 0; }
+.meeting-review-notes [role="alert"] { color: var(--color-danger); }
+
+.meeting-review-transcript { grid-area: transcript; display: grid; grid-template-rows: auto minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; padding-inline-start: var(--space-6); border-inline-start: 1px solid var(--color-border); }
+.meeting-review-transcript header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block-end: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.meeting-review-transcript-body { min-block-size: 0; overflow: auto; padding: 0 var(--space-3) var(--space-7); }
+/* The speaker filter stays on top of the scrolling turns, so it needs the panel colour behind it. */
+.meeting-review-transcript-body .transcript-speaker-filter { width: auto; max-width: none; margin-inline: calc(-1 * var(--space-3)); padding: var(--space-2) var(--space-3) var(--space-4); background: var(--color-surface); }
+.meeting-review-follow { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-soft); font-size: var(--font-size-small); }
+.meeting-review-follow > span { position: relative; inline-size: 1.6rem; block-size: .95rem; border-radius: var(--radius-pill); background: var(--color-border-strong); transition: background var(--transition-quick); }
+.meeting-review-follow > span::after { content: ""; position: absolute; top: 2px; left: 2px; inline-size: calc(.95rem - 4px); block-size: calc(.95rem - 4px); border-radius: 50%; background: #fff; transition: transform var(--transition-quick); }
+.meeting-review-follow[aria-checked="true"] > span { background: var(--color-accent); }
+.meeting-review-follow[aria-checked="true"] > span::after { transform: translateX(.65rem); }
+.transcript-turn[aria-current="true"] { border-radius: var(--radius-sm); background: var(--color-accent-tint); box-shadow: 0 0 0 var(--space-3) var(--color-accent-tint), 0 0 0 calc(var(--space-3) + 1px) var(--color-accent-border); }
+
+.meeting-review :is(button, input, summary):focus-visible, .meeting-replay-note summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* A narrow panel stacks the video above the transcript. */
+@container meeting-review (max-width: 34rem) {
+  .meeting-review-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "player" "notes" "transcript"; }
+  .meeting-replay-frame { inline-size: min(100%, 42cqb * var(--replay-ratio)); }
+  .meeting-review-notes { overflow: visible; }
+  .meeting-review-transcript { margin-block-start: var(--space-4); padding-block-start: var(--space-3); padding-inline-start: 0; border-inline-start: 0; border-block-start: 1px solid var(--color-border); }
+}
+
 /* Full screen shows only the video and its controls; the stage is the size container. */
-.meeting-replay-player:fullscreen { display: flex; flex-direction: column; background: var(--color-card); }
-.meeting-replay-player:fullscreen .meeting-replay-stage { flex: 1 1 auto; min-block-size: 0; padding: 0; container-type: size; background: #000; }
-.meeting-replay-player:fullscreen .meeting-replay-frame { inline-size: min(100cqi, 100cqb * var(--replay-ratio)); border-radius: 0; }
-.transcript-turn[aria-current="true"] { outline: 1px solid var(--color-accent); }
+.meeting-review-player:fullscreen { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-6) var(--space-5); background: var(--color-card); }
+.meeting-review-player:fullscreen .meeting-review-stage { flex: 1 1 auto; min-block-size: 0; margin-inline: calc(-1 * var(--space-6)); container-type: size; background: #000; }
+.meeting-review-player:fullscreen .meeting-replay-frame { inline-size: min(100cqi, 100cqb * var(--replay-ratio)); border-radius: 0; }
+
+/* A Meeting that recorded audio but has no Screen video to replay. */
+.meeting-replay-note { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-5) var(--space-6); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-card); color: var(--color-text-soft); font-size: var(--font-size-small); }
+.meeting-replay-note svg { margin-block-start: 2px; }
+.meeting-replay-note strong { color: var(--color-text); font-size: var(--font-size-body); }
+.meeting-replay-note p { margin: var(--space-1) 0 0; }
+.meeting-replay-note details { margin-block-start: var(--space-3); }
