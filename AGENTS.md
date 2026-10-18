@@ -12,3 +12,8 @@ After a code change, run the relevant tests and build checks. Once validation pa
 ## Cloud tests
 
 - Cloud database tests need PostgreSQL 15 or newer (migration 005 uses `security_invoker`); Homebrew on this Mac has 14. Start a disposable `postgres:18` container on a loopback port and set the four `TEST_*` URLs listed in `cloud/README.md` (Local/CI checks). Without them the database tests skip and `TestRealCopiesRequireTheUnionView` fails.
+- To open a pool on another database, build the URL (`url.Parse(dsn)`, set `Path = "/"+name`). Do not change `pgxpool.Config.ConnConfig.Database` and then call `Config.ConnString()`: it returns the original DSN, so the test connects to the wrong database and can pass for the wrong reason.
+
+## Desktop tests
+
+- `npm test` in `desktop/` uses Node type stripping. Value imports in any module a test loads need the `.ts` extension plus the repo's `// @ts-ignore Node type stripping requires explicit TypeScript extension.` line; type-only imports need neither. A tested module cannot import tsup-only modules (for example `native-runtime.ts`); inject the value instead. A polling timer left running hangs the test process, so give each test its own state and dispose it in `t.after`.
