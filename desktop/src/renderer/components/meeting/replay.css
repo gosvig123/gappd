@@ -72,6 +72,7 @@
 .transcript-turn[aria-current="true"] { border-radius: var(--radius-sm); background: var(--color-accent-tint); box-shadow: 0 0 0 var(--space-3) var(--color-accent-tint), 0 0 0 calc(var(--space-3) + 1px) var(--color-accent-border); }
 
 .meeting-review :is(button, input, summary):focus-visible, .meeting-replay-note summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.meeting-review-transcript-body:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: var(--radius-sm); }
 
 /* A narrow panel stacks the video above the transcript. */
 @container meeting-review (max-width: 34rem) {

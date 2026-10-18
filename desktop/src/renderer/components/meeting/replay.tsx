@@ -50,6 +50,8 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
   const duration = Math.max(videoEnd, meeting.endedAt ? (new Date(meeting.endedAt).getTime() - new Date(meeting.startedAt).getTime()) / 1000 : 0)
   const audioOffset = (host: number | undefined) => host === undefined || state.videoStartHostSec === undefined ? null : videoStart + host - state.videoStartHostSec
   const clock = useRef({ time: startSec, started: 0, playing: false })
+  // Scroll events before this time come from following playback; any other scroll is the person reading.
+  const followScrollUntil = useRef(0)
   const segments = meeting.segments ?? []
   const current = segments.reduce((last, segment, index) => segment.startSec <= time ? index : last, -1)
   const speaking = current >= 0 ? segments[current] : null
@@ -107,7 +109,9 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
     const turn = list?.querySelector<HTMLElement>('[aria-current="true"]')
     if (!follow || !list || !turn) return
     const offset = turn.getBoundingClientRect().top - list.getBoundingClientRect().top
-    if (offset < list.clientHeight * .15 || offset > list.clientHeight * .7) list.scrollTo({ top: list.scrollTop + offset - list.clientHeight / 3, behavior: 'smooth' })
+    if (offset >= list.clientHeight * .15 && offset <= list.clientHeight * .7) return
+    followScrollUntil.current = performance.now() + 1500
+    list.scrollTo({ top: list.scrollTop + offset - list.clientHeight / 3, behavior: 'smooth' })
   }, [current, follow])
 
   const exportVideo = async () => {
@@ -172,7 +176,8 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
       </div>
       <div className="meeting-review-transcript">
         <header><span>Transcript</span><button type="button" role="switch" aria-checked={follow} className="meeting-review-follow" onClick={() => setFollow(!follow)}><span aria-hidden="true" />Follow playback</button></header>
-        <div ref={transcript} className="meeting-review-transcript-body ui-scroll" onWheel={() => setFollow(false)} onTouchMove={() => setFollow(false)}>{children}</div>
+        {/* A scrollbar drag, the keyboard, or page search scrolls without a wheel; a wheel or touch also stops a follow scroll in progress. */}
+        <div ref={transcript} className="meeting-review-transcript-body ui-scroll" role="region" aria-label="Transcript" tabIndex={0} onScroll={() => { if (performance.now() > followScrollUntil.current) setFollow(false) }} onScrollEnd={() => { followScrollUntil.current = 0 }} onWheel={() => setFollow(false)} onTouchMove={() => setFollow(false)}>{children}</div>
       </div>
     </div>
   </section>

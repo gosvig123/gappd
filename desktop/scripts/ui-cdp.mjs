@@ -119,11 +119,11 @@ try {
     await evaluate(`document.documentElement.dataset.theme = ${JSON.stringify(selector)}; localStorage.setItem('gappd.theme', ${JSON.stringify(selector)})`)
     console.log(`Theme ${selector}`)
   } else if (action === 'screenshot' && selector) {
-    // An emulated size lasts only for this CDP session, so it is part of the capture.
+    // Electron keeps an emulated size after this script exits, which shifts real pointer input, so clear it in the same session.
     const [width, height] = (size || '').split('x').map(Number)
     if (size && !(width > 0 && height > 0)) throw new Error('Size must be WIDTHxHEIGHT, for example 1280x800')
     if (size) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 0, mobile: false })
-    const { data } = await settled(() => send('Page.captureScreenshot', { format: 'png' }))
+    const { data } = await settled(() => send('Page.captureScreenshot', { format: 'png' })).finally(() => size ? send('Emulation.clearDeviceMetricsOverride') : undefined)
     writeFileSync(selector, Buffer.from(data, 'base64'))
     console.log(`Saved ${selector}`)
   } else if (action === 'audit') {
