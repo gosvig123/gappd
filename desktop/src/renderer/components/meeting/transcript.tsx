@@ -154,5 +154,14 @@ function formatSegmentTime(seconds: number): string {
 
 function openSpeakerLabels(speakerKey: string) {
   const panel = document.getElementById("meeting-speaker-labels") as HTMLDetailsElement | null
-  if (panel) { panel.open = true; panel.scrollIntoView({ behavior: "smooth", block: "nearest" }); document.getElementById(`speaker-label-${encodeURIComponent(speakerKey)}`)?.querySelector("select")?.focus() }
+  if (!panel) return
+  panel.open = true
+  // Opening can switch the Recording tab to its People column, which stays inert until that render; wait a few frames for it.
+  const moveToRow = (frames: number) => {
+    const row = document.getElementById(`speaker-label-${encodeURIComponent(speakerKey)}`) ?? panel
+    if (row.closest("[inert]")) { if (frames > 0) requestAnimationFrame(() => moveToRow(frames - 1)); return }
+    row.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    row.querySelector("select")?.focus({ preventScroll: true })
+  }
+  requestAnimationFrame(() => moveToRow(5))
 }

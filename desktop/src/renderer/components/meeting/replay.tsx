@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import type { MeetingDetail, MeetingSegment } from '../../../shared/contracts'
-import { Captions, Download, Maximize, Minimize, Monitor, Pause, Play, RotateCcw, RotateCw } from 'lucide-react'
+import { Captions, Download, Info, Maximize, Minimize, Monitor, Pause, Play, RotateCcw, RotateCw, TriangleAlert } from 'lucide-react'
 import { Button } from '../ui'
 import { speakerStyle } from './transcript'
 import './replay.css'
@@ -29,13 +30,16 @@ export function ReplayNote({ meeting }: { meeting: MeetingDetail }) {
   </section>
 }
 
-/** The Recording tab: Screen video and controls beside a transcript that follows playback. */
-export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, children }: { meeting: MeetingDetail; seekTo: { sec: number; request: number } | null; startSec: number; onTimeChange: (sec: number) => void; children: ReactNode }) {
+/** The Recording tab: Screen video and controls beside a column that shows the transcript, following playback, or the people. */
+export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, people, children }: { meeting: MeetingDetail; seekTo: { sec: number; request: number } | null; startSec: number; onTimeChange: (sec: number) => void; people: ReactNode; children: ReactNode }) {
   const player = useRef<HTMLDivElement>(null)
   const transcript = useRef<HTMLDivElement>(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [ratio, setRatio] = useState(16 / 10)
   const [follow, setFollow] = useState(true)
+  const [column, setColumn] = useState<'transcript' | 'people'>('transcript')
+  const peopleList = useRef<HTMLDivElement>(null)
+  const notesId = useId()
   const [exporting, setExporting] = useState(false)
   const [exported, setExported] = useState(false)
   const video = useRef<HTMLVideoElement>(null)
@@ -98,6 +102,20 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
     }, 200)
     return () => { window.clearInterval(timer); clock.current.time = Math.min(duration, clock.current.time + (performance.now() - clock.current.started) / 1000); clock.current.playing = false; video.current?.pause(); mic.current?.pause(); system.current?.pause() }
   }, [playing, meeting.id, duration])
+  // The people list is the speaker-labels disclosure: opening it, also from a speaker name in the transcript, shows the People column.
+  useEffect(() => {
+    const list = peopleList.current
+    if (!list) return
+    // Render the switch now, so a speaker-name click can move to that speaker's row in the same frame.
+    const toggle = (event: Event) => { if (event.target instanceof HTMLDetailsElement && event.target.open) flushSync(() => setColumn('people')) }
+    list.addEventListener('toggle', toggle, true)
+    return () => list.removeEventListener('toggle', toggle, true)
+  }, [])
+  const showColumn = (next: 'transcript' | 'people') => {
+    const labels = peopleList.current?.querySelector('details')
+    if (labels) labels.open = next === 'people'
+    setColumn(next)
+  }
   useEffect(() => {
     const change = () => setFullscreen(document.fullscreenElement !== null && document.fullscreenElement === player.current)
     document.addEventListener('fullscreenchange', change)
@@ -133,6 +151,8 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
   const gap = before || time >= videoEnd
   const turns = segments.filter((segment, index) => index === 0 || speakerKey(segments[index - 1]) !== speakerKey(segment))
   const timingMissing = state.micStartHostSec === undefined || state.systemStartHostSec === undefined || state.videoStartHostSec === undefined
+  const speakers = meeting.speakers ?? []
+  const suggestions = speakers.filter(speaker => !speaker.personId && speaker.suggestedPersonId).length
   return <section className="meeting-review" aria-label="Meeting recording">
     <div className="meeting-review-grid">
       <div ref={player} className="meeting-review-player">
@@ -163,21 +183,33 @@ export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, childre
           <button type="button" className="meeting-review-icon" aria-label="Forward 10 seconds" onClick={() => move(time + 10)}><RotateCw aria-hidden="true" /></button>
           <span className="meeting-review-time">{timestamp(time)} / {timestamp(duration)}</span>
           {speaking?.speaker ? <span className="meeting-review-speaking" style={speakerStyle(speakerKey(speaking))}><span className="transcript-chip-dot" aria-hidden="true" /><span>{speaking.speaker}</span></span> : null}
+          {timingMissing || state.message ? <>
+            <button type="button" className={`meeting-review-icon meeting-review-notes-button${timingMissing ? ' is-warning' : ''}`} popoverTarget={notesId} aria-label="Recording notes" title="Recording notes">{timingMissing ? <TriangleAlert aria-hidden="true" /> : <Info aria-hidden="true" />}</button>
+            <div id={notesId} popover="auto" className="meeting-review-popover">
+              {timingMissing ? <p>Audio without timing information does not play.</p> : null}
+              {state.message ? <p><strong>Recording details</strong>{state.message}</p> : null}
+            </div>
+          </> : null}
           <button type="button" className="meeting-review-icon" aria-label={fullscreen ? 'Exit full screen' : 'Full screen recording'} title={fullscreen ? 'Exit full screen' : 'Full screen'} onClick={toggleFullscreen}>{fullscreen ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}</button>
           {meeting.status.capture.state === 'captured' ? <button type="button" className="meeting-review-icon" aria-label="Export recording" title="Export recording" disabled={exporting} onClick={() => void exportVideo()}><Download aria-hidden="true" /></button> : null}
         </div>
       </div>
       <div className="meeting-review-notes">
         {exporting ? <p>Exporting recording…</p> : exported ? <p>Recording exported.</p> : null}
-        {timingMissing ? <p>Some audio timing is missing. Only audio with known timing can play in sync.</p> : null}
-        {state.state === 'ended' ? <p>Screen video ended early, at {timestamp(videoEnd)}.</p> : null}
-        {state.message ? <details><summary>Recording details</summary>{state.message}</details> : null}
         {error ? <p role="alert">{error}</p> : null}
       </div>
       <div className="meeting-review-transcript">
-        <header><span>Transcript</span><button type="button" role="switch" aria-checked={follow} className="meeting-review-follow" onClick={() => setFollow(!follow)}><span aria-hidden="true" />Follow playback</button></header>
+        <header>
+          <div className="meeting-review-columns">
+            <button type="button" aria-pressed={column === 'transcript'} onClick={() => showColumn('transcript')}>Transcript</button>
+            {speakers.length ? <button type="button" aria-pressed={column === 'people'} onClick={() => showColumn('people')}>People <span>{suggestions ? `${suggestions} to check` : speakers.length}</span></button> : null}
+          </div>
+          {column === 'transcript' ? <button type="button" role="switch" aria-checked={follow} aria-label="Follow playback" title="Follow playback" className="meeting-review-follow" onClick={() => setFollow(!follow)}><span aria-hidden="true" /><span className="meeting-review-follow-label">Follow<span> playback</span></span></button> : null}
+        </header>
+        {/* Both views stay laid out in one place; the inactive one is inert, so the transcript keeps its scroll position. */}
+        <div ref={peopleList} className="meeting-review-people ui-scroll" inert={column !== 'people'}>{people}</div>
         {/* A scrollbar drag, the keyboard, or page search scrolls without a wheel; a wheel or touch also stops a follow scroll in progress. */}
-        <div ref={transcript} className="meeting-review-transcript-body ui-scroll" role="region" aria-label="Transcript" tabIndex={0} onScroll={() => { if (performance.now() > followScrollUntil.current) setFollow(false) }} onScrollEnd={() => { followScrollUntil.current = 0 }} onWheel={() => setFollow(false)} onTouchMove={() => setFollow(false)}>{children}</div>
+        <div ref={transcript} className="meeting-review-transcript-body ui-scroll" inert={column !== 'transcript'} role="region" aria-label="Transcript" tabIndex={0} onScroll={() => { if (performance.now() > followScrollUntil.current) setFollow(false) }} onScrollEnd={() => { followScrollUntil.current = 0 }} onWheel={() => setFollow(false)} onTouchMove={() => setFollow(false)}>{children}</div>
       </div>
     </div>
   </section>

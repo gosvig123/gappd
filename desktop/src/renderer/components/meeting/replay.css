@@ -1,22 +1,23 @@
-/* The Recording tab fills the panel body. The transcript scrolls in its own column, so the video stays in view. */
-.app-panel-body:has(> .app-panel-pane > .meeting-review) { display: flex; flex-direction: column; }
-/* It fills the space under the speaker labels, and is never shorter than the body, so a short window scrolls once past the labels.
-   More specific than the reading padding in meetings-workspace.css: the review uses the full body width. */
-.app-panel-body > .app-panel-pane:has(> .meeting-review) { flex: 1 1 0; min-block-size: min(20rem, 100cqb); display: grid; padding: var(--space-2) 0 0; }
+/* The Recording tab fills the panel body without scrolling it: the transcript column is the only scroller.
+   More specific than the reading padding in meetings-workspace.css, so the review uses the full body width. */
+.app-panel-body:has(> .app-panel-pane > .meeting-review) { display: flex; flex-direction: column; overflow: hidden; }
+.app-panel-body:has(> .app-panel-pane > .meeting-review) > :not(.app-panel-pane) { flex: none; }
+.app-panel-body > .app-panel-pane:has(> .meeting-review) { flex: 1 1 0; min-block-size: 0; display: grid; padding: var(--space-2) 0 0; }
 .meeting-review { container: meeting-review / size; min-block-size: 0; min-inline-size: 0; }
 .meeting-review-grid {
   block-size: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(15rem, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   grid-template-areas: "player transcript" "notes transcript";
   column-gap: var(--space-8);
 }
-.meeting-review-player { grid-area: player; display: grid; gap: var(--space-3); min-inline-size: 0; }
+.meeting-review-player { grid-area: player; display: grid; grid-template-rows: minmax(0, 1fr) auto auto; gap: var(--space-3); min-block-size: 0; min-inline-size: 0; }
 .meeting-review-player svg, .meeting-replay-note svg { inline-size: 1rem; block-size: 1rem; flex: none; }
-.meeting-review-stage { display: grid; place-items: center; }
-/* The frame takes the video's own shape, so a window capture gets no black bars. It leaves room for the timeline and controls. */
-.meeting-replay-frame { position: relative; inline-size: min(100%, (100cqb - 6rem) * var(--replay-ratio)); aspect-ratio: var(--replay-ratio); overflow: hidden; border-radius: var(--radius-md); background: #000; container: replay-frame / inline-size; }
+/* The video area takes the height left after the timeline, controls, and notes, so nothing below it scrolls. */
+.meeting-review-stage { display: grid; place-items: center; min-block-size: 0; container-type: size; }
+/* The frame takes the video's own shape and the largest size that fits the video area, so a window capture gets no black bars. */
+.meeting-replay-frame { position: relative; inline-size: min(100cqi, 100cqb * var(--replay-ratio)); aspect-ratio: var(--replay-ratio); overflow: hidden; border-radius: var(--radius-md); background: #000; container: replay-frame / inline-size; }
 .meeting-replay-frame video { display: block; inline-size: 100%; block-size: 100%; object-fit: contain; }
 
 /* Without a screen, the frame shows what is being said. */
@@ -50,21 +51,40 @@
 .meeting-review-icon { display: grid; place-items: center; inline-size: 1.9rem; block-size: 1.9rem; flex: none; padding: 0; border: 1px solid transparent; border-radius: var(--radius-md); background: transparent; color: var(--color-text-muted); }
 .meeting-review-icon:hover:not(:disabled) { color: var(--color-text); background: var(--surface-hover); }
 .meeting-review-icon:disabled { opacity: .5; }
+.meeting-review-icon.is-warning { color: var(--color-warning); }
+/* Notes about the recording open above their button, outside the panel, so they never take height from the video. */
+.meeting-review-notes-button { anchor-name: --replay-notes; }
+.meeting-review-popover { position-anchor: --replay-notes; position-area: top span-left; inset: auto; margin: 0 0 var(--space-3); max-inline-size: min(22rem, 90vw); padding: var(--space-4) var(--space-5); border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); background: var(--color-surface-elevated); color: var(--color-text-soft); box-shadow: var(--shadow-sheet); font-size: var(--font-size-small); }
+.meeting-review-popover p { margin: 0; }
+.meeting-review-popover p + p { margin-block-start: var(--space-3); }
+.meeting-review-popover strong { display: block; color: var(--color-text); }
 .meeting-review-time { flex: 1 1 auto; margin-inline-start: var(--space-2); color: var(--color-text-soft); font-family: var(--font-mono); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .meeting-review-speaking { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; min-inline-size: 0; overflow: hidden; color: hsl(var(--speaker-hue, 210) 48% var(--speaker-ink-lightness)); font-size: var(--font-size-small); font-weight: var(--font-weight-semibold); white-space: nowrap; text-overflow: ellipsis; }
 .meeting-review-speaking .transcript-chip-dot { flex: none; }
 .meeting-review-speaking > span:last-child { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; }
 
-.meeting-review-notes { grid-area: notes; display: grid; align-content: start; gap: var(--space-2); min-block-size: 0; overflow: auto; padding-block-start: var(--space-4); color: var(--color-text-soft); font-size: var(--font-size-small); }
+/* Notes share one wrapping line, so they take little height from the video. */
+.meeting-review-notes { grid-area: notes; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-5); padding-block-start: var(--space-3); color: var(--color-text-soft); font-size: var(--font-size-small); }
+.meeting-review-notes:empty { display: none; }
 .meeting-review-notes p { margin: 0; }
 .meeting-review-notes [role="alert"] { color: var(--color-danger); }
 
-.meeting-review-transcript { grid-area: transcript; display: grid; grid-template-rows: auto minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; padding-inline-start: var(--space-6); border-inline-start: 1px solid var(--color-border); }
+.meeting-review-transcript { grid-area: transcript; container: review-column / inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; padding-inline-start: var(--space-6); border-inline-start: 1px solid var(--color-border); }
 .meeting-review-transcript header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding-block-end: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); }
-.meeting-review-transcript-body { min-block-size: 0; overflow: auto; padding: 0 var(--space-3) var(--space-7); }
+.meeting-review-transcript-body, .meeting-review-people { grid-row: 2; grid-column: 1; min-block-size: 0; overflow: auto; padding: 0 var(--space-3) var(--space-7); }
+.meeting-review-transcript [inert] { visibility: hidden; }
+.meeting-review-columns { display: flex; gap: var(--space-2); }
+.meeting-review-columns button { white-space: nowrap; padding: var(--space-1) var(--space-3); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); }
+.meeting-review-columns button:hover { color: var(--color-text); }
+.meeting-review-columns button[aria-pressed="true"] { background: var(--surface-hover); color: var(--color-text); }
+.meeting-review-columns span { color: var(--color-text-muted); font-weight: 400; }
+/* In the column, the speaker list shows without its disclosure line and card. */
+.meeting-review-people .speaker-labels { border: 0; background: none; }
+.meeting-review-people .speaker-labels > summary { display: none; }
+.meeting-review-people .speaker-label-content { padding: var(--space-2) 0 0; }
 /* The speaker filter stays on top of the scrolling turns, so it needs the panel colour behind it. */
 .meeting-review-transcript-body .transcript-speaker-filter { width: auto; max-width: none; margin-inline: calc(-1 * var(--space-3)); padding: var(--space-2) var(--space-3) var(--space-4); background: var(--color-surface); }
-.meeting-review-follow { display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-soft); font-size: var(--font-size-small); }
+.meeting-review-follow { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: var(--space-3); padding: var(--space-1) var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-text-soft); font-size: var(--font-size-small); }
 .meeting-review-follow > span { position: relative; inline-size: 1.6rem; block-size: .95rem; border-radius: var(--radius-pill); background: var(--color-border-strong); transition: background var(--transition-quick); }
 .meeting-review-follow > span::after { content: ""; position: absolute; top: 2px; left: 2px; inline-size: calc(.95rem - 4px); block-size: calc(.95rem - 4px); border-radius: 50%; background: #fff; transition: transform var(--transition-quick); }
 .meeting-review-follow[aria-checked="true"] > span { background: var(--color-accent); }
@@ -74,18 +94,28 @@
 .meeting-review :is(button, input, summary):focus-visible, .meeting-replay-note summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .meeting-review-transcript-body:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: var(--radius-sm); }
 
+/* A narrow column shortens the follow label, then drops it; the switch keeps its full name for assistive technology. */
+@container review-column (max-width: 19rem) {
+  .meeting-review-follow-label > span { display: none; }
+}
+@container review-column (max-width: 15rem) {
+  .meeting-review-follow-label { display: none; }
+}
+/* A narrow player has no room for the speaker name; the highlighted turn in the transcript shows it. */
+@container meeting-review (max-width: 40rem) {
+  .meeting-review-speaking { display: none; }
+}
+
 /* A narrow panel stacks the video above the transcript. */
 @container meeting-review (max-width: 34rem) {
-  .meeting-review-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: "player" "notes" "transcript"; }
-  .meeting-replay-frame { inline-size: min(100%, 42cqb * var(--replay-ratio)); }
-  .meeting-review-notes { overflow: visible; }
+  .meeting-review-grid { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 1.2fr); grid-template-areas: "player" "notes" "transcript"; }
   .meeting-review-transcript { margin-block-start: var(--space-4); padding-block-start: var(--space-3); padding-inline-start: 0; border-inline-start: 0; border-block-start: 1px solid var(--color-border); }
 }
 
 /* Full screen shows only the video and its controls; the stage is the size container. */
 .meeting-review-player:fullscreen { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-6) var(--space-5); background: var(--color-card); }
-.meeting-review-player:fullscreen .meeting-review-stage { flex: 1 1 auto; min-block-size: 0; margin-inline: calc(-1 * var(--space-6)); container-type: size; background: #000; }
-.meeting-review-player:fullscreen .meeting-replay-frame { inline-size: min(100cqi, 100cqb * var(--replay-ratio)); border-radius: 0; }
+.meeting-review-player:fullscreen .meeting-review-stage { flex: 1 1 auto; margin-inline: calc(-1 * var(--space-6)); background: #000; }
+.meeting-review-player:fullscreen .meeting-replay-frame { border-radius: 0; }
 
 /* A Meeting that recorded audio but has no Screen video to replay. */
 .meeting-replay-note { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-5) var(--space-6); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); background: var(--color-card); color: var(--color-text-soft); font-size: var(--font-size-small); }
