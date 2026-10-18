@@ -51,7 +51,7 @@ function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof us
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
-      {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} onOpenCalendarSettings={() => shell.setSettingsCategory('Connections')} /> : null}
+      {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}
     </div>
   </main>

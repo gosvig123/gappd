@@ -4,7 +4,6 @@
 .workspace-head { min-inline-size: 0; }
 .workspace-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-6); }
 .workspace-heading h1 { margin: 0; }
-.workspace-calendar-actions { display: flex; gap: var(--space-7); flex-wrap: wrap; }
 .workspace-search { margin-block-start: var(--space-7); }
 .workspace-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
 .has-selection .workspace-columns { grid-template-columns: minmax(220px, 26%) minmax(0, 1fr); }
@@ -36,7 +35,6 @@
 .has-selection .workspace-row-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .workspace-event { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; block-size: 100%; min-block-size: 0; min-inline-size: 0; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-panel); background: var(--color-surface); }
 .workspace-event-body { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: clamp(16px, 3cqi, 36px); }
-/* The draft lines up with the text above it, not with the old Calendar settings card. */
 .workspace-content .app-panel-top { background: transparent; }
 .workspace-content .app-panel-titles h1 { font-size: clamp(1.4rem, 2.4cqi, 2rem); }
 .workspace-content .app-reading { font-size: 1rem; line-height: 1.75; }
