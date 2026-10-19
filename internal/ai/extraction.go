@@ -14,21 +14,55 @@ const (
 func mergeExtractions(extractions []*Extraction) *Extraction {
 	var merged Extraction
 	for _, extraction := range extractions {
-		mergeExtraction(&merged, extraction)
+		if merged.Title == "" {
+			merged.Title = extraction.Title
+		}
+		merged.Participants = append(merged.Participants, extraction.Participants...)
 	}
+	merged.Topics = fairTake(chunkLists(extractions, func(e *Extraction) []Topic { return e.Topics }), maxMergedTopics)
+	merged.Decisions = fairTake(chunkLists(extractions, func(e *Extraction) []Decision { return e.Decisions }), maxMergedDecisions)
+	merged.ActionItems = fairTake(chunkLists(extractions, func(e *Extraction) []ExtractedAction { return e.ActionItems }), maxMergedActionItems)
+	merged.OpenQuestions = fairTake(chunkLists(extractions, func(e *Extraction) []string { return e.OpenQuestions }), maxMergedOpenQuestions)
 	merged.Sentiment = mergedSentiment(extractions)
 	return boundExtraction(&merged)
 }
 
-func mergeExtraction(dst *Extraction, src *Extraction) {
-	if dst.Title == "" {
-		dst.Title = src.Title
+func chunkLists[T any](extractions []*Extraction, field func(*Extraction) []T) [][]T {
+	lists := make([][]T, len(extractions))
+	for index, extraction := range extractions {
+		lists[index] = field(extraction)
 	}
-	dst.Participants = append(dst.Participants, src.Participants...)
-	dst.Topics = append(dst.Topics, src.Topics...)
-	dst.Decisions = append(dst.Decisions, src.Decisions...)
-	dst.ActionItems = append(dst.ActionItems, src.ActionItems...)
-	dst.OpenQuestions = append(dst.OpenQuestions, src.OpenQuestions...)
+	return lists
+}
+
+// fairTake joins the chunks' items in Meeting order. When more than limit
+// items exist, each chunk keeps an equal number of its first items, so a long
+// Meeting keeps items from its end as well as its start.
+func fairTake[T any](lists [][]T, limit int) []T {
+	quota := 0
+	for quota < limit && takenWithin(lists, quota+1) <= limit {
+		quota++
+	}
+	spare := limit - takenWithin(lists, quota)
+	var out []T
+	for _, list := range lists {
+		take := min(len(list), quota)
+		if take < len(list) && spare > 0 {
+			take++
+			spare--
+		}
+		out = append(out, list[:take]...)
+	}
+	return out
+}
+
+// takenWithin counts the items kept when each chunk keeps at most quota items.
+func takenWithin[T any](lists [][]T, quota int) int {
+	total := 0
+	for _, list := range lists {
+		total += min(len(list), quota)
+	}
+	return total
 }
 
 func boundExtraction(extraction *Extraction) *Extraction {

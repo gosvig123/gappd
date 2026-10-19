@@ -36,12 +36,21 @@ func TestPipelineRefineNotesClearsEmptyDecisionSection(t *testing.T) {
 	}
 }
 
-func TestPipelineRejectsTooManyChunks(t *testing.T) {
-	_, pipeline := newFakePipeline()
-	transcript := strings.Repeat(strings.Repeat("x", maxTranscriptChunkChars)+"\n", maxTranscriptChunks+1)
+func TestPipelineRunsAMeetingOfManyLocalChunks(t *testing.T) {
+	const chunks = 30
+	contents := make([]string, 0, chunks+2)
+	for i := 0; i < chunks; i++ {
+		contents = append(contents, `{"title":"Long Review","topics":[]}`)
+	}
+	contents = append(contents, `{"title":"Long Review","topics":[]}`, "### Summary\nLong review.")
+	provider, pipeline := newFakePipeline(contents...)
+	transcript := strings.Repeat(strings.Repeat("x", localTranscriptChunkChars-1)+"\n", chunks)
 
 	_, _, err := pipeline.Run(context.Background(), transcript, "")
-	if err == nil || !strings.Contains(err.Error(), "transcript too large") {
-		t.Fatalf("Run error = %v, want transcript too large", err)
+	if err != nil {
+		t.Fatalf("Run error = %v, want notes for every chunk", err)
+	}
+	if len(provider.requests) != chunks+2 {
+		t.Fatalf("requests = %d, want %d chunk extractions, one refinement, and one synthesis", len(provider.requests), chunks)
 	}
 }

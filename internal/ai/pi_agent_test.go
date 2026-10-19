@@ -13,7 +13,10 @@ func TestParsePiModelsReadsTheTable(t *testing.T) {
 	if models[0].ID != "claude-bridge/claude-fable-5" || len(models[0].ReasoningEfforts) != 2 {
 		t.Fatalf("first model = %+v", models[0])
 	}
-	if models[1].ID != "openai-codex/gpt-5.5-mini" || models[1].ReasoningEfforts != nil {
+	if models[0].ContextTokens != 1_000_000 {
+		t.Fatalf("first model context = %d, want 1000000", models[0].ContextTokens)
+	}
+	if models[1].ID != "openai-codex/gpt-5.5-mini" || models[1].ReasoningEfforts != nil || models[1].ContextTokens != 400_000 {
 		t.Fatalf("second model = %+v", models[1])
 	}
 }

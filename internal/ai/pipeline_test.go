@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -165,6 +166,26 @@ func TestMergeExtractionsBoundsMergedItems(t *testing.T) {
 	long := mergeExtractions([]*Extraction{{Topics: []Topic{{Name: strings.Repeat("x", maxExtractionTextRunes+1)}}}})
 	if len([]rune(long.Topics[0].Name)) > maxExtractionTextRunes {
 		t.Fatalf("topic name runes = %d, want bounded", len([]rune(long.Topics[0].Name)))
+	}
+}
+
+func TestMergeExtractionsKeepsEveryChunkWhenOverTheLimit(t *testing.T) {
+	const chunks, perChunk = 30, 5
+	extractions := make([]*Extraction, 0, chunks)
+	for c := 0; c < chunks; c++ {
+		var topics []Topic
+		for i := 0; i < perChunk; i++ {
+			topics = append(topics, Topic{Name: fmt.Sprintf("chunk %d topic %d", c, i), Summary: "summary"})
+		}
+		extractions = append(extractions, &Extraction{Topics: topics})
+	}
+
+	merged := mergeExtractions(extractions)
+	if len(merged.Topics) != maxMergedTopics {
+		t.Fatalf("topics = %d, want %d", len(merged.Topics), maxMergedTopics)
+	}
+	if last := merged.Topics[len(merged.Topics)-1].Name; !strings.HasPrefix(last, fmt.Sprintf("chunk %d ", chunks-1)) {
+		t.Fatalf("last topic = %q, want one from the last chunk", last)
 	}
 }
 

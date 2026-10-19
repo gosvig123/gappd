@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -98,13 +99,30 @@ func parsePiModels(output string, levels []string) []AgentModel {
 			continue
 		}
 		id := fields[0] + "/" + fields[1]
-		model := AgentModel{ID: id, DisplayName: fields[1]}
+		model := AgentModel{ID: id, DisplayName: fields[1], ContextTokens: parseTokenCount(fields[2])}
 		if fields[4] == "yes" {
 			model.ReasoningEfforts = levels
 		}
 		models = append(models, model)
 	}
 	return models
+}
+
+// parseTokenCount reads a Pi token count such as "1M", "200K", or "32768".
+// It returns 0 for a value it cannot read.
+func parseTokenCount(value string) int {
+	scale := 1.0
+	switch {
+	case strings.HasSuffix(value, "M"):
+		scale, value = 1_000_000, strings.TrimSuffix(value, "M")
+	case strings.HasSuffix(value, "K"):
+		scale, value = 1_000, strings.TrimSuffix(value, "K")
+	}
+	count, err := strconv.ParseFloat(value, 64)
+	if err != nil || count <= 0 {
+		return 0
+	}
+	return int(count * scale)
 }
 
 func piThinkingLevels(help string) []string {
