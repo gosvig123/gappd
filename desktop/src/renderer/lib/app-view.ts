@@ -59,6 +59,7 @@ export type AppActions = {
   start: (eventSourceId?: string) => void
   stop: () => void
   requestPermissions: () => void
+  relaunch: () => void
   openPermissionsSettings: () => void
   /** Opens the Settings dialog on one category, such as "Meeting processing". */
   openSettings: (category: string) => void

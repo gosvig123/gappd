@@ -35,6 +35,7 @@ export function SetupChecklist({ view }: { view: AppView }) {
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
   if (steps.recording) rows.push(recordingRow(steps.recording, view, primary('recording')))
+  if (steps.speech) rows.push(speechRow(steps.speech, view, primary('speech')))
   if (steps.notes) rows.push(notesRow(steps.notes, view, notes, skipNotes))
   if (steps.calendar) rows.push(calendarRow(steps.calendar, view, skipCalendar))
   const finished = rows.filter((row) => isFinished(row.state)).length
@@ -86,21 +87,25 @@ function StepRow({ step, number, current }: { step: Step; number: number; curren
 
 function recordingRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
   const base = { key: 'recording', title: 'Allow recording', state }
-  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed. Transcripts are made on this Mac.</p> }
-  if (view.permissionStatus === 'granted') return speechRow(base, state, view, variant)
+  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed.</p> }
   const privacy = <>
     <p>Gappd records your microphone and meeting audio. By default, audio, transcripts, and notes stay on this Mac. No account needed.</p>
     <p className="setup-step-note">macOS lists meeting audio under Screen &amp; System Audio Recording. Gappd captures your screen only when you turn on Screen video.</p>
   </>
-  if (state === 'blocked') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Access is off. In System Settings, turn on Gappd under Microphone and under Screen &amp; System Audio Recording, then come back here.</p></>, actions: <Button variant={variant} onClick={view.actions.requestPermissions}>Open System Settings</Button> }
+  // macOS applies a new Screen & System Audio Recording grant only after the app restarts.
+  if (state === 'blocked') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Access is off. In System Settings, turn on Gappd under Microphone and under Screen &amp; System Audio Recording. After you allow it, reopen Gappd.</p></>, actions: <>
+    <Button variant={variant} onClick={view.actions.requestPermissions}>Open System Settings</Button>
+    <Button onClick={view.actions.relaunch}>Reopen Gappd</Button>
+  </> }
   if (state === 'error') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Gappd could not check recording access. Try again.</p></>, actions: <Button variant={variant} onClick={view.actions.requestPermissions}>Try again</Button> }
   return { ...base, detail: privacy, actions: <Button variant={variant} disabled={state === 'working'} onClick={view.actions.requestPermissions}>{state === 'working' ? 'Waiting for macOS…' : 'Allow recording access'}</Button> }
 }
 
-function speechRow(base: Pick<Step, 'key' | 'title' | 'state'>, state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
-  const allowed = <p>Microphone and meeting audio are allowed.</p>
-  if (state === 'error') return { ...base, detail: <>{allowed}<p className="setup-step-warning">The Apple speech model did not download, so Gappd cannot make transcripts yet. {view.runtime?.capabilities.transcription.message}</p></>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.prepareSpeech}>Try again</Button> }
-  return { ...base, detail: <>{allowed}<p className="setup-step-note">Getting transcripts ready: a one-time download of Apple's speech model.</p></> }
+function speechRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
+  const base = { key: 'speech', title: 'Transcripts on this Mac', state }
+  if (state === 'done') return { ...base, detail: <p>Apple's speech model is ready. Transcripts never leave this Mac.</p> }
+  if (state === 'error') return { ...base, detail: <p className="setup-step-warning">Apple's speech model did not download, so Gappd cannot make transcripts yet. {view.runtime?.capabilities.transcription.message}</p>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.prepareSpeech}>Try again</Button> }
+  return { ...base, detail: <p className="setup-step-note">Downloading Apple's speech model. This happens once and needs no action.</p> }
 }
 
 type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; saved: AIProviderStatus | null; useAgent(install: AgentInstall): void; recheck(): void }

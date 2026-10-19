@@ -6,6 +6,7 @@ export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done' |
 
 export type SetupSteps = {
   recording: SetupStepState | null
+  speech: SetupStepState | null
   notes: SetupStepState | null
   calendar: SetupStepState | null
 }
@@ -20,7 +21,7 @@ const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_
  * see it flash while status loads.
  */
 export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips): SetupSteps {
-  return { recording: recordingStep(permission, runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar) }
+  return { recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar) }
 }
 
 /** The checklist stays while any step that applies is not done or skipped. */
@@ -50,24 +51,22 @@ export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): Notes
   return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
 }
 
-/**
- * Recording is done when macOS allows it and the Apple speech model is ready,
- * because transcripts need both. The speech model downloads by itself.
- */
-function recordingStep(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null): SetupStepState | null {
+function recordingStep(permission: SetupPermissionStatus): SetupStepState | null {
   switch (permission) {
     case 'waiting': return null
     case 'checking': return 'working'
-    case 'granted': return speechStep(runtime)
+    case 'granted': return 'done'
     case 'blocked': return 'blocked'
     case 'error': return 'error'
     case 'unknown': return 'todo'
   }
 }
 
-function speechStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState {
-  const readiness = runtime?.capabilities.transcription.readiness
-  if (readiness === 'preparing' || readiness === 'missing' && runtime?.operation === 'checking') return 'working'
+/** Transcripts need Apple's speech model. It downloads by itself, so this step only reports it. */
+function speechStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState | null {
+  if (!runtime) return null
+  const readiness = runtime.capabilities.transcription.readiness
+  if (readiness === 'preparing' || readiness === 'missing' && runtime.operation === 'checking') return 'working'
   return readiness === 'missing' ? 'error' : 'done'
 }
 

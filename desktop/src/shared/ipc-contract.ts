@@ -31,6 +31,7 @@ export type IpcInvokeContract = {
     requestCapturePermissions: OperationSpec<[], CapturePermissions>
     openPermissionsSettings: OperationSpec<[target?: CapturePermissionTarget], void>
     startStaleRecordingRecovery: OperationSpec<[], number>
+    relaunch: OperationSpec<[], void>
   }
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
@@ -100,6 +101,7 @@ export const IPC_OPERATIONS = {
     requestCapturePermissions: 'system:requestCapturePermissions',
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
+    relaunch: 'system:relaunch',
   },
   meetings: {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',

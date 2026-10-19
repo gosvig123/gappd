@@ -31,20 +31,22 @@ export function useSetupPermissions(enabled: boolean) {
     await updatePermissionState(false)
   }
 
-  async function request() {
-    await updatePermissionState(true)
+  async function request(): Promise<SetupPermissionStatus> {
+    return updatePermissionState(true)
   }
 
-  async function updatePermissionState(prompt: boolean) {
-    if (!enabled) return
+  async function updatePermissionState(prompt: boolean): Promise<SetupPermissionStatus> {
+    if (!enabled) return 'waiting'
     if (prompt) setState((current) => ({ status: 'checking', permissions: current.permissions }))
     try {
       const permissions = prompt ? await window.gappd.system.requestCapturePermissions() : await window.gappd.system.checkCapturePermissions()
       const next = permissionState(permissions)
       setState(next)
       if (prompt && next.status !== 'granted') await window.gappd.system.openPermissionsSettings(permissionTarget(permissions))
+      return next.status
     } catch (err) {
       setState((current) => ({ status: 'error', permissions: current.permissions, error: err instanceof Error ? err.message : String(err) }))
+      return 'error'
     }
   }
 

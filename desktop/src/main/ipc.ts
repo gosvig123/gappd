@@ -1,7 +1,7 @@
 import { exportRecording } from './meeting-export'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
@@ -30,6 +30,8 @@ const IPC_HANDLERS: MainHandlers = {
     requestCapturePermissions: () => requestCapturePermissions(),
     openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
     startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
+    // macOS applies a new screen recording grant only to a new process. Quit runs the normal shutdown first.
+    relaunch: () => { app.relaunch(); app.quit() },
   },
   meetings: {
     list: () => listMeetings(),
