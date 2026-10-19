@@ -82,10 +82,10 @@ function useAppActions(input: ActionInputs): AppActions {
     deleteMeeting: dashboard.actions.deleteMeeting,
     setDevice: dashboard.actions.setDevice,
     // Without access, Record asks through the same flow as setup, so macOS prompts once and setup shows the result.
-    start: (eventSourceId) => void (async () => {
+    start: (eventSourceId, title) => void (async () => {
       if (permissions.state.status === 'checking') return
       if (permissions.state.status !== 'granted' && await permissions.request() !== 'granted') return
-      await dashboard.actions.start(eventSourceId)
+      await dashboard.actions.start(eventSourceId, title)
     })(),
     stop: () => void dashboard.actions.stop(),
     requestPermissions: () => void permissions.request(),

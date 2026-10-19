@@ -92,3 +92,9 @@
 .setup-finished p { margin: 0; max-inline-size: 64ch; color: var(--color-text-soft); font-size: var(--font-size-small); }
 /* The accent link colour misses contrast on the tinted card in light mode. */
 .setup-step-note .app-link { color: var(--color-text); text-decoration: underline; }
+/* The test recording spans the ready card under its text and buttons. */
+.setup-test { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); padding-block-start: var(--space-5); border-block-start: 1px solid var(--color-border); }
+.setup-test p { margin: 0; display: flex; align-items: center; gap: var(--space-3); }
+.setup-test-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: var(--color-danger); animation: setup-test-pulse 1.2s ease-in-out infinite; }
+@keyframes setup-test-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .setup-test-dot { animation: none; } }

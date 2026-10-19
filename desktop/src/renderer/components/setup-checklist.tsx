@@ -5,6 +5,7 @@ import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-c
 import { AGENTS, agentInfo, isAgentId } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
 import type { AppView } from '../lib/app-view'
+import { SetupTestRecording } from './setup-test-recording'
 import { notesAvailability, setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
 import { runtimeErrorView } from './settings/managed-runtime-contract'
 import { Button, ProgressBar, cx } from './ui'
@@ -67,6 +68,7 @@ function SetupFinished({ view, agent, onClose }: { view: AppView; agent: AIProvi
         {notesOff || agentName ? <Button onClick={() => view.actions.openSettings('Meeting processing')}>{notesOff ? 'Turn on notes' : 'Change notes model'}</Button> : null}
         <Button onClick={onClose}>Done</Button>
       </div>
+      <SetupTestRecording view={view} />
     </section>
   )
 }
