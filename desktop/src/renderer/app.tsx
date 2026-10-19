@@ -21,7 +21,7 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
-  const meetingDetails = useMeetingDetails(dashboard.meetings)
+  const meetingDetails = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
   const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [people, setPeople] = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())

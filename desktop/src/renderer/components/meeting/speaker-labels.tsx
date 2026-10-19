@@ -6,16 +6,18 @@ import { personOptions, type SavedPerson } from './speaker-options'
 import { SpeakerRow } from './speaker-row'
 import './speaker-labels.css'
 
-type Props = { meeting: MeetingDetail; event?: CalendarEventSummary; onUpdated: (meeting: MeetingDetail) => void }
+type Props = { meeting: MeetingDetail; event?: CalendarEventSummary; onUpdated: (meeting: MeetingDetail) => void; onPeopleChanged: (people: SavedPerson[]) => void }
 
 /** The Meeting's Calendar event comes from the header picker; its invitees are listed first. */
-export function SpeakerLabels({ meeting, event, onUpdated }: Props) {
+export function SpeakerLabels({ meeting, event, onUpdated, onPeopleChanged }: Props) {
   const { people, contacts, error } = useParticipantOptions(meeting)
+  // A label can save a new Person, so the People view must reload its list.
+  const labeled = (next: MeetingDetail) => { onUpdated(next); void window.gappd.meetings.people().then(onPeopleChanged).catch(console.error) }
   const audio = useSpeakerAudio(meeting.id)
   if (!meeting.speakers?.length) return null
   const options = personOptions(people, event, contacts)
   const suggested = meeting.speakers.filter(speaker => !speaker.personId && speaker.suggestedPersonId).length
-  return <details className="speaker-labels" id="meeting-speaker-labels"><summary>People in this meeting <span>{meeting.speakers.length} speakers · {suggested ? `${suggested} voice ${suggested === 1 ? 'suggestion' : 'suggestions'} to check` : 'Listen and label'}</span></summary><div className="speaker-label-content"><p className="speaker-label-hint">Play a short clip, then choose a person. {event ? 'Invitees of the Calendar event come first, but confirm who actually spoke. ' : ''}Confirmed labels can help fill future speaker names on this Mac. Auto-filled labels can be corrected or cleared.</p>{meeting.speakers.map(speaker => <SpeakerRow key={`${meeting.id}:${speaker.key}:${speaker.personId ?? ''}:${speaker.identityOrigin ?? ''}:${speaker.suggestedPersonId ?? ''}`} excerpt={audio.excerpt?.speakerKey === speaker.key ? audio.excerpt : null} meetingId={meeting.id} speaker={speaker} options={options} playing={audio.playing === speaker.key} play={index => void audio.play(speaker.key, index)} stop={audio.stop} onUpdated={onUpdated} />)}{error || audio.error ? <p role="alert">{error || audio.error}</p> : null}</div></details>
+  return <details className="speaker-labels" id="meeting-speaker-labels"><summary>People in this meeting <span>{meeting.speakers.length} speakers · {suggested ? `${suggested} voice ${suggested === 1 ? 'suggestion' : 'suggestions'} to check` : 'Listen and label'}</span></summary><div className="speaker-label-content"><p className="speaker-label-hint">Play a short clip, then choose a person. {event ? 'Invitees of the Calendar event come first, but confirm who actually spoke. ' : ''}Confirmed labels can help fill future speaker names on this Mac. Auto-filled labels can be corrected or cleared.</p>{meeting.speakers.map(speaker => <SpeakerRow key={`${meeting.id}:${speaker.key}:${speaker.personId ?? ''}:${speaker.identityOrigin ?? ''}:${speaker.suggestedPersonId ?? ''}`} excerpt={audio.excerpt?.speakerKey === speaker.key ? audio.excerpt : null} meetingId={meeting.id} speaker={speaker} options={options} playing={audio.playing === speaker.key} play={index => void audio.play(speaker.key, index)} stop={audio.stop} onUpdated={labeled} />)}{error || audio.error ? <p role="alert">{error || audio.error}</p> : null}</div></details>
 }
 
 function useParticipantOptions(meeting: MeetingDetail) {

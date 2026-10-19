@@ -4,7 +4,7 @@ import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
 const cache = new Map<string, MeetingDetail>()
 
 /** Loads every Meeting detail once per revision so search and tables can use real content. */
-export function useMeetingDetails(meetings: MeetingListItem[]): Map<string, MeetingDetail> {
+export function useMeetingDetails(meetings: MeetingListItem[], selected: MeetingDetail | null): Map<string, MeetingDetail> {
   const [details, setDetails] = useState<Map<string, MeetingDetail>>(new Map())
   const signature = meetings.map(keyOf).join('|')
   useEffect(() => {
@@ -12,6 +12,12 @@ export function useMeetingDetails(meetings: MeetingListItem[]): Map<string, Meet
     void load(meetings).then((next) => { if (active) setDetails(next) })
     return () => { active = false }
   }, [signature])
+  // A speaker label does not change the revision, so the open Meeting's newer detail replaces the cached one.
+  useEffect(() => {
+    if (!selected) return
+    cache.set(keyOf(selected), selected)
+    setDetails((current) => current.has(selected.id) && current.get(selected.id) !== selected ? new Map(current).set(selected.id, selected) : current)
+  }, [selected])
   return details
 }
 
