@@ -9,6 +9,7 @@ import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../ui'
 import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
 import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
+import { notesAvailability } from '../../lib/setup-steps'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
@@ -97,8 +98,13 @@ function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek
 
 function SummaryPane({ view }: { view: AppView }) {
   const summary = view.selectedMeeting?.summary
-  if (!summary) return <EmptyState>No notes yet. Notes are created locally after recording ends.</EmptyState>
-  return <div className="app-reading"><Markdown value={summary} /></div>
+  if (summary) return <div className="app-reading"><Markdown value={summary} /></div>
+  const openNotesSettings = () => view.actions.openSettings('Meeting processing')
+  switch (notesAvailability(view.runtime)) {
+    case 'off': return <EmptyState><p>Notes are off, so this Meeting has a transcript only. Turn on notes and Gappd writes them for this Meeting too.</p><Button className="compact-action" onClick={openNotesSettings}>Turn on notes</Button></EmptyState>
+    case 'waiting': return <EmptyState><p>Notes are waiting. {view.runtime?.message}</p><Button className="compact-action" onClick={openNotesSettings}>Open notes settings</Button></EmptyState>
+    default: return <EmptyState>No notes yet. Gappd writes notes after the recording ends.</EmptyState>
+  }
 }
 
 /** The recording and its transcript. Without a playable Screen video, the transcript fills the tab. */

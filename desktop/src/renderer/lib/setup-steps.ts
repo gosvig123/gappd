@@ -37,6 +37,19 @@ export function localAiNeedsFirstSetup(runtime: ManagedRuntimeSnapshot | null): 
   return runtime.operation === 'needs_setup' || !runtime.configured
 }
 
+export type NotesAvailability = 'ready' | 'off' | 'waiting'
+
+/**
+ * Whether Gappd can write Meeting notes now, or null while unknown. Notes are
+ * off until the user chooses where they are made; they wait while the chosen
+ * provider is getting ready or unavailable. Waiting Meetings get notes later.
+ */
+export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): NotesAvailability | null {
+  if (!runtime || runtime.operation === 'checking') return null
+  if (runtime.capabilities.summarization.readiness === 'ready') return 'ready'
+  return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
+}
+
 /**
  * Recording is done when macOS allows it and the Apple speech model is ready,
  * because transcripts need both. The speech model downloads by itself.

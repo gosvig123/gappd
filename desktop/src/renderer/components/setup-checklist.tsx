@@ -5,7 +5,7 @@ import type { AgentId, AgentInstall } from '../../shared/ipc-contract'
 import { AGENTS, agentInfo } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
 import type { AppView } from '../lib/app-view'
-import { setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
+import { notesAvailability, setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
 import { runtimeErrorView } from './settings/managed-runtime-contract'
 import { Button, ProgressBar, cx } from './ui'
 import './setup-checklist.css'
@@ -26,7 +26,11 @@ export function SetupChecklist({ view }: { view: AppView }) {
   const [notesSkipped, skipNotes] = useSkip(NOTES_SKIPPED_KEY)
   const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped })
   const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
-  if (!setupVisible(steps)) return null
+  const visible = setupVisible(steps)
+  const [opened, setOpened] = useState(false)
+  const [closed, setClosed] = useState(false)
+  if (visible && !opened) setOpened(true)
+  if (!visible) return opened && !closed ? <SetupFinished view={view} onClose={() => setClosed(true)} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
@@ -41,6 +45,23 @@ export function SetupChecklist({ view }: { view: AppView }) {
         <span>{finished} of {rows.length} done</span>
       </header>
       <ol>{rows.map((row, index) => <StepRow key={row.key} step={row} number={index + 1} current={row.key === current} />)}</ol>
+    </section>
+  )
+}
+
+/** Shown once, after the last step finishes in this session, so a skip is never silent. */
+function SetupFinished({ view, onClose }: { view: AppView; onClose: () => void }) {
+  const notesOff = notesAvailability(view.runtime) === 'off'
+  return (
+    <section className="setup-checklist setup-finished" aria-labelledby="setup-finished-title">
+      <div className="setup-step-body">
+        <h2 id="setup-finished-title">Gappd is ready</h2>
+        <p>Click Record when a meeting starts.{notesOff ? ' Notes are off, so you get transcripts only. You can turn on notes in Settings › Meeting processing.' : ''}</p>
+      </div>
+      <div className="setup-step-actions">
+        {notesOff ? <Button onClick={() => view.actions.openSettings('Meeting processing')}>Turn on notes</Button> : null}
+        <Button onClick={onClose}>Done</Button>
+      </div>
     </section>
   )
 }

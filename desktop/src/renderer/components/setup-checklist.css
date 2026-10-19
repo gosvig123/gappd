@@ -81,3 +81,7 @@
 .setup-choice strong { color: var(--color-text); font-size: var(--font-size-body); }
 .setup-choice ul { margin: 0; padding-inline-start: 1.1em; display: grid; gap: var(--space-1); }
 .setup-choice .ui-button { justify-self: start; }
+
+.setup-finished { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.setup-finished h2 { margin: 0; font-size: var(--font-size-body); }
+.setup-finished p { margin: 0; max-inline-size: 64ch; color: var(--color-text-soft); font-size: var(--font-size-small); }

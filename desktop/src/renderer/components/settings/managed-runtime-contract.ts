@@ -14,10 +14,10 @@ type RuntimeErrorView = {
 }
 
 const ERROR_VIEWS: Record<NonNullable<ManagedRuntimeSnapshot['errorKind']>, Omit<RuntimeErrorView, 'debugDetail' | 'ownershipHelp'>> = {
-  pull_timeout: { title: 'Download took too long.', detail: 'Check your connection, then click Fix setup.', compact: 'Download timed out.' },
-  pull_network: { title: 'Download was interrupted.', detail: 'Check your connection, then click Fix setup.', compact: 'Download interrupted.' },
-  pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Fix setup.', compact: 'Download host unavailable.' },
-  disk_space: { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Fix setup.', compact: 'Need more disk space.' },
+  pull_timeout: { title: 'Download took too long.', detail: 'Check your connection, then click Try again.', compact: 'Download timed out.' },
+  pull_network: { title: 'Download was interrupted.', detail: 'Check your connection, then click Try again.', compact: 'Download interrupted.' },
+  pull_blob_host_network: { title: 'Gappd could not reach the download host.', detail: 'Check VPN, firewall, or network filters, then click Try again.', compact: 'Download host unavailable.' },
+  disk_space: { title: 'Not enough disk space.', detail: 'Free some space on this Mac, then click Try again.', compact: 'Need more disk space.' },
   permission: { title: 'Gappd could not update local AI files.', detail: 'Check file permissions on this Mac, then retry setup.', compact: 'File permission issue.' },
   ownership_mismatch: { title: "Another process is using Gappd's local port.", detail: 'Gappd needs its local port for the managed runtime. Stop the other process manually, then retry setup.', compact: 'Local port already in use.' },
   runtime: { title: 'Bundled runtime needs attention.', compact: 'Bundled runtime needs attention.' },

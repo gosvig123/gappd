@@ -85,6 +85,8 @@ function useAppActions(input: ActionInputs): AppActions {
     stop: () => void dashboard.actions.stop(),
     requestPermissions: () => void permissions.request(),
     openPermissionsSettings: dashboard.actions.openPermissionsSettings,
+    // AppShell owns the Settings dialog and replaces this.
+    openSettings: () => undefined,
     setLanguage: dashboard.actions.setLanguage,
     setupRuntime: () => void runtime.prepare('setup'),
     repairRuntime: () => void runtime.prepare('repair'),

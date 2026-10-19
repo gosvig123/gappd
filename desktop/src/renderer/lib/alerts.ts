@@ -23,8 +23,8 @@ export function buildAlerts(view: AppView): AlertItem[] {
   const items: AlertItem[] = []
   if (view.bannerError) {
     items.push(view.isPermissionError
-      ? { id: 'error', kind: 'attention', title: 'Recording could not start', detail: view.bannerError, actionLabel: 'Try again', run: () => view.actions.start() }
-      : { id: 'error', kind: 'attention', title: 'Something needs attention', detail: view.bannerError, actionLabel: 'Open System Settings', run: view.actions.openPermissionsSettings })
+      ? { id: 'error', kind: 'attention', title: 'Recording access is off', detail: view.bannerError, actionLabel: 'Open System Settings', run: view.actions.openPermissionsSettings }
+      : { id: 'error', kind: 'attention', title: 'Something needs attention', detail: view.bannerError })
   }
   for (const runtimeAlert of runtimeAlerts(view)) items.push(runtimeAlert)
   if (view.recoveringStale) items.push({ id: 'stale-recovery', kind: 'info', title: 'Checking previous recordings', detail: 'Recovering any interrupted recording in the background.' })
