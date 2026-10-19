@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
-import type { AgentId, AgentInstall } from '../../shared/ipc-contract'
-import { AGENTS, agentInfo } from '../../shared/agents'
+import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-contract'
+import { AGENTS, agentInfo, isAgentId } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
 import type { AppView } from '../lib/app-view'
 import { notesAvailability, setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
@@ -30,7 +30,7 @@ export function SetupChecklist({ view }: { view: AppView }) {
   const [opened, setOpened] = useState(false)
   const [closed, setClosed] = useState(false)
   if (visible && !opened) setOpened(true)
-  if (!visible) return opened && !closed ? <SetupFinished view={view} onClose={() => setClosed(true)} /> : null
+  if (!visible) return opened && !closed ? <SetupFinished view={view} agent={notes.saved} onClose={() => setClosed(true)} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
@@ -39,7 +39,7 @@ export function SetupChecklist({ view }: { view: AppView }) {
   if (steps.calendar) rows.push(calendarRow(steps.calendar, view, skipCalendar))
   const finished = rows.filter((row) => isFinished(row.state)).length
   return (
-    <section className="setup-checklist" aria-labelledby="setup-checklist-title">
+    <section className="setup-checklist ui-scroll" aria-labelledby="setup-checklist-title">
       <header className="setup-checklist-head">
         <h2 id="setup-checklist-title">Set up Gappd</h2>
         <span>{finished} of {rows.length} done</span>
@@ -50,16 +50,20 @@ export function SetupChecklist({ view }: { view: AppView }) {
 }
 
 /** Shown once, after the last step finishes in this session, so a skip is never silent. */
-function SetupFinished({ view, onClose }: { view: AppView; onClose: () => void }) {
+function SetupFinished({ view, agent, onClose }: { view: AppView; agent: AIProviderStatus | null; onClose: () => void }) {
   const notesOff = notesAvailability(view.runtime) === 'off'
+  const agentName = agent && isAgentId(agent.provider) ? agentInfo(agent.provider).name : null
+  const notes = notesOff
+    ? ' Notes are off, so you get transcripts only. You can turn on notes in Settings › Meeting processing.'
+    : agentName ? ` ${agentName} writes the notes${agent?.agentModel ? ` with ${agent.agentModel}` : ''}.` : ''
   return (
     <section className="setup-checklist setup-finished" aria-labelledby="setup-finished-title">
       <div className="setup-step-body">
         <h2 id="setup-finished-title">Gappd is ready</h2>
-        <p>Click Record when a meeting starts.{notesOff ? ' Notes are off, so you get transcripts only. You can turn on notes in Settings › Meeting processing.' : ''}</p>
+        <p>Click Record when a meeting starts.{notes}</p>
       </div>
       <div className="setup-step-actions">
-        {notesOff ? <Button onClick={() => view.actions.openSettings('Meeting processing')}>Turn on notes</Button> : null}
+        {notesOff || agentName ? <Button onClick={() => view.actions.openSettings('Meeting processing')}>{notesOff ? 'Turn on notes' : 'Change notes model'}</Button> : null}
         <Button onClick={onClose}>Done</Button>
       </div>
     </section>
@@ -99,7 +103,7 @@ function speechRow(base: Pick<Step, 'key' | 'title' | 'state'>, state: SetupStep
   return { ...base, detail: <>{allowed}<p className="setup-step-note">Getting transcripts ready: a one-time download of Apple's speech model.</p></> }
 }
 
-type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; useAgent(install: AgentInstall): void; recheck(): void }
+type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; saved: AIProviderStatus | null; useAgent(install: AgentInstall): void; recheck(): void }
 
 function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, skip: () => void): Step {
   const base = { key: 'notes', title: 'Meeting notes with AI', optional: true, state }
@@ -109,7 +113,8 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
   if (state === 'working') return { ...base, detail: <LocalAiProgress message={runtime?.message} progress={runtime?.progress} /> }
   const failure = state === 'error' ? runtimeErrorView(runtime) : null
   const busy = view.runtimeBusy || choice.busy !== null
-  const found = (choice.installs ?? []).filter((install) => install.executable)
+  // Options that work now come first; agents that need a sign-in follow.
+  const found = (choice.installs ?? []).filter((install) => install.executable).sort((a, b) => Number(b.signedIn) - Number(a.signedIn))
   return {
     ...base,
     detail: <>
@@ -125,13 +130,11 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
           return <NotesOption key={install.agent} title={info.name} points={install.signedIn ? [info.account, info.sendsTo] : [`Found ${info.name}, but it is not signed in.`, `${info.signIn}, then come back.`]}>
             {install.signedIn
               ? <Button disabled={busy} onClick={() => choice.useAgent(install)}>{choice.busy === install.agent ? `Checking ${info.name}…` : `Use ${info.name}`}</Button>
-              : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
+              : <Button aria-label={`Check ${info.name} sign-in again`} disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
           </NotesOption>
         })}
-        <NotesOption title="Not now" points={['Record and get transcripts only.', 'No notes until you choose in Settings.']}>
-          <Button disabled={busy} onClick={skip}>Not now</Button>
-        </NotesOption>
       </div>
+      <p className="setup-step-note"><button type="button" className="app-link" disabled={busy} onClick={skip}>Not now</button> · Get transcripts only. You can turn on notes later in Settings.</p>
       {choice.installs && !found.length ? <p className="setup-step-note">Have {new Intl.ListFormat('en', { type: 'disjunction' }).format(AGENTS.map((agent) => agent.name))}? Install one and Gappd finds it here.</p> : null}
     </>,
   }
@@ -150,14 +153,16 @@ function useNotesChoice(open: boolean): NotesChoice {
   const found = useAgentInstalls(open)
   const [busy, setBusy] = useState<AgentId | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState<AIProviderStatus | null>(null)
   const useAgent = (install: AgentInstall) => {
     if (!install.executable) return
     setBusy(install.agent); setError(null)
     window.gappd.aiProvider.configureAgent({ agent: install.agent, executable: install.executable, model: '', reasoningEffort: '' })
+      .then(setSaved)
       .catch((cause) => setError(`Gappd could not use ${agentInfo(install.agent).name}. ${ipcErrorMessage(cause)}`))
       .finally(() => setBusy(null))
   }
-  return { installs: found.installs, finding: found.checking, busy, error, useAgent, recheck: found.recheck }
+  return { installs: found.installs, finding: found.checking, busy, error, saved, useAgent, recheck: found.recheck }
 }
 
 function ipcErrorMessage(cause: unknown): string {
