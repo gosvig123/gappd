@@ -81,13 +81,20 @@ func (piAgent) catalog(_ context.Context, c cli) (AgentCatalog, error) {
 	return AgentCatalog{Models: models, DefaultModel: selected.ID, DefaultReasoningEffort: selected.DefaultReasoningEffort}, nil
 }
 
-// parsePiModels reads the `pi --list-models` table. Models that think get
-// every thinking level; the others have no effort setting.
+// parsePiModels reads the `pi --list-models` table. Only rows after the
+// `provider` header count, so a message such as "No models available. Use
+// /login …" is not read as a model. Models that think get every thinking
+// level; the others have no effort setting.
 func parsePiModels(output string, levels []string) []AgentModel {
 	var models []AgentModel
+	inTable := false
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 6 || fields[0] == "provider" {
+		if len(fields) > 0 && fields[0] == "provider" {
+			inTable = true
+			continue
+		}
+		if !inTable || len(fields) < 6 {
 			continue
 		}
 		id := fields[0] + "/" + fields[1]
