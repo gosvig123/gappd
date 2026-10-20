@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
 import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-contract'
@@ -13,6 +13,7 @@ import './setup-checklist.css'
 
 const CALENDAR_SKIPPED_KEY = 'gappd.setup.calendarSkipped'
 const NOTES_SKIPPED_KEY = 'gappd.setup.notesSkipped'
+const FINISHED_SHOWN_KEY = 'gappd.setup.finishedShown'
 const MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 
 type ButtonVariant = 'primary' | 'secondary'
@@ -29,7 +30,7 @@ export function SetupChecklist({ view }: { view: AppView }) {
   const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
   const visible = setupVisible(steps)
   const [opened, setOpened] = useState(false)
-  const [closed, setClosed] = useState(false)
+  const [closed, setClosed] = useState(() => window.localStorage.getItem(FINISHED_SHOWN_KEY) === 'true')
   if (visible && !opened) setOpened(true)
   if (!visible) return opened && !closed ? <SetupFinished view={view} agent={notes.saved} onClose={() => setClosed(true)} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
@@ -51,8 +52,9 @@ export function SetupChecklist({ view }: { view: AppView }) {
   )
 }
 
-/** Shown once, after the last step finishes in this session, so a skip is never silent. */
+/** Shown once ever, after the last step finishes, so a skip is never silent. */
 function SetupFinished({ view, agent, onClose }: { view: AppView; agent: AIProviderStatus | null; onClose: () => void }) {
+  useEffect(() => { window.localStorage.setItem(FINISHED_SHOWN_KEY, 'true') }, [])
   const notesOff = notesAvailability(view.runtime) === 'off'
   const agentName = agent && isAgentId(agent.provider) ? agentInfo(agent.provider).name : null
   const notes = notesOff

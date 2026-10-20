@@ -66,7 +66,9 @@ function recordingStep(permission: SetupPermissionStatus): SetupStepState | null
 function speechStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState | null {
   if (!runtime) return null
   const readiness = runtime.capabilities.transcription.readiness
-  if (readiness === 'preparing' || readiness === 'missing' && runtime.operation === 'checking') return 'working'
+  if (readiness === 'preparing') return 'working'
+  // Every launch starts as checking with the model missing, so that state is unknown, not unfinished.
+  if (readiness === 'missing' && runtime.operation === 'checking') return null
   return readiness === 'missing' ? 'error' : 'done'
 }
 
