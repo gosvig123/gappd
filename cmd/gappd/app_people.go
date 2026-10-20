@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
@@ -38,6 +39,37 @@ func appMergePeopleCmd() *cobra.Command {
 	cmd.Flags().StringVar(&kept.Name, "name", "", "Name of the merged Person")
 	cmd.Flags().StringVar(&kept.Email, "email", "", "Email of the merged Person; empty removes it")
 	return cmd
+}
+
+func appImportPeopleCmd() *cobra.Command {
+	var contactsJSON string
+	cmd := meetingJSONCommand("import-people", nil, func(_ []string) error {
+		return runImportPeople(contactsJSON)
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().StringVar(&contactsJSON, "contacts", "", `Contacts as a JSON array of {"name","email"}`)
+	return cmd
+}
+
+func runImportPeople(contactsJSON string) error {
+	var contacts []db.Person
+	if err := json.Unmarshal([]byte(contactsJSON), &contacts); err != nil {
+		return fmt.Errorf("import people: read contacts JSON: %w", err)
+	}
+	_, store, err := loadStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	added, updated, err := store.ImportPeople(contacts)
+	if err != nil {
+		return err
+	}
+	people, err := store.ListPeople()
+	if err != nil {
+		return err
+	}
+	return writeJSON(appprotocol.ImportPeopleResponse{People: appprotocol.BuildPeople(people), Added: added, Updated: updated})
 }
 
 // changePeople applies one change and returns the updated People list.

@@ -37,6 +37,16 @@ export type MergePeopleInput = {
   email?: string
 }
 
+export type ImportPeopleInput = {
+  contacts: string
+}
+
+export type ImportPeopleResponse = {
+  people: Person[]
+  added: number
+  updated: number
+}
+
 export type AssignSpeakerInput = {
   id: string
   speakerKey: string

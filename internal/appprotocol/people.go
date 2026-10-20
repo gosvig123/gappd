@@ -26,6 +26,18 @@ type UpdatePersonInput struct {
 	Email string `json:"email,omitempty"`
 }
 
+// ImportPeopleInput carries contacts as a JSON array of {name, email}, because command
+// arguments are strings.
+type ImportPeopleInput struct {
+	Contacts string `json:"contacts"`
+}
+
+type ImportPeopleResponse struct {
+	People  []Person `json:"people"`
+	Added   int      `json:"added"`
+	Updated int      `json:"updated"`
+}
+
 type MergePeopleInput struct {
 	KeepID  string `json:"keepId"`
 	MergeID string `json:"mergeId"`

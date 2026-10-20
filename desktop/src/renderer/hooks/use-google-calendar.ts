@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { CalendarSnapshot } from '../../shared/calendar-contract'
+import type { CalendarSnapshot, GoogleAccess } from '../../shared/calendar-contract'
 
 const CONNECT_OPERATION = 'connect'
 const SYNC_ALL_OPERATION = 'sync-all'
@@ -9,7 +9,7 @@ export type GoogleCalendarController = {
   loading: boolean
   busy: string | null
   error: string | null
-  connect(): Promise<void>
+  connect(access?: GoogleAccess[]): Promise<void>
   sync(connectionId: string): Promise<void>
   syncAll(): Promise<void>
   disconnect(connectionId: string): Promise<void>
@@ -37,8 +37,8 @@ export function useGoogleCalendar(): GoogleCalendarController {
     finally { setBusy(null) }
   }, [])
 
-  const connect = useCallback(() => run(CONNECT_OPERATION, async () => {
-    let latest = await window.gappd.googleCalendar.connect()
+  const connect = useCallback((access: GoogleAccess[] = []) => run(CONNECT_OPERATION, async () => {
+    let latest = await window.gappd.googleCalendar.connect(access)
     for (const connection of latest.connections.filter((item) => item.status === 'syncing')) {
       setSnapshot(latest); setBusy(`sync:${connection.id}`)
       latest = await window.gappd.googleCalendar.sync(connection.id)

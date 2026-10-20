@@ -33,3 +33,16 @@ Review and trim the file before uploading. Make the YouTube video unlisted or us
 ## Reply facts to verify with the owner
 
 The email also requests AI provider names, account plan tiers, gateways/downstream endpoints, training controls, and privacy-policy coverage of offline models. The code offers on-device Local AI and optional Installed Codex via the user's own Codex executable/account. The personal browser showed a **ChatGPT Pro** account on 27 September 2026; Codex Data controls said **model improvement enabled** and **Include environments off**. This does not prove the installed CLI uses that same account. **Do not assert that remote processing disables model training** until the owner disables Improve the model for everyone, verifies the setting and the CLI account, and confirms the relevant provider terms. Gappd does not enforce the account's plan, controls, or downstream endpoints. The staged privacy policy describes both paths; confirm the live policy before replying. The submitted Calendar permission is read-only; no write/delete Calendar scope is requested. Reply directly to the existing thread after those facts and the video are checked by the owner.
+
+## Gmail and Contacts (not verified)
+
+Gappd can ask for two optional scopes on a Google Calendar connection (`desktop/src/main/google/google-access.ts`):
+
+- `gmail.readonly` (restricted): shows the last 20 threads with a saved Person, with subject, sender, date, and snippet. It reads message headers and snippets only, never bodies, and stores nothing. `gmail.metadata` is narrower but cannot search by address, so it cannot find the threads with one Person.
+- `contacts.readonly` (sensitive): imports saved Google contacts that have an email into People. It does not ask for `contacts.other.readonly`, so people the user only emailed are not imported.
+
+Google has not approved either scope for `gappd-production`, and it forbids unverified scopes in production traffic. A packaged build never offers them. To show them in a demo, run an unpackaged development build with `GAPPD_GMAIL_REVIEW=1` and/or `GAPPD_CONTACTS_REVIEW=1`. The checkboxes then show in Settings → Connections, and each connected account gets an **Add …** button for the access it does not have yet. In a selected-fixture profile, the switches show fictional contacts and threads without any Google call.
+
+On 6 October 2026, Google asked for an ADA-CASA tier AL1 security assessment for `gmail.readonly`, due 3 January 2027, in the [verification thread](https://mail.google.com/mail/u/?authuser=leasemobil%40gmail.com#all/1a0706249e1227c9). Only the owner sends replies or changes the Cloud Console. When both scopes are approved, remove the review gate so that packaged builds offer them.
+
+Demo sequence: show the two disclosures before connecting, the complete consent screen with both permissions, **Import Google contacts** in People with its result line, then a Person's **Email** panel and **Open in Gmail**. Explain the minimum scope as above.

@@ -1,9 +1,9 @@
 import type { MeetingUploadStatus } from './meeting-upload-contract'
-import type { CalendarParticipant, CalendarSnapshot } from './calendar-contract'
+import type { CalendarParticipant, CalendarSnapshot, GmailThread, GoogleAccess } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
-import type { AssignSpeakerInput, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
+import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -41,6 +41,7 @@ export type IpcInvokeContract = {
     people: OperationSpec<[], SavedPerson[]>
     updatePerson: OperationSpec<[input: UpdatePersonInput], SavedPerson[]>
     mergePeople: OperationSpec<[input: MergePeopleInput], SavedPerson[]>
+    importGoogleContacts: OperationSpec<[], ImportPeopleResult>
     assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
@@ -66,9 +67,11 @@ export type IpcInvokeContract = {
   googleCalendar: {
     snapshot: OperationSpec<[], CalendarSnapshot>
     contacts: OperationSpec<[], CalendarParticipant[]>
-    connect: OperationSpec<[], CalendarSnapshot>
+    connect: OperationSpec<[access?: GoogleAccess[]], CalendarSnapshot>
     sync: OperationSpec<[connectionId: string], CalendarSnapshot>
     disconnect: OperationSpec<[connectionId: string], CalendarSnapshot>
+    gmailThreads: OperationSpec<[personEmail: string], GmailThread[]>
+    openGmailThread: OperationSpec<[accountEmail: string, threadId: string], void>
   }
   update: {
     getStatus: OperationSpec<[], UpdateStatus>
@@ -105,7 +108,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
-    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
+    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', importGoogleContacts: 'meetings:importGoogleContacts', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
     exportRecording: 'meetings:exportRecording',
   },
@@ -114,7 +117,7 @@ export const IPC_OPERATIONS = {
   aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureAgent: 'aiProvider:configureAgent', useLocal: 'aiProvider:useLocal' },
   googleCalendar: {
     snapshot: 'googleCalendar:snapshot', connect: 'googleCalendar:connect', contacts: 'googleCalendar:contacts',
-    sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect',
+    sync: 'googleCalendar:sync', disconnect: 'googleCalendar:disconnect', gmailThreads: 'googleCalendar:gmailThreads', openGmailThread: 'googleCalendar:openGmailThread',
   },
   update: {
     getStatus: 'update:getStatus',

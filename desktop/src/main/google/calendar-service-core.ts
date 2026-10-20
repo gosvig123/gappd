@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
-import type { CalendarConnection, CalendarEventSummary, CalendarSnapshot, CalendarHistoryRange } from '../../shared/calendar-contract'
+import type { CalendarConnection, CalendarEventSummary, CalendarSnapshot, CalendarHistoryRange, GoogleAccess } from '../../shared/calendar-contract'
 import type { OAuthTokenSet } from '../oauth'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { grantedAccess } from './google-access.ts'
 
 const READY_STATUS = 'ready'
 const SYNCING_STATUS = 'syncing'
 const ERROR_STATUS = 'error'
 // Background syncs fetch past Meeting windows again only this often; they rarely change.
 const HISTORY_REFRESH_MS = 24 * 60 * 60 * 1000
+const ACCESS_NAMES: Record<GoogleAccess, string> = { gmail: 'Gmail', contacts: 'Google Contacts' }
 
 export type StoredCalendarConnection = {
   id: string
@@ -28,11 +31,13 @@ export type CalendarStore = {
 }
 export type CalendarApi = {
   configured(): boolean
-  authorize(): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
+  authorize(access?: GoogleAccess[]): Promise<{ subject: string; email: string; tokens: OAuthTokenSet }>
   refresh?(tokens: OAuthTokenSet): Promise<OAuthTokenSet>
   sync(connectionId: string, email: string, tokens: OAuthTokenSet, includeHistory?: boolean): Promise<{ tokens: OAuthTokenSet; events: CalendarEventSummary[]; historicalEvents?: CalendarEventSummary[]; historyRanges?: CalendarHistoryRange[]; historyError?: string }>
   revoke(tokens: OAuthTokenSet): Promise<void>
 }
+/** A fresh access token of one account that granted the requested optional access. */
+export type GoogleAccessToken = { connectionId: string; email: string; accessToken: string }
 
 export class GoogleCalendarServiceCore {
   private connecting: Promise<CalendarSnapshot> | null = null
@@ -43,11 +48,13 @@ export class GoogleCalendarServiceCore {
   private readonly api: CalendarApi
   private readonly store: CalendarStore
   private readonly now: () => Date
+  private readonly availableAccess: GoogleAccess[]
 
-  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date()) {
+  constructor(api: CalendarApi, store: CalendarStore, now: () => Date = () => new Date(), availableAccess: GoogleAccess[] = []) {
     this.api = api
     this.store = store
     this.now = now
+    this.availableAccess = availableAccess
   }
 
   async snapshot(): Promise<CalendarSnapshot> {
@@ -55,9 +62,26 @@ export class GoogleCalendarServiceCore {
     return this.toSnapshot(await this.readDocument())
   }
 
-  connect(): Promise<CalendarSnapshot> {
-    if (!this.connecting) this.connecting = this.performConnect(++this.authorizationVersion).finally(() => { this.connecting = null })
+  connect(access: GoogleAccess[] = []): Promise<CalendarSnapshot> {
+    const unavailable = access.filter((item) => !this.availableAccess.includes(item))
+    if (unavailable.length) return Promise.reject(new Error(`${unavailable.map((item) => ACCESS_NAMES[item]).join(' and ')} access is not available in this build until Google verifies it.`))
+    if (!this.connecting) this.connecting = this.performConnect(access, ++this.authorizationVersion).finally(() => { this.connecting = null })
     return this.connecting
+  }
+
+  /** Refreshes and stores the tokens of every account that granted access, for a read outside Calendar. */
+  accessTokens(access: GoogleAccess): Promise<GoogleAccessToken[]> {
+    if (!this.availableAccess.includes(access)) return Promise.resolve([])
+    return this.withStore(async () => {
+      const document = await this.readDocument()
+      const result: GoogleAccessToken[] = []
+      for (const connection of document.connections.filter((item) => grantedAccess(item.tokens.scope).includes(access))) {
+        const tokens = this.api.refresh ? await this.api.refresh(connection.tokens) : connection.tokens
+        if (tokens !== connection.tokens) { connection.tokens = tokens; await this.store.write(document) }
+        result.push({ connectionId: connection.id, email: connection.email, accessToken: tokens.accessToken })
+      }
+      return result
+    })
   }
 
   subscribe(listener: (snapshot: CalendarSnapshot) => void): () => void {
@@ -99,8 +123,8 @@ export class GoogleCalendarServiceCore {
     }).finally(() => this.publish())
   }
 
-  private async performConnect(version: number): Promise<CalendarSnapshot> {
-    const authorized = await this.api.authorize()
+  private async performConnect(access: GoogleAccess[], version: number): Promise<CalendarSnapshot> {
+    const authorized = await this.api.authorize(access)
     const { document, connectionId } = await this.withStore(async () => {
       if (version !== this.authorizationVersion) throw new Error('The Google connection changed during authorization. Connect again.')
       const document = await this.readDocument()
@@ -153,7 +177,7 @@ export class GoogleCalendarServiceCore {
     const connections = document.connections.map((connection) => this.toConnection(connection))
     const events = document.connections.flatMap((connection) => [...new Map([...(connection.historicalEvents ?? []), ...connection.events].map(event => [event.sourceId, event])).values()])
       .sort((left, right) => left.start.localeCompare(right.start))
-    return { configured: this.api.configured(), connections, events }
+    return { configured: this.api.configured(), connections, events, availableAccess: this.availableAccess }
   }
 
   private toConnection(connection: StoredCalendarConnection): CalendarConnection {
@@ -161,6 +185,7 @@ export class GoogleCalendarServiceCore {
     return {
       id: connection.id, email: connection.email, status,
       historyRanges: connection.historyRanges, lastSyncedAt: connection.lastSyncedAt, error: connection.error,
+      access: grantedAccess(connection.tokens.scope).filter((item) => this.availableAccess.includes(item)),
     }
   }
 

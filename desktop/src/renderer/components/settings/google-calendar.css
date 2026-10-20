@@ -41,6 +41,12 @@
   line-height: 1.5;
 }
 
+.calendar-access {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 .calendar-account {
   padding: var(--space-4) 0;
   border-bottom: 1px solid var(--color-border);

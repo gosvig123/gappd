@@ -255,3 +255,45 @@ func refreshPersonMeetings(tx *sql.Tx, meetingIDs []string) error {
 	}
 	return nil
 }
+
+// ImportPeople saves contacts that have a valid email and no Person yet; a contact without a
+// name is saved under its email. A contact also
+// fills the email of the only Person with the same name and no email, instead of a duplicate.
+// Names do not change, so no transcript needs a processing pass.
+func (d *DB) ImportPeople(contacts []Person) (added, updated int, err error) {
+	tx, err := d.Conn.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+	for _, contact := range contacts {
+		if strings.TrimSpace(contact.Name) == "" {
+			contact.Name = contact.Email
+		}
+		contact, err := cleanPerson(Person{Name: contact.Name, Email: contact.Email})
+		if err != nil || contact.Email == "" {
+			continue
+		}
+		var taken int
+		if err := tx.QueryRow(`SELECT COUNT(*) FROM people WHERE email=?`, contact.Email).Scan(&taken); err != nil {
+			return 0, 0, fmt.Errorf("import people: check %s: %w", contact.Email, err)
+		}
+		if taken > 0 {
+			continue
+		}
+		filled, err := tx.Exec(`UPDATE people SET email=? WHERE email='' AND name=? COLLATE NOCASE
+ AND (SELECT COUNT(*) FROM people WHERE email='' AND name=? COLLATE NOCASE)=1`, contact.Email, contact.Name, contact.Name)
+		if err != nil {
+			return 0, 0, fmt.Errorf("import people: fill email of %s: %w", contact.Name, err)
+		}
+		if rows, _ := filled.RowsAffected(); rows > 0 {
+			updated++
+			continue
+		}
+		if _, err := insertPerson(tx, contact); err != nil {
+			return 0, 0, fmt.Errorf("import people: save %s: %w", contact.Email, err)
+		}
+		added++
+	}
+	return added, updated, tx.Commit()
+}
