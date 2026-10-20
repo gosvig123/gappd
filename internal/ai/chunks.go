@@ -6,30 +6,51 @@ import (
 )
 
 const (
-	maxTranscriptChunkChars = 6000
-	maxTranscriptChunks     = 24
-	chunkOverlapLines       = 6
+	// localTranscriptChunkChars fits the managed local model, which reads short
+	// chunks best. A long Meeting is many chunks; there is no chunk limit.
+	localTranscriptChunkChars = 6000
+	// agentTranscriptChunkChars is about 90 minutes of talk. A longer chunk
+	// makes one extraction cover too much of the Meeting.
+	agentTranscriptChunkChars = 100_000
+	// agentPromptReserveTokens covers the agent CLI's own instructions, the
+	// extraction prompt, and its answer.
+	agentPromptReserveTokens = 24_000
+	// minCharsPerToken is low for non-English speech, so a chunk never
+	// overflows a model's context.
+	minCharsPerToken  = 3
+	chunkOverlapLines = 6
 )
 
-func transcriptChunks(transcript string) []string {
-	if len(transcript) <= maxTranscriptChunkChars {
-		return []string{transcript}
+// agentChunkChars sizes chunks for an agent model. A chunk uses at most half
+// of the context left after the reserve. An unknown context (0) gets the
+// agent default, because every hosted agent model reads more than it.
+func agentChunkChars(contextTokens int) int {
+	if contextTokens <= 0 {
+		return agentTranscriptChunkChars
 	}
-	lines := splitOversizedLines(strings.SplitAfter(transcript, "\n"))
-	return buildTranscriptChunks(lines)
+	fit := (contextTokens - agentPromptReserveTokens) / 2 * minCharsPerToken
+	return min(max(fit, localTranscriptChunkChars), agentTranscriptChunkChars)
 }
 
-func splitOversizedLines(lines []string) []string {
+func transcriptChunks(transcript string, maxChars int) []string {
+	if len(transcript) <= maxChars {
+		return []string{transcript}
+	}
+	lines := splitOversizedLines(strings.SplitAfter(transcript, "\n"), maxChars)
+	return buildTranscriptChunks(lines, maxChars)
+}
+
+func splitOversizedLines(lines []string, maxChars int) []string {
 	out := make([]string, 0, len(lines))
 	for _, line := range lines {
-		out = appendLineParts(out, line)
+		out = appendLineParts(out, line, maxChars)
 	}
 	return out
 }
 
-func appendLineParts(out []string, line string) []string {
-	for len(line) > maxTranscriptChunkChars {
-		cut := runeSafeCut(line, maxTranscriptChunkChars)
+func appendLineParts(out []string, line string, maxChars int) []string {
+	for len(line) > maxChars {
+		cut := runeSafeCut(line, maxChars)
 		out = append(out, line[:cut])
 		line = line[cut:]
 	}
@@ -54,14 +75,14 @@ func runeSafeCut(value string, limit int) int {
 	return cut
 }
 
-func buildTranscriptChunks(lines []string) []string {
+func buildTranscriptChunks(lines []string, maxChars int) []string {
 	var chunks []string
 	current := make([]string, 0, chunkOverlapLines+1)
 	currentLen := 0
 	for _, line := range lines {
-		if currentLen > 0 && currentLen+len(line) > maxTranscriptChunkChars {
+		if currentLen > 0 && currentLen+len(line) > maxChars {
 			chunks = append(chunks, strings.Join(current, ""))
-			current, currentLen = nextChunkSeed(current, line)
+			current, currentLen = nextChunkSeed(current, line, maxChars)
 		}
 		current = append(current, line)
 		currentLen += len(line)
@@ -69,10 +90,10 @@ func buildTranscriptChunks(lines []string) []string {
 	return appendFinalChunk(chunks, current)
 }
 
-func nextChunkSeed(current []string, line string) ([]string, int) {
+func nextChunkSeed(current []string, line string, maxChars int) ([]string, int) {
 	seed := overlapLines(current)
 	seedLen := linesLen(seed)
-	if seedLen+len(line) > maxTranscriptChunkChars {
+	if seedLen+len(line) > maxChars {
 		return nil, 0
 	}
 	return seed, seedLen

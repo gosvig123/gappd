@@ -21,7 +21,7 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
-  const meetingDetails = useMeetingDetails(dashboard.meetings)
+  const meetingDetails = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
   const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [people, setPeople] = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
@@ -81,10 +81,18 @@ function useAppActions(input: ActionInputs): AppActions {
     meetingUpdated: dashboard.actions.updateMeeting,
     deleteMeeting: dashboard.actions.deleteMeeting,
     setDevice: dashboard.actions.setDevice,
-    start: (eventSourceId) => void dashboard.actions.start(eventSourceId),
+    // Without access, Record asks through the same flow as setup, so macOS prompts once and setup shows the result.
+    start: (eventSourceId, title) => void (async () => {
+      if (permissions.state.status === 'checking') return
+      if (permissions.state.status !== 'granted' && await permissions.request() !== 'granted') return
+      await dashboard.actions.start(eventSourceId, title)
+    })(),
     stop: () => void dashboard.actions.stop(),
     requestPermissions: () => void permissions.request(),
+    relaunch: () => void window.gappd.system.relaunch(),
     openPermissionsSettings: dashboard.actions.openPermissionsSettings,
+    // AppShell owns the Settings dialog and replaces this.
+    openSettings: () => undefined,
     setLanguage: dashboard.actions.setLanguage,
     setupRuntime: () => void runtime.prepare('setup'),
     repairRuntime: () => void runtime.prepare('repair'),
@@ -98,7 +106,7 @@ function useAppActions(input: ActionInputs): AppActions {
     setTheme, linkMeetingCalendar,
     // Renames and merges rewrite Meeting transcripts, so reload the Meetings with the People.
     peopleChanged: (people) => { setPeople(people); void dashboard.actions.refreshMeetings().catch(console.error) },
-  }), [dashboard.actions, permissions.request, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople])
+  }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople])
 }
 
 function updateActions(update: Inputs['update']) {

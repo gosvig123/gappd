@@ -1,4 +1,6 @@
 export type CalendarHistoryRange = { start: number; end: number }
+/** Optional Google access beyond Calendar, granted per account. */
+export type GoogleAccess = 'gmail' | 'contacts'
 
 export type CalendarConnection = {
   id: string
@@ -7,9 +9,12 @@ export type CalendarConnection = {
   historyRanges?: CalendarHistoryRange[]
   lastSyncedAt?: string
   error?: string
+  access?: GoogleAccess[]
 }
 
 export type CalendarParticipant = { email: string; name?: string }
+/** One Gmail thread with a Person, read live from Google and never stored. */
+export type GmailThread = { accountEmail: string; threadId: string; subject: string; from: string; date: string; snippet: string; messageCount: number }
 export type CalendarAttendee = CalendarParticipant & { responseStatus?: string; self?: boolean }
 
 export type CalendarEventSummary = {
@@ -33,6 +38,8 @@ export type CalendarSnapshot = {
   configured: boolean
   connections: CalendarConnection[]
   events: CalendarEventSummary[]
+  /** Optional access this build may request; empty until Google verifies the scope. */
+  availableAccess?: GoogleAccess[]
 }
 
 /** Stable Calendar event identity: account plus event, independent of the connection id. */

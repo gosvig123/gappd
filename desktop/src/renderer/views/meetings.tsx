@@ -15,19 +15,22 @@ type Props = { view: AppView; searchRef: React.RefObject<HTMLInputElement | null
 
 export function MeetingsView({ view, searchRef, confirm }: Props) {
   const [query, setQuery] = useState('')
+  // A narrow window shows either the results or the selection. Choosing a result keeps the query, so typing again shows the results.
+  const [browsingResults, setBrowsingResults] = useState(false)
+  const search = (value: string) => { setQuery(value); setBrowsingResults(true) }
   const [event, setEvent] = useState<CalendarTarget | null>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   const rows = useWorkspaceRows(view, query)
   const close = () => { setEvent(null); view.actions.closeMeeting(); requestAnimationFrame(() => (trigger.current?.isConnected ? trigger.current : searchRef.current)?.focus()) }
   const select = (row: WorkspaceRow, button: HTMLButtonElement) => {
-    trigger.current = button; setQuery('')
+    trigger.current = button; setBrowsingResults(false)
     if (row.kind === 'meeting') { setEvent(null); view.actions.openMeeting(row.meeting.id) }
     else { view.actions.closeMeeting(); setEvent(row.target) }
   }
   useEffect(() => { if (view.selectedMeetingId) setEvent(null) }, [view.selectedMeetingId])
   const selectedKey = view.selectedMeetingId ? `meeting:${view.selectedMeetingId}` : event ? `event:${event.key}` : null
-  return <div className={`meetings-workspace ${selectedKey ? 'has-selection' : ''} ${query.trim() ? 'is-searching' : ''}`}>
-    <WorkspaceHeader view={view} query={query} setQuery={setQuery} searchRef={searchRef} />
+  return <div className={`meetings-workspace ${selectedKey ? 'has-selection' : ''} ${query.trim() && browsingResults ? 'is-searching' : ''}`}>
+    <WorkspaceHeader view={view} query={query} setQuery={search} searchRef={searchRef} />
     <div className="workspace-columns"><div className="workspace-list ui-scroll"><WorkspaceList {...rows} selectedKey={selectedKey} searching={Boolean(query.trim())} onSelect={select} /></div>
       {selectedKey ? <div className="workspace-content">{view.selectedMeetingId ? <MeetingPanel view={{ ...view, actions: { ...view.actions, closeMeeting: close } }} confirm={confirm} /> : event ? <WorkspaceEvent target={event} view={view} onClose={close} /> : null}</div> : null}
     </div>

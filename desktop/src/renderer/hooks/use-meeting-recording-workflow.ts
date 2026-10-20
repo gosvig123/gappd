@@ -43,7 +43,7 @@ export function useMeetingRecordingWorkflow(enabled: boolean, effects: Recording
 
 function useRecordingActions(device: number, language: string, setState: SetRecordingWorkflowState, effects: EffectsRef) {
   return useMemo(() => ({
-    start: (eventSourceId?: string) => startRecording(device, language, setState, effects.current.setError, eventSourceId),
+    start: (eventSourceId?: string, title?: string) => startRecording(device, language, setState, effects.current.setError, eventSourceId, title),
     stop: () => stopRecording(setState, effects.current.setError),
     setDevice: (next: number) => setState((current) => ({ ...current, device: next })),
     setLanguage: (next: string) => setLanguage(next, setState),
@@ -104,11 +104,11 @@ async function handleRecordingChange(next: RecordingState, effects: RecordingWor
   if (target !== undefined) await effects.refreshMeetings(target)
 }
 
-async function startRecording(device: number, language: string, setState: SetRecordingWorkflowState, setError: (error: string | null) => void, eventSourceId?: string) {
+async function startRecording(device: number, language: string, setState: SetRecordingWorkflowState, setError: (error: string | null) => void, eventSourceId?: string, title?: string) {
   try {
     setError(null)
     const { speakerLabelsEnabled } = await window.gappd.startup.getSettings()
-    const recording = await window.gappd.recording.start({ device, language, speakerLabelsEnabled, eventSourceId })
+    const recording = await window.gappd.recording.start({ device, language, speakerLabelsEnabled, eventSourceId, title })
     setState((current) => ({ ...current, recording }))
   } catch (err) {
     setError(errorMessage(err))

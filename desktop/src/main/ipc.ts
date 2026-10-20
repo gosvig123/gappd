@@ -1,15 +1,16 @@
 import { exportRecording } from './meeting-export'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
-import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { requestDrains } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureAgent, findAgents, providerModels, providerStatus, useLocalProvider } from './ai-provider'
-import { connectGoogleCalendar, disconnectGoogleCalendar, googleCalendarSnapshot, onGoogleCalendarChange, syncGoogleCalendar } from './google/calendar-service'
+import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
+import { parseGoogleAccess } from './google/google-access'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
@@ -30,6 +31,8 @@ const IPC_HANDLERS: MainHandlers = {
     requestCapturePermissions: () => requestCapturePermissions(),
     openPermissionsSettings: (_event, target?: CapturePermissionTarget) => openPermissionsSettings(target),
     startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
+    // macOS applies a new screen recording grant only to a new process. Quit runs the normal shutdown first.
+    relaunch: () => { app.relaunch(); app.quit() },
   },
   meetings: {
     list: () => listMeetings(),
@@ -39,6 +42,7 @@ const IPC_HANDLERS: MainHandlers = {
     people: () => listPeople(),
     updatePerson: (_event, input) => updatePerson(input),
     mergePeople: (_event, input) => mergePeople(input),
+    importGoogleContacts: () => importGoogleContacts(),
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
@@ -64,9 +68,11 @@ const IPC_HANDLERS: MainHandlers = {
   googleCalendar: {
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
-    connect: () => connectGoogleCalendar(),
+    connect: (_event, access?: unknown) => connectGoogleCalendar(parseGoogleAccess(access)),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
+    gmailThreads: (_event, personEmail: string) => gmailThreads(String(personEmail)),
+    openGmailThread: (_event, accountEmail: string, threadId: string) => openGmailThread(String(accountEmail), String(threadId)),
   },
   meetingUpload: { status: () => meetingUpload().status(), connect: (_event, enabled) => meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setAccountDeleteConsent: (_event, subject, enabled) => meetingUpload().setAccountDeleteConsent(subject, enabled), deleteAll: () => meetingUpload().deleteAll(), allowUploads: () => meetingUpload().allowUploads(), setRevokeConsent: (_event, subject, enabled, clientId) => meetingUpload().setRevokeConsent(subject, enabled, clientId), revokeClient: (_event, subject, clientId) => meetingUpload().revokeClient(subject, clientId), knownClients: () => meetingUpload().knownClients(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
   update: {

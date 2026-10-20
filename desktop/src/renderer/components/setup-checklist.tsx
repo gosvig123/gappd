@@ -1,17 +1,19 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Check } from 'lucide-react'
 import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
-import type { AgentId, AgentInstall } from '../../shared/ipc-contract'
-import { AGENTS, agentInfo } from '../../shared/agents'
+import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-contract'
+import { AGENTS, agentInfo, isAgentId } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
 import type { AppView } from '../lib/app-view'
-import { setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
+import { SetupTestRecording } from './setup-test-recording'
+import { notesAvailability, setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
 import { runtimeErrorView } from './settings/managed-runtime-contract'
 import { Button, ProgressBar, cx } from './ui'
 import './setup-checklist.css'
 
 const CALENDAR_SKIPPED_KEY = 'gappd.setup.calendarSkipped'
 const NOTES_SKIPPED_KEY = 'gappd.setup.notesSkipped'
+const FINISHED_SHOWN_KEY = 'gappd.setup.finishedShown'
 const MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 
 type ButtonVariant = 'primary' | 'secondary'
@@ -26,21 +28,49 @@ export function SetupChecklist({ view }: { view: AppView }) {
   const [notesSkipped, skipNotes] = useSkip(NOTES_SKIPPED_KEY)
   const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped })
   const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
-  if (!setupVisible(steps)) return null
+  const visible = setupVisible(steps)
+  const [opened, setOpened] = useState(false)
+  const [closed, setClosed] = useState(() => window.localStorage.getItem(FINISHED_SHOWN_KEY) === 'true')
+  if (visible && !opened) setOpened(true)
+  if (!visible) return opened && !closed ? <SetupFinished view={view} agent={notes.saved} onClose={() => setClosed(true)} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
   if (steps.recording) rows.push(recordingRow(steps.recording, view, primary('recording')))
+  if (steps.speech) rows.push(speechRow(steps.speech, view, primary('speech')))
   if (steps.notes) rows.push(notesRow(steps.notes, view, notes, skipNotes))
   if (steps.calendar) rows.push(calendarRow(steps.calendar, view, skipCalendar))
   const finished = rows.filter((row) => isFinished(row.state)).length
   return (
-    <section className="setup-checklist" aria-labelledby="setup-checklist-title">
+    <section className="setup-checklist ui-scroll" aria-labelledby="setup-checklist-title">
       <header className="setup-checklist-head">
         <h2 id="setup-checklist-title">Set up Gappd</h2>
         <span>{finished} of {rows.length} done</span>
       </header>
       <ol>{rows.map((row, index) => <StepRow key={row.key} step={row} number={index + 1} current={row.key === current} />)}</ol>
+    </section>
+  )
+}
+
+/** Shown once ever, after the last step finishes, so a skip is never silent. */
+function SetupFinished({ view, agent, onClose }: { view: AppView; agent: AIProviderStatus | null; onClose: () => void }) {
+  useEffect(() => { window.localStorage.setItem(FINISHED_SHOWN_KEY, 'true') }, [])
+  const notesOff = notesAvailability(view.runtime) === 'off'
+  const agentName = agent && isAgentId(agent.provider) ? agentInfo(agent.provider).name : null
+  const notes = notesOff
+    ? ' Notes are off, so you get transcripts only. You can turn on notes in Settings › Meeting processing.'
+    : agentName ? ` ${agentName} writes the notes${agent?.agentModel ? ` with ${agent.agentModel}` : ''}.` : ''
+  return (
+    <section className="setup-checklist setup-finished" aria-labelledby="setup-finished-title">
+      <div className="setup-step-body">
+        <h2 id="setup-finished-title">Gappd is ready</h2>
+        <p>Click Record when a meeting starts.{notes}</p>
+      </div>
+      <div className="setup-step-actions">
+        {notesOff || agentName ? <Button onClick={() => view.actions.openSettings('Meeting processing')}>{notesOff ? 'Turn on notes' : 'Change notes model'}</Button> : null}
+        <Button onClick={onClose}>Done</Button>
+      </div>
+      <SetupTestRecording view={view} />
     </section>
   )
 }
@@ -61,24 +91,28 @@ function StepRow({ step, number, current }: { step: Step; number: number; curren
 
 function recordingRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
   const base = { key: 'recording', title: 'Allow recording', state }
-  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed. Transcripts are made on this Mac.</p> }
-  if (view.permissionStatus === 'granted') return speechRow(base, state, view, variant)
+  if (state === 'done') return { ...base, detail: <p>Microphone and meeting audio are allowed.</p> }
   const privacy = <>
     <p>Gappd records your microphone and meeting audio. By default, audio, transcripts, and notes stay on this Mac. No account needed.</p>
     <p className="setup-step-note">macOS lists meeting audio under Screen &amp; System Audio Recording. Gappd captures your screen only when you turn on Screen video.</p>
   </>
-  if (state === 'blocked') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Access is off. In System Settings, turn on Gappd under Microphone and under Screen &amp; System Audio Recording, then come back here.</p></>, actions: <Button variant={variant} onClick={view.actions.requestPermissions}>Open System Settings</Button> }
+  // macOS applies a new Screen & System Audio Recording grant only after the app restarts.
+  if (state === 'blocked') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Access is off. In System Settings, turn on Gappd under Microphone and under Screen &amp; System Audio Recording. After you allow it, reopen Gappd.</p></>, actions: <>
+    <Button variant={variant} onClick={view.actions.requestPermissions}>Open System Settings</Button>
+    <Button onClick={view.actions.relaunch}>Reopen Gappd</Button>
+  </> }
   if (state === 'error') return { ...base, detail: <>{privacy}<p className="setup-step-warning">Gappd could not check recording access. Try again.</p></>, actions: <Button variant={variant} onClick={view.actions.requestPermissions}>Try again</Button> }
   return { ...base, detail: privacy, actions: <Button variant={variant} disabled={state === 'working'} onClick={view.actions.requestPermissions}>{state === 'working' ? 'Waiting for macOS…' : 'Allow recording access'}</Button> }
 }
 
-function speechRow(base: Pick<Step, 'key' | 'title' | 'state'>, state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
-  const allowed = <p>Microphone and meeting audio are allowed.</p>
-  if (state === 'error') return { ...base, detail: <>{allowed}<p className="setup-step-warning">The Apple speech model did not download, so Gappd cannot make transcripts yet. {view.runtime?.capabilities.transcription.message}</p></>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.prepareSpeech}>Try again</Button> }
-  return { ...base, detail: <>{allowed}<p className="setup-step-note">Getting transcripts ready: a one-time download of Apple's speech model.</p></> }
+function speechRow(state: SetupStepState, view: AppView, variant: ButtonVariant): Step {
+  const base = { key: 'speech', title: 'Transcripts on this Mac', state }
+  if (state === 'done') return { ...base, detail: <p>Apple's speech model is ready. Transcripts never leave this Mac.</p> }
+  if (state === 'error') return { ...base, detail: <p className="setup-step-warning">Apple's speech model did not download, so Gappd cannot make transcripts yet. {view.runtime?.capabilities.transcription.message}</p>, actions: <Button variant={variant} disabled={view.runtimeBusy} onClick={view.actions.prepareSpeech}>Try again</Button> }
+  return { ...base, detail: <p className="setup-step-note">Downloading Apple's speech model. This happens once and needs no action.</p> }
 }
 
-type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; useAgent(install: AgentInstall): void; recheck(): void }
+type NotesChoice = { installs: AgentInstall[] | null; finding: boolean; busy: AgentId | null; error: string | null; saved: AIProviderStatus | null; useAgent(install: AgentInstall): void; recheck(): void }
 
 function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, skip: () => void): Step {
   const base = { key: 'notes', title: 'Meeting notes with AI', optional: true, state }
@@ -88,7 +122,8 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
   if (state === 'working') return { ...base, detail: <LocalAiProgress message={runtime?.message} progress={runtime?.progress} /> }
   const failure = state === 'error' ? runtimeErrorView(runtime) : null
   const busy = view.runtimeBusy || choice.busy !== null
-  const found = (choice.installs ?? []).filter((install) => install.executable)
+  // Options that work now come first; agents that need a sign-in follow.
+  const found = (choice.installs ?? []).filter((install) => install.executable).sort((a, b) => Number(b.signedIn) - Number(a.signedIn))
   return {
     ...base,
     detail: <>
@@ -104,13 +139,11 @@ function notesRow(state: SetupStepState, view: AppView, choice: NotesChoice, ski
           return <NotesOption key={install.agent} title={info.name} points={install.signedIn ? [info.account, info.sendsTo] : [`Found ${info.name}, but it is not signed in.`, `${info.signIn}, then come back.`]}>
             {install.signedIn
               ? <Button disabled={busy} onClick={() => choice.useAgent(install)}>{choice.busy === install.agent ? `Checking ${info.name}…` : `Use ${info.name}`}</Button>
-              : <Button disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
+              : <Button aria-label={`Check ${info.name} sign-in again`} disabled={choice.finding} onClick={choice.recheck}>{choice.finding ? 'Checking…' : 'Check again'}</Button>}
           </NotesOption>
         })}
-        <NotesOption title="Not now" points={['Record and get transcripts only.', 'No notes until you choose in Settings.']}>
-          <Button disabled={busy} onClick={skip}>Not now</Button>
-        </NotesOption>
       </div>
+      <p className="setup-step-note"><button type="button" className="app-link" disabled={busy} onClick={skip}>Not now</button> · Get transcripts only. You can turn on notes later in Settings.</p>
       {choice.installs && !found.length ? <p className="setup-step-note">Have {new Intl.ListFormat('en', { type: 'disjunction' }).format(AGENTS.map((agent) => agent.name))}? Install one and Gappd finds it here.</p> : null}
     </>,
   }
@@ -129,14 +162,16 @@ function useNotesChoice(open: boolean): NotesChoice {
   const found = useAgentInstalls(open)
   const [busy, setBusy] = useState<AgentId | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState<AIProviderStatus | null>(null)
   const useAgent = (install: AgentInstall) => {
     if (!install.executable) return
     setBusy(install.agent); setError(null)
     window.gappd.aiProvider.configureAgent({ agent: install.agent, executable: install.executable, model: '', reasoningEffort: '' })
+      .then(setSaved)
       .catch((cause) => setError(`Gappd could not use ${agentInfo(install.agent).name}. ${ipcErrorMessage(cause)}`))
       .finally(() => setBusy(null))
   }
-  return { installs: found.installs, finding: found.checking, busy, error, useAgent, recheck: found.recheck }
+  return { installs: found.installs, finding: found.checking, busy, error, saved, useAgent, recheck: found.recheck }
 }
 
 function ipcErrorMessage(cause: unknown): string {

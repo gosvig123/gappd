@@ -1,4 +1,4 @@
-import type { CalendarSnapshot } from '../../shared/calendar-contract'
+import type { CalendarParticipant, CalendarSnapshot, GmailThread, GoogleAccess } from '../../shared/calendar-contract'
 import { mapGoogleEvent, type GoogleEventItem } from './calendar-model'
 
 const CONNECTION_ID = 'synthetic-calendar'
@@ -16,7 +16,7 @@ const people = {
  * realistic day. Times follow the clock: one event is over, the rest are still ahead.
  * Items use Google's event shape and the production mapper.
  */
-export function selectedFixtureCalendar(now = new Date()): CalendarSnapshot {
+export function selectedFixtureCalendar(access: GoogleAccess[] = [], now = new Date()): CalendarSnapshot {
   const slot = new Date(now)
   slot.setMinutes(slot.getMinutes() < 30 ? 30 : 60, 0, 0)
   const at = (hours: number, minutes: number) => {
@@ -32,5 +32,28 @@ export function selectedFixtureCalendar(now = new Date()): CalendarSnapshot {
     { id: 'tomorrow-standup', summary: 'Team standup', ...at(24, 15), location: 'https://meet.google.com/zxc-vbnm-asd', attendees: [self, people.avery, people.riley] },
   ]
   const events = items.flatMap((item) => mapGoogleEvent({ status: 'confirmed', organizer: people.jordan, ...item }, CONNECTION_ID, ACCOUNT) ?? [])
-  return { configured: true, connections: [{ id: CONNECTION_ID, email: ACCOUNT, status: 'ready', lastSyncedAt: now.toISOString() }], events }
+  return { configured: true, connections: [{ id: CONNECTION_ID, email: ACCOUNT, status: 'ready', lastSyncedAt: now.toISOString(), access }], events, availableAccess: access }
+}
+
+/** Fictional saved Google contacts for a selected-fixture session: invitees plus people never invited. */
+export function selectedFixtureContacts(): CalendarParticipant[] {
+  return [
+    ...Object.values(people).map((person) => ({ email: person.email, name: person.displayName })),
+    { email: 'casey.nguyen@example.test', name: 'Casey Nguyen' },
+    { email: 'drew.okafor@example.test', name: 'Drew Okafor' },
+    { email: 'support@example.test' },
+  ]
+}
+
+/** Fictional Gmail threads for a selected-fixture session; an unknown address has none. */
+export function selectedFixtureGmailThreads(email: string, now = new Date()): GmailThread[] {
+  const person = Object.values(people).find((item) => item.email === email.toLowerCase())
+  if (!person) return []
+  const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000).toISOString()
+  const first = person.displayName.split(' ')[0]
+  return [
+    { accountEmail: ACCOUNT, threadId: '18f0a1b2c3d4e5f1', subject: 'Notes from our last call', from: `${person.displayName} <${person.email}>`, date: daysAgo(1), snippet: `Thanks for the time today, ${first} here. I added the two open questions to the doc.`, messageCount: 3 },
+    { accountEmail: ACCOUNT, threadId: '18f0a1b2c3d4e5f2', subject: 'Agenda for next week', from: `You <${ACCOUNT}>`, date: daysAgo(4), snippet: 'Here is a first draft of the agenda. Let me know what to add before Thursday.', messageCount: 2 },
+    { accountEmail: ACCOUNT, threadId: '18f0a1b2c3d4e5f3', subject: 'Intro', from: `${person.displayName} <${person.email}>`, date: daysAgo(21), snippet: 'Great to meet you at the offsite. Sharing the deck we talked about.', messageCount: 1 },
+  ]
 }

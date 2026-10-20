@@ -56,10 +56,13 @@ export type AppActions = {
   linkMeetingCalendar: (input: LinkCalendarInput) => Promise<ParticipantContext>
   deleteMeeting: (id: string) => Promise<void>
   setDevice: (device: number) => void
-  start: (eventSourceId?: string) => void
+  start: (eventSourceId?: string, title?: string) => void
   stop: () => void
   requestPermissions: () => void
+  relaunch: () => void
   openPermissionsSettings: () => void
+  /** Opens the Settings dialog on one category, such as "Meeting processing". */
+  openSettings: (category: string) => void
   setLanguage: (language: string) => void
   setupRuntime: () => void
   repairRuntime: () => void
@@ -106,7 +109,7 @@ export function artifactLine(meeting: MeetingListItem): string {
   if (meeting.status.processing.state === 'processing' && !meeting.hasSummary) return 'Creating summary…'
   if (meeting.status.processing.state === 'processing') return 'Finalizing notes…'
   if (meeting.status.state === 'failed') return meeting.status.processing.failureMessage ?? meeting.status.capture.failureMessage ?? 'Recording failed'
-  if (meeting.status.state === 'pending') return 'Audio captured · waiting to process'
+  if (meeting.status.state === 'pending') return meeting.hasTranscript ? 'Transcript available · notes waiting' : 'Audio captured · waiting to process'
   if (meeting.hasSummary && meeting.hasTranscript) return COMPLETE_ARTIFACTS
   if (meeting.hasSummary) return 'Notes available'
   if (meeting.hasTranscript) return 'Transcript available'

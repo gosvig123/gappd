@@ -69,6 +69,16 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
   )
 }
 
+/** Without a connected calendar, the empty Schedule offers to connect one. */
+function CalendarHint({ view }: { view: AppView }) {
+  const calendar = view.calendar
+  if (!calendar?.configured || calendar.connections.length) return null
+  return <>
+    <span>Connect Google Calendar to see today's meetings here.</span>
+    <Button disabled={Boolean(view.calendarBusy)} onClick={() => void view.actions.connectCalendar()}>{view.calendarBusy === 'connect' ? 'Connecting…' : 'Connect Google Calendar'}</Button>
+  </>
+}
+
 function UpNext({ view }: { view: AppView }) {
   const events = upcomingEvents(view.calendar, 4)
   if (!events.length) {
@@ -76,7 +86,7 @@ function UpNext({ view }: { view: AppView }) {
       <div className="app-empty">
         <CalendarDays aria-hidden="true" />
         <strong>No calendar events today</strong>
-        <span>Connect a Google Calendar connection to see the day here.</span>
+        <CalendarHint view={view} />
       </div>
     )
   }

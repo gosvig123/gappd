@@ -164,6 +164,13 @@
 .app-person-form { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .app-person-form > .actions-row, .app-person-form-note, .app-person-form-error { grid-column: 1 / -1; margin: 0; }
 .app-person-form-note { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-person-email { flex-basis: 100%; display: grid; gap: var(--space-3); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
+.app-person-threads { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+.app-person-thread { display: grid; gap: var(--space-1); width: 100%; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: transparent; color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.app-person-thread:hover, .app-person-thread:focus-visible { border-color: var(--color-accent-border-strong); background: var(--color-accent-tint); }
+.app-person-thread > span { color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-person-thread-snippet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-people-import { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-small); }
 .app-people-duplicates { display: grid; gap: var(--space-3); }
 .app-person-duplicate { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-6); border: 1px dashed var(--color-accent-border-strong); border-radius: var(--radius-md); background: var(--color-accent-tint); }
 .app-person-duplicate > span { flex: 1; min-inline-size: 16rem; }

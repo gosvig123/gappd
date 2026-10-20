@@ -51,9 +51,10 @@ function selectedDeviceIndex(devices: Device[], requested?: number): number | nu
   return devices.some((device) => device.index === requested) ? requested : devices[0].index
 }
 
+/** A Meeting without a Calendar event gets a readable title such as "Meeting · Mon 9:08 AM". */
 function recordingTitle(title?: string): string {
   const trimmed = title?.trim()
-  return trimmed || new Date().toLocaleString()
+  return trimmed || `Meeting · ${new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date())}`
 }
 
 function recordingLanguage(language?: string): string {

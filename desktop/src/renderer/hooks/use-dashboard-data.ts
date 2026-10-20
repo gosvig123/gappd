@@ -117,7 +117,7 @@ function failMeetingDelete(err: unknown, setState: SetDashboardState) {
 
 type MeetingActions = ReturnType<typeof useDashboardActions>
 type DashboardActions = MeetingActions & {
-  start(eventSourceId?: string): void
+  start(eventSourceId?: string, title?: string): void
   stop(): void
   setDevice(device: number): void
   setLanguage(language: string): void

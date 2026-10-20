@@ -53,6 +53,8 @@ type AgentModel struct {
 	// ReasoningEfforts is empty when the model has no reasoning effort setting.
 	ReasoningEfforts []string
 	IsDefault        bool
+	// ContextTokens is the model's context window, or 0 when the catalog does not say.
+	ContextTokens int
 }
 
 // AgentCatalog is the installed agent's model catalog and the pair Gappd uses
@@ -67,6 +69,8 @@ type AgentCatalog struct {
 type AgentSelection struct {
 	Model  string
 	Effort string
+	// ContextTokens comes from the catalog and sizes transcript chunks; 0 when unknown.
+	ContextTokens int
 }
 
 // ListAgentModels reads the installed agent's model catalog.
@@ -93,19 +97,19 @@ func ResolveAgentSelection(id string, catalog AgentCatalog, savedModel, savedEff
 		if selected == nil || !supportsEffort(selected, catalog.DefaultReasoningEffort) {
 			return AgentSelection{}, fmt.Errorf("installed %s model catalog does not advertise %s with %q reasoning effort; choose a model in Settings", name, catalog.DefaultModel, catalog.DefaultReasoningEffort)
 		}
-		return AgentSelection{Model: catalog.DefaultModel, Effort: catalog.DefaultReasoningEffort}, nil
+		return AgentSelection{Model: catalog.DefaultModel, Effort: catalog.DefaultReasoningEffort, ContextTokens: selected.ContextTokens}, nil
 	}
 	selected := findAgentModel(catalog.Models, model)
 	if selected == nil {
 		return AgentSelection{}, fmt.Errorf("%s model %q is not in the installed %s model catalog; choose a model in Settings", name, model, name)
 	}
 	if effort == "" {
-		return AgentSelection{Model: model, Effort: selected.DefaultReasoningEffort}, nil
+		return AgentSelection{Model: model, Effort: selected.DefaultReasoningEffort, ContextTokens: selected.ContextTokens}, nil
 	}
 	if !supportsEffort(selected, effort) {
 		return AgentSelection{}, fmt.Errorf("%s model %q does not support reasoning effort %q; choose a supported effort in Settings", name, model, effort)
 	}
-	return AgentSelection{Model: model, Effort: effort}, nil
+	return AgentSelection{Model: model, Effort: effort, ContextTokens: selected.ContextTokens}, nil
 }
 
 func findAgentModel(models []AgentModel, id string) *AgentModel {
@@ -157,6 +161,10 @@ func NewAgentProvider(id, executable string, selection AgentSelection) (*AgentPr
 // Selection reports the model and reasoning effort used for every completion.
 func (p *AgentProvider) Selection() AgentSelection {
 	return p.selection
+}
+
+func (p *AgentProvider) transcriptChunkChars() int {
+	return agentChunkChars(p.selection.ContextTokens)
 }
 
 func (p *AgentProvider) Complete(ctx context.Context, req CompletionRequest) (string, error) {

@@ -6,6 +6,9 @@
   border: 1px solid var(--color-accent-border);
   border-radius: var(--radius-lg);
   background: var(--color-accent-tint);
+  /* The card sits above the scrolling view, so it scrolls by itself instead of pushing the view off screen. */
+  max-block-size: 55vh;
+  overflow: auto;
 }
 
 .setup-checklist-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-6); }
@@ -40,6 +43,8 @@
 
 .setup-step-body { display: grid; gap: var(--space-2); min-inline-size: 0; }
 .setup-step-body strong { display: flex; align-items: center; gap: var(--space-3); font-size: var(--font-size-body); line-height: 1.5rem; }
+/* A finished step takes one line: its title, then its short result. */
+.setup-step:is(.done, .skipped) .setup-step-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); }
 .setup-step.done .setup-step-body strong,
 .setup-step.skipped .setup-step-body strong { color: var(--color-text-soft); font-weight: 500; }
 
@@ -81,3 +86,15 @@
 .setup-choice strong { color: var(--color-text); font-size: var(--font-size-body); }
 .setup-choice ul { margin: 0; padding-inline-start: 1.1em; display: grid; gap: var(--space-1); }
 .setup-choice .ui-button { justify-self: start; }
+
+.setup-finished { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.setup-finished h2 { margin: 0; font-size: var(--font-size-body); }
+.setup-finished p { margin: 0; max-inline-size: 64ch; color: var(--color-text-soft); font-size: var(--font-size-small); }
+/* The accent link colour misses contrast on the tinted card in light mode. */
+.setup-step-note .app-link { color: var(--color-text); text-decoration: underline; }
+/* The test recording spans the ready card under its text and buttons. */
+.setup-test { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); padding-block-start: var(--space-5); border-block-start: 1px solid var(--color-border); }
+.setup-test p { margin: 0; display: flex; align-items: center; gap: var(--space-3); }
+.setup-test-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: var(--color-danger); animation: setup-test-pulse 1.2s ease-in-out infinite; }
+@keyframes setup-test-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .setup-test-dot { animation: none; } }

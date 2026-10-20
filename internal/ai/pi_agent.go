@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -81,23 +82,47 @@ func (piAgent) catalog(_ context.Context, c cli) (AgentCatalog, error) {
 	return AgentCatalog{Models: models, DefaultModel: selected.ID, DefaultReasoningEffort: selected.DefaultReasoningEffort}, nil
 }
 
-// parsePiModels reads the `pi --list-models` table. Models that think get
-// every thinking level; the others have no effort setting.
+// parsePiModels reads the `pi --list-models` table. Only rows after the
+// `provider` header count, so a message such as "No models available. Use
+// /login …" is not read as a model. Models that think get every thinking
+// level; the others have no effort setting.
 func parsePiModels(output string, levels []string) []AgentModel {
 	var models []AgentModel
+	inTable := false
 	for _, line := range strings.Split(output, "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 6 || fields[0] == "provider" {
+		if len(fields) > 0 && fields[0] == "provider" {
+			inTable = true
+			continue
+		}
+		if !inTable || len(fields) < 6 {
 			continue
 		}
 		id := fields[0] + "/" + fields[1]
-		model := AgentModel{ID: id, DisplayName: fields[1]}
+		model := AgentModel{ID: id, DisplayName: fields[1], ContextTokens: parseTokenCount(fields[2])}
 		if fields[4] == "yes" {
 			model.ReasoningEfforts = levels
 		}
 		models = append(models, model)
 	}
 	return models
+}
+
+// parseTokenCount reads a Pi token count such as "1M", "200K", or "32768".
+// It returns 0 for a value it cannot read.
+func parseTokenCount(value string) int {
+	scale := 1.0
+	switch {
+	case strings.HasSuffix(value, "M"):
+		scale, value = 1_000_000, strings.TrimSuffix(value, "M")
+	case strings.HasSuffix(value, "K"):
+		scale, value = 1_000, strings.TrimSuffix(value, "K")
+	}
+	count, err := strconv.ParseFloat(value, 64)
+	if err != nil || count <= 0 {
+		return 0
+	}
+	return int(count * scale)
 }
 
 func piThinkingLevels(help string) []string {

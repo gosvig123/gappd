@@ -11,6 +11,11 @@ type Provider interface {
 	Available() error
 }
 
+// chunkSizer is a Provider that reads longer transcript chunks than the local model.
+type chunkSizer interface {
+	transcriptChunkChars() int
+}
+
 type CompletionRequest struct {
 	System      string          `json:"system"`
 	User        string          `json:"user"`

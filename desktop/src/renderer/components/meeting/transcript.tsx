@@ -134,7 +134,12 @@ export function speakerStyle(speaker: string): CSSProperties {
   return { '--speaker-hue': speakerHue(speaker) } as CSSProperties
 }
 
+// Far-apart hues for the diarizer's "Speaker N" keys, which differ by one character and so hash to almost the same hue.
+const NUMBERED_SPEAKER_HUES = [210, 150, 35, 280, 185, 330, 95, 255]
+
 function speakerHue(speaker: string): number {
+  const numbered = /^Speaker ([1-9]\d*)$/.exec(speaker)
+  if (numbered) return NUMBERED_SPEAKER_HUES[(Number(numbered[1]) - 1) % NUMBERED_SPEAKER_HUES.length]
   let hash = 0
   for (let index = 0; index < speaker.length; index += 1) hash = (hash * 31 + speaker.charCodeAt(index)) | 0
   return Math.abs(hash) % 360

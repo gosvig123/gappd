@@ -9,6 +9,7 @@ import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../ui'
 import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
 import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
+import { notesAvailability } from '../../lib/setup-steps'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
@@ -42,12 +43,13 @@ export function MeetingPanel({ view, confirm }: { view: AppView; confirm: Confir
 function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; tab: TabId; transcript: string }) {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const text = tab === 'summary' ? meeting.summary ?? '' : transcript
   const copy = async () => {
-    try { await navigator.clipboard.writeText(tab === 'summary' ? meeting.summary ?? '' : transcript); setCopied(true); setError('') }
+    try { await navigator.clipboard.writeText(text); setCopied(true); setError('') }
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
 }
 
 function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -80,7 +82,7 @@ function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HT
 function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; calendar: MeetingCalendar; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
   // With a playable Screen video, the Recording tab shows the people in its side column, so the player keeps the height.
-  const people = <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} />
+  const people = <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} onPeopleChanged={view.actions.peopleChanged} />
   return (
     <>
       {meetingHasWork(meeting) ? <ProgressBar value={null} label={meetingProgressLabel(row)} /> : null}
@@ -96,8 +98,13 @@ function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek
 
 function SummaryPane({ view }: { view: AppView }) {
   const summary = view.selectedMeeting?.summary
-  if (!summary) return <EmptyState>No notes yet. Notes are created locally after recording ends.</EmptyState>
-  return <div className="app-reading"><Markdown value={summary} /></div>
+  if (summary) return <div className="app-reading"><Markdown value={summary} /></div>
+  const openNotesSettings = () => view.actions.openSettings('Meeting processing')
+  switch (notesAvailability(view.runtime)) {
+    case 'off': return <EmptyState><p>Notes are off, so this Meeting has a transcript only. Turn on notes and Gappd writes them for this Meeting too.</p><Button className="compact-action" onClick={openNotesSettings}>Turn on notes</Button></EmptyState>
+    case 'waiting': return <EmptyState><p>Notes are waiting. {view.runtime?.message}</p><Button className="compact-action" onClick={openNotesSettings}>Open notes settings</Button></EmptyState>
+    default: return <EmptyState>No notes yet. Gappd writes notes after the recording ends.</EmptyState>
+  }
 }
 
 /** The recording and its transcript. Without a playable Screen video, the transcript fills the tab. */

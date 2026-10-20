@@ -22,7 +22,7 @@ import './record-bar.css'
 /** All Meeting links lead to the same reading workspace. Recording stays global. */
 export function AppShell({ view }: { view: AppView }) {
   const shell = useShellController(view)
-  const routedView = { ...view, actions: { ...view.actions, openMeeting: shell.openMeeting } }
+  const routedView = { ...view, actions: { ...view.actions, openMeeting: shell.openMeeting, openSettings: shell.setSettingsCategory } }
   return <div className="app-shell">
     <AppSidebar section={shell.section} onSelect={shell.setSection} onOpenSettings={() => shell.setSettingsCategory('General')} />
     <ShellMain view={routedView} shell={shell} />

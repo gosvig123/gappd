@@ -25,6 +25,9 @@ A person listed on a calendar event whose attendance and voice identity still ne
 **Google Calendar connection**:
 Read-only authorization for one Google account's primary calendar, with independent synchronization, errors, reconnect, and disconnect behavior.
 
+**Google access**:
+Optional extra read-only access on a **Google Calendar connection**: Gmail (recent threads with a **Person**) or Contacts (import saved Google contacts as People).
+
 **Installed agent**:
 An AI agent CLI on this Mac (Codex, Claude Code, or Pi) that Gappd runs headless with the user's own sign-in to make Meeting notes.
 
@@ -49,9 +52,11 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain.
+- **Google access** is asked for only when the user picks it, and only in a build where Google has verified its scope. Until then, a release build never asks for Gmail or Contacts; only an unpackaged run with `GAPPD_GMAIL_REVIEW=1` or `GAPPD_CONTACTS_REVIEW=1` can.
+- Gmail threads are read from Google only when the user opens a **Person**'s Email panel; Gappd stores no mail and sends none to AI or servers. Contact import saves only the name and email of each contact that is not already a **Person**, and fills the email of the one **Person** with that name and no email.
 - The renderer receives Calendar snapshots and account operations, never Google tokens.
 - The desktop app exchanges and refreshes Google tokens directly with Google; no Gappd server receives Google tokens or Google user data.
-- Meeting notes are optional. Every **Meeting** gets a transcript from the Apple speech model, which downloads by itself; notes need a chosen AI provider: Local AI on this Mac or one **Installed agent**. Skipping notes leaves transcripts only.
+- Meeting notes are optional. Every **Meeting** gets a transcript from the Apple speech model, which downloads by itself; notes need a chosen AI provider: Local AI on this Mac or one **Installed agent**. Skipping notes leaves transcripts only. A Meeting without notes is *waiting* when a provider is chosen but not ready (its notes come later) and has notes *off* when none is chosen.
 - Gappd finds each **Installed agent** itself (the newest install, including the Codex copy inside the ChatGPT app); users never type its path.
 - **Installed agent** operations use one model and one reasoning effort from that agent's model catalog (Codex: its app-server catalog; Claude Code: its model aliases; Pi: `pi --list-models`). An unset model uses the catalog default (Codex `gpt-5.6-terra`/medium, Claude Code `sonnet`/medium, Pi the user's own Pi default), and Gappd never substitutes a model or effort the catalog does not advertise.
 - Gappd runs an **Installed agent** without tools, in an empty folder, with a minimal environment. Codex and Claude Code also ignore the user's own customizations; Pi keeps the user's Pi extensions, so extension model providers stay available.

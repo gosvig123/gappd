@@ -1,5 +1,7 @@
 import type { CalendarRange } from './calendar-history-ranges'
-import type { CalendarEventSummary } from '../../shared/calendar-contract'
+import type { CalendarEventSummary, GoogleAccess } from '../../shared/calendar-contract'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { accessScopes } from './google-access.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 import { mapGoogleEvent, type GoogleEventItem } from './calendar-model.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
@@ -49,8 +51,10 @@ export class GoogleCalendarApi {
     return Boolean(this.clientId && this.clientSecret)
   }
 
-  async authorize(): Promise<GoogleAuthorizedAccount> {
-    const tokens = await authorizeOAuth(this.oauthConfig(), { openExternal: this.openExternal, fetcher: this.fetcher, now: this.now })
+  async authorize(access: GoogleAccess[] = []): Promise<GoogleAuthorizedAccount> {
+    const config = this.oauthConfig()
+    config.scopes = [...config.scopes, ...accessScopes(access)]
+    const tokens = await authorizeOAuth(config, { openExternal: this.openExternal, fetcher: this.fetcher, now: this.now })
     return { ...await this.fetchProfile(tokens), tokens }
   }
 
@@ -83,7 +87,8 @@ export class GoogleCalendarApi {
     return {
       clientId: this.clientId, clientSecret: this.clientSecret, authorizeUrl: GOOGLE_AUTHORIZE_URL, tokenUrl: GOOGLE_TOKEN_URL,
       scopes: GOOGLE_SCOPES, callbackPath: '',
-      authorizeParams: { access_type: 'offline', prompt: 'consent select_account' },
+      // Keeps optional access granted earlier when the account connects again.
+      authorizeParams: { access_type: 'offline', prompt: 'consent select_account', include_granted_scopes: 'true' },
     }
   }
 

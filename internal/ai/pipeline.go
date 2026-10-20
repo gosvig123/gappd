@@ -45,15 +45,20 @@ func NewPipeline(provider Provider, temperature float64) *Pipeline {
 	return &Pipeline{provider: provider, temperature: temperature}
 }
 
+// chunkChars is the provider's chunk size, or the local model's.
+func (p *Pipeline) chunkChars() int {
+	if sizer, ok := p.provider.(chunkSizer); ok {
+		return sizer.transcriptChunkChars()
+	}
+	return localTranscriptChunkChars
+}
+
 func (p *Pipeline) Extract(ctx context.Context, transcript string) (*Extraction, error) {
 	return p.extractVerified(ctx, transcript, nil, "", "")
 }
 
 func (p *Pipeline) extractLong(ctx context.Context, transcript string, progress func(Progress), language, relevance string) (*Extraction, error) {
-	chunks := transcriptChunks(transcript)
-	if len(chunks) > maxTranscriptChunks {
-		return nil, fmt.Errorf("transcript too large: %d chunks exceeds limit %d", len(chunks), maxTranscriptChunks)
-	}
+	chunks := transcriptChunks(transcript, p.chunkChars())
 	if len(chunks) == 1 {
 		return p.extractChunk(ctx, transcript, language)
 	}
