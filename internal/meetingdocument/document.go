@@ -99,7 +99,9 @@ func (d *Document) addTurns(segments []db.Segment) error {
 				return errors.New("Meeting document unavailable")
 			}
 			seen[key] = true
-			d.Speakers = append(d.Speakers, Speaker{Key: key, Label: segment.Speaker})
+			// The label is the speaker key, never a Person name: AI clients read cloud copies, and
+			// People names can come from Google Calendar or Google Contacts.
+			d.Speakers = append(d.Speakers, Speaker{Key: key, Label: key})
 		}
 		d.Turns = append(d.Turns, Turn{StartSec: segment.Start, EndSec: segment.End, SpeakerKey: key, Text: segment.Text})
 	}

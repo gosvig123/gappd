@@ -92,11 +92,28 @@ func (s Service) refineStoredSummary(ctx context.Context, meeting *db.Meeting, t
 
 func (s Service) enhanceAndSave(ctx context.Context, meeting *db.Meeting, transcript string, req StoredRequest) error {
 	s.report().EnhancementStarted()
-	extraction, summary, err := s.notes().RunWithOptions(ctx, transcript, s.runOptions(meeting, req))
+	input, err := s.notesTranscript(meeting.ID, transcript)
+	if err != nil {
+		return s.saveEnhanceFailure(ctx, meeting, transcript, s.processingError("enhance stored", meeting.ID, PhasePersist, err))
+	}
+	extraction, summary, err := s.notes().RunWithOptions(ctx, input, s.runOptions(meeting, req))
 	if err != nil {
 		return s.saveEnhanceFailure(ctx, meeting, transcript, err)
 	}
 	return s.saveEnhancement(ctx, meeting, extraction, transcript, summary)
+}
+
+// notesTranscript is the text a notes model gets: speaker labels, never People names. A
+// transcript saved without segments has no assigned People, so it is sent as saved.
+func (s Service) notesTranscript(meetingID, saved string) (string, error) {
+	segments, err := s.Store.GetSegments(meetingID)
+	if err != nil {
+		return "", err
+	}
+	if len(segments) == 0 {
+		return saved, nil
+	}
+	return db.FormatLabeledTranscript(segments), nil
 }
 
 func (s Service) runOptions(meeting *db.Meeting, req StoredRequest) ai.RunOptions {

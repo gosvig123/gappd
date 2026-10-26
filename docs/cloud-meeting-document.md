@@ -21,8 +21,8 @@ executable form of this page.
   "language": "en",
   "summary": "Prototype review.",
   "speakers": [
-    { "key": "You", "label": "Kristian" },
-    { "key": "Other", "label": "Sam" }
+    { "key": "You", "label": "You" },
+    { "key": "Other", "label": "Other" }
   ],
   "turns": [
     { "start_sec": 0, "end_sec": 4.5, "speaker_key": "You", "text": "Hello." },
@@ -73,10 +73,15 @@ Meeting. It opens the normal local store and never contacts the network. The syn
 revision: it starts at 1 and increases by one for each change it sends, so ordering never depends
 on a local counter or the device clock.
 
-Meeting speaker labels are part of the document. An unconfirmed speaker keeps its generic key
-("You", "Other"), but a speaker assigned to a saved Person uploads that assigned name. That is a
-Meeting speaker label, and it is the one place a person's name can reach the cloud, so the upload
-consent must say so.
+Each speaker's `label` is its key ("You", "Other", "Speaker 1"), also when the speaker is assigned
+to a saved Person. AI clients read cloud copies, and People names can come from Google Calendar or
+Google Contacts, so no Person name reaches the cloud. Documents from older app versions can still
+carry a name; the cloud accepts any label.
+
+A Meeting started from a Calendar event is named after it. While the Meeting title still matches a
+title of a Calendar event saved for that Meeting, the desktop uploads a generic title such as
+"Meeting · Mon 9:08 AM" (`desktop/src/main/cloud/document-loader.ts`). Notes replace the title with
+a generated one, and that title uploads as it is.
 
 `internal/meetingdocument` is the local builder and `cloud/internal/service/document.go` is the
 cloud validator. The two modules cannot share a type, so both tests pin the same literal bytes:

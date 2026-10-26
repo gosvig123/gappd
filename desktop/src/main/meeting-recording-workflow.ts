@@ -1,5 +1,6 @@
 import type { Device, RecordingState } from '../shared/contracts'
 import type { StartRecordingInput } from '../shared/ipc-contract'
+import { genericMeetingTitle } from '../shared/meeting-title'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE } from '../shared/transcription-languages'
 import { requestCapturePermissions } from './capture-permissions'
 import { pauseDrains, resumeDrains } from './drain-coordinator'
@@ -51,10 +52,8 @@ function selectedDeviceIndex(devices: Device[], requested?: number): number | nu
   return devices.some((device) => device.index === requested) ? requested : devices[0].index
 }
 
-/** A Meeting without a Calendar event gets a readable title such as "Meeting · Mon 9:08 AM". */
 function recordingTitle(title?: string): string {
-  const trimmed = title?.trim()
-  return trimmed || `Meeting · ${new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date())}`
+  return title?.trim() || genericMeetingTitle(new Date())
 }
 
 function recordingLanguage(language?: string): string {

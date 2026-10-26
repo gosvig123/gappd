@@ -14,8 +14,14 @@ that someone attended. Calendar access is optional.
 
 Assignments update all of that speaker's transcript turns immediately. The
 previous summary remains visible while participants, action items, and summary
-are regenerated from the named transcript. If processing fails, the assignment
-remains saved and the normal processing recovery flow can retry.
+are regenerated. If processing fails, the assignment remains saved and the
+normal processing recovery flow can retry.
+
+The notes model never gets People names: each transcript line it reads starts
+with the speaker key ("You", "Speaker 1"), not the assigned name
+(`db.FormatLabeledTranscript`). People names can come from Google Calendar or
+Google Contacts, and an Installed agent sends its input to a remote provider.
+The app still shows names.
 
 Saved people remain available across calls. An explicit person label can enroll
 clean, sufficient remote speech for local voice suggestions and auto-fill:

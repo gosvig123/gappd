@@ -37,7 +37,7 @@ func TestBuildProducesTheVersionOneDocument(t *testing.T) {
 	if len(document.Turns) != 2 || len(document.Speakers) != 2 {
 		t.Fatalf("content: %+v", document)
 	}
-	if document.Speakers[0] != (Speaker{Key: "You", Label: "Kristian"}) {
+	if document.Speakers[0] != (Speaker{Key: "You", Label: "You"}) {
 		t.Fatalf("speaker: %+v", document.Speakers[0])
 	}
 	if document.Turns[1].StartSec != 5 || document.Turns[1].SpeakerKey != "Other" {
@@ -168,7 +168,7 @@ func TestBuildFallsBackToTheLabelWhenNoKeyExists(t *testing.T) {
 // PinnedDocument is the exact bytes this package produces for the shared sample Meeting.
 // The cloud keeps the same literal in its own test, so drift between the two modules
 // breaks one of them instead of silently breaking uploads.
-const PinnedDocument = `{"version":1,"meeting_id":"72619a1d-f713-4f46-a2b8-c74e568726b1","revision":4,"title":"Weekly sync","started_at":"2026-09-14T12:00:00Z","ended_at":"2026-09-14T12:31:00Z","language":"en","summary":"Prototype review.","speakers":[{"key":"You","label":"Kristian"},{"key":"Other","label":"Sam"}],"turns":[{"start_sec":0,"end_sec":4.5,"speaker_key":"You","text":"Hello."},{"start_sec":5,"end_sec":9,"speaker_key":"Other","text":"Hi there."}]}`
+const PinnedDocument = `{"version":1,"meeting_id":"72619a1d-f713-4f46-a2b8-c74e568726b1","revision":4,"title":"Weekly sync","started_at":"2026-09-14T12:00:00Z","ended_at":"2026-09-14T12:31:00Z","language":"en","summary":"Prototype review.","speakers":[{"key":"You","label":"You"},{"key":"Other","label":"Other"}],"turns":[{"start_sec":0,"end_sec":4.5,"speaker_key":"You","text":"Hello."},{"start_sec":5,"end_sec":9,"speaker_key":"Other","text":"Hi there."}]}`
 
 func TestBuildMatchesThePinnedDocument(t *testing.T) {
 	data, err := Build(meeting(), segments(), 4)

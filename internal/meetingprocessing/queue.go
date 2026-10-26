@@ -142,7 +142,11 @@ func (s Service) summarizeClaim(ctx context.Context, lifecycle meetinglifecycle.
 	if claim.Meeting.Transcript == nil || *claim.Meeting.Transcript == "" {
 		return deterministic(ErrNoTranscript)
 	}
-	extraction, summary, err := s.notes().RunWithOptions(ctx, *claim.Meeting.Transcript, s.runOptions(&claim.Meeting, StoredRequest{}))
+	input, err := s.notesTranscript(claim.Meeting.ID, *claim.Meeting.Transcript)
+	if err != nil {
+		return err
+	}
+	extraction, summary, err := s.notes().RunWithOptions(ctx, input, s.runOptions(&claim.Meeting, StoredRequest{}))
 	if err != nil {
 		return err
 	}
