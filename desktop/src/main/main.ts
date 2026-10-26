@@ -15,6 +15,7 @@ import { startStorageCompaction, stopStorageCompaction } from './storage-compact
 import { startCalendarRefresh, stopCalendarRefresh } from './google/calendar-refresh'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
+import { startUsageReports, stopUsageReports } from './usage-report'
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
@@ -93,6 +94,7 @@ app.whenReady().then(async () => {
   startStorageCompaction()
   startCalendarRefresh()
   startAutoUpdateChecks()
+  startUsageReports()
   logMainProcessMemory('ready')
 
   app.on('activate', showMainWindow)
@@ -124,6 +126,7 @@ async function shutdown(): Promise<void> {
   await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()
+  stopUsageReports()
   await stopActiveRecordingForQuit()
   await managedRuntime.close()
   logMainProcessMemory('shutdown:done')

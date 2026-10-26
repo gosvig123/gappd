@@ -34,6 +34,9 @@ An AI agent CLI on this Mac (Codex, Claude Code, or Pi) that Gappd runs headless
 **Cloud upload consent**:
 Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
 
+**Usage report**:
+One anonymous daily set of counts and settings (buckets and fixed values only) that the app sends when the user shares usage counts.
+
 ## Relationships
 
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
@@ -43,6 +46,7 @@ Explicit permission to sync Meeting text from this Mac under one Gappd account a
 - Once a Meeting is idle (captured, processing finished, speaker labeling not waiting or running), its `mic.wav` and `system.wav` are replaced by lossless `mic.flac` and `system.flac` copies with the same frame count; readers prefer the FLAC when it exists.
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
+- A **Usage report** is separate from sign-in and from **Cloud upload consent**: it carries no account, device or install id, is off until the user says yes, and the server keeps only per-field daily totals.
 - Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - Renaming a **Person** or merging two People refreshes the transcript and summary of each **Meeting** whose shown name changes. A merge moves speaker labels and voice evidence to the kept **Person**, which keeps one email; two People with different emails are never suggested as duplicates.

@@ -18,6 +18,7 @@ import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
+import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
 
 type Awaitable<T> = T | Promise<T>
 type IpcHandler = Parameters<typeof ipcMain.handle>[1]
@@ -87,6 +88,11 @@ const IPC_HANDLERS: MainHandlers = {
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
     setScreenVideoEnabled: (_event, enabled: boolean) => setScreenVideoEnabled(enabled),
+  },
+  usage: {
+    status: () => usageReportStatus(),
+    setSharing: (_event, enabled: boolean) => setUsageSharing(enabled),
+    report: () => usageReportView(),
   },
 }
 

@@ -13,6 +13,8 @@ import (
 const (
 	ClassRead  = "read"
 	ClassWrite = "write"
+	// ClassUsage is one budget for every anonymous Usage report: it has no account to count by.
+	ClassUsage = "usage"
 )
 
 // Per-account limits. They are in-process and per-instance: a restart clears them and a second
@@ -21,6 +23,7 @@ const (
 const (
 	readBurstPerMinute  = 60
 	writeBurstPerMinute = 12
+	usageBurstPerMinute = 600
 	maxCopiesPerAccount = 500
 	maxBytesPerAccount  = 64 << 20
 )
@@ -36,21 +39,25 @@ type bucket struct {
 type Limiter struct {
 	ReadBurst  int
 	WriteBurst int
+	UsageBurst int
 	mu         sync.Mutex
 	now        func() time.Time
 	buckets    map[string]*bucket
 }
 
 func NewLimiter() *Limiter {
-	return &Limiter{ReadBurst: readBurstPerMinute, WriteBurst: writeBurstPerMinute,
+	return &Limiter{ReadBurst: readBurstPerMinute, WriteBurst: writeBurstPerMinute, UsageBurst: usageBurstPerMinute,
 		now: time.Now, buckets: map[string]*bucket{}}
 }
 
 // allow reports whether one more request fits the budget for this class.
 func (l *Limiter) allow(class, subject string) bool {
 	burst := l.ReadBurst
-	if class == ClassWrite {
+	switch class {
+	case ClassWrite:
 		burst = l.WriteBurst
+	case ClassUsage:
+		burst = l.UsageBurst
 	}
 	if burst <= 0 || subject == "" {
 		return false

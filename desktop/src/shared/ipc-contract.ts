@@ -3,6 +3,7 @@ import type { CalendarParticipant, CalendarSnapshot, GmailThread, GoogleAccess }
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
+import type { UsageReportStatus, UsageReportView } from './usage-report'
 import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
@@ -86,6 +87,11 @@ export type IpcInvokeContract = {
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
     setScreenVideoEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
+  usage: {
+    status: OperationSpec<[], UsageReportStatus>
+    setSharing: OperationSpec<[enabled: boolean], UsageReportStatus>
+    report: OperationSpec<[], UsageReportView>
+  }
 }
 
 export type IpcOperationGroup = Extract<keyof IpcInvokeContract, string>
@@ -131,6 +137,7 @@ export const IPC_OPERATIONS = {
     setOpenAtLogin: 'startup:setOpenAtLogin',
     setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled', setScreenVideoEnabled: 'startup:setScreenVideoEnabled',
   },
+  usage: { status: 'usage:status', setSharing: 'usage:setSharing', report: 'usage:report' },
 } as const satisfies IpcOperationChannels
 
 export const IPC_EVENTS = {

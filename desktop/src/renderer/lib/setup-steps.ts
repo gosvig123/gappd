@@ -1,5 +1,6 @@
 import type { CalendarSnapshot } from '../../shared/calendar-contract'
 import type { ManagedRuntimeSnapshot } from '../../shared/contracts'
+import type { UsageSharing } from '../../shared/usage-report'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
 
 export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done' | 'skipped'
@@ -9,6 +10,7 @@ export type SetupSteps = {
   speech: SetupStepState | null
   notes: SetupStepState | null
   calendar: SetupStepState | null
+  usage: SetupStepState | null
 }
 
 export type SetupSkips = { notes: boolean; calendar: boolean }
@@ -20,8 +22,8 @@ const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_
  * not apply. Unknown steps never show the checklist, so returning users do not
  * see it flash while status loads.
  */
-export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips): SetupSteps {
-  return { recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar) }
+export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips, usage: UsageSharing | null): SetupSteps {
+  return { recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar), usage: usageStep(usage) }
 }
 
 /** The checklist stays while any step that applies is not done or skipped. */
@@ -79,6 +81,13 @@ function notesStep(runtime: ManagedRuntimeSnapshot | null, skipped: boolean): Se
   if (NOTES_PREPARING.has(runtime!.operation)) return 'working'
   if (skipped) return 'skipped'
   return runtime!.operation === 'error' ? 'error' : 'todo'
+}
+
+/** Usage sharing is asked once, also of users who finished setup before the question existed. */
+function usageStep(sharing: UsageSharing | null): SetupStepState | null {
+  if (!sharing) return null
+  if (sharing === 'unset') return 'todo'
+  return sharing === 'on' ? 'done' : 'skipped'
 }
 
 function calendarStep(calendar: CalendarSnapshot | null, skipped: boolean): SetupStepState | null {

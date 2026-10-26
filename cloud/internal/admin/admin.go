@@ -48,6 +48,9 @@ var demoRemovalMigration string
 //go:embed 013.sql
 var syntheticRemovalMigration string
 
+//go:embed 014.sql
+var usageMigration string
+
 func Migrate(ctx context.Context, conn *pgx.Conn) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
@@ -108,7 +111,7 @@ func migrateVersion(ctx context.Context, tx pgx.Tx) error {
 		return err
 	}
 	for index, sql := range []string{migration, lifecycleMigration, selectedMigration, meetingMigration, readSurfaceMigration, revocationMigration,
-		accountStateMigration, deviceMigration, clientDirectoryMigration, backlogMigration, summaryLimitMigration, demoRemovalMigration, syntheticRemovalMigration} {
+		accountStateMigration, deviceMigration, clientDirectoryMigration, backlogMigration, summaryLimitMigration, demoRemovalMigration, syntheticRemovalMigration, usageMigration} {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM cloud_migrations WHERE version=$1)`, index+1).Scan(&exists); err != nil {
 			return err

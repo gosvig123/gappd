@@ -13,6 +13,7 @@ node_modules/
 !/docs/cloud-meeting-document.md
 !/docs/cloud-data-lifecycle.md
 !/docs/cloud-operations.md
+!/docs/usage-reports.md
 # Go
 vendor/
 

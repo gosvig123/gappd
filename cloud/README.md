@@ -86,6 +86,15 @@ An external check should poll `/status` and alert when `behind` is true, which c
 sweep and a missed run. A missed run with nothing expired has no user impact, so the backlog is the
 signal that matters.
 
+## Usage reports
+
+`POST /usage` takes one anonymous Usage report from the desktop app: no token, no device signature,
+bounded to 1 KiB, one shared budget of 600 a minute (429 beyond), and cross-origin protection. It
+answers 204, 400 for any field or value outside the allowlist, and 503 when the database is down.
+The route uses the writer pool, which can only call `record_usage()`: that function adds one to each
+field value's daily total in `usage_daily` and keeps no report. Only the owner can read the table.
+Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
+
 ## Client inventory
 
 Revocation is keyed on a client id, so the service keeps the clients it has seen for each account.
@@ -228,6 +237,7 @@ database runs all of them in order. Current schema:
   permanent deletion markers and the guards that enforce them. 011 raises the summary bound.
 - 006 `revoked_grants`, 007 `account_state` (generations), 008 `account_devices`,
   009 `account_clients`, 010 the `cleanup_backlog()` aggregate.
+- 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports.
 - 001, 002, 003 and 005 created the synthetic read slice and upload demo. 012 removes the demo and
   013 removes the slice (`meetings` and the `cloud_read_meetings` view). The files stay because
   migrations run in order; nothing in the service uses those objects.
