@@ -32,6 +32,8 @@ type Auth struct {
 	Revocations *Revocations
 	// Clients keeps the list of clients that have used each account. Nil disables recording.
 	Clients *ClientDirectory
+	// StatsToken lets the private stats dashboard read Usage totals. Empty leaves the route absent.
+	StatsToken string
 }
 
 var errScope = errors.New("insufficient scope")

@@ -54,8 +54,14 @@ retention period.
 
 ## Reading the numbers
 
+The private stats dashboard (`stats.getgappd.com`, in the `gappd-site` repository) shows these
+totals. It reads them from `GET /usage/totals` with the `GAPPD_STATS_TOKEN` bearer token. The
+route calls `usage_totals()` (migration 015): the daily totals of the last 400 days, without any
+total under 5. The reader role can call that function but still cannot read `usage_daily`.
+
 Each install sends at most one report per day, so the reports for a day equal the installs that ran
-on the day before (or on their last day of use, when the app was closed for a while).
+on the day before (or on their last day of use, when the app was closed for a while). To query by
+hand, as the database owner:
 
 ```sql
 -- Active installs per day

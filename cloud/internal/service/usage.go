@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -126,5 +127,58 @@ func usageHandler(limits *Limiter, pool *pgxpool.Pool) http.Handler {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	})
+}
+
+// UsageTotal is one daily total of one field value. usage_totals() never returns a total under 5.
+type UsageTotal struct {
+	Day     string `json:"day"`
+	Field   string `json:"field"`
+	Value   string `json:"value"`
+	Reports int64  `json:"reports"`
+}
+
+// ReadUsageTotals returns the daily totals of the last 400 days.
+func ReadUsageTotals(ctx context.Context, pool *pgxpool.Pool) ([]UsageTotal, error) {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	rows, err := pool.Query(ctx, `SELECT to_char(day,'YYYY-MM-DD'),field,value,reports FROM usage_totals()`)
+	if err != nil {
+		return nil, errors.New("usage totals unavailable")
+	}
+	totals := []UsageTotal{}
+	for rows.Next() {
+		var total UsageTotal
+		if err = rows.Scan(&total.Day, &total.Field, &total.Value, &total.Reports); err != nil {
+			return nil, errors.New("usage totals unavailable")
+		}
+		totals = append(totals, total)
+	}
+	if rows.Err() != nil {
+		return nil, errors.New("usage totals unavailable")
+	}
+	return totals, nil
+}
+
+// usageTotalsHandler serves the totals to the private stats dashboard, which holds the token.
+func usageTotalsHandler(token string, limits *Limiter, pool *pgxpool.Pool) http.Handler {
+	expected := []byte("Bearer " + token)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), expected) != 1 {
+			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		if limits != nil && !limits.allow(ClassRead, "stats") {
+			w.Header().Set("Retry-After", "60")
+			http.Error(w, http.StatusText(http.StatusTooManyRequests), http.StatusTooManyRequests)
+			return
+		}
+		totals, err := ReadUsageTotals(r.Context(), pool)
+		if err != nil {
+			http.Error(w, "usage totals unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"totals": totals})
 	})
 }

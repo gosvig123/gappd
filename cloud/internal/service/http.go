@@ -65,6 +65,9 @@ func registerPublicRoutes(mux *http.ServeMux, a *Auth, pool *pgxpool.Pool) {
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /ready", readiness(pool))
 	mux.HandleFunc("GET /status", status(pool))
+	if a.StatsToken != "" {
+		mux.Handle("GET /usage/totals", usageTotalsHandler(a.StatsToken, a.Limits, pool))
+	}
 }
 
 // registerMeetingUploads keeps the write routes in one place, so a new route cannot be added

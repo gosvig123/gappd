@@ -19,6 +19,7 @@ Runtime variables. The server refuses to start without the first five:
 - `MCP_RESOURCE_URL`: `https://gappd-cloud-api-production.up.railway.app/mcp`.
 - `GAPPD_PRODUCTION_MODE=true`: refuses a development Clerk issuer.
 - `PORT`: Railway listening port; default `8080`.
+- `GAPPD_STATS_TOKEN` (optional, 32+ characters): enables `GET /usage/totals` for the stats dashboard.
 
 `GET /health` is public liveness; `GET /ready` checks a runtime database connection.
 Both protected-resource metadata paths are public:
@@ -93,6 +94,10 @@ bounded to 1 KiB, one shared budget of 600 a minute (429 beyond), and cross-orig
 answers 204, 400 for any field or value outside the allowlist, and 503 when the database is down.
 The route uses the writer pool, which can only call `record_usage()`: that function adds one to each
 field value's daily total in `usage_daily` and keeps no report. Only the owner can read the table.
+`GET /usage/totals` serves the totals to the private stats dashboard. It exists only when
+`GAPPD_STATS_TOKEN` (32+ characters) is set, needs `Authorization: Bearer <token>` (401 otherwise),
+and uses the read budget. It returns `{"totals":[{day,field,value,reports}]}` from
+`usage_totals()` on the reader pool: the last 400 days, without any total under 5.
 Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
 
 ## Client inventory
@@ -237,7 +242,8 @@ database runs all of them in order. Current schema:
   permanent deletion markers and the guards that enforce them. 011 raises the summary bound.
 - 006 `revoked_grants`, 007 `account_state` (generations), 008 `account_devices`,
   009 `account_clients`, 010 the `cleanup_backlog()` aggregate.
-- 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports.
+- 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports. 015 the
+  `usage_totals()` function, which the reader may call, for the stats dashboard.
 - 001, 002, 003 and 005 created the synthetic read slice and upload demo. 012 removes the demo and
   013 removes the slice (`meetings` and the `cloud_read_meetings` view). The files stay because
   migrations run in order; nothing in the service uses those objects.
