@@ -274,9 +274,13 @@ transaction that holds `pg_advisory_xact_lock(74812001)` like `/admin migrate`. 
 its arguments into a remote `bash -c`, so pass the SQL base64-encoded and decode it remotely. No
 admin credential leaves Railway and no public proxy is opened.
 
-Deploy the server that a migration needs before applying a migration that removes objects. For
-013: deploy first, check that `list_meetings` still answers, then apply 013 and remove the unused
-`GAPPD_MEETING_STORAGE_ENABLED` variable from the API service.
+Apply a migration that adds objects before the deploy that uses them. Deploy first when a
+migration removes objects, check that `list_meetings` still answers, then apply it. `/admin migrate`
+checks each version on its own, so one applied out of order does not skip an earlier one; check
+`SELECT version FROM cloud_migrations` before and after.
+
+`railway variable delete` from the CLI does not redeploy; run `railway redeploy` so the running
+service matches its variables.
 
 ## Local/CI checks
 
