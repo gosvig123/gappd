@@ -4,6 +4,7 @@ import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
 import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-contract'
 import { AGENTS, agentInfo, isAgentId } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
+import { useUsageSharing } from '../hooks/use-usage-sharing'
 import type { AppView } from '../lib/app-view'
 import { SetupTestRecording } from './setup-test-recording'
 import { notesAvailability, setupSteps, setupVisible, type SetupStepState } from '../lib/setup-steps'
@@ -26,7 +27,8 @@ type Step = { key: string; title: string; optional?: boolean; state: SetupStepSt
 export function SetupChecklist({ view }: { view: AppView }) {
   const [calendarSkipped, skipCalendar] = useSkip(CALENDAR_SKIPPED_KEY)
   const [notesSkipped, skipNotes] = useSkip(NOTES_SKIPPED_KEY)
-  const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped })
+  const usage = useUsageSharing()
+  const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped }, usage.status?.sharing ?? null)
   const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
   const visible = setupVisible(steps)
   const [opened, setOpened] = useState(false)
@@ -40,6 +42,7 @@ export function SetupChecklist({ view }: { view: AppView }) {
   if (steps.speech) rows.push(speechRow(steps.speech, view, primary('speech')))
   if (steps.notes) rows.push(notesRow(steps.notes, view, notes, skipNotes))
   if (steps.calendar) rows.push(calendarRow(steps.calendar, view, skipCalendar))
+  if (steps.usage) rows.push(usageRow(steps.usage, usage))
   const finished = rows.filter((row) => isFinished(row.state)).length
   return (
     <section className="setup-checklist ui-scroll" aria-labelledby="setup-checklist-title">
@@ -199,6 +202,24 @@ function calendarRow(state: SetupStepState, view: AppView, skip: () => void): St
     actions: <>
       <Button disabled={Boolean(view.calendarBusy)} onClick={() => void view.actions.connectCalendar()}>{connecting ? 'Connecting…' : 'Connect'}</Button>
       <Button disabled={connecting} onClick={skip}>Skip</Button>
+    </>,
+  }
+}
+
+function usageRow(state: SetupStepState, usage: ReturnType<typeof useUsageSharing>): Step {
+  const base = { key: 'usage', title: 'Share anonymous usage counts', optional: true, state }
+  if (state === 'done') return { ...base, detail: <p>Thank you. You can see each report or stop sharing in Settings › General.</p> }
+  if (state === 'skipped') return { ...base, detail: <p>Not shared. You can turn it on in Settings › General.</p> }
+  return {
+    ...base,
+    detail: <>
+      <p>Once a day, Gappd can send counts that help us improve it: how many Meetings you recorded in a range such as 2–5, total minutes, and which features are on.</p>
+      <p className="setup-step-note">No account or ID, and no names, titles, transcripts, or notes.</p>
+      {usage.error ? <p className="setup-step-warning">{usage.error}</p> : null}
+    </>,
+    actions: <>
+      <Button onClick={() => void usage.setSharing(true)}>Share</Button>
+      <Button onClick={() => void usage.setSharing(false)}>Don't share</Button>
     </>,
   }
 }

@@ -52,6 +52,9 @@ func registerWriteRoutes(mux *http.ServeMux, a *Auth, uploads Uploads) {
 	}
 	if uploads.Meeting != nil {
 		registerMeetingUploads(mux, protect, uploads.Meeting)
+		// Usage reports carry no account, so they skip the token. The reader pool cannot write, so
+		// they use the writer pool, which can only add to the totals through record_usage.
+		mux.Handle("POST /usage", http.NewCrossOriginProtection().Handler(usageHandler(a.Limits, uploads.Meeting)))
 	}
 }
 
