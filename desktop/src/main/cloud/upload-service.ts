@@ -9,6 +9,7 @@ import { resolveGappdBinary } from '../native-runtime'
 import { MeetingSyncQueue } from './sync-queue'
 import { MeetingUpload } from './upload'
 import { cloudAuthConfig, cloudResource } from '../service-config'
+import { savedMeetingCalendarContexts } from '../participant-calendar'
 import type { MeetingDeleteResponse } from '../../shared/contracts'
 
 // The store names keep their original "development" suffix, so existing installs keep their
@@ -27,10 +28,16 @@ function meetingUploadAuthorization(): CloudAuth {
 export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
-    meetingDocumentLoader(resolveGappdBinary),
+    meetingDocumentLoader(resolveGappdBinary, meetingCalendarTitles),
     listMeetings,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
+}
+
+async function meetingCalendarTitles(id: string): Promise<string[]> {
+  const context = (await savedMeetingCalendarContexts())[id]
+  if (!context) return []
+  return [context.event, ...context.candidates].flatMap((event) => event ? [event.title] : [])
 }
 
 /**

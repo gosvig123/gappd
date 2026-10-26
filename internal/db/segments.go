@@ -150,6 +150,21 @@ func FormatTranscript(segments []Segment) string {
 	return b.String()
 }
 
+// FormatLabeledTranscript writes each line with the speaker's label ("You", "Speaker 1"),
+// never the name of the Person assigned to it. Meeting notes models get only this text, so
+// People names, which can come from Google Calendar or Google Contacts, stay on the Mac.
+func FormatLabeledTranscript(segments []Segment) string {
+	var b strings.Builder
+	for _, segment := range segments {
+		label := segment.SpeakerKey
+		if label == "" {
+			label = segment.Speaker
+		}
+		fmt.Fprintf(&b, "[%s] %s\n", label, segment.Text)
+	}
+	return b.String()
+}
+
 func (d *DB) GetSegments(meetingID string) ([]Segment, error) {
 	rows, err := d.Conn.Query(selectSegmentsSQL, meetingID)
 	if err != nil {

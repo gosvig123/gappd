@@ -65,14 +65,15 @@ func TestUnconfirmedSpeakerUploadsNoName(t *testing.T) {
 	}
 }
 
-// A confirmed Person label is a Meeting speaker label, so it is part of the document.
-func TestConfirmedSpeakerUploadsTheAssignedLabel(t *testing.T) {
+// A confirmed Person name stays on the Mac: AI clients read cloud copies, so the cloud label
+// is the speaker key.
+func TestConfirmedSpeakerUploadsOnlyItsKey(t *testing.T) {
 	store := documentStore(t)
 	if err := store.AssignSpeaker(localMeetingID, db.SpeakerYou, db.Person{Name: "Kristian"}); err != nil {
 		t.Fatal(err)
 	}
 	document := buildLocalDocument(t, store)
-	if len(document.Speakers) != 1 || document.Speakers[0].Key != db.SpeakerYou || document.Speakers[0].Label != "Kristian" {
+	if len(document.Speakers) != 1 || document.Speakers[0].Key != db.SpeakerYou || document.Speakers[0].Label != db.SpeakerYou {
 		t.Fatalf("confirmed label: %+v", document.Speakers)
 	}
 }
