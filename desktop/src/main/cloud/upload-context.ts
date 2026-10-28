@@ -15,7 +15,7 @@ export type UploadContext = {
   fetcher: typeof fetch
   consented(): Promise<CloudCredential | null>
   setPending(controller: AbortController | null): void
-  setResult(message: string): void
+  setResult(message: string | null): void
   rememberGeneration(generation: string): Promise<void>
 }
 

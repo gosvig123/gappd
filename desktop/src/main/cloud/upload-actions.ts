@@ -19,13 +19,27 @@ export async function deleteAllCloudData(context: UploadContext, subject: string
   await context.queue.clear()
 }
 
+/**
+ * Records the user's upload consent on the server when they turn sync on. The server refuses
+ * uploads from an account that never consented, so a bearer token alone cannot store Meetings.
+ */
+export async function consentToUploads(context: UploadContext, subject: string): Promise<void> {
+  // Success needs no message: the sync switch already shows that uploads are on.
+  await sendConsent(context, subject, 'Turning on uploads for this account.', () => null)
+}
+
 /** Opens uploads again and remembers the generation the server issued, which stale devices lack. */
 export async function allowUploadsAgain(context: UploadContext, subject: string): Promise<void> {
-  await runAccountAction(context, subject, '/consent', '', 'Allowing uploads again.', async (value) => {
+  await sendConsent(context, subject, 'Allowing uploads again.', (generation) =>
+    `Uploads are allowed at generation ${generation}. A Mac that still holds an older generation cannot write until someone allows uploads again on it.`)
+}
+
+async function sendConsent(context: UploadContext, subject: string, started: string, describe: (generation: string) => string | null): Promise<void> {
+  await runAccountAction(context, subject, '/consent', '', started, async (value) => {
     const generation = typeof value === 'object' && value !== null && 'generation' in value ? String((value as { generation: unknown }).generation) : ''
     if (!/^[0-9]+$/.test(generation)) throw new Error('no generation')
     await context.rememberGeneration(generation)
-    return `Uploads are allowed again at generation ${generation}. Only this Mac knows it, so a device that still holds the old authorization cannot write.`
+    return describe(generation)
   })
 }
 
@@ -54,7 +68,7 @@ export async function listKnownClients(context: UploadContext): Promise<string[]
 
 /** Shared shape: authorize, register, sign, send, and report one outcome either way. */
 async function runAccountAction(context: UploadContext, subject: string, path: string, body: string,
-  started: string, describe: (value: unknown) => string | Promise<string>): Promise<void> {
+  started: string, describe: (value: unknown) => string | null | Promise<string | null>): Promise<void> {
   const credential = await context.consented()
   if (!credential || credential.subject !== subject) return
   const controller = new AbortController()

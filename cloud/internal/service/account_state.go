@@ -77,15 +77,20 @@ func verifyAccountEmpty(ctx context.Context, tx pgx.Tx, owner string) error {
 	return nil
 }
 
-// ConsentUploads opens uploads again and issues a new generation, which only the caller learns.
+// ConsentUploads records the account's explicit upload consent and returns the generation the
+// caller must present. The first consent issues generation 0, which a device that sends no
+// generation header presents. Reopening blocked uploads issues a new generation, so a device that
+// held the old one stays refused until its user consents too. Consent to uploads that are already
+// open keeps the generation, so a second Mac that consents does not make the first one stale.
 func ConsentUploads(ctx context.Context, pool *pgxpool.Pool, owner string) (int, error) {
 	if owner == "" {
 		return 0, errors.New("invalid account")
 	}
 	generation := 0
 	err := inMeetingTx(ctx, pool, owner, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `INSERT INTO account_state(owner_id,generation,uploads_allowed) VALUES($1,1,true)
- ON CONFLICT (owner_id) DO UPDATE SET uploads_allowed=true,generation=account_state.generation+1,
+		err := tx.QueryRow(ctx, `INSERT INTO account_state(owner_id,generation,uploads_allowed) VALUES($1,0,true)
+ ON CONFLICT (owner_id) DO UPDATE SET uploads_allowed=true,
+ generation=CASE WHEN account_state.uploads_allowed THEN account_state.generation ELSE account_state.generation+1 END,
  updated_at=statement_timestamp() RETURNING generation`, owner).Scan(&generation)
 		if err != nil {
 			return errors.New("consent unavailable")
@@ -99,13 +104,14 @@ func ConsentUploads(ctx context.Context, pool *pgxpool.Pool, owner string) (int,
 }
 
 // checkAccountUploads refuses a write while uploads are blocked, and refuses one that does not
-// present the account's current generation. An account with no state row has nothing to match.
+// present the account's current generation. An account with no state row never consented, so it
+// is refused like a blocked one: a bearer token alone is not consent to store Meetings.
 func checkAccountUploads(ctx context.Context, tx pgx.Tx, owner string, generation int) error {
 	var stored int
 	var allowed bool
 	err := tx.QueryRow(ctx, `SELECT generation,uploads_allowed FROM account_state WHERE owner_id=$1 FOR UPDATE`, owner).Scan(&stored, &allowed)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil
+		return errUploadsBlocked
 	}
 	if err != nil {
 		return errors.New("cloud copy unavailable")

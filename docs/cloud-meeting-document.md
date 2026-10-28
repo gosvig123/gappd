@@ -107,7 +107,9 @@ deletions before uploads. The Settings panel shows how many wait.
 
 Upload consent is stored in the same encrypted on-device record as the upload account's
 credentials. Startup restores only an explicitly saved opt-in for that authorization; signing
-in alone never grants upload consent. Background sync resumes without opening Settings.
+in alone never grants upload consent. Turning sync on also records the consent on the server
+(`POST /consent`), which refuses uploads from an account that never consented. Background sync resumes
+without opening Settings.
 Destructive confirmations are one-use and are never restored.
 
 Upload sign-in requests `offline_access` and retains the refresh token. Before an access token

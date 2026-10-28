@@ -31,24 +31,19 @@ func newTestDevice() *testDeviceKey {
 	return &testDeviceKey{private: private, public: base64.RawStdEncoding.EncodeToString(public), known: map[string]bool{}}
 }
 
-// register ensures the device is known for this token's account before a signed write.
+// register ensures the device is known for this token's account before a signed write, and
+// consents to uploads as the desktop does when sync is turned on. The first consent issues
+// generation 0, which a write without a generation header presents.
 func (d *testDeviceKey) register(t *testing.T, host, token string) {
 	t.Helper()
 	if d.known[token] {
 		return
 	}
-	request, err := http.NewRequest("POST", host+"/device", strings.NewReader(`{"public_key":"`+d.public+`"}`))
-	if err != nil {
-		t.Fatal(err)
+	if code := registerDevice(t, host, token); code != 200 {
+		t.Fatalf("device registration returned %d", code)
 	}
-	request.Header.Set("Authorization", "Bearer "+token)
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	response.Body.Close()
-	if response.StatusCode != 200 {
-		t.Fatalf("device registration returned %d", response.StatusCode)
+	if code, ack := postRaw(t, host+"/consent", token, "", d.sign("POST", "/consent", "", nil)); code != 200 || ack["status"] != "allowed" {
+		t.Fatalf("consent returned %d %v", code, ack)
 	}
 	d.known[token] = true
 }

@@ -132,7 +132,7 @@ function renderManage({ status, busy, run, meetings, clients, confirm }: Manage)
       })}>Delete all cloud data…</Button>
       <Button disabled={busy} onClick={() => void run((api) => api.allowUploads())}>Allow uploads again</Button>
     </div>
-    <p className="status-note">Use Allow uploads again only after deleting all cloud data or when sync says uploads are off. It resets upload authorization, so another Mac on this account must allow uploads again too.</p>
+    <p className="status-note">Use Allow uploads again after deleting all cloud data, or when sync says uploads are off or this Mac's upload authorization is out of date. After a deletion, every other Mac on this account must allow uploads again too.</p>
   </details>
 }
 
