@@ -56,7 +56,7 @@ One anonymous daily set of counts and settings (buckets and fixed values only) t
 - Speaker auto-fill uses confirmed **Calendar invitee** emails as a candidate constraint, or a manually confirmed remote **Person** and previous confirmed coattendance; Calendar alone never identifies a voice.
 - A **Meeting** can retain a calendar event snapshot to suggest **Calendar invitees** when labeling speakers.
 - Disconnecting one **Google Calendar connection** removes only that account's authorization and Calendar cache; existing **Meetings** and their confirmed Calendar snapshots remain.
-- **Google access** is asked for only when the user picks it, and only in a build where Google has verified its scope. Until then, a release build never asks for Gmail or Contacts; only an unpackaged run with `GAPPD_GMAIL_REVIEW=1` or `GAPPD_CONTACTS_REVIEW=1` can.
+- **Google access** is asked for only when the user picks it, and only in a build where Google has verified its scope. Google has verified Contacts, so every build offers it. A release build never asks for Gmail; only an unpackaged run with `GAPPD_GMAIL_REVIEW=1` can.
 - Gmail threads are read from Google only when the user opens a **Person**'s Email panel; Gappd stores no mail and sends none to AI or servers. Contact import saves only the name and email of each contact that is not already a **Person**, and fills the email of the one **Person** with that name and no email.
 - The renderer receives Calendar snapshots and account operations, never Google tokens.
 - The desktop app exchanges and refreshes Google tokens directly with Google; no Gappd server receives Google tokens or Google user data.
