@@ -163,6 +163,9 @@
 .app-person-actions { display: flex; gap: var(--space-3); }
 .app-person-form { flex-basis: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .app-person-form > .actions-row, .app-person-form-note, .app-person-form-error { grid-column: 1 / -1; margin: 0; }
+/* A select is as wide as its longest option; let it shrink to its column instead of covering the next field. */
+.app-person-form > label { min-inline-size: 0; }
+.app-person-form :is(input, select) { min-inline-size: 0; inline-size: 100%; }
 .app-person-form-note { color: var(--color-text-muted); font-size: var(--font-size-small); }
 .app-person-email { flex-basis: 100%; display: grid; gap: var(--space-3); padding-block-start: var(--space-4); border-block-start: 1px solid var(--color-border); }
 .app-person-threads { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }

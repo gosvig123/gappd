@@ -6,12 +6,12 @@ import { errorText, PersonEditor, PersonMerge } from '../components/person-forms
 import { Button, EmptyState } from '../components/ui'
 import type { AppView } from '../lib/app-view'
 import { initialsOf, personMeetings, shortDate } from '../lib/person-activity'
-import { isEmailName, likelyDuplicates, readableName, type DuplicatePair } from '../lib/person-identity'
+import { isEmailName, likelyDuplicates, mergeOrder, readableName, type DuplicatePair } from '../lib/person-identity'
 import { PersonPage } from './person-page'
 import { SpeakerQueue } from './speaker-queue'
 
 type PersonRow = { person: SavedPerson; meetings: number; lastSeen?: string }
-type Change = { mode: 'edit' | 'email'; personId: string } | { mode: 'merge'; personId: string; otherId?: string }
+type Change = { mode: 'edit' | 'email'; personId: string } | { mode: 'merge'; personId: string; otherId?: string; pairId?: string }
 const DISMISSED_DUPLICATES_KEY = 'gappd.people.notDuplicates'
 
 export function PeopleView({ view }: { view: AppView }) {
@@ -39,8 +39,10 @@ export function PeopleView({ view }: { view: AppView }) {
           {duplicates.map((pair) => (
             <div key={pair.id} className="app-person-duplicate">
               <span><strong>{pair.first.name}</strong> and <strong>{pair.second.name}</strong> may be the same person.</span>
-              <Button className="compact-action" onClick={() => setChange(duplicateMerge(pair))}>Review merge</Button>
+              <Button className="compact-action" aria-expanded={isPairChange(change, pair)} onClick={() => setChange(isPairChange(change, pair) ? null : duplicateMerge(pair))}>Review merge</Button>
               <Button className="compact-action" onClick={() => dismiss(pair.id)}>Not the same</Button>
+              {/* The review opens where it was asked for, not in a Person row further down the list. */}
+              {change?.mode === 'merge' && isPairChange(change, pair) ? <PersonMerge key={pair.id} person={mergeOrder(pair)[0]} people={view.people} otherId={change.otherId} onDone={done} onCancel={() => setChange(null)} /> : null}
             </div>
           ))}
         </section>
@@ -63,7 +65,7 @@ export function PeopleView({ view }: { view: AppView }) {
               </span>
               {change?.personId === row.person.id && change.mode === 'edit' ? <PersonEditor person={row.person} onDone={done} onCancel={() => setChange(null)} /> : null}
               {change?.personId === row.person.id && change.mode === 'email' && row.person.email ? <PersonEmail name={row.person.name} email={row.person.email} /> : null}
-              {change?.personId === row.person.id && change.mode === 'merge' ? <PersonMerge person={row.person} people={view.people} otherId={change.otherId} onDone={done} onCancel={() => setChange(null)} /> : null}
+              {change?.personId === row.person.id && change.mode === 'merge' && !change.pairId ? <PersonMerge person={row.person} people={view.people} onDone={done} onCancel={() => setChange(null)} /> : null}
             </li>
           ))}
         </ul>
@@ -118,10 +120,13 @@ function readDismissed(): string[] {
   }
 }
 
-// Keep the Person with a real name, so the merge form starts on the record the user recognizes.
 function duplicateMerge(pair: DuplicatePair): Change {
-  const [kept, merged] = isEmailName(pair.first.name) && !isEmailName(pair.second.name) ? [pair.second, pair.first] : [pair.first, pair.second]
-  return { mode: 'merge', personId: kept.id, otherId: merged.id }
+  const [kept, merged] = mergeOrder(pair)
+  return { mode: 'merge', personId: kept.id, otherId: merged.id, pairId: pair.id }
+}
+
+function isPairChange(change: Change | null, pair: DuplicatePair): boolean {
+  return change?.mode === 'merge' && change.pairId === pair.id
 }
 
 function personDetail(person: SavedPerson): string {

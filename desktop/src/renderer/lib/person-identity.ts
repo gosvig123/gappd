@@ -42,10 +42,27 @@ export function likelyDuplicates(people: SavedPerson[]): DuplicatePair[] {
   return pairs
 }
 
-/** The values a merge of two People starts with: a real name over an email, and the one saved email. */
+/**
+ * The pair in merge order: the Person to keep first. The kept record is the fuller identity: one
+ * with an email, then a real name, then a capitalized name, so "Robert · robert@…" outlives "robert".
+ */
+export function mergeOrder(pair: DuplicatePair): [kept: SavedPerson, merged: SavedPerson] {
+  return identityRank(pair.second) > identityRank(pair.first) ? [pair.second, pair.first] : [pair.first, pair.second]
+}
+
+/** The values a merge of two People starts with: the better-written real name, and the one saved email. */
 export function mergeDefaults(kept: SavedPerson, merged: SavedPerson): { name: string; email: string } {
-  const name = !isEmailName(kept.name) ? kept.name : !isEmailName(merged.name) ? merged.name : readableName(kept)
+  const names = [kept.name, merged.name].filter((name) => !isEmailName(name))
+  const name = names.find(hasCapital) ?? names[0] ?? readableName(kept)
   return { name, email: kept.email || merged.email || '' }
+}
+
+function identityRank(person: SavedPerson): number {
+  return (person.email ? 4 : 0) + (isEmailName(person.name) ? 0 : 2) + (hasCapital(person.name) ? 1 : 0)
+}
+
+function hasCapital(name: string): boolean {
+  return name !== name.toLowerCase()
 }
 
 function nameKey(person: SavedPerson): string {
