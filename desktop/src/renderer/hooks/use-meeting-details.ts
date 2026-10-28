@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { MeetingDetail, MeetingListItem } from '../../shared/contracts'
 
 const cache = new Map<string, MeetingDetail>()
 
-/** Loads every Meeting detail once per revision so search and tables can use real content. */
-export function useMeetingDetails(meetings: MeetingListItem[], selected: MeetingDetail | null): Map<string, MeetingDetail> {
+/**
+ * Loads every Meeting detail once per revision so search and tables can use real content.
+ * Also returns `remember`, which stores a newer detail for a Meeting that is not open.
+ */
+export function useMeetingDetails(meetings: MeetingListItem[], selected: MeetingDetail | null): [Map<string, MeetingDetail>, (detail: MeetingDetail) => void] {
   const [details, setDetails] = useState<Map<string, MeetingDetail>>(new Map())
   const signature = meetings.map(keyOf).join('|')
   useEffect(() => {
@@ -12,13 +15,13 @@ export function useMeetingDetails(meetings: MeetingListItem[], selected: Meeting
     void load(meetings).then((next) => { if (active) setDetails(next) })
     return () => { active = false }
   }, [signature])
-  // A speaker label does not change the revision, so the open Meeting's newer detail replaces the cached one.
-  useEffect(() => {
-    if (!selected) return
-    cache.set(keyOf(selected), selected)
-    setDetails((current) => current.has(selected.id) && current.get(selected.id) !== selected ? new Map(current).set(selected.id, selected) : current)
-  }, [selected])
-  return details
+  // A speaker label does not change the revision, so a newer detail replaces the cached one.
+  const remember = useCallback((detail: MeetingDetail) => {
+    cache.set(keyOf(detail), detail)
+    setDetails((current) => current.has(detail.id) && current.get(detail.id) !== detail ? new Map(current).set(detail.id, detail) : current)
+  }, [])
+  useEffect(() => { if (selected) remember(selected) }, [selected, remember])
+  return [details, remember]
 }
 
 async function load(meetings: MeetingListItem[]): Promise<Map<string, MeetingDetail>> {

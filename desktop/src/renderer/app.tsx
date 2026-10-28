@@ -21,11 +21,11 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
-  const meetingDetails = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
+  const [meetingDetails, rememberMeetingDetail] = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
   const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [people, setPeople] = useSavedPeople()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
-  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople })
+  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail })
   const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingDetails, meetingEvents, people, theme, dismissals, actions })
   return <AppShell view={view} />
 }
@@ -70,15 +70,16 @@ type ActionInputs = Pick<Inputs, 'dashboard' | 'permissions' | 'calendar' | 'upd
   setDismissals: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void
   setTheme: (theme: ThemeName) => void
   setPeople: AppActions['peopleChanged']
+  rememberMeetingDetail: (meeting: MeetingDetail) => void
 }
 
 function useAppActions(input: ActionInputs): AppActions {
-  const { dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople } = input
+  const { dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail } = input
   return useMemo(() => ({
     openMeeting: (id) => void dashboard.actions.loadMeeting(id),
     closeMeeting: dashboard.actions.clearSelectedMeeting,
     retryDiarization: dashboard.actions.retryDiarization,
-    meetingUpdated: dashboard.actions.updateMeeting,
+    meetingUpdated: (meeting) => { rememberMeetingDetail(meeting); dashboard.actions.updateMeeting(meeting) },
     deleteMeeting: dashboard.actions.deleteMeeting,
     setDevice: dashboard.actions.setDevice,
     // Without access, Record asks through the same flow as setup, so macOS prompts once and setup shows the result.
@@ -106,7 +107,7 @@ function useAppActions(input: ActionInputs): AppActions {
     setTheme, linkMeetingCalendar,
     // Renames and merges rewrite Meeting transcripts, so reload the Meetings with the People.
     peopleChanged: (people) => { setPeople(people); void dashboard.actions.refreshMeetings().catch(console.error) },
-  }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople])
+  }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail])
 }
 
 function updateActions(update: Inputs['update']) {
