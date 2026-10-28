@@ -49,7 +49,7 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer),
 		Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool),
 		// The reader pool cannot write, so the client list uses the writer pool.
-		Clients: service.NewClientDirectory(uploads.Meeting)}
+		Clients: service.NewClientDirectory(uploads.Meeting), StatsToken: statsToken()}
 	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
@@ -65,6 +65,14 @@ func meetingPool() (service.Uploads, error) {
 	pool, err := service.OpenMeetingPool(context.Background(), os.Getenv("MEETING_STORAGE_DATABASE_URL"))
 	uploads.Meeting = pool
 	return uploads, err
+}
+
+// statsToken returns GAPPD_STATS_TOKEN, or nothing when it is too short to be a secret.
+func statsToken() string {
+	if token := os.Getenv("GAPPD_STATS_TOKEN"); len(token) >= 32 {
+		return token
+	}
+	return ""
 }
 
 // A production deployment must not accept the shared development identity, which cannot verify

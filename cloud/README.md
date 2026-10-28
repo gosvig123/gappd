@@ -19,6 +19,7 @@ Runtime variables. The server refuses to start without the first five:
 - `MCP_RESOURCE_URL`: `https://gappd-cloud-api-production.up.railway.app/mcp`.
 - `GAPPD_PRODUCTION_MODE=true`: refuses a development Clerk issuer.
 - `PORT`: Railway listening port; default `8080`.
+- `GAPPD_STATS_TOKEN` (optional, 32+ characters): enables `GET /usage/totals` for the stats dashboard.
 
 `GET /health` is public liveness; `GET /ready` checks a runtime database connection.
 Both protected-resource metadata paths are public:
@@ -93,6 +94,10 @@ bounded to 1 KiB, one shared budget of 600 a minute (429 beyond), and cross-orig
 answers 204, 400 for any field or value outside the allowlist, and 503 when the database is down.
 The route uses the writer pool, which can only call `record_usage()`: that function adds one to each
 field value's daily total in `usage_daily` and keeps no report. Only the owner can read the table.
+`GET /usage/totals` serves the totals to the private stats dashboard. It exists only when
+`GAPPD_STATS_TOKEN` (32+ characters) is set, needs `Authorization: Bearer <token>` (401 otherwise),
+and uses the read budget. It returns `{"totals":[{day,field,value,reports}]}` from
+`usage_totals()` on the reader pool: the last 400 days, without any total under 5.
 Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
 
 ## Client inventory
@@ -237,7 +242,8 @@ database runs all of them in order. Current schema:
   permanent deletion markers and the guards that enforce them. 011 raises the summary bound.
 - 006 `revoked_grants`, 007 `account_state` (generations), 008 `account_devices`,
   009 `account_clients`, 010 the `cleanup_backlog()` aggregate.
-- 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports.
+- 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports. 015 the
+  `usage_totals()` function, which the reader may call, for the stats dashboard.
 - 001, 002, 003 and 005 created the synthetic read slice and upload demo. 012 removes the demo and
   013 removes the slice (`meetings` and the `cloud_read_meetings` view). The files stay because
   migrations run in order; nothing in the service uses those objects.
@@ -274,9 +280,13 @@ transaction that holds `pg_advisory_xact_lock(74812001)` like `/admin migrate`. 
 its arguments into a remote `bash -c`, so pass the SQL base64-encoded and decode it remotely. No
 admin credential leaves Railway and no public proxy is opened.
 
-Deploy the server that a migration needs before applying a migration that removes objects. For
-013: deploy first, check that `list_meetings` still answers, then apply 013 and remove the unused
-`GAPPD_MEETING_STORAGE_ENABLED` variable from the API service.
+Apply a migration that adds objects before the deploy that uses them. Deploy first when a
+migration removes objects, check that `list_meetings` still answers, then apply it. `/admin migrate`
+checks each version on its own, so one applied out of order does not skip an earlier one; check
+`SELECT version FROM cloud_migrations` before and after.
+
+`railway variable delete` from the CLI does not redeploy; run `railway redeploy` so the running
+service matches its variables.
 
 ## Local/CI checks
 

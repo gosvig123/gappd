@@ -4,7 +4,8 @@ const ACCESS_SCOPES: Record<GoogleAccess, string> = {
   gmail: 'https://www.googleapis.com/auth/gmail.readonly',
   contacts: 'https://www.googleapis.com/auth/contacts.readonly',
 }
-const REVIEW_SWITCHES: Record<GoogleAccess, string> = { gmail: 'GAPPD_GMAIL_REVIEW', contacts: 'GAPPD_CONTACTS_REVIEW' }
+/** Access Google has not verified for `gappd-production`, with the switch that allows it in a development run. */
+const REVIEW_SWITCHES: Partial<Record<GoogleAccess, string>> = { gmail: 'GAPPD_GMAIL_REVIEW' }
 
 export function accessScopes(access: readonly GoogleAccess[]): string[] {
   return access.map((item) => ACCESS_SCOPES[item])
@@ -23,12 +24,15 @@ export function parseGoogleAccess(value: unknown): GoogleAccess[] {
 }
 
 /**
- * Google has not verified the Gmail and Contacts scopes, and it forbids unverified scopes in
- * production traffic. Only an unpackaged development run with a review switch may request them.
+ * Google approved Contacts on 28 October 2026 but has not verified Gmail, and it forbids
+ * unverified scopes in production traffic. Every build offers verified access; only an
+ * unpackaged development run with a review switch may request unverified access.
  */
 export function reviewGoogleAccess(packaged: boolean, env: NodeJS.ProcessEnv): GoogleAccess[] {
-  if (packaged) return []
-  return googleAccessKinds().filter((item) => env[REVIEW_SWITCHES[item]] === '1')
+  return googleAccessKinds().filter((item) => {
+    const reviewSwitch = REVIEW_SWITCHES[item]
+    return !reviewSwitch || (!packaged && env[reviewSwitch] === '1')
+  })
 }
 
 function googleAccessKinds(): GoogleAccess[] {
