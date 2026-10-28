@@ -41,6 +41,23 @@ func appMergePeopleCmd() *cobra.Command {
 	return cmd
 }
 
+func appPersonActionItemsCmd() *cobra.Command {
+	cmd := meetingJSONCommand("person-action-items [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		items, err := store.PersonActionItems(args[0])
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.PersonActionItemsResponse{Items: appprotocol.BuildPersonActionItems(items)})
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	return cmd
+}
+
 func appImportPeopleCmd() *cobra.Command {
 	var contactsJSON string
 	cmd := meetingJSONCommand("import-people", nil, func(_ []string) error {

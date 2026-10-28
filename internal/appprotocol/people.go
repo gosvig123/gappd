@@ -20,6 +20,30 @@ type PeopleResponse struct {
 	People []Person `json:"people"`
 }
 
+type PersonActionItemsInput struct {
+	ID string `json:"id"`
+}
+
+type PersonActionItem struct {
+	MeetingID    string `json:"meetingId"`
+	MeetingTitle string `json:"meetingTitle"`
+	StartedAt    string `json:"startedAt"`
+	Task         string `json:"task"`
+	Deadline     string `json:"deadline,omitempty"`
+}
+
+type PersonActionItemsResponse struct {
+	Items []PersonActionItem `json:"items"`
+}
+
+func BuildPersonActionItems(items []db.PersonActionItem) []PersonActionItem {
+	result := make([]PersonActionItem, 0, len(items))
+	for _, item := range items {
+		result = append(result, PersonActionItem(item))
+	}
+	return result
+}
+
 type UpdatePersonInput struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`

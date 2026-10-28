@@ -28,9 +28,7 @@ test('erasing every copy needs its own confirmation and clears the queue', async
 })
 
 test('allowing uploads again remembers the generation and signs with it', async () => {
-  const h = harness({ fetcher: async (input) => input.toString().endsWith('/consent')
-    ? Response.json({ status: 'allowed', subject: 'user_a', generation: 5 })
-    : accepted(1) })
+  const h = harness({ consentGeneration: 5 })
   await h.upload.setConsent('user_a', true)
   const status = await h.upload.allowUploads()
   assert.match(status.result || '', /generation 5/)

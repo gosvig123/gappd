@@ -77,6 +77,9 @@ export class MeetingUpload {
     if (generation !== this.generation) return this.status()
     this.stored.upload = grantedConsent(saved)
     if (saved) {
+      // The server keeps its own record of this consent; without it every upload is refused.
+      await consentToUploads(this.context(), saved.subject)
+      if (generation !== this.generation) return this.status()
       this.startRetryTimer()
       await this.refresh(true)
     }
@@ -311,7 +314,7 @@ function backfillMessage(queued: number, unreadable: number, queue: MeetingUploa
 import { acceptedMessage } from './upload-ack.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { allowUploadsAgain, deleteAllCloudData, listKnownClients, revokeClientAccess } from './upload-actions.ts'
+import { allowUploadsAgain, consentToUploads, deleteAllCloudData, listKnownClients, revokeClientAccess } from './upload-actions.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { deleteCloudCopy } from './upload-delete.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.

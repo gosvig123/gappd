@@ -154,10 +154,17 @@ identity deleted, removes the content, and closes uploads under a new generation
 under the same account lock as an upload, so a write cannot race the deletion. The response reports
 how many copies were removed.
 
-Uploads then stay closed until an explicit `POST /consent`, which opens them again and issues a new
-generation. An upload must present that generation in `X-Gappd-Generation`; a device that never
-learned it is refused with 409. A blocked account is refused with 403. An account with no state row,
-which is every account before its first deletion, has uploads open and nothing to match.
+Upload consent is a recorded account state. The desktop sends `POST /consent` when the user turns
+sync on, and an account with no state row never consented, so its uploads are refused with 403 like a
+blocked account. The first consent issues generation 0, which a write without `X-Gappd-Generation`
+presents. Migration 016 gave every account that already had a device or a copy an open row at
+generation 0, because those users consented on their Mac before the server recorded it.
+
+After a deletion, uploads stay closed until an explicit `POST /consent`, which opens them again and
+issues a new generation. An upload must present that generation in `X-Gappd-Generation`; a device that
+never learned it is refused with 409. A consent while uploads are already open keeps the generation,
+so a second Mac that turns sync on does not make the first one stale. Old desktop builds that do not
+consent on sync recover with **Allow uploads again**, which their 403 message already names.
 
 Two properties to keep in mind:
 
@@ -244,6 +251,9 @@ database runs all of them in order. Current schema:
   009 `account_clients`, 010 the `cleanup_backlog()` aggregate.
 - 014 `usage_daily` and the `record_usage()` function for anonymous Usage reports. 015 the
   `usage_totals()` function, which the reader may call, for the stats dashboard.
+- 016 allows generation 0 and records consent for accounts that uploaded before consent was recorded.
+  Apply it before the deploy that refuses accounts without a state row, then run its `INSERT` again
+  after that deploy for accounts that started uploading in between; the `INSERT` is idempotent.
 - 001, 002, 003 and 005 created the synthetic read slice and upload demo. 012 removes the demo and
   013 removes the slice (`meetings` and the `cloud_read_meetings` view). The files stay because
   migrations run in order; nothing in the service uses those objects.

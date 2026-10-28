@@ -52,7 +52,7 @@ type RecordedRequest = {
   generation: string | null
 }
 
-type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
+type HarnessOptions = { auth?: Authorization; queue?: MeetingSyncQueue; fetcher?: typeof fetch; saved?: CloudCredential | null; deviceStatus?: number; consentGeneration?: number; meetings?: MeetingListItem[]; load?: (localId: string, revision: number) => Promise<string> }
 
 /**
  * One Meeting list row, shaped as the app protocol sends it. Capture and processing statuses
@@ -73,15 +73,16 @@ export function harness(options: HarnessOptions = {}) {
   let saved: CloudCredential | null = options.saved === undefined ? credential() : options.saved
   const requests: RecordedRequest[] = []
   const registrations: string[] = []
+  const consents: string[] = []
   const auth = options.auth ?? buildAuth(() => saved, (next) => { saved = next })
   const upload = new MeetingUpload(auth, 'https://example.test/mcp',
     options.queue ?? new MeetingSyncQueue(new FakeStore('/tmp/unused.enc', cipher)),
     options.load ?? (async (_localId, revision) => `{"version":1,"revision":${revision}}`),
     async () => options.meetings ?? [],
     new MeetingDevice(new DeviceStore('/tmp/unused.enc', cipher)),
-    recordingFetcher(options, requests, registrations))
+    recordingFetcher(options, requests, registrations, consents))
   return {
-    upload, auth, requests, registrations, sends: () => requests.length,
+    upload, auth, requests, registrations, consents, sends: () => requests.length,
     switch: (value: CloudCredential | null) => { saved = value },
   }
 }
@@ -97,13 +98,17 @@ function buildAuth(current: () => CloudCredential | null, set: (value: CloudCred
   return auth
 }
 
-// Registration is recorded separately from the writes, so a write assertion stays readable.
-function recordingFetcher(options: HarnessOptions, requests: RecordedRequest[], registrations: string[]): typeof fetch {
+// Registration and consent are recorded separately from the writes, so a write assertion stays readable.
+function recordingFetcher(options: HarnessOptions, requests: RecordedRequest[], registrations: string[], consents: string[]): typeof fetch {
   return async (input, init) => {
     if (String(input).endsWith('/device')) {
       registrations.push(String(init?.body))
       if (options.deviceStatus && options.deviceStatus !== 200) return new Response('no', { status: options.deviceStatus })
       return Response.json({ status: 'registered', device_id: 'x' })
+    }
+    if (String(input).endsWith('/consent')) {
+      consents.push(new Headers(init?.headers).get('X-Gappd-Generation') ?? '')
+      return Response.json({ status: 'allowed', subject: 'user_a', generation: options.consentGeneration ?? 0 })
     }
     const header = new Headers(init?.headers)
     requests.push({

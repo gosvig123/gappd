@@ -37,6 +37,22 @@ export type MergePeopleInput = {
   email?: string
 }
 
+export type PersonActionItemsInput = {
+  id: string
+}
+
+export type PersonActionItemsResponse = {
+  items: PersonActionItem[]
+}
+
+export type PersonActionItem = {
+  meetingId: string
+  meetingTitle: string
+  startedAt: string
+  task: string
+  deadline?: string
+}
+
 export type ImportPeopleInput = {
   contacts: string
 }

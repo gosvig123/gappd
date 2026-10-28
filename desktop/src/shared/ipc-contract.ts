@@ -4,7 +4,7 @@ import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, Rec
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
 import type { UsageReportStatus, UsageReportView } from './usage-report'
-import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
+import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, PersonActionItem, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
 export type CapturePermissionTarget = 'microphone' | 'screen-recording'
@@ -42,6 +42,7 @@ export type IpcInvokeContract = {
     people: OperationSpec<[], SavedPerson[]>
     updatePerson: OperationSpec<[input: UpdatePersonInput], SavedPerson[]>
     mergePeople: OperationSpec<[input: MergePeopleInput], SavedPerson[]>
+    personActionItems: OperationSpec<[id: string], PersonActionItem[]>
     importGoogleContacts: OperationSpec<[], ImportPeopleResult>
     assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
@@ -114,7 +115,7 @@ export const IPC_OPERATIONS = {
   },
   meetings: {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
-    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', importGoogleContacts: 'meetings:importGoogleContacts', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
+    people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', personActionItems: 'meetings:personActionItems', importGoogleContacts: 'meetings:importGoogleContacts', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
     exportRecording: 'meetings:exportRecording',
   },

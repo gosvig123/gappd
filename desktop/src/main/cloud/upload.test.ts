@@ -68,7 +68,9 @@ test('a Mac that cannot register sends nothing', async () => {
   await h.upload.enqueue(MEETING)
   const status = await h.upload.sync()
   assert.equal(h.sends(), 0)
-  assert.equal(h.registrations.length, 1)
+  // Consent and sync each try to register; neither sends anything without a device.
+  assert.equal(h.registrations.length, 2)
+  assert.equal(h.consents.length, 0)
   assert.match(status.result || '', /could not register/)
 })
 

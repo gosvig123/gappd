@@ -27,6 +27,16 @@ module.exports = {
     { from: 'resources/llamacpp', to: 'llamacpp' },
     { from: 'resources/ffmpeg', to: 'ffmpeg' },
   ],
+  // Without these fuses, any local process could start the signed app as plain Node or with an
+  // inspector, and so use its microphone, Screen Recording and Keychain access.
+  electronFuses: {
+    runAsNode: false,
+    enableNodeOptionsEnvironmentVariable: false,
+    enableNodeCliInspectArguments: false,
+    enableEmbeddedAsarIntegrityValidation: true,
+    onlyLoadAppFromAsar: true,
+    enableCookieEncryption: true,
+  },
   afterPack: hooks.afterPack,
   afterSign: hooks.afterSign,
   mac: {

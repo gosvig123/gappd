@@ -48,6 +48,10 @@ export async function updatePerson(input: UpdatePersonInput) {
   return people
 }
 
+export async function personActionItems(id: string) {
+  return (await requestCommand('meetings.personActionItems', { id })).items
+}
+
 export async function mergePeople(input: MergePeopleInput) {
   const { people } = await requestCommand('meetings.mergePeople', input)
   requestDrains()

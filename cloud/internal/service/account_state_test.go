@@ -124,7 +124,7 @@ func consent(t *testing.T, host, token string) int {
 		t.Fatalf("consent: %d %v", code, ack)
 	}
 	generation := int(ack["generation"].(float64))
-	if generation < 2 {
+	if generation < 1 {
 		t.Fatalf("consent did not issue a new generation: %d", generation)
 	}
 	return generation
