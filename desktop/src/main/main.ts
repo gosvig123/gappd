@@ -1,5 +1,6 @@
 import { initializeSelectedFixtureProfile } from './selected-fixture-profile'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor, protocol } from 'electron'
 import { registerIpc } from './ipc'
 import { registerMeetingMedia } from './meeting-media'
@@ -50,7 +51,13 @@ function createWindow(show = true): void {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: true,
     },
+  })
+  // The window holds the full preload API, so it never opens or leaves the app's own page.
+  createdWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  createdWindow.webContents.on('will-navigate', (event, url) => {
+    if (!isRendererUrl(url)) event.preventDefault()
   })
 
   mainWindow = createdWindow
@@ -68,14 +75,33 @@ function showMainWindow(): void {
   mainWindow.focus()
 }
 
+/** A packaged build ignores the dev server, so an environment variable cannot replace the app's page. */
+function devServerUrl(): string | undefined {
+  return app.isPackaged ? undefined : process.env.VITE_DEV_SERVER_URL
+}
+
+function rendererEntryUrl(): string {
+  return devServerUrl() || pathToFileURL(path.join(__dirname, '../../dist/index.html')).href
+}
+
+function isRendererUrl(url: string): boolean {
+  try {
+    const entry = new URL(rendererEntryUrl())
+    const target = new URL(url)
+    return target.protocol === entry.protocol && target.host === entry.host && target.pathname === entry.pathname
+  } catch {
+    return false
+  }
+}
+
 function loadRenderer(createdWindow: BrowserWindow): void {
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL
-  if (devServerUrl) {
-    void createdWindow.loadURL(devServerUrl)
+  const devUrl = devServerUrl()
+  if (devUrl) {
+    void createdWindow.loadURL(devUrl)
     if (process.env.OPEN_DEVTOOLS === '1') createdWindow.webContents.openDevTools({ mode: 'detach' })
     return
   }
-  void createdWindow.loadFile(path.join(__dirname, '../../dist/index.html'))
+  void createdWindow.loadURL(rendererEntryUrl())
 }
 
 app.whenReady().then(async () => {
