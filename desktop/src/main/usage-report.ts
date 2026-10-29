@@ -38,7 +38,11 @@ let timer: NodeJS.Timeout | null = null
 export function startUsageReports(): void {
   if (timer) return
   // Note the launch day at once, so a session that ends before the first check still counts.
-  noteToday()
+  try {
+    noteToday()
+  } catch (error) {
+    console.error('Usage report could not note the launch day', error)
+  }
   timer = setTimeout(function tick() {
     void reportPreviousDay().catch((error) => console.error('Usage report skipped for today', error))
     timer = setTimeout(tick, CHECK_INTERVAL_MS)
