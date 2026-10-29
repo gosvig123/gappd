@@ -60,11 +60,12 @@
 .app-main {
   min-inline-size: 0;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  /* Record bar, setup checklist, account prompt, then the scrolling view. */
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
-.app-scroll { grid-row: 3; min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
+.app-scroll { grid-row: 4; min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
 
 .app-icon-action {
   display: grid;

@@ -4,6 +4,7 @@ import { buildAlerts } from '../lib/alerts'
 import { MeetingsView } from '../views/meetings'
 import { PeopleView } from '../views/people'
 import { TodayView } from '../views/today'
+import { AccountPrompt } from './account-prompt'
 import { AppSidebar, type SectionKey } from './app-sidebar'
 import { useConfirm } from './confirm'
 import { NotificationStack, useMeetingReadyNotices } from './notifications'
@@ -49,6 +50,7 @@ function useShellController(view: AppView) {
 
 function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof useShellController> }) {
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
+    <AccountPrompt view={view} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}

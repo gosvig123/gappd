@@ -1,4 +1,5 @@
 import type { CalendarSnapshot } from '../../shared/calendar-contract'
+import type { CloudAuthStatus } from '../../shared/cloud-auth-contract'
 import type { ManagedRuntimeSnapshot } from '../../shared/contracts'
 import type { UsageSharing } from '../../shared/usage-report'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
@@ -6,6 +7,7 @@ import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
 export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done' | 'skipped'
 
 export type SetupSteps = {
+  account: SetupStepState | null
   recording: SetupStepState | null
   speech: SetupStepState | null
   notes: SetupStepState | null
@@ -15,6 +17,9 @@ export type SetupSteps = {
 
 export type SetupSkips = { notes: boolean; calendar: boolean }
 
+/** The account step asks only new installs. answered is true after a skip or a sign-in. */
+export type AccountAsk = { account: CloudAuthStatus | null; asks: boolean | null; answered: boolean }
+
 const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_runtime', 'pulling_model', 'saving_config'])
 
 /**
@@ -22,8 +27,8 @@ const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_
  * not apply. Unknown steps never show the checklist, so returning users do not
  * see it flash while status loads.
  */
-export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips, usage: UsageSharing | null): SetupSteps {
-  return { recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar), usage: usageStep(usage) }
+export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips, usage: UsageSharing | null, account: AccountAsk): SetupSteps {
+  return { account: accountStep(account), recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar), usage: usageStep(usage) }
 }
 
 /** The checklist stays while any step that applies is not done or skipped. */
@@ -51,6 +56,14 @@ export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): Notes
   if (!runtime || runtime.operation === 'checking') return null
   if (runtime.capabilities.summarization.readiness === 'ready') return 'ready'
   return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
+}
+
+/** The account comes first. Once it is answered, a later sign-out does not ask again. */
+function accountStep({ account, asks, answered }: AccountAsk): SetupStepState | null {
+  if (!asks || !account) return null
+  if (account.email) return 'done'
+  if (account.pending) return 'working'
+  return answered ? 'skipped' : 'todo'
 }
 
 function recordingStep(permission: SetupPermissionStatus): SetupStepState | null {
