@@ -31,11 +31,13 @@ together and raise `v` when a field changes meaning.
 
 ## How it is sent
 
-`desktop/src/main/usage-report.ts` checks every hour; the first check waits a random 5 to 60
-minutes after launch. When the local day changed, it builds the report for the day that ended from
-data already on the Mac (the Meeting list and settings) and sends it with `POST /usage`. Gappd keeps
-no usage log: only the sharing choice, the install week, the current day and the last report, in
-`usage-report.json` in the app data folder. A failed send is dropped, not retried.
+`desktop/src/main/usage-report.ts` notes the local day at launch, so a short session still counts.
+When the day changed, the day that ended waits for the next check (only the newest one waits). The
+app checks every hour; the first check waits a random 5 to 60 minutes after launch. A check builds
+the report for the waiting day from data already on the Mac (the Meeting list and settings) and
+sends it with `POST /usage`. Gappd keeps no usage log: only the sharing choice, the install week, the
+current day, the waiting day and the last report, in `usage-report.json` in the app data folder. A
+failed send is dropped, not retried.
 
 A development run never sends to production. It sends only when `GAPPD_USAGE_REPORT_URL` is set,
 for example to a local cloud server (`http://127.0.0.1:58080/usage`). With that variable set, the
