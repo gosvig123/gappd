@@ -1,6 +1,7 @@
 import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calendar-contract'
 import type { Device, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from '../../shared/contracts'
 import type { ManagedRuntimeSnapshot } from '../../shared/managed-runtime'
+import type { Agenda } from '../../shared/agenda'
 import type { LinkCalendarInput, ParticipantContext, SavedPerson } from '../../shared/participant-contract'
 import { meetingProgressLabel } from '../components/meeting/progress'
 import { contactName } from './person-identity'
@@ -18,6 +19,8 @@ export type AppView = {
   meetingDetails: Map<string, MeetingDetail>
   meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]
+  /** Saved Agendas by Calendar event key. */
+  agendas: Record<string, Agenda> | null
   selectedMeetingId: string | null
   selectedMeeting: MeetingDetail | null
   selectedMeetingLoading: boolean

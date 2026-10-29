@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { CalendarEventSummary } from '../../shared/calendar-contract'
 import type { PersonActionItem, SavedPerson } from '../../shared/participant-contract'
+import { AgendaButton, AgendaPanel } from '../components/agenda'
 import { PersonEmail } from '../components/person-email'
 import { errorText, PersonEditor, PersonMerge } from '../components/person-forms'
 import { Button } from '../components/ui'
@@ -41,13 +42,7 @@ export function PersonPage({ person, view, canEmail, onBack }: Props) {
         <section className="app-block" aria-label="Next">
           <div className="app-block-head"><h2>Next</h2></div>
           <ul className="app-person-list">
-            {events.map((event) => (
-              <li key={event.sourceId} className="app-recent-row">
-                <span className="app-recent-time">{shortDate(event.start)}</span>
-                <span className="app-person-item-title">{event.title || 'Untitled event'}</span>
-                <span className="app-block-note">{eventTime(event)}</span>
-              </li>
-            ))}
+            {events.map((event) => <NextEventRow key={event.sourceId} event={event} view={view} />)}
           </ul>
         </section>
       ) : null}
@@ -85,6 +80,21 @@ export function PersonPage({ person, view, canEmail, onBack }: Props) {
         ) : <p className="app-block-note app-person-empty">No Meeting speaker is labeled as {firstName} yet.</p>}
       </section>
     </div>
+  )
+}
+
+function NextEventRow({ event, view }: { event: CalendarEventSummary; view: AppView }) {
+  const [agendaOpen, setAgendaOpen] = useState(false)
+  return (
+    <li className="app-recent-row app-person-event">
+      <span className="app-recent-time">{shortDate(event.start)}</span>
+      <span className="app-person-item-title">{event.title || 'Untitled event'}</span>
+      <span className="app-timeline-actions">
+        <span className="app-block-note">{eventTime(event)}</span>
+        <AgendaButton event={event} view={view} open={agendaOpen} onToggle={() => setAgendaOpen(!agendaOpen)} />
+      </span>
+      {agendaOpen ? <AgendaPanel event={event} view={view} /> : null}
+    </li>
   )
 }
 

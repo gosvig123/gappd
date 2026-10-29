@@ -4,6 +4,7 @@ import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, Rec
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
 import type { UsageReportStatus, UsageReportView } from './usage-report'
+import type { Agenda, AgendaItem } from './agenda'
 import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, PersonActionItem, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
 
@@ -12,7 +13,7 @@ export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
-export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean; agendaAutoDraftEnabled: boolean }
 export type { AgentId } from './agents'
 /** The newest install of one agent CLI on this Mac. executable is empty when it is not installed. */
 export type AgentInstall = { agent: AgentId; executable: string; version: string; signedIn: boolean }
@@ -49,6 +50,11 @@ export type IpcInvokeContract = {
     participantContext: OperationSpec<[id: string], ParticipantContext>
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
     exportRecording: OperationSpec<[id: string], boolean>
+  }
+  agenda: {
+    list: OperationSpec<[], Record<string, Agenda>>
+    draft: OperationSpec<[eventKey: string], Agenda>
+    save: OperationSpec<[eventKey: string, items: AgendaItem[]], Agenda>
   }
   recording: {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
@@ -87,6 +93,7 @@ export type IpcInvokeContract = {
     setOpenAtLogin: OperationSpec<[openAtLogin: boolean], StartupSettings>
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
     setScreenVideoEnabled: OperationSpec<[enabled: boolean], StartupSettings>
+    setAgendaAutoDraftEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
   usage: {
     status: OperationSpec<[], UsageReportStatus>
@@ -119,6 +126,7 @@ export const IPC_OPERATIONS = {
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
     exportRecording: 'meetings:exportRecording',
   },
+  agenda: { list: 'agenda:list', draft: 'agenda:draft', save: 'agenda:save' },
   recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureAgent: 'aiProvider:configureAgent', useLocal: 'aiProvider:useLocal' },
@@ -137,6 +145,7 @@ export const IPC_OPERATIONS = {
     getSettings: 'startup:getSettings',
     setOpenAtLogin: 'startup:setOpenAtLogin',
     setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled', setScreenVideoEnabled: 'startup:setScreenVideoEnabled',
+    setAgendaAutoDraftEnabled: 'startup:setAgendaAutoDraftEnabled',
   },
   usage: { status: 'usage:status', setSharing: 'usage:setSharing', report: 'usage:report' },
 } as const satisfies IpcOperationChannels
@@ -150,6 +159,9 @@ export const IPC_EVENTS = {
   },
   googleCalendar: {
     changed: 'googleCalendar:changed',
+  },
+  agenda: {
+    changed: 'agenda:changed',
   },
   update: {
     statusChanged: 'update:status-changed',
@@ -165,6 +177,9 @@ export type GappdApi = IpcInvokeApi & {
   }
   googleCalendar: IpcInvokeApi['googleCalendar'] & {
     onChanged(listener: (snapshot: CalendarSnapshot) => void): () => void
+  }
+  agenda: IpcInvokeApi['agenda'] & {
+    onChanged(listener: (agendas: Record<string, Agenda>) => void): () => void
   }
   update: IpcInvokeApi['update'] & {
     onStatusChanged(listener: (state: UpdateStatus) => void): () => void

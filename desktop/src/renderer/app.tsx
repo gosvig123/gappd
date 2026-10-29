@@ -4,6 +4,7 @@ import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { SavedPerson } from '../shared/participant-contract'
 import { AppShell } from './components/app-shell'
 import { useSavedPeople } from './hooks/use-app-data'
+import { useAgendas } from './hooks/use-agendas'
 import { useDashboardData } from './hooks/use-dashboard-data'
 import { useGoogleCalendar } from './hooks/use-google-calendar'
 import { useManagedRuntime } from './hooks/use-managed-runtime'
@@ -24,9 +25,10 @@ export function App() {
   const [meetingDetails, rememberMeetingDetail] = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
   const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
   const [people, setPeople] = useSavedPeople()
+  const agendas = useAgendas()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
   const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail })
-  const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingDetails, meetingEvents, people, theme, dismissals, actions })
+  const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingDetails, meetingEvents, people, agendas, theme, dismissals, actions })
   return <AppShell view={view} />
 }
 
@@ -39,6 +41,7 @@ type Inputs = {
   meetingDetails: Map<string, MeetingDetail>
   meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]
+  agendas: AppView['agendas']
   theme: ThemeName
   dismissals: ReadonlySet<string>
   actions: AppActions
@@ -48,7 +51,7 @@ function buildView(input: Inputs): AppView {
   const { dashboard, permissions, calendar, update, runtime } = input
   return {
     meetings: dashboard.meetings, meetingDetails: input.meetingDetails, meetingEvents: input.meetingEvents,
-    people: input.people,
+    people: input.people, agendas: input.agendas,
     selectedMeetingId: dashboard.selectedMeetingId, selectedMeeting: dashboard.selectedMeeting,
     selectedMeetingLoading: dashboard.selectedMeetingLoading, selectedMeetingError: dashboard.selectedMeetingError,
     transcript: dashboard.transcript,

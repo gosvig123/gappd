@@ -14,6 +14,7 @@ import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { startStorageCompaction, stopStorageCompaction } from './storage-compaction'
 import { startCalendarRefresh, stopCalendarRefresh } from './google/calendar-refresh'
+import { startAgendaAutoDraft, stopAgendaAutoDraft } from './agenda'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 import { startUsageReports, stopUsageReports } from './usage-report'
@@ -119,6 +120,7 @@ app.whenReady().then(async () => {
   startMeetingPresence(showMainWindow)
   startStorageCompaction()
   startCalendarRefresh()
+  startAgendaAutoDraft()
   startAutoUpdateChecks()
   startUsageReports()
   logMainProcessMemory('ready')
@@ -149,6 +151,7 @@ async function shutdown(): Promise<void> {
   stopStaleRecordingRecovery()
   stopStorageCompaction()
   stopCalendarRefresh()
+  stopAgendaAutoDraft()
   await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()

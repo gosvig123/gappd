@@ -3,6 +3,7 @@ import type { AssignSpeakerInput, MergePeopleInput, SpeakerClipInput, UpdatePers
 import { requestCommand } from './app-protocol'
 import { requestDrains } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
+import { forgetAgendaMeeting } from './agenda'
 
 export async function getDevices(): Promise<Device[]> {
   const result = await requestCommand('devices.list', {})
@@ -32,6 +33,10 @@ export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> 
   })
   await forgetMeetingCalendar(id).catch((cause) => {
     console.error('Meeting context cleanup failed:', cause)
+    result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
+  })
+  await forgetAgendaMeeting(id).catch((cause) => {
+    console.error('Meeting agenda cleanup failed:', cause)
     result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
   })
   return result

@@ -31,6 +31,12 @@ Optional extra read-only access on a **Google Calendar connection**: Gmail (rece
 **Installed agent**:
 An AI agent CLI on this Mac (Codex, Claude Code, or Pi) that Gappd runs headless with the user's own sign-in to make Meeting notes.
 
+**Agenda**:
+The editable list of points for one upcoming Calendar event, saved on this Mac by that event. AI drafts it from the notes of **Related Meetings**; the user can change, add, or remove items.
+
+**Related Meeting**:
+An earlier **Meeting** with notes whose linked Calendar event is in the same recurring series as an upcoming event, or whose people (linked **Calendar invitees** and labeled **Persons**) overlap that event's invitees enough. The user's own accounts never count.
+
 **Cloud upload consent**:
 Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
 
@@ -67,6 +73,7 @@ One anonymous daily set of counts and settings (buckets and fixed values only) t
 - **Installed agent** operations use one model and one reasoning effort from that agent's model catalog (Codex: its app-server catalog; Claude Code: its model aliases; Pi: `pi --list-models`). An unset model uses the catalog default (Codex `gpt-5.6-terra`/medium, Claude Code `sonnet`/medium, Pi the user's own Pi default), and Gappd never substitutes a model or effort the catalog does not advertise.
 - Gappd runs an **Installed agent** without tools, in an empty folder, with a minimal environment. Codex and Claude Code also ignore the user's own customizations; Pi keeps the user's Pi extensions, so extension model providers stay available.
 - Gappd suggests Calendar events that overlap a **Meeting**; only the user's choice links one, and a suggestion never confirms attendance or identifies a **Meeting speaker**.
+- An **Agenda** uses only Calendar events the user linked to a **Meeting**, never suggestions. With no **Related Meeting**, Gappd calls no AI and writes no Agenda points. Every drafted point cites the Related Meetings it came from. An Agenda stays on this Mac and never syncs. Automatic drafting 15 minutes before an event is off by default.
 
 ## Example dialogue
 
