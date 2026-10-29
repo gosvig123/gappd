@@ -13,6 +13,7 @@ function buildOperationApi(): IpcInvokeApi {
   return {
     system: invokeGroup('system'),
     meetings: invokeGroup('meetings'),
+    agenda: invokeGroup('agenda'),
     recording: invokeGroup('recording'),
     managedRuntime: invokeGroup('managedRuntime'),
     aiProvider: invokeGroup('aiProvider'),
@@ -46,6 +47,7 @@ const api: GappdApi = {
   recording: { ...operationApi.recording, onStatusChanged: subscribe(IPC_EVENTS.recording.statusChanged) },
   managedRuntime: { ...operationApi.managedRuntime, observe: subscribe(IPC_EVENTS.managedRuntime.changed) },
   googleCalendar: { ...operationApi.googleCalendar, onChanged: subscribe(IPC_EVENTS.googleCalendar.changed) },
+  agenda: { ...operationApi.agenda, onChanged: subscribe(IPC_EVENTS.agenda.changed) },
   update: { ...operationApi.update, onStatusChanged: subscribe(IPC_EVENTS.update.statusChanged) },
 }
 

@@ -27,12 +27,22 @@ const PROBE_FIRST_CHECK_MS = 10_000
 const SEND_TIMEOUT_MS = 10_000
 const ONE_DAY_MS = 86_400_000
 
-type StoredUsage = { version: 1; sharing: UsageSharing; installWeek: string; day: string; lastReport: UsageReport | null; lastSentAt: string | null }
+// `day` is the last local day the app ran; `pendingDay` is the ended day that the next check reports.
+type StoredUsage = {
+  version: 1; sharing: UsageSharing; installWeek: string; day: string; pendingDay?: string | null
+  lastReport: UsageReport | null; lastSentAt: string | null
+}
 
 let timer: NodeJS.Timeout | null = null
 
 export function startUsageReports(): void {
   if (timer) return
+  // Note the launch day at once, so a session that ends before the first check still counts.
+  try {
+    noteToday()
+  } catch (error) {
+    console.error('Usage report could not note the launch day', error)
+  }
   timer = setTimeout(function tick() {
     void reportPreviousDay().catch((error) => console.error('Usage report skipped for today', error))
     timer = setTimeout(tick, CHECK_INTERVAL_MS)
@@ -60,16 +70,26 @@ export async function usageReportView(): Promise<UsageReportView> {
   return { report: await buildReport(localDay(new Date()), stored.installWeek), sentAt: null }
 }
 
-/** When the local day changed since the last check, report the day that ended. */
-async function reportPreviousDay(): Promise<void> {
+/** When the local day changed, the day that ended waits for the next check. Only the newest one is kept. */
+function noteToday(): StoredUsage {
   const stored = readStored()
   const today = localDay(new Date())
-  if (stored.day === today) return
-  // Move to today first, so an error or a quit can never send one day twice.
-  writeStored({ ...stored, day: today })
+  if (stored.day === today) return stored
+  const next = { ...stored, day: today, pendingDay: stored.day || stored.pendingDay || null }
+  writeStored(next)
+  return next
+}
+
+/** Report the day that ended, if there is one. */
+async function reportPreviousDay(): Promise<void> {
+  const stored = noteToday()
+  const day = stored.pendingDay
+  if (!day) return
+  // Clear it first, so an error or a quit can never send one day twice.
+  writeStored({ ...stored, pendingDay: null })
   const url = reportUrl()
-  if (!stored.day || stored.sharing !== 'on' || !url) return
-  const report = await buildReport(stored.day, stored.installWeek)
+  if (stored.sharing !== 'on' || !url) return
+  const report = await buildReport(day, stored.installWeek)
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(report), signal: AbortSignal.timeout(SEND_TIMEOUT_MS) })
   if (!response.ok) throw new Error(`Usage report was refused with HTTP ${response.status}; it is dropped, and tomorrow's report is sent as usual.`)

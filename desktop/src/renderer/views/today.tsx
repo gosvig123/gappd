@@ -1,5 +1,7 @@
+import { useState } from 'react'
 import { CalendarDays, CircleAlert, Clock, MapPin, Video } from 'lucide-react'
-import type { CalendarEventSummary, CalendarSnapshot } from '../../shared/calendar-contract'
+import { AgendaButton, AgendaPanel } from '../components/agenda'
+import { calendarEventKey, type CalendarEventSummary, type CalendarSnapshot } from '../../shared/calendar-contract'
 import type { MeetingListItem } from '../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../shared/meeting-recording-workflow'
 import { meetingHasWork, meetingProgressLabel } from '../components/meeting/progress'
@@ -51,6 +53,8 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
   const people = eventPeople(event, view.people)
   const place = eventPlace(event)
   const Place = place?.call ? Video : MapPin
+  const [agendaOpen, setAgendaOpen] = useState(false)
+  const showAgenda = !past || Boolean(view.agendas?.[calendarEventKey(event)])
   return (
     <li className={cx('app-timeline-row', past && 'is-past', now && 'is-now', next && 'is-next')}>
       <div className="app-timeline-when">
@@ -64,7 +68,11 @@ function TimelineRow({ event, next, view }: { event: CalendarEventSummary; next:
           {place ? <span className="app-timeline-place"><Place aria-hidden="true" />{place.label}</span> : null}
         </div>
       </div>
-      {past ? null : <Button variant={now || next ? 'primary' : 'secondary'} className={cx('compact-action', !(now || next) && 'app-reveal')} disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>}
+      <span className="app-timeline-actions">
+        {showAgenda ? <AgendaButton event={event} view={view} open={agendaOpen} onToggle={() => setAgendaOpen(!agendaOpen)} /> : null}
+        {past ? null : <Button variant={now || next ? 'primary' : 'secondary'} className={cx('compact-action', !(now || next) && 'app-reveal')} disabled={!view.canStart} title={view.canStart ? undefined : 'Connect an audio input to record'} onClick={() => view.actions.start(event.sourceId)}>Record</Button>}
+      </span>
+      {agendaOpen ? <AgendaPanel event={event} view={view} /> : null}
     </li>
   )
 }
@@ -94,14 +102,23 @@ function UpNext({ view }: { view: AppView }) {
     <div className="app-upcoming">
       <p className="app-upcoming-note"><Clock aria-hidden="true" /> Nothing left today. Next up:</p>
       <ul>
-        {events.map((event) => (
-          <li key={event.sourceId}>
-            <div><strong>{event.title}</strong><span>{eventTimeRange(event)}</span></div>
-            <Button className="compact-action" disabled={!view.canStart} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
-          </li>
-        ))}
+        {events.map((event) => <UpNextRow key={event.sourceId} event={event} view={view} />)}
       </ul>
     </div>
+  )
+}
+
+function UpNextRow({ event, view }: { event: CalendarEventSummary; view: AppView }) {
+  const [agendaOpen, setAgendaOpen] = useState(false)
+  return (
+    <li>
+      <div><strong>{event.title}</strong><span>{eventTimeRange(event)}</span></div>
+      <span className="app-timeline-actions">
+        <AgendaButton event={event} view={view} open={agendaOpen} onToggle={() => setAgendaOpen(!agendaOpen)} />
+        <Button className="compact-action" disabled={!view.canStart} onClick={() => view.actions.start(event.sourceId)}>Record</Button>
+      </span>
+      {agendaOpen ? <AgendaPanel event={event} view={view} /> : null}
+    </li>
   )
 }
 

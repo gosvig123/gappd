@@ -54,7 +54,10 @@ railway up --service 7407bf7c-600e-4a4c-928d-bf4c02747463 \
 
 Wait for CI on the commit first. Then confirm the deployment reports `SUCCESS`, and check `/health`,
 `/ready`, `/status`, a 401 for `/mcp` without a token, and one authenticated `list_meetings` call.
-`railway up` from `/cloud` does not resolve the Dockerfile path. Apply database migrations as the
+`railway up` from `/cloud` does not resolve the Dockerfile path. The watch pattern `/cloud/**`
+compares an upload with the last attempted deployment, so after a failed one the same files are
+`SKIPPED` ("No changes to watched files"). Then deploy the pushed commit once with
+`railway redeploy --service … --commit <sha> --yes`. Apply database migrations as the
 [runbook](../cloud/README.md#applying-a-migration-in-production) describes.
 
 ## Identity (Clerk)

@@ -13,10 +13,11 @@ import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
+import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
-import { getStartupSettings, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
+import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
 
@@ -50,6 +51,11 @@ const IPC_HANDLERS: MainHandlers = {
     participantContext: (_event, id) => participantContext(id),
     linkCalendar: (_event, input) => linkCalendar(input),
     exportRecording: (_event, id: string) => exportRecording(id),
+  },
+  agenda: {
+    list: () => listAgendas(),
+    draft: (_event, eventKey: string) => draftAgenda(String(eventKey)),
+    save: (_event, eventKey: string, items: unknown) => saveAgendaItems(String(eventKey), items),
   },
   recording: {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
@@ -89,6 +95,7 @@ const IPC_HANDLERS: MainHandlers = {
     setOpenAtLogin: (_event, openAtLogin: boolean) => setOpenAtLogin(openAtLogin),
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
     setScreenVideoEnabled: (_event, enabled: boolean) => setScreenVideoEnabled(enabled),
+    setAgendaAutoDraftEnabled: (_event, enabled: boolean) => setAgendaAutoDraftEnabled(Boolean(enabled)),
   },
   usage: {
     status: () => usageReportStatus(),
@@ -137,6 +144,7 @@ export function registerIpc(mainWindow: BrowserWindow): void {
     forwardToWindow(mainWindow, IPC_EVENTS.recording.statusChanged, onRecordingStateChange),
     forwardToWindow(mainWindow, IPC_EVENTS.managedRuntime.changed, managedRuntime.observe),
     forwardToWindow(mainWindow, IPC_EVENTS.googleCalendar.changed, onGoogleCalendarChange),
+    forwardToWindow(mainWindow, IPC_EVENTS.agenda.changed, onAgendasChange),
     forwardToWindow(mainWindow, IPC_EVENTS.update.statusChanged, onUpdateStatusChange),
   ]
   windowSubscriptions.set(mainWindow, () => disposers.forEach((dispose) => dispose()))

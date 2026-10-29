@@ -7,6 +7,7 @@ const MACOS_PLATFORM = 'darwin'
 const STARTUP_MARKER_FILE = 'startup-initialized'
 const SPEAKER_LABELS_DISABLED_FILE = 'speaker-labels-disabled'
 const SCREEN_VIDEO_ENABLED_FILE = 'screen-video-enabled'
+const AGENDA_AUTO_DRAFT_FILE = 'agenda-auto-draft-enabled'
 const REQUIRES_APPROVAL_STATUS = 'requires-approval'
 
 export function initializeStartupSettings(): void {
@@ -32,9 +33,10 @@ export function shouldStartHidden(): boolean {
 export function getStartupSettings(): StartupSettings {
   const speakerLabelsEnabled = !fs.existsSync(preferencePath(SPEAKER_LABELS_DISABLED_FILE))
   const screenVideoEnabled = fs.existsSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE))
-  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled, screenVideoEnabled }
+  const agendaAutoDraftEnabled = fs.existsSync(preferencePath(AGENDA_AUTO_DRAFT_FILE))
+  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled }
   const settings = app.getLoginItemSettings()
-  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled, screenVideoEnabled }
+  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled }
 }
 
 export function setSpeakerLabelsEnabled(enabled: boolean): StartupSettings {
@@ -48,6 +50,14 @@ export function setScreenVideoEnabled(enabled: boolean): StartupSettings {
   fs.mkdirSync(app.getPath('userData'), { recursive: true })
   if (enabled) fs.writeFileSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE), '', { flag: 'w', mode: 0o600 })
   else fs.rmSync(preferencePath(SCREEN_VIDEO_ENABLED_FILE), { force: true })
+  return getStartupSettings()
+}
+
+/** Off by default: drafting runs the notes provider for every upcoming event with other invitees. */
+export function setAgendaAutoDraftEnabled(enabled: boolean): StartupSettings {
+  fs.mkdirSync(app.getPath('userData'), { recursive: true })
+  if (enabled) fs.writeFileSync(preferencePath(AGENDA_AUTO_DRAFT_FILE), '', { flag: 'w', mode: 0o600 })
+  else fs.rmSync(preferencePath(AGENDA_AUTO_DRAFT_FILE), { force: true })
   return getStartupSettings()
 }
 

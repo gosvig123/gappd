@@ -317,6 +317,29 @@ export type VoiceTarget = {
   revision: number
 }
 
+export type AgendaInput = {
+  event: string
+  linked: string
+}
+
+export type AgendaResponse = {
+  items: AgendaItem[]
+  sources: AgendaSource[]
+}
+
+export type AgendaItem = {
+  text: string
+  sources: string[]
+}
+
+export type AgendaSource = {
+  ref: string
+  kind: string
+  id: string
+  title: string
+  date: string
+}
+
 export type RecognizeSpeakersInput = {
   id: string
   revision: number
