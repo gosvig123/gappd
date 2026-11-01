@@ -73,6 +73,7 @@ Production uses the Clerk production instance of the `Gappd` application.
 | Domain | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, verified |
 | Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
 | Dynamic Client Registration | Off; the metadata has no registration endpoint |
+| Branding | Logo and favicon are PNG renders of `gappd-site/apps/web/public/app-logo.svg` (Clerk takes no SVG). Account Portal colours follow `desktop/src/renderer/theme.css`: primary `#2F6FB5` on `#F5F6F9` (light), `#2B70BD` on `#282C33` (dark; the lighter app accent fails contrast under white button text). No Terms or Privacy links: Clerk shows them only with a required consent checkbox at sign-up. |
 
 Not advertising `meetings:sync` is not an authorization boundary. The server accepts writes only
 from the Desktop client, with that scope and a registered device signature.
