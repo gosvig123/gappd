@@ -23,6 +23,10 @@ Native runtimes and diarization models ship with the application. Managed setup 
 - release verification checks the packaged app and expected artifacts;
 - GitHub release publishing includes updater metadata and a generated release manifest.
 
+### Release notes
+
+Before you tag a stable release, commit `desktop/release-notes/vMAJOR.MINOR.PATCH.md` on `beta`. Write it for people who use Gappd: what changed for them, in short `-` items, with no internal changes (CI, migrations, docs). The workflow checks out the tag and uses this file as the GitHub release body. Without the file, the body is a placeholder line. [getgappd.com/releases/](https://getgappd.com/releases/) shows the body of each stable release (markdown headings, `-` lists, paragraphs, `**bold**`, `` `code` ``, and `https` links) and shows "Fixes and improvements." for the placeholder. To fix the notes of a published release, edit the file and run `gh release edit <tag> --notes-file desktop/release-notes/<tag>.md`; the website shows the change within 10 minutes.
+
 Workflow releases require all signing and notarization secrets. The workflow fails before building if any are absent, then imports the Developer ID certificate, enables hardened runtime, notarizes the app, and requires Gatekeeper verification.
 
 The signing setup exports `CSC_KEYCHAIN` so Electron Builder uses the verified keychain. Do not also set `CSC_LINK`: that asks the builder to import the certificate again into a separate keychain.

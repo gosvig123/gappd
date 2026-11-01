@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# getgappd.com/releases/ shows the body of each stable release. It treats this line as no notes.
 notes="Gappd macOS $RELEASE_CHANNEL signed and notarized build for $RELEASE_TAG."
-if [[ "$RELEASE_CHANNEL" == "beta" ]]; then
+notes_file="desktop/release-notes/$RELEASE_TAG.md"
+if [[ "$RELEASE_CHANNEL" == "stable" && -s "$notes_file" ]]; then
+  notes="$(<"$notes_file")"
+elif [[ "$RELEASE_CHANNEL" == "beta" ]]; then
   printf -v notes '%s\n\nSource commit: %s' "$notes" "$GITHUB_SHA"
 fi
 
