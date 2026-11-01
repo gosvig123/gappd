@@ -1,6 +1,6 @@
 import { type CSSProperties, useMemo, useState } from 'react'
 import type { MeetingDetail, MeetingSegment } from '../../../shared/contracts'
-import { meetingHasWork } from './progress'
+import { meetingFailed, meetingHasWork } from './progress'
 import { MultiSelect } from '../ui'
 import './transcript.css'
 
@@ -23,6 +23,7 @@ export function meetingHasSegments(meeting: MeetingDetail): boolean { return (me
 
 export function meetingTranscriptEmptyText(meeting: MeetingDetail): string {
   if (meetingHasWork(meeting)) return 'Transcript is being created locally…'
+  if (meetingFailed(meeting)) return 'No transcript: Gappd could not make one for this Meeting.'
   return 'No transcript yet.'
 }
 

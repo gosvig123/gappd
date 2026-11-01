@@ -4,7 +4,7 @@ import { Copy, X } from 'lucide-react'
 import type { MeetingDetail } from '../../../shared/contracts'
 import { meetingStatusPillVisible, meetingStatusTone } from '../../../shared/meeting-recording-workflow'
 import { Markdown } from './markdown'
-import { meetingHasWork, meetingProgressLabel } from './progress'
+import { meetingFailed, meetingHasWork, meetingProgressLabel } from './progress'
 import { Button, EmptyState, ProgressBar, StatusPill, cx } from '../ui'
 import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
@@ -89,16 +89,18 @@ function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek
       {meeting.diarization.state === 'degraded' ? <DiarizationNotice view={view} /> : null}
       {tab === 'recording' && replayReady(meeting) ? null : people}
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
-        {tab === 'summary' ? <SummaryPane view={view} /> : null}
+        {tab === 'summary' ? <SummaryPane view={view} transcript={transcript} /> : null}
         {tab === 'recording' ? <RecordingPane meeting={meeting} text={transcript} people={people} seekTo={seekTo} onSeek={onSeek} currentSec={currentSec} onTimeChange={onTimeChange} /> : null}
       </section>
     </>
   )
 }
 
-function SummaryPane({ view }: { view: AppView }) {
+function SummaryPane({ view, transcript }: { view: AppView; transcript: string }) {
   const summary = view.selectedMeeting?.summary
   if (summary) return <div className="app-reading"><Markdown value={summary} /></div>
+  // Notes come from the transcript, so a Meeting that failed before it has one gets no notes from any setting.
+  if (view.selectedMeeting && meetingFailed(view.selectedMeeting) && !transcript.trim()) return <EmptyState>No notes: Gappd could not make a transcript for this Meeting.</EmptyState>
   const openNotesSettings = () => view.actions.openSettings('Meeting processing')
   switch (notesAvailability(view.runtime)) {
     case 'off': return <EmptyState><p>Notes are off, so this Meeting has a transcript only. Turn on notes and Gappd writes them for this Meeting too.</p><Button className="compact-action" onClick={openNotesSettings}>Turn on notes</Button></EmptyState>

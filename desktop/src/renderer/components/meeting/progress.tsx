@@ -32,7 +32,7 @@ export function meetingReady(meeting: MeetingProgressInput): boolean {
   return meeting.hasTranscript && meeting.hasSummary
 }
 
-export function meetingFailed(meeting: MeetingProgressInput): boolean {
+export function meetingFailed(meeting: Pick<MeetingProgressInput, 'status'>): boolean {
   return meeting.status.state === MEETING_FAILED || meeting.status.capture.state === CAPTURE_FAILED || meeting.status.processing.state === PROCESSING_FAILED
 }
 
