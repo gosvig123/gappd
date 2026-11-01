@@ -4,8 +4,8 @@ import { MANAGED_LLAMACPP_MODEL_ARTIFACT } from '../../shared/managed-local-ai'
 import type { AgentId, AgentInstall, AIProviderStatus } from '../../shared/ipc-contract'
 import { AGENTS, agentInfo, isAgentId } from '../../shared/agents'
 import { useAgentInstalls } from '../hooks/use-agent-installs'
-import { useCloudAccount, useContinueWithGoogle } from '../hooks/use-cloud-account'
-import { useGuardedEffect } from '../hooks/use-guarded-effect'
+import { CALENDAR_SKIPPED_KEY, FINISHED_SHOWN_KEY, NOTES_SKIPPED_KEY, type useAccountRequirement } from '../hooks/use-account-requirement'
+import type { useCloudAccount } from '../hooks/use-cloud-account'
 import { useUsageSharing } from '../hooks/use-usage-sharing'
 import type { AppView } from '../lib/app-view'
 import { SetupTestRecording } from './setup-test-recording'
@@ -14,11 +14,6 @@ import { runtimeErrorView } from './settings/managed-runtime-contract'
 import { Button, ProgressBar, cx } from './ui'
 import './setup-checklist.css'
 
-const CALENDAR_SKIPPED_KEY = 'gappd.setup.calendarSkipped'
-const NOTES_SKIPPED_KEY = 'gappd.setup.notesSkipped'
-const FINISHED_SHOWN_KEY = 'gappd.setup.finishedShown'
-export const ACCOUNT_ASKS_KEY = 'gappd.setup.accountAsks'
-export const ACCOUNT_ANSWERED_KEY = 'gappd.setup.accountAnswered'
 const MODEL_SIZE = `${(MANAGED_LLAMACPP_MODEL_ARTIFACT.size / 1e9).toFixed(1)} GB`
 
 type ButtonVariant = 'primary' | 'secondary'
@@ -28,30 +23,25 @@ type Step = { key: string; title: string; optional?: boolean; state: SetupStepSt
  * First-run setup, one step at a time. It explains what Gappd records before
  * macOS asks, and it leaves once every step that applies is done or skipped.
  */
-export function SetupChecklist({ view }: { view: AppView }) {
+export function SetupChecklist({ view, account }: { view: AppView; account: ReturnType<typeof useAccountRequirement> }) {
   const [calendarSkipped, skipCalendar] = useSkip(CALENDAR_SKIPPED_KEY)
   const [notesSkipped, skipNotes] = useSkip(NOTES_SKIPPED_KEY)
-  const [accountAnswered, answerAccount] = useSkip(ACCOUNT_ANSWERED_KEY)
   const usage = useUsageSharing()
-  const cloud = useCloudAccount()
-  const accountAsks = useAccountAsks()
-  const continueWithGoogle = useContinueWithGoogle(view, answerAccount)
-  // A sign-in in Settings also answers the step, so a later sign-out does not ask again.
-  useEffect(() => { if (cloud.account?.email && !accountAnswered) answerAccount() }, [cloud.account?.email, accountAnswered])
+  const { cloud, asks: accountAsks, signedIn } = account
   const steps = setupSteps(view.permissionStatus, view.runtime, view.calendar, { notes: notesSkipped, calendar: calendarSkipped }, usage.status?.sharing ?? null,
-    { account: cloud.account, asks: accountAsks, answered: accountAnswered })
+    { account: cloud.account, asks: accountAsks, signedIn })
   const notes = useNotesChoice(steps.notes === 'todo' || steps.notes === 'error')
   const visible = setupVisible(steps)
   const [opened, setOpened] = useState(false)
   const [closed, setClosed] = useState(() => window.localStorage.getItem(FINISHED_SHOWN_KEY) === 'true')
   // Until Gappd knows whether to ask for an account, it shows nothing, so "Gappd is ready" never comes early.
-  if (accountAsks === null || (accountAsks && !accountAnswered && !cloud.account)) return null
+  if (accountAsks === null || (accountAsks && !signedIn && !cloud.account)) return null
   if (visible && !opened) setOpened(true)
   if (!visible) return opened && !closed ? <SetupFinished view={view} agent={notes.saved} onClose={() => setClosed(true)} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []
-  if (steps.account) rows.push(accountRow(steps.account, view, cloud, answerAccount, continueWithGoogle, primary('account')))
+  if (steps.account) rows.push(accountRow(steps.account, cloud, primary('account')))
   if (steps.recording) rows.push(recordingRow(steps.recording, view, primary('recording')))
   if (steps.speech) rows.push(speechRow(steps.speech, view, primary('speech')))
   if (steps.notes) rows.push(notesRow(steps.notes, view, notes, skipNotes))
@@ -109,24 +99,21 @@ function StepRow({ step, number, current }: { step: Step; number: number; curren
 type CloudAccount = ReturnType<typeof useCloudAccount>
 
 /**
- * One button signs in to Gappd and then connects Google Calendar, so most people make an
- * account on the way to the calendar they already want. Sync stays off until Settings.
+ * The account step shows after the sign-up screen: signed in, or still to do after the person
+ * continued without an account. It has no skip. Sync stays off until Settings.
  */
-function accountRow(state: SetupStepState, view: AppView, cloud: CloudAccount, answer: () => void, continueWithGoogle: () => Promise<void>, variant: ButtonVariant): Step {
-  const base = { key: 'account', title: 'Create your Gappd account', state }
+function accountRow(state: SetupStepState, cloud: CloudAccount, variant: ButtonVariant): Step {
+  const base = { key: 'account', title: 'Create your free Gappd account', state }
   if (state === 'done') return { ...base, detail: <p>Signed in as {cloud.account?.email}. Meeting sync stays off until you turn it on in Settings › Connections.</p> }
-  if (state === 'skipped') return { ...base, detail: <p>Skipped. You can sign in later in Settings › Connections.</p> }
-  const withCalendar = Boolean(view.calendar?.configured && !view.calendar.connections.length)
   if (state === 'working') return { ...base, detail: <p className="setup-step-note">Finish signing in in your browser, then come back to Gappd.</p>, actions: <Button onClick={() => void cloud.cancel()}>Cancel</Button> }
   return {
     ...base,
     detail: <>
-      <p>Your free account lets the AI assistants you connect read the Meetings you choose to sync.{withCalendar ? ' Next, Gappd asks you to connect Google Calendar, so your meetings show up here.' : ''}</p>
-      <p className="setup-step-note">Signing in uploads nothing. Meeting sync stays off until you turn it on in Settings. The sign-in page also accepts an email address.</p>
+      <p>Use your Google account or any email address. Your browser opens; it takes about a minute.</p>
+      <p className="setup-step-note">Signing in uploads nothing. Meeting sync stays off until you turn it on in Settings.</p>
       {cloud.error ? <p className="setup-step-warning">{cloud.error}</p> : null}
-      <p className="setup-step-note"><button type="button" className="app-link" disabled={cloud.connecting} onClick={answer}>Not now</button></p>
     </>,
-    actions: <Button variant={variant} disabled={cloud.connecting} onClick={() => void continueWithGoogle()}>Continue with Google</Button>,
+    actions: <Button variant={variant} disabled={cloud.connecting} onClick={() => void cloud.signIn()}>Sign up or sign in</Button>,
   }
 }
 
@@ -264,28 +251,6 @@ function usageRow(state: SetupStepState, usage: ReturnType<typeof useUsageSharin
 
 function isFinished(state: SetupStepState | null): boolean {
   return state === 'done' || state === 'skipped'
-}
-
-/**
- * Only new installs get the account step: no setup answer saved and no Meetings yet. It is
- * decided once; a failed Meeting list read retries instead of deciding.
- */
-function useAccountAsks(): boolean | null {
-  const [asks, setAsks] = useState<boolean | null>(() => {
-    const saved = window.localStorage.getItem(ACCOUNT_ASKS_KEY)
-    return saved === null ? null : saved === 'true'
-  })
-  const [attempt, setAttempt] = useState(0)
-  useGuardedEffect((guard) => {
-    if (asks !== null) return
-    const save = (value: boolean) => { window.localStorage.setItem(ACCOUNT_ASKS_KEY, String(value)); setAsks(value) }
-    if ([FINISHED_SHOWN_KEY, NOTES_SKIPPED_KEY, CALENDAR_SKIPPED_KEY].some((key) => window.localStorage.getItem(key) === 'true')) return save(false)
-    let retry: ReturnType<typeof setTimeout> | undefined
-    window.gappd.meetings.list().then((meetings) => guard(() => save(meetings.length === 0)))
-      .catch(() => guard(() => { retry = setTimeout(() => setAttempt((value) => value + 1), 5000) }))
-    return () => clearTimeout(retry)
-  }, [asks, attempt])
-  return asks
 }
 
 function useSkip(key: string): [boolean, () => void] {

@@ -1,0 +1,30 @@
+.account-gate {
+  display: grid;
+  place-items: center;
+  block-size: 100dvh;
+  padding: var(--space-10);
+  overflow: auto;
+  background: var(--shell-glow), var(--color-bg);
+}
+
+.account-gate-card {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-5);
+  inline-size: min(100%, 30rem);
+  padding: var(--space-10);
+  border: 1px solid var(--color-accent-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-accent-tint);
+}
+
+.account-gate-card h1 { margin: var(--space-3) 0 0; font-size: var(--font-size-display); letter-spacing: var(--tracking-tight); }
+.account-gate-card p { margin: 0; }
+/* The narrow window layout hides the sidebar name; the gate always shows it. */
+.account-gate .app-brand-name { display: inline; }
+.account-gate-later { display: grid; gap: var(--space-1); }
+/* The accent link colour misses contrast on the tinted card in light mode. */
+.account-gate-later .app-link { color: var(--color-text); text-decoration: underline; }
+.account-gate-note { color: var(--color-text-soft); font-size: var(--font-size-small); }
+/* The red sits in the border: red text on the tinted card fails contrast in dark mode. */
+.account-gate-warning { padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--color-danger); font-size: var(--font-size-small); }
