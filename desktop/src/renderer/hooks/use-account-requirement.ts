@@ -9,6 +9,8 @@ export const NOTES_SKIPPED_KEY = 'gappd.setup.notesSkipped'
 export const FINISHED_SHOWN_KEY = 'gappd.setup.finishedShown'
 // sessionStorage ends with the window, so Gappd asks again the next time it opens.
 const CONTINUED_KEY = 'gappd.setup.accountContinued'
+// v0.1.32 saved the setup account answer (sign-in or Not now) here.
+const LEGACY_ACCOUNT_ANSWERED_KEY = 'gappd.setup.accountAnswered'
 
 /**
  * New installs need a Gappd account before they use the app. A sign-in that does not finish
@@ -40,6 +42,7 @@ export function useAccountRequirement() {
  */
 function useAccountAsks(): { asks: boolean | null; failed: boolean } {
   const [asks, setAsks] = useState<boolean | null>(() => {
+    if (window.localStorage.getItem(LEGACY_ACCOUNT_ANSWERED_KEY) === 'true') return false
     const saved = window.localStorage.getItem(ACCOUNT_ASKS_KEY)
     return saved === null ? null : saved === 'true'
   })
