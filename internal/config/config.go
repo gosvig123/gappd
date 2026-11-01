@@ -42,6 +42,8 @@ const (
 	ProviderClaudeCode = "claude_code"
 	ProviderPiAgent    = "pi_agent"
 	legacyProviderPi   = "pi"
+	// legacyProviderOllama is the Local AI runtime before llama.cpp.
+	legacyProviderOllama = "ollama"
 
 	DefaultLlamaCppModel    = "LiquidAI/LFM2-2.6B-Transcript-GGUF"
 	DefaultLlamaCppEndpoint = "http://127.0.0.1:11436"
@@ -55,15 +57,16 @@ func defaults() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{
-		DBPath: filepath.Join(dir, "db.sqlite"),
-		AI: AI{
-			Provider: ProviderLlamaCpp,
-			Model:    DefaultLlamaCppModel,
-			Endpoint: DefaultLlamaCppEndpoint,
-			Temp:     DefaultAITemperature,
-		},
-	}, nil
+	return Config{DBPath: filepath.Join(dir, "db.sqlite"), AI: defaultAI()}, nil
+}
+
+func defaultAI() AI {
+	return AI{
+		Provider: ProviderLlamaCpp,
+		Model:    DefaultLlamaCppModel,
+		Endpoint: DefaultLlamaCppEndpoint,
+		Temp:     DefaultAITemperature,
+	}
 }
 
 func Load() (Config, error) {
@@ -154,6 +157,12 @@ func normalizeConfig(cfg *Config) error {
 	cfg.AI.Provider = strings.ToLower(strings.TrimSpace(cfg.AI.Provider))
 	if cfg.AI.Provider == legacyProviderPi {
 		cfg.AI.Provider = ProviderLlamaCpp
+	}
+	// Ollama model names do not work with llama.cpp, so an Ollama config
+	// (kept in ~/.gappd after an app uninstall) loads as notes not chosen,
+	// and setup asks again.
+	if cfg.AI.Provider == legacyProviderOllama {
+		cfg.AI = defaultAI()
 	}
 	cfg.AI.Model = strings.TrimSpace(cfg.AI.Model)
 	cfg.AI.Endpoint = strings.TrimSpace(cfg.AI.Endpoint)
