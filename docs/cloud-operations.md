@@ -70,6 +70,7 @@ Production uses the Clerk production instance of the `Gappd` application.
 | Production instance | `ins_3JJlwm8pUSkAERBSaRo0Ii5ue6X` (Hobby plan; OAuth applications and custom scopes are not plan-gated) |
 | Issuer (Frontend API) | `https://clerk.getgappd.com` |
 | Application domain / account portal | `app.getgappd.com` / `accounts.getgappd.com` |
+| Account Portal redirects | After sign-up, after sign-in, and logo click go to `https://getgappd.com`. `app.getgappd.com` has no DNS record and no web app; Clerk falls back to it when these are empty, and the browser shows `ERR_NAME_NOT_RESOLVED`. Clerk's `home_url` and `after_switch_session_url` still use it (check with `curl -s https://clerk.getgappd.com/v1/environment`). |
 | Domain | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, verified |
 | Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
 | Dynamic Client Registration | Off; the metadata has no registration endpoint |
