@@ -76,13 +76,13 @@ const IPC_HANDLERS: MainHandlers = {
   googleCalendar: {
     snapshot: () => googleCalendarSnapshot(),
     contacts: async () => collectCalendarContacts((await googleCalendarSnapshot()).events),
-    connect: (_event, access?: unknown) => connectGoogleCalendar(parseGoogleAccess(access)),
+    connect: (event, access?: unknown) => returnToApp(event, connectGoogleCalendar(parseGoogleAccess(access))),
     sync: (_event, connectionId: string) => syncGoogleCalendar(connectionId),
     disconnect: (_event, connectionId: string) => disconnectGoogleCalendar(connectionId),
     gmailThreads: (_event, personEmail: string) => gmailThreads(String(personEmail)),
     openGmailThread: (_event, accountEmail: string, threadId: string) => openGmailThread(String(accountEmail), String(threadId)),
   },
-  meetingUpload: { status: () => meetingUpload().status(), connect: (_event, enabled) => meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setAccountDeleteConsent: (_event, subject, enabled) => meetingUpload().setAccountDeleteConsent(subject, enabled), deleteAll: () => meetingUpload().deleteAll(), allowUploads: () => meetingUpload().allowUploads(), setRevokeConsent: (_event, subject, enabled, clientId) => meetingUpload().setRevokeConsent(subject, enabled, clientId), revokeClient: (_event, subject, clientId) => meetingUpload().revokeClient(subject, clientId), knownClients: () => meetingUpload().knownClients(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
+  meetingUpload: { status: () => meetingUpload().status(), connect: (event, enabled) => enabled === true ? returnToApp(event, meetingUpload().connect(enabled)) : meetingUpload().connect(enabled), setConsent: (_event, subject, enabled) => meetingUpload().setConsent(subject, enabled), enqueue: (_event, localId) => meetingUpload().enqueue(localId), sync: () => meetingUpload().sync(), setAccountDeleteConsent: (_event, subject, enabled) => meetingUpload().setAccountDeleteConsent(subject, enabled), deleteAll: () => meetingUpload().deleteAll(), allowUploads: () => meetingUpload().allowUploads(), setRevokeConsent: (_event, subject, enabled, clientId) => meetingUpload().setRevokeConsent(subject, enabled, clientId), revokeClient: (_event, subject, clientId) => meetingUpload().revokeClient(subject, clientId), knownClients: () => meetingUpload().knownClients(), setDeleteConsent: (_event, subject, enabled, localId) => meetingUpload().setDeleteConsent(subject, enabled, localId), deleteCopy: (_event, subject, localId) => meetingUpload().deleteCopy(subject, localId) },
   update: {
     getStatus: () => getUpdateStatus(),
     checkNow: () => checkForUpdate(),
@@ -102,6 +102,19 @@ const IPC_HANDLERS: MainHandlers = {
     setSharing: (_event, enabled: boolean) => setUsageSharing(enabled),
     report: () => usageReportView(),
   },
+}
+
+/** A sign-in ends in the browser, so Gappd comes back to the front when it finishes or fails. */
+async function returnToApp<T>(event: IpcMainInvokeEvent, work: Promise<T>): Promise<T> {
+  try { return await work } finally {
+    // The window can close while the browser is open; a destroyed sender throws on lookup.
+    const window = event.sender.isDestroyed() ? null : BrowserWindow.fromWebContents(event.sender)
+    if (window && !window.isDestroyed()) {
+      if (window.isMinimized()) window.restore()
+      window.show()
+      app.focus({ steal: true })
+    }
+  }
 }
 
 async function refreshedProviderStatus() {

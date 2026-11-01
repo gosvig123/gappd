@@ -2,6 +2,8 @@
 import { requestTokens } from './oauth-tokens.ts'
 // @ts-expect-error Node type stripping requires explicit TypeScript extension.
 export { parseTokenResponse } from './oauth-tokens.ts'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { CALLBACK_PAGE_CSP, callbackPage } from './oauth-callback-page.ts'
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 
@@ -128,7 +130,7 @@ function handleCallback(request: IncomingMessage, response: ServerResponse, path
   if (url.searchParams.has('error')) return finishError(response, completion, 'Authorization was not completed. Try again.')
   const code = url.searchParams.get('code')
   if (!code || code.length > 4096 || /[\x00-\x20\x7f]/.test(code)) return finishError(response, completion, 'Authorization code was missing or invalid.')
-  respond(response, 200, 'Authorization complete. You can return to Gappd.', () => resolveCompletion(completion, code))
+  respondPage(response, 200, callbackPage({ ok: true }), () => resolveCompletion(completion, code))
 }
 
 function createCompletion(): Completion & { promise: Promise<string> } {
@@ -151,7 +153,12 @@ function rejectCompletion(completion: Completion, error: Error): void {
 }
 
 function finishError(response: ServerResponse, completion: Completion, message: string): void {
-  respond(response, 400, message, () => rejectCompletion(completion, new Error(message)))
+  respondPage(response, 400, callbackPage({ ok: false, problem: message }), () => rejectCompletion(completion, new Error(message)))
+}
+
+function respondPage(response: ServerResponse, status: number, html: string, done: () => void): void {
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': CALLBACK_PAGE_CSP })
+  response.end(html, done)
 }
 
 function respond(response: ServerResponse, status: number, message: string, done?: () => void): void {
