@@ -70,9 +70,11 @@ Production uses the Clerk production instance of the `Gappd` application.
 | Production instance | `ins_3JJlwm8pUSkAERBSaRo0Ii5ue6X` (Hobby plan; OAuth applications and custom scopes are not plan-gated) |
 | Issuer (Frontend API) | `https://clerk.getgappd.com` |
 | Application domain / account portal | `app.getgappd.com` / `accounts.getgappd.com` |
+| Account Portal redirects | After sign-up, after sign-in, and logo click go to `https://getgappd.com`. `app.getgappd.com` has no DNS record and no web app; Clerk falls back to it when these are empty, and the browser shows `ERR_NAME_NOT_RESOLVED`. Clerk's `home_url` and `after_switch_session_url` still use it (check with `curl -s https://clerk.getgappd.com/v1/environment`). |
 | Domain | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, verified |
 | Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
 | Dynamic Client Registration | Off; the metadata has no registration endpoint |
+| Branding | Logo and favicon are PNG renders of `gappd-site/apps/web/public/app-logo.svg` (Clerk takes no SVG). Account Portal colours follow `desktop/src/renderer/theme.css`: primary `#2F6FB5` on `#F5F6F9` (light), `#2B70BD` on `#282C33` (dark; the lighter app accent fails contrast under white button text). No Terms or Privacy links: Clerk shows them only with a required consent checkbox at sign-up. |
 
 Not advertising `meetings:sync` is not an authorization boundary. The server accepts writes only
 from the Desktop client, with that scope and a registered device signature.
@@ -159,11 +161,13 @@ Daily volume backups: schedule `45cb81af-0160-4847-a7eb-2948aea475c2` on volume 
 A manual backup has no expiry (`expiresAt: null`) and must be deleted by hand; do not use manual
 backups as a substitute for the schedule.
 
-Point-in-time recovery is on: `WAL_ARCHIVE_*` variables on `Postgres` point at the `Postgres-PITR`
-bucket. A PITR restore creates a new standalone Postgres service and leaves the live one running.
-The restorable window starts at the moment PITR was enabled (2026-09-14).
+Point-in-time recovery (PITR) is off, and its `Postgres-PITR` bucket was deleted on 2026-11-01.
+Railway's PITR keeps the last 4 weekly full backups (about 4 weeks) with no retention setting, which
+breaks the 7-day backup maximum in the [lifecycle contract](cloud-data-lifecycle.md). Do not turn it
+back on without an owner-approved retention change. The worst-case data loss is now the time since
+the last daily backup (up to 24 hours).
 
-Both paths were drilled on 2026-09-14 into isolated targets, never the live volume. Each restored
+Volume and PITR restores were drilled on 2026-09-14 into isolated targets, never the live volume. Each restored
 cluster had the expected migrations, copies, deletion markers and all `gappd%` roles, and lacked a
 sentinel row written after the restore point, which proves a real rollback. A volume restore is
 staged (unmount old, mount new, redeploy) and stays discardable until `Deploy`; attach the restored

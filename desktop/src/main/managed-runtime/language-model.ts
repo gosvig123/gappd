@@ -32,7 +32,7 @@ export async function ensureManagedLanguageModel(onProgress?: ProgressSink): Pro
 }
 
 export function missingManagedLanguageModelMessage(): string {
-  return 'Meeting summary model missing. Click Fix setup to download it.'
+  return 'Meeting summary model missing. Download it in Settings › Meeting processing.'
 }
 
 async function downloadModel(model: LanguageModel, onProgress?: ProgressSink): Promise<string> {

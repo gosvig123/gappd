@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 import type { CloudAuthStatus } from '../../shared/cloud-auth-contract'
-import type { AppView } from '../lib/app-view'
 
 type Snapshot = { account: CloudAuthStatus | null; connecting: boolean; error: string | null }
 
@@ -44,7 +43,7 @@ async function signIn(): Promise<boolean> {
   publish({ connecting: true, error: null })
   try {
     const account = (await window.gappd.meetingUpload.connect(true)).account
-    // After Cancel, a late result only updates the status; it does not go on to Calendar.
+    // After Cancel, a late result only updates the status.
     if (attempt !== attempts) { void refresh(); return false }
     reads++
     publish({ account, connecting: false, error: account.error })
@@ -80,19 +79,4 @@ export function useCloudAccount() {
   // The main process reports pending only in a status read during the sign-in, so show it from here too.
   const account = state.connecting && state.account ? { ...state.account, pending: true } : state.account
   return { account, connecting: state.connecting, error: state.error ?? state.account?.error ?? null, signIn, cancel }
-}
-
-/**
- * Signs in to Gappd, then connects Google Calendar when it is still not connected. It reads
- * the Calendar state after the sign-in, because it can load or change while the browser is open.
- */
-export function useContinueWithGoogle(view: AppView, onSignedIn: () => void): () => Promise<void> {
-  const latest = useRef(view)
-  useEffect(() => { latest.current = view })
-  return useCallback(async () => {
-    if (!await signIn()) return
-    onSignedIn()
-    const calendar = latest.current.calendar
-    if (calendar?.configured && !calendar.connections.length && !latest.current.calendarBusy) await latest.current.actions.connectCalendar()
-  }, [onSignedIn])
 }

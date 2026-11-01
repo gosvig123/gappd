@@ -4,6 +4,8 @@ import { buildAlerts } from '../lib/alerts'
 import { MeetingsView } from '../views/meetings'
 import { PeopleView } from '../views/people'
 import { TodayView } from '../views/today'
+import { useAccountRequirement } from '../hooks/use-account-requirement'
+import { AccountGate } from './account-gate'
 import { AccountPrompt } from './account-prompt'
 import { AppSidebar, type SectionKey } from './app-sidebar'
 import { useConfirm } from './confirm'
@@ -23,10 +25,13 @@ import './record-bar.css'
 /** All Meeting links lead to the same reading workspace. Recording stays global. */
 export function AppShell({ view }: { view: AppView }) {
   const shell = useShellController(view)
+  const account = useAccountRequirement()
+  if (account.deciding) return <main className="account-gate" aria-busy="true" />
+  if (account.required) return <AccountGate account={account} />
   const routedView = { ...view, actions: { ...view.actions, openMeeting: shell.openMeeting, openSettings: shell.setSettingsCategory } }
   return <div className="app-shell">
     <AppSidebar section={shell.section} onSelect={shell.setSection} onOpenSettings={() => shell.setSettingsCategory('General')} />
-    <ShellMain view={routedView} shell={shell} />
+    <ShellMain view={routedView} shell={shell} account={account} />
     <NotificationStack alerts={shell.alerts} notices={shell.notices} onDismissAlert={view.actions.dismissAlert} onDismissNotice={shell.dismissNotice} onOpenMeeting={shell.openMeeting} />
     {shell.settingsCategory ? <SettingsDialog view={routedView} initialCategory={shell.settingsCategory} onClose={() => shell.setSettingsCategory(null)} /> : null}
     {shell.confirm.dialog}<PageSearch />
@@ -48,9 +53,9 @@ function useShellController(view: AppView) {
   return { section, setSection, settingsCategory, setSettingsCategory, notices, dismissNotice, searchRef, confirm, alerts, openMeeting }
 }
 
-function ShellMain({ view, shell }: { view: AppView; shell: ReturnType<typeof useShellController> }) {
-  return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} />
-    <AccountPrompt view={view} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
+function ShellMain({ view, shell, account }: { view: AppView; shell: ReturnType<typeof useShellController>; account: ReturnType<typeof useAccountRequirement> }) {
+  return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} account={account} />
+    <AccountPrompt view={view} account={account} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}

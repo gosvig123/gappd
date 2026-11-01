@@ -17,8 +17,8 @@ export type SetupSteps = {
 
 export type SetupSkips = { notes: boolean; calendar: boolean }
 
-/** The account step asks only new installs. answered is true after a skip or a sign-in. */
-export type AccountAsk = { account: CloudAuthStatus | null; asks: boolean | null; answered: boolean }
+/** The account step asks only new installs. signedIn is true after the first sign-in. */
+export type AccountAsk = { account: CloudAuthStatus | null; asks: boolean | null; signedIn: boolean }
 
 const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_runtime', 'pulling_model', 'saving_config'])
 
@@ -58,12 +58,12 @@ export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): Notes
   return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
 }
 
-/** The account comes first. Once it is answered, a later sign-out does not ask again. */
-function accountStep({ account, asks, answered }: AccountAsk): SetupStepState | null {
+/** The account comes first and has no skip. After a sign-in, a later sign-out does not ask again. */
+function accountStep({ account, asks, signedIn }: AccountAsk): SetupStepState | null {
   if (!asks || !account) return null
   if (account.email) return 'done'
   if (account.pending) return 'working'
-  return answered ? 'skipped' : 'todo'
+  return signedIn ? null : 'todo'
 }
 
 function recordingStep(permission: SetupPermissionStatus): SetupStepState | null {
