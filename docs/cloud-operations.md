@@ -159,11 +159,13 @@ Daily volume backups: schedule `45cb81af-0160-4847-a7eb-2948aea475c2` on volume 
 A manual backup has no expiry (`expiresAt: null`) and must be deleted by hand; do not use manual
 backups as a substitute for the schedule.
 
-Point-in-time recovery is on: `WAL_ARCHIVE_*` variables on `Postgres` point at the `Postgres-PITR`
-bucket. A PITR restore creates a new standalone Postgres service and leaves the live one running.
-The restorable window starts at the moment PITR was enabled (2026-09-14).
+Point-in-time recovery (PITR) is off, and its `Postgres-PITR` bucket was deleted on 2026-11-01.
+Railway's PITR keeps the last 4 weekly full backups (about 4 weeks) with no retention setting, which
+breaks the 7-day backup maximum in the [lifecycle contract](cloud-data-lifecycle.md). Do not turn it
+back on without an owner-approved retention change. The worst-case data loss is now the time since
+the last daily backup (up to 24 hours).
 
-Both paths were drilled on 2026-09-14 into isolated targets, never the live volume. Each restored
+Volume and PITR restores were drilled on 2026-09-14 into isolated targets, never the live volume. Each restored
 cluster had the expected migrations, copies, deletion markers and all `gappd%` roles, and lacked a
 sentinel row written after the restore point, which proves a real rollback. A volume restore is
 staged (unmount old, mount new, redeploy) and stays discardable until `Deploy`; attach the restored

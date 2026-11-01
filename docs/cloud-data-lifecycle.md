@@ -95,6 +95,6 @@ checks or supported online token validation. Deleting content still blocks later
 | Send a deletion with sync OFF | Not built. Pending deletions and the per-Meeting delete action both need active upload consent, so with sync OFF a deletion waits until sync is turned on again. |
 | Turn sync OFF, account switch, reconnect, concurrent sends, lost acknowledgment | Built. Desktop tests cover each (`desktop/src/main/cloud/upload*.test.ts`, `sync-queue.test.ts`). |
 | Show account, expiry, pending deletion and backup limits | Built in Settings → Connections → Cloud Meeting sync: the account, a deletion count while deletions wait, the 7-day backup note, and the expiry in each accepted upload's result. |
-| Restore cannot revive deleted content | Partly proven. Isolated volume and PITR restores passed; replaying later deletion markers onto a restore is not automated, so a restore must stay offline. |
+| Restore cannot revive deleted content | Partly proven. Isolated volume and PITR restores passed (PITR is now off: its 4-week window exceeds the 7-day backup maximum); replaying later deletion markers onto a restore is not automated, so a restore must stay offline. |
 | Backup expiry and removal | Configured (6 days); actual removal is unverified. |
 | 14-day log retention | Blocked by the Railway plan; see [operations](cloud-operations.md#open-gates). |
