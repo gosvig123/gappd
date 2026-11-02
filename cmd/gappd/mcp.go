@@ -18,7 +18,7 @@ const maxMCPMessageBytes = 1024 * 1024
 func mcpCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "Serve read-only Gappd database queries over stdio MCP",
+		Short: "Serve read-only Gappd Meeting tools and database queries over stdio MCP",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runMCPCommand(cmd)
 		},

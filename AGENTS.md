@@ -17,3 +17,7 @@ After a code change, run the relevant tests and build checks. Once validation pa
 ## Desktop tests
 
 - `npm test` in `desktop/` uses Node type stripping. Value imports in any module a test loads need the `.ts` extension plus the repo's `// @ts-ignore Node type stripping requires explicit TypeScript extension.` line; type-only imports need neither. A tested module cannot import tsup-only modules (for example `native-runtime.ts`); inject the value instead. A polling timer left running hangs the test process, so give each test its own state and dispose it in `t.after`.
+
+## Local MCP
+
+- `gappd mcp` serves stdio MCP: `get_meeting`, `list_meetings` and `search_meetings` (same names, inputs and outputs as the cloud `/mcp` tools, read from local SQLite, completed Meetings only) plus the raw read-only `query` tool. Search turns web search syntax into an FTS5 query over `meetings_fts`, which has no stemming. To check it on real data without touching the profile, copy the database with `sqlite3 ~/.gappd/db.sqlite ".backup /private/tmp/<dir>/home/.gappd/db.sqlite"` (directory mode 700, file mode 600) and pipe JSON-RPC lines into `HOME=/private/tmp/<dir>/home gappd mcp`.

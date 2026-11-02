@@ -97,10 +97,12 @@ func assertInitializeResponse(t *testing.T, response rpcResponse) {
 func assertToolListResponse(t *testing.T, response rpcResponse) {
 	t.Helper()
 	result := response.Result.(map[string]any)
-	tools := result["tools"].([]any)
-	tool := tools[0].(map[string]any)
-	if len(tools) != 1 || tool["name"] != "query" {
-		t.Fatalf("tools result = %#v", result)
+	var names []string
+	for _, tool := range result["tools"].([]any) {
+		names = append(names, tool.(map[string]any)["name"].(string))
+	}
+	if strings.Join(names, ",") != "get_meeting,list_meetings,search_meetings,query" {
+		t.Fatalf("tools = %v", names)
 	}
 }
 
