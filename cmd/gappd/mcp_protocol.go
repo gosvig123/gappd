@@ -48,7 +48,7 @@ type toolContent struct {
 	Text string `json:"text"`
 }
 
-func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcResponse {
+func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest, remote bool) *rpcResponse {
 	if len(request.ID) == 0 {
 		return nil
 	}
@@ -58,15 +58,15 @@ func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcRespon
 	case "ping":
 		return rpcSuccess(request.ID, map[string]any{})
 	case "tools/list":
-		return rpcSuccess(request.ID, toolList())
+		return rpcSuccess(request.ID, toolList(remote))
 	case "tools/call":
-		return handleToolCall(ctx, conn, request)
+		return handleToolCall(ctx, conn, request, remote)
 	default:
 		return rpcFailure(request.ID, -32601, "method not found")
 	}
 }
 
-func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcResponse {
+func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest, remote bool) *rpcResponse {
 	var call toolCallParams
 	if err := json.Unmarshal(request.Params, &call); err != nil {
 		return rpcFailure(request.ID, -32602, "invalid tools/call params")
@@ -77,7 +77,7 @@ func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcR
 		}
 		return rpcSuccess(request.ID, jsonToolResult(result))
 	}
-	if call.Name != "query" {
+	if call.Name != "query" || remote {
 		return rpcFailure(request.ID, -32602, "unknown tool")
 	}
 	var args queryArgs
@@ -109,7 +109,10 @@ func initializeResult() map[string]any {
 	}
 }
 
-func toolList() map[string]any {
+func toolList(remote bool) map[string]any {
+	if remote {
+		return map[string]any{"tools": meetingToolDefinitions()}
+	}
 	primitive := []map[string]any{{"type": "string"}, {"type": "number"}, {"type": "boolean"}, {"type": "null"}}
 	properties := map[string]any{
 		"sql":      map[string]any{"type": "string", "description": "One SELECT or WITH statement."},

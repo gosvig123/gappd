@@ -1,6 +1,7 @@
 import { exportRecording } from './meeting-export'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
+import { remoteAccess } from './cloud/remote-access-service'
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
@@ -103,6 +104,10 @@ const IPC_HANDLERS: MainHandlers = {
     status: () => aiAppStatuses(),
     connect: (_event, id: AIAppId) => connectAIApp(aiAppId(id)),
     disconnect: (_event, id: AIAppId) => disconnectAIApp(aiAppId(id)),
+  },
+  remoteAccess: {
+    status: () => remoteAccess().status(),
+    setEnabled: (_event, enabled: boolean) => remoteAccess().setEnabled(enabled === true),
   },
   usage: {
     status: () => usageReportStatus(),

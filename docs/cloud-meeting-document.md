@@ -74,9 +74,13 @@ revision: it starts at 1 and increases by one for each change it sends, so order
 on a local counter or the device clock.
 
 Each speaker's `label` is its key ("You", "Other", "Speaker 1"), also when the speaker is assigned
-to a saved Person. AI clients read cloud copies, and People names can come from Google Calendar or
-Google Contacts, so no Person name reaches the cloud. Documents from older app versions can still
-carry a name; the cloud accepts any label.
+to a saved Person. Uploaded cloud copies omit these Person labels because names can come from
+Google Calendar or Google Contacts. Documents from older app versions can still carry a name;
+the cloud accepts any label.
+
+Remote access (`MCP_RELAY=on`) is separate from uploaded copies and off by default. By the owner's
+choice, it passes local Meeting answers, including Person names in titles and transcripts, through
+Gappd Cloud without storing them.
 
 A Meeting started from a Calendar event is named after it. While the Meeting title still matches a
 title of a Calendar event saved for that Meeting, the desktop uploads a generic title such as

@@ -46,6 +46,10 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 		return err
 	}
 	defer uploads.Meeting.Close()
+	// MCP_RELAY=on sends /mcp to the account's Mac. Without it, /mcp still reads cloud copies.
+	if os.Getenv("MCP_RELAY") == "on" {
+		uploads.Relay = service.NewRelay()
+	}
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer),
 		Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool),
 		// The reader pool cannot write, so the client list uses the writer pool.

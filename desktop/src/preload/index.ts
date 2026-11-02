@@ -22,6 +22,7 @@ function buildOperationApi(): IpcInvokeApi {
     update: invokeGroup('update'),
     startup: invokeGroup('startup'),
     aiApps: invokeGroup('aiApps'),
+    remoteAccess: invokeGroup('remoteAccess'),
     usage: invokeGroup('usage'),
   }
 }

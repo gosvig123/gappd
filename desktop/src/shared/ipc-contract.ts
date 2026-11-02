@@ -5,6 +5,7 @@ import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './manage
 import type { AgentId } from './agents'
 import type { UsageReportStatus, UsageReportView } from './usage-report'
 import type { AIAppId, AIAppStatus } from './ai-apps'
+import type { RemoteAccessStatus } from './remote-access'
 import type { Agenda, AgendaItem } from './agenda'
 import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, PersonActionItem, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
@@ -101,6 +102,10 @@ export type IpcInvokeContract = {
     connect: OperationSpec<[id: AIAppId], AIAppStatus[]>
     disconnect: OperationSpec<[id: AIAppId], AIAppStatus[]>
   }
+  remoteAccess: {
+    status: OperationSpec<[], RemoteAccessStatus>
+    setEnabled: OperationSpec<[enabled: boolean], RemoteAccessStatus>
+  }
   usage: {
     status: OperationSpec<[], UsageReportStatus>
     setSharing: OperationSpec<[enabled: boolean], UsageReportStatus>
@@ -154,6 +159,7 @@ export const IPC_OPERATIONS = {
     setAgendaAutoDraftEnabled: 'startup:setAgendaAutoDraftEnabled',
   },
   aiApps: { status: 'aiApps:status', connect: 'aiApps:connect', disconnect: 'aiApps:disconnect' },
+  remoteAccess: { status: 'remoteAccess:status', setEnabled: 'remoteAccess:setEnabled' },
   usage: { status: 'usage:status', setSharing: 'usage:setSharing', report: 'usage:report' },
 } as const satisfies IpcOperationChannels
 

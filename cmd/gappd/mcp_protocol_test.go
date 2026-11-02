@@ -20,7 +20,7 @@ func TestServeMCPInitializeListAndCall(t *testing.T) {
 		`{"jsonrpc":"2.0","id":4,"method":"ping"}`,
 	}, "\n")
 	var output bytes.Buffer
-	if err := serveMCP(context.Background(), strings.NewReader(input), &output, store.Conn); err != nil {
+	if err := serveMCP(context.Background(), strings.NewReader(input), &output, store.Conn, false); err != nil {
 		t.Fatal(err)
 	}
 	responses := decodeMCPResponses(t, output.Bytes())
@@ -48,7 +48,7 @@ func TestServeMCPReturnsToolAndProtocolErrors(t *testing.T) {
 	defer store.Close()
 	input := "not json\n" + `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"query","arguments":{"sql":"DELETE FROM meetings"}}}`
 	var output bytes.Buffer
-	if err := serveMCP(context.Background(), strings.NewReader(input), &output, store.Conn); err != nil {
+	if err := serveMCP(context.Background(), strings.NewReader(input), &output, store.Conn, false); err != nil {
 		t.Fatal(err)
 	}
 	responses := decodeMCPResponses(t, output.Bytes())

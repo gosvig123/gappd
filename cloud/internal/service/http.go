@@ -22,10 +22,12 @@ func (a *Auth) ResourceMetadata() string {
 	return u.Scheme + "://" + u.Host + "/.well-known/oauth-protected-resource" + u.Path
 }
 
-// Uploads carries the optional write pools. A nil pool leaves its routes absent.
+// Uploads carries the optional write pools and the relay. A nil pool or relay leaves its routes
+// absent. With a relay, /mcp forwards to the account's Mac instead of reading cloud copies.
 type Uploads struct {
 	Meeting  *pgxpool.Pool
 	ClientID string
+	Relay    *Relay
 }
 
 func Handler(a *Auth, pool *pgxpool.Pool) http.Handler {
@@ -35,8 +37,23 @@ func Handler(a *Auth, pool *pgxpool.Pool) http.Handler {
 func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handler {
 	mux := http.NewServeMux()
 	registerWriteRoutes(mux, a, uploads)
-	registerPublicRoutes(mux, a, pool)
-	return bounded(mux)
+	registerPublicRoutes(mux, a, pool, uploads.Relay)
+	if uploads.Relay == nil {
+		return bounded(mux)
+	}
+	// The Mac's connection stays open, so it skips the 10-second bound on every other route.
+	outer := http.NewServeMux()
+	outer.Handle("/", bounded(mux))
+	desktop := a.desktop(uploads.ClientID)
+	outer.Handle("GET /relay", guarded(desktop.protect(desktop.limited(ClassWrite, uploads.Relay.connect()))))
+	return outer
+}
+
+// desktop returns the checks for a route that only the signed-in Gappd desktop app may call.
+func (a *Auth) desktop(clientID string) *Auth {
+	desktop := *a
+	desktop.RequiredScope, desktop.ClientID = "meetings:sync", clientID
+	return &desktop
 }
 
 // registerWriteRoutes installs the authenticated write surface, and only when the deployment has
@@ -45,8 +62,7 @@ func registerWriteRoutes(mux *http.ServeMux, a *Auth, uploads Uploads) {
 	if uploads.ClientID == "" {
 		return
 	}
-	uploadAuth := *a
-	uploadAuth.RequiredScope, uploadAuth.ClientID = "meetings:sync", uploads.ClientID
+	uploadAuth := a.desktop(uploads.ClientID)
 	protect := func(h http.Handler) http.Handler {
 		return uploadAuth.protect(uploadAuth.limited(ClassWrite, http.NewCrossOriginProtection().Handler(h)))
 	}
@@ -58,8 +74,12 @@ func registerWriteRoutes(mux *http.ServeMux, a *Auth, uploads Uploads) {
 	}
 }
 
-func registerPublicRoutes(mux *http.ServeMux, a *Auth, pool *pgxpool.Pool) {
-	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(meetingTransport(pool)))))
+func registerPublicRoutes(mux *http.ServeMux, a *Auth, pool *pgxpool.Pool, relay *Relay) {
+	transport := meetingTransport(pool)
+	if relay != nil {
+		transport = relayTransport(relay)
+	}
+	mux.Handle("/mcp", a.protect(a.limited(ClassRead, http.NewCrossOriginProtection().Handler(transport))))
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource", a.metadata)
 	mux.HandleFunc("GET /.well-known/oauth-protected-resource/mcp", a.metadata)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
@@ -133,13 +153,17 @@ func status(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func bounded(next http.Handler) http.Handler {
+	return guarded(http.TimeoutHandler(next, 10*time.Second, "request timeout"))
+}
+
+func guarded(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		if r.URL.RawQuery != "" {
 			http.Error(w, "query parameters forbidden", 400)
 			return
 		}
-		http.TimeoutHandler(next, 10*time.Second, "request timeout").ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 

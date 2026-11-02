@@ -18,6 +18,7 @@ import { startAgendaAutoDraft, stopAgendaAutoDraft } from './agenda'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 import { startUsageReports, stopUsageReports } from './usage-report'
+import { remoteAccess } from './cloud/remote-access-service'
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
@@ -123,11 +124,12 @@ app.whenReady().then(async () => {
   startAgendaAutoDraft()
   startAutoUpdateChecks()
   startUsageReports()
+  remoteAccess().start()
   logMainProcessMemory('ready')
 
   app.on('activate', showMainWindow)
   powerMonitor.on('suspend', () => { void pauseDrains('sleep').catch((error) => console.error('Failed to pause drains for sleep', error)) })
-  powerMonitor.on('resume', () => resumeDrains('sleep'))
+  powerMonitor.on('resume', () => { resumeDrains('sleep'); remoteAccess().reconnect() })
 })
 
 nativeAutoUpdater.on(BEFORE_QUIT_FOR_UPDATE_EVENT, () => { updateInstallRequested = true })
@@ -156,6 +158,7 @@ async function shutdown(): Promise<void> {
   stopMeetingPresence()
   stopAutoUpdateChecks()
   stopUsageReports()
+  remoteAccess().stop()
   await stopActiveRecordingForQuit()
   await managedRuntime.close()
   logMainProcessMemory('shutdown:done')
