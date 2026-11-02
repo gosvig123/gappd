@@ -12,6 +12,7 @@ import { LocalAIErrorBanner } from '../components/settings/local-ai-error-banner
 import { GoogleCalendarPanel } from '../components/settings/google-calendar-panel'
 import { NotesProviderPanel } from '../components/settings/notes-provider-panel'
 import { UsagePanel } from '../components/settings/usage-panel'
+import { AIAppsPanel } from '../components/settings/ai-apps-panel'
 import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
 import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
@@ -32,7 +33,7 @@ export function SettingsView({ language, onLanguageChange, theme, onThemeChange,
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><UsagePanel /></> },
     { label: 'Meeting processing', content: <><NotesProviderPanel runtime={localAI.status} onRepair={localAI.onRepair} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
-    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
+    { label: 'Connections', content: <><AIAppsPanel /><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
   return <SettingsLayout categories={categories} initialCategory={initialCategory} />

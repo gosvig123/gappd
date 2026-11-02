@@ -20,6 +20,8 @@ import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
+import { aiAppStatuses, connectAIApp, disconnectAIApp } from './ai-apps'
+import { isAIAppId, type AIAppId } from '../shared/ai-apps'
 
 type Awaitable<T> = T | Promise<T>
 type IpcHandler = Parameters<typeof ipcMain.handle>[1]
@@ -97,11 +99,21 @@ const IPC_HANDLERS: MainHandlers = {
     setScreenVideoEnabled: (_event, enabled: boolean) => setScreenVideoEnabled(enabled),
     setAgendaAutoDraftEnabled: (_event, enabled: boolean) => setAgendaAutoDraftEnabled(Boolean(enabled)),
   },
+  aiApps: {
+    status: () => aiAppStatuses(),
+    connect: (_event, id: AIAppId) => connectAIApp(aiAppId(id)),
+    disconnect: (_event, id: AIAppId) => disconnectAIApp(aiAppId(id)),
+  },
   usage: {
     status: () => usageReportStatus(),
     setSharing: (_event, enabled: boolean) => setUsageSharing(enabled),
     report: () => usageReportView(),
   },
+}
+
+function aiAppId(id: unknown): AIAppId {
+  if (!isAIAppId(id)) throw new Error('Unknown AI app.')
+  return id
 }
 
 /** A sign-in ends in the browser, so Gappd comes back to the front when it finishes or fails. */

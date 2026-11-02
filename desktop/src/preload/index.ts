@@ -21,6 +21,7 @@ function buildOperationApi(): IpcInvokeApi {
     meetingUpload: invokeGroup('meetingUpload'),
     update: invokeGroup('update'),
     startup: invokeGroup('startup'),
+    aiApps: invokeGroup('aiApps'),
     usage: invokeGroup('usage'),
   }
 }
