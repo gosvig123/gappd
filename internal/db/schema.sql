@@ -70,7 +70,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS meetings_fts USING fts5(
     transcript,
     summary,
     content='meetings',
-    content_rowid='rowid'
+    content_rowid='rowid',
+    tokenize='porter unicode61 remove_diacritics 2'
 );
 
 CREATE TRIGGER IF NOT EXISTS meetings_ai AFTER INSERT ON meetings BEGIN
