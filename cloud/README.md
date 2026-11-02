@@ -8,8 +8,10 @@ see the [Meeting document contract](../docs/cloud-meeting-document.md) and the
 
 ## Runtime
 
-Railway uses root `/cloud`, branch `beta`, explicit Dockerfile builder and `/ready` healthcheck.
+Railway uses root `/cloud`, explicit Dockerfile builder and `/ready` healthcheck.
 These settings are configured on the service: the CLI did not persist the nested TOML path.
+Automatic deployment is off: a push or merge to `beta` or `main` deploys nothing (see
+[Deploying the API](../docs/cloud-operations.md#deploying-the-api)).
 Runtime variables. The server refuses to start without the first five:
 
 - `DATABASE_URL`: private PostgreSQL URL for **gappd_reader**, never the administrator.
@@ -352,7 +354,7 @@ reset, runtime write/admin rejection, schema/input limits, and fixed JWKS fetch 
 ## Live gates (parent-owned)
 
 1. Apply migration/provision privately; configure reader URL and canonical resource.
-2. Deploy from beta with Railway root `/cloud`; check health/readiness and metadata.
+2. Deploy a pushed commit with Railway root `/cloud`; check health/readiness and metadata.
 3. Register distinct read-only clients with actual callbacks. Do NOT reuse Desktop
    client `iFaeusoYBwClQRoP`. Keep DCR OFF and S256 required. Request `resource` exactly
    equal to MCP_RESOURCE_URL so Clerk includes audience; request `meetings:read`.
