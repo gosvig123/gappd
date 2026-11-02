@@ -12,16 +12,21 @@ import { SpeakerQueue } from './speaker-queue'
 
 type PersonRow = { person: SavedPerson; meetings: number; lastSeen?: string }
 type Change = { mode: 'edit' | 'email'; personId: string } | { mode: 'merge'; personId: string; otherId?: string; pairId?: string }
+type ContactsImportState = ReturnType<typeof useContactsImport>
 const DISMISSED_DUPLICATES_KEY = 'gappd.people.notDuplicates'
+// Set on this machine after the first import or "Not now"; the prompt then shrinks to a link in the header.
+const CONTACTS_IMPORT_ANSWERED_KEY = 'gappd.people.contactsImportAnswered'
 
 export function PeopleView({ view }: { view: AppView }) {
   const rows = view.people.map((person) => personRow(person, view)).sort((left, right) => right.meetings - left.meetings)
   const [change, setChange] = useState<Change | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [dismissed, dismiss] = useDismissedDuplicates()
+  const contactsImport = useContactsImport(view.actions.peopleChanged)
   const duplicates = likelyDuplicates(view.people).filter((pair) => !dismissed.has(pair.id))
   const done = (people: SavedPerson[]) => { view.actions.peopleChanged(people); setChange(null) }
   const hasAccess = (access: GoogleAccess) => Boolean(view.calendar?.connections.some((connection) => connection.access?.includes(access)))
+  const canImport = hasAccess('contacts')
   // A merge can remove the open Person; the list shows again then.
   const open = view.people.find((person) => person.id === openId)
   if (open) return <PersonPage person={open} view={view} canEmail={hasAccess('gmail')} onBack={() => setOpenId(null)} />
@@ -31,9 +36,10 @@ export function PeopleView({ view }: { view: AppView }) {
         <p className="ui-eyebrow">Saved identities</p>
         <h1 className="ui-title">People</h1>
         <p className="app-section-sub">{rows.length} saved {rows.length === 1 ? 'person' : 'people'} · assigning a Person to a Meeting speaker names their turns and refreshes the summary</p>
+        {canImport && contactsImport.answered ? <ContactsImportLink state={contactsImport} /> : null}
       </header>
       <SpeakerQueue view={view} />
-      {hasAccess('contacts') ? <ContactsImport onDone={view.actions.peopleChanged} /> : null}
+      {canImport && !contactsImport.answered ? <ContactsImportPrompt state={contactsImport} /> : null}
       {duplicates.length ? (
         <section className="app-people-duplicates" aria-label="Possible duplicates">
           {duplicates.map((pair) => (
@@ -74,24 +80,42 @@ export function PeopleView({ view }: { view: AppView }) {
   )
 }
 
-function ContactsImport({ onDone }: { onDone: (people: SavedPerson[]) => void }) {
+function useContactsImport(onDone: (people: SavedPerson[]) => void) {
+  const [answered, setAnswered] = useState(() => window.localStorage.getItem(CONTACTS_IMPORT_ANSWERED_KEY) === 'true')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const answer = () => { window.localStorage.setItem(CONTACTS_IMPORT_ANSWERED_KEY, 'true'); setAnswered(true) }
   const run = async () => {
     setBusy(true); setError(null); setNote('')
     try {
       const result = await window.gappd.meetings.importGoogleContacts()
       onDone(result.people)
       setNote(importNote(result.added, result.updated))
+      answer()
     } catch (cause) { setError(errorText(cause)) }
     finally { setBusy(false) }
   }
+  return { answered, note, error, busy, run, answer }
+}
+
+function ContactsImportPrompt({ state }: { state: ContactsImportState }) {
   return (
     <div className="app-people-import">
-      <Button className="compact-action" disabled={busy} onClick={() => void run()}>{busy ? 'Importing…' : 'Import Google contacts'}</Button>
-      <span role="status">{error ? <span className="app-error">{error}</span> : note || 'Adds every saved Google contact with an email who is not already a Person.'}</span>
+      <Button className="compact-action" disabled={state.busy} onClick={() => void state.run()}>{state.busy ? 'Importing…' : 'Import Google contacts'}</Button>
+      <Button className="compact-action" disabled={state.busy} onClick={state.answer}>Not now</Button>
+      <span role="status">{state.error ? <span className="app-error">{state.error}</span> : 'Adds every saved Google contact with an email who is not already a Person.'}</span>
     </div>
+  )
+}
+
+/** After the first import or "Not now", a later import stays one click away without a prompt. */
+function ContactsImportLink({ state }: { state: ContactsImportState }) {
+  return (
+    <p className="app-section-sub app-people-import-link">
+      <button type="button" className="app-link" disabled={state.busy} onClick={() => void state.run()}>{state.busy ? 'Importing Google contacts…' : 'Import Google contacts'}</button>
+      <span role="status">{state.error ? <span className="app-error">{state.error}</span> : state.note}</span>
+    </p>
   )
 }
 
