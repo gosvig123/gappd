@@ -1,0 +1,50 @@
+/* People: search and tabs above a list; the chosen Person opens beside the list. */
+.people-workspace { container: people-workspace / inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); block-size: 100%; min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
+.people-head { display: grid; gap: var(--space-6); min-inline-size: 0; }
+.people-head .ui-title { margin: 0; }
+.people-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
+.people-search { flex: 1 1 18rem; max-inline-size: 32rem; }
+.people-toolbar .ui-segmented { flex-wrap: wrap; max-inline-size: 100%; }
+.people-tab-count { margin-inline-start: var(--space-1); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.ui-segmented-option.is-active .people-tab-count { color: inherit; }
+
+.people-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
+.has-selection .people-columns { grid-template-columns: minmax(240px, 30%) minmax(0, 1fr); }
+.people-list { display: grid; align-content: start; gap: var(--space-5); overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-4) var(--space-7) 2px; overscroll-behavior: contain; }
+/* Inline padding holds the negative margin of .app-person-list, so the pane does not scroll sideways. */
+.people-content { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-5) var(--space-7); overscroll-behavior: contain; }
+
+.people-rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; }
+.people-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "avatar name meta" "avatar detail meta";
+  align-items: center;
+  column-gap: var(--space-5);
+  row-gap: 1px;
+  inline-size: 100%;
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+}
+.people-row:hover { background: var(--surface-hover); }
+.people-row[aria-current] { background: var(--color-accent-tint); box-shadow: inset 3px 0 var(--color-accent); }
+.people-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.people-row .app-avatar { grid-area: avatar; }
+.people-row-name { grid-area: name; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-medium); }
+.people-row-detail { grid-area: detail; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.people-row-meta { grid-area: meta; color: var(--color-text-muted); font-size: var(--font-size-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The open Person shows the Meeting count, so the narrow list keeps only name and email. */
+.has-selection .people-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar name" "avatar detail"; }
+.has-selection .people-row-meta { display: none; }
+
+/* A narrow window shows the list or the open Person, not both. "← People" goes back to the list. */
+@container people-workspace (max-width: 760px) {
+  .has-selection .people-columns { grid-template-columns: minmax(0, 1fr); }
+  .has-selection :is(.people-list, .people-toolbar) { display: none; }
+  .people-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar name" "avatar detail" "avatar meta"; }
+}
