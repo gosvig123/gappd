@@ -45,7 +45,7 @@ func (k *Keys) lookup(id string) (*rsa.PublicKey, error) {
 		}
 	}
 	if k.set == nil {
-		return nil, errors.New("keys unavailable")
+		return nil, WithCause("keys unavailable", nil)
 	}
 	key, ok := k.set.LookupKeyID(id)
 	if !ok {
@@ -77,7 +77,7 @@ func (k *Keys) fetch() (jwk.Set, error) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, errors.New("keys unavailable")
+		return nil, WithCause("keys unavailable", nil)
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, maxJWKSBytes+1))
 	if err != nil {

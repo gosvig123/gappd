@@ -1,5 +1,6 @@
 import { app, powerMonitor } from 'electron'
 import { backgroundSyncGoogleCalendar } from './calendar-service'
+import { logFailure } from '../error-log'
 
 // Google Calendar has no push channel to this Mac, so connected accounts are synced on a timer,
 // when a Gappd window gets focus, and after the Mac wakes.
@@ -51,6 +52,6 @@ function refreshIfDue(minGapMs: number): void {
   running = true
   lastStartedAt = Date.now()
   void backgroundSyncGoogleCalendar()
-    .catch((error) => console.error('Background Google Calendar sync failed; it will retry later', error))
+    .catch((error) => logFailure('calendar.refresh', 'Background Google Calendar sync failed; it will retry later', error))
     .finally(() => { running = false })
 }

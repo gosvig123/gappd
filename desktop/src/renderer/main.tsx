@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { App } from './app'
 import { installTransientScrollbars } from './scrollbars'
+import { installErrorReports } from './error-reports'
 import '@fontsource/hanken-grotesk/400.css';
 import '@fontsource/hanken-grotesk/500.css';
 import '@fontsource/hanken-grotesk/600.css';
@@ -16,6 +17,7 @@ import './theme.css'
 import './styles.css'
 import './components/ui.css'
 
+installErrorReports()
 installTransientScrollbars()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

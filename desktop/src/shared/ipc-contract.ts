@@ -4,6 +4,7 @@ import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, Rec
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
 import type { UsageReportStatus, UsageReportView } from './usage-report'
+import type { ErrorReportStatus, RendererError } from './error-report'
 import type { AIAppId, AIAppStatus } from './ai-apps'
 import type { RemoteAccessStatus } from './remote-access'
 import type { Agenda, AgendaItem } from './agenda'
@@ -111,6 +112,11 @@ export type IpcInvokeContract = {
     setSharing: OperationSpec<[enabled: boolean], UsageReportStatus>
     report: OperationSpec<[], UsageReportView>
   }
+  errorReports: {
+    status: OperationSpec<[], ErrorReportStatus>
+    setSharing: OperationSpec<[enabled: boolean], ErrorReportStatus>
+    report: OperationSpec<[error: RendererError], void>
+  }
 }
 
 export type IpcOperationGroup = Extract<keyof IpcInvokeContract, string>
@@ -161,6 +167,7 @@ export const IPC_OPERATIONS = {
   aiApps: { status: 'aiApps:status', connect: 'aiApps:connect', disconnect: 'aiApps:disconnect' },
   remoteAccess: { status: 'remoteAccess:status', setEnabled: 'remoteAccess:setEnabled' },
   usage: { status: 'usage:status', setSharing: 'usage:setSharing', report: 'usage:report' },
+  errorReports: { status: 'errorReports:status', setSharing: 'errorReports:setSharing', report: 'errorReports:report' },
 } as const satisfies IpcOperationChannels
 
 export const IPC_EVENTS = {

@@ -3,6 +3,7 @@ import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime/runtime'
 import { recognizePendingSpeakers } from './speaker-recognition'
 import { usingSummaryRuntime } from './summary-runtime'
+import { logFailure } from './error-log'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
 const DRAIN_RETRY_INTERVAL_MS = 60_000
@@ -99,7 +100,7 @@ export async function requestPendingDrains(): Promise<void> {
       if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
     }
   } catch (error) {
-    console.error('pending processing check failed', error)
+    logFailure('processing.pending-check', 'pending processing check failed', error)
   } finally {
     pendingCheckRunning = false
   }
@@ -122,7 +123,7 @@ async function runDrain(current: Flight): Promise<void> {
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
   } catch (error) {
-    if (!current.controller.signal.aborted) console.error(`${current.capability} drain failed`, error)
+    if (!current.controller.signal.aborted) logFailure('processing.drain', `${current.capability} drain failed`, error)
   } finally {
     if (flight === current) flight = null
     startNextFlight()

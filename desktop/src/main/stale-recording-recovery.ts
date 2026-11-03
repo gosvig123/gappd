@@ -1,5 +1,6 @@
 import { requestCommand } from './app-protocol'
 import { requestPendingDrains } from './drain-coordinator'
+import { logFailure } from './error-log'
 
 const STALE_RECORDING_RECOVERY_INTERVAL_MS = 60_000
 
@@ -29,7 +30,7 @@ async function runStaleRecordingRecovery(): Promise<number> {
   try {
     return await recoverStaleRecordings()
   } catch (error) {
-    console.error('stale recording recovery failed', error)
+    logFailure('recording.stale-recovery', 'stale recording recovery failed', error)
     return 0
   } finally {
     staleRecoveryRunning = false

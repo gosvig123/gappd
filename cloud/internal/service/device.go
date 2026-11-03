@@ -67,12 +67,12 @@ func storeDevice(ctx context.Context, tx pgx.Tx, owner, id string, key ed25519.P
 		return nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return errors.New("device unavailable")
+		return WithCause("device unavailable", err)
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO account_devices(owner_id,device_id,public_key) VALUES($1,$2,$3)
  ON CONFLICT (owner_id,device_id) DO NOTHING`, owner, id, []byte(key))
 	if err != nil {
-		return errors.New("device unavailable")
+		return WithCause("device unavailable", err)
 	}
 	return nil
 }

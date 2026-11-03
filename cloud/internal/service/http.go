@@ -39,14 +39,14 @@ func HandlerWithUploads(a *Auth, pool *pgxpool.Pool, uploads Uploads) http.Handl
 	registerWriteRoutes(mux, a, uploads)
 	registerPublicRoutes(mux, a, pool, uploads.Relay)
 	if uploads.Relay == nil {
-		return bounded(mux)
+		return a.Alerts.reported(bounded(mux))
 	}
 	// The Mac's connection stays open, so it skips the 10-second bound on every other route.
 	outer := http.NewServeMux()
 	outer.Handle("/", bounded(mux))
 	desktop := a.desktop(uploads.ClientID)
 	outer.Handle("GET /relay", guarded(desktop.protect(desktop.limited(ClassWrite, uploads.Relay.connect()))))
-	return outer
+	return a.Alerts.reported(outer)
 }
 
 // desktop returns the checks for a route that only the signed-in Gappd desktop app may call.
@@ -85,6 +85,8 @@ func registerPublicRoutes(mux *http.ServeMux, a *Auth, pool *pgxpool.Pool, relay
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
 	mux.HandleFunc("GET /ready", readiness(pool))
 	mux.HandleFunc("GET /status", status(pool))
+	// Error reports carry no account, so they skip the token, like Usage reports.
+	mux.Handle("POST /errors", http.NewCrossOriginProtection().Handler(errorReportHandler(a.Limits, a.Alerts)))
 	if a.StatsToken != "" {
 		mux.Handle("GET /usage/totals", usageTotalsHandler(a.StatsToken, a.Limits, pool))
 	}
@@ -129,7 +131,8 @@ func readiness(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
-		if pool.Ping(ctx) != nil {
+		if err := pool.Ping(ctx); err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "unavailable", 503)
 			return
 		}
@@ -144,6 +147,7 @@ func status(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		backlog, err := ReadBacklog(r.Context(), pool)
 		if err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "status unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -153,7 +157,7 @@ func status(pool *pgxpool.Pool) http.HandlerFunc {
 }
 
 func bounded(next http.Handler) http.Handler {
-	return guarded(http.TimeoutHandler(next, 10*time.Second, "request timeout"))
+	return guarded(http.TimeoutHandler(caught(next), 10*time.Second, "request timeout"))
 }
 
 func guarded(next http.Handler) http.Handler {

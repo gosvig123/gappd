@@ -24,6 +24,7 @@ function buildOperationApi(): IpcInvokeApi {
     aiApps: invokeGroup('aiApps'),
     remoteAccess: invokeGroup('remoteAccess'),
     usage: invokeGroup('usage'),
+    errorReports: invokeGroup('errorReports'),
   }
 }
 

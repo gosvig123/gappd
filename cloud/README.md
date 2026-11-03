@@ -22,6 +22,7 @@ Runtime variables. The server refuses to start without the first five:
 - `GAPPD_PRODUCTION_MODE=true`: refuses a development Clerk issuer.
 - `PORT`: Railway listening port; default `8080`.
 - `GAPPD_STATS_TOKEN` (optional, 32+ characters): enables `GET /usage/totals` for the stats dashboard.
+- `DISCORD_ERRORS_WEBHOOK_URL` (optional, API and cleanup services): posts 5xx answers, panics, a stopped server, failed cleanups and desktop Error reports to a private Discord channel. See [error reports](../docs/error-reports.md).
 - `MCP_RELAY=on` (optional): `/mcp` forwards to the account's Mac instead of reading cloud copies. See [Remote access relay](#remote-access-relay).
 
 `GET /health` is public liveness; `GET /ready` checks a runtime database connection.
@@ -104,6 +105,16 @@ field value's daily total in `usage_daily` and keeps no report. Only the owner c
 and uses the read budget. It returns `{"totals":[{day,field,value,reports}]}` from
 `usage_totals()` on the reader pool: the last 400 days, without any total under 5.
 Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
+
+## Error reports
+
+`POST /errors` takes one anonymous desktop Error report: no token, no device signature, bounded to
+4 KiB (413), one shared budget of 300 a minute (429 beyond), and cross-origin protection (403). It
+answers 204, or 400 for any field or value outside the allowlist. It keeps no database record: it
+writes the report line to the application log and forwards it to the Discord error channel when
+`DISCORD_ERRORS_WEBHOOK_URL` is set. The service also reports its own 5xx
+answers and panics there, with the route and the kind of each cause, never error text. Fields and
+setup: [error reports](../docs/error-reports.md).
 
 ## Client inventory
 

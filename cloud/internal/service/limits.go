@@ -15,6 +15,8 @@ const (
 	ClassWrite = "write"
 	// ClassUsage is one budget for every anonymous Usage report: it has no account to count by.
 	ClassUsage = "usage"
+	// ClassErrors is one budget for every anonymous Error report, for the same reason.
+	ClassErrors = "errors"
 )
 
 // Per-account limits. They are in-process and per-instance: a restart clears them and a second
@@ -24,6 +26,7 @@ const (
 	readBurstPerMinute  = 60
 	writeBurstPerMinute = 12
 	usageBurstPerMinute = 600
+	errorBurstPerMinute = 300
 	maxCopiesPerAccount = 500
 	maxBytesPerAccount  = 64 << 20
 )
@@ -40,6 +43,7 @@ type Limiter struct {
 	ReadBurst  int
 	WriteBurst int
 	UsageBurst int
+	ErrorBurst int
 	mu         sync.Mutex
 	now        func() time.Time
 	buckets    map[string]*bucket
@@ -47,7 +51,7 @@ type Limiter struct {
 
 func NewLimiter() *Limiter {
 	return &Limiter{ReadBurst: readBurstPerMinute, WriteBurst: writeBurstPerMinute, UsageBurst: usageBurstPerMinute,
-		now: time.Now, buckets: map[string]*bucket{}}
+		ErrorBurst: errorBurstPerMinute, now: time.Now, buckets: map[string]*bucket{}}
 }
 
 // allow reports whether one more request fits the budget for this class.
@@ -58,6 +62,8 @@ func (l *Limiter) allow(class, subject string) bool {
 		burst = l.WriteBurst
 	case ClassUsage:
 		burst = l.UsageBurst
+	case ClassErrors:
+		burst = l.ErrorBurst
 	}
 	if burst <= 0 || subject == "" {
 		return false
@@ -88,7 +94,7 @@ func checkCapacity(ctx context.Context, tx pgx.Tx, owner, id string, incoming in
  coalesce(sum(octet_length(title)+octet_length(summary)+octet_length(transcript)),0)
  FROM cloud_meetings WHERE owner_id=$1 AND id<>$2::uuid`, owner, id).Scan(&copies, &bytes)
 	if err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if copies >= maxCopiesPerAccount || bytes+int64(incoming) > maxBytesPerAccount {
 		return errStorageFull

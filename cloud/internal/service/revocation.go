@@ -85,12 +85,12 @@ func RevokeGrant(ctx context.Context, pool *pgxpool.Pool, owner, client string) 
 	return inMeetingTx(ctx, pool, owner, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `INSERT INTO revoked_grants(owner_id,client_id) VALUES($1,$2)
  ON CONFLICT (owner_id,client_id) DO NOTHING`, owner, client); err != nil {
-			return errors.New("revocation unavailable")
+			return WithCause("revocation unavailable", err)
 		}
 		var revoked bool
 		err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM revoked_grants WHERE owner_id=$1 AND client_id=$2)`, owner, client).Scan(&revoked)
 		if err != nil || !revoked {
-			return errors.New("revocation unavailable")
+			return WithCause("revocation unavailable", err)
 		}
 		return nil
 	})
@@ -119,6 +119,7 @@ func revokeHandler(pool *pgxpool.Pool) http.Handler {
 		}
 		owner, _ := r.Context().Value(ownerKey{}).(string)
 		if err := RevokeGrant(r.Context(), pool, owner, client); err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "revocation unavailable", http.StatusServiceUnavailable)
 			return
 		}

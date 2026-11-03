@@ -1,5 +1,6 @@
 import { powerMonitor } from 'electron'
 import { requestCommand } from './app-protocol'
+import { logFailure } from './error-log'
 
 // Finished Meetings are compacted in the background to save disk space: leftover Live Transcript chunks are removed,
 // audio becomes lossless FLAC, and Screen videos are encoded again. The backend skips this while a Meeting records.
@@ -35,7 +36,7 @@ async function compactStorage(): Promise<void> {
       if (!result.attempted) break
     }
   } catch (error) {
-    if (!controller.signal.aborted) console.error('Meeting storage compaction failed; it will retry later', error)
+    if (!controller.signal.aborted) logFailure('storage.compaction', 'Meeting storage compaction failed; it will retry later', error)
   } finally {
     running = null
   }

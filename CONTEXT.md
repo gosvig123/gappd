@@ -46,6 +46,9 @@ An optional connection from this Mac to Gappd Cloud that lets AI services elsewh
 **Usage report**:
 One anonymous daily set of counts and settings (buckets and fixed values only) that the app sends when the user shares usage counts.
 
+**Error report**:
+One anonymous description of one failure in the app (step, error type and code, place in Gappd's own code; never error text) that the app sends to the cloud service, which forwards it to the team's error channel.
+
 ## Relationships
 
 - A Gappd identity and a **Google Calendar connection** are separate and neither gates local app features.
@@ -56,6 +59,7 @@ One anonymous daily set of counts and settings (buckets and fixed values only) t
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
 - A **Usage report** is separate from sign-in and from **Cloud upload consent**: it carries no account, device or install id, is off until the user says yes, and the server keeps only per-field daily totals.
+- An **Error report** is separate from a **Usage report** and from sign-in: it is on until the user turns it off, carries no account, device or install id, and the cloud service forwards it without keeping a database record.
 - **Remote access** needs the signed-in Gappd account but not **Cloud upload consent**: the cloud passes requests to this Mac and stores nothing. The Mac checks each caller's token, never offers raw database queries, and drops the connection when the account changes; a newer Mac on the same account turns it off on the older one.
 - Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.

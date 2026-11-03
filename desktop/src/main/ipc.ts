@@ -21,6 +21,9 @@ import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
+import { errorReportStatus, reportRendererError, setErrorSharing } from './error-report'
+import { reportFailure } from './error-log'
+import { ipcOperation, type RendererError } from '../shared/error-report'
 import { aiAppStatuses, connectAIApp, disconnectAIApp } from './ai-apps'
 import { isAIAppId, type AIAppId } from '../shared/ai-apps'
 
@@ -114,6 +117,11 @@ const IPC_HANDLERS: MainHandlers = {
     setSharing: (_event, enabled: boolean) => setUsageSharing(enabled),
     report: () => usageReportView(),
   },
+  errorReports: {
+    status: () => errorReportStatus(),
+    setSharing: (_event, enabled: boolean) => setErrorSharing(enabled === true),
+    report: (_event, error: RendererError) => reportRendererError(error),
+  },
 }
 
 function aiAppId(id: unknown): AIAppId {
@@ -195,7 +203,21 @@ function operationNames<G extends IpcOperationGroup>(group: G): IpcOperationName
 
 function registerIpcGroup<G extends IpcOperationGroup>(group: G): void {
   const channels = IPC_OPERATIONS[group] as Record<IpcOperationName<G>, string>
-  for (const name of operationNames(group)) ipcMain.handle(channels[name], IPC_HANDLERS[group][name] as IpcHandler)
+  for (const name of operationNames(group)) ipcMain.handle(channels[name], reported(channels[name], IPC_HANDLERS[group][name] as IpcHandler))
+}
+
+/** A failed operation is reported, then rejected to the window as before. */
+function reported(channel: string, handler: IpcHandler): IpcHandler {
+  if (channel.startsWith('errorReports:')) return handler
+  const operation = ipcOperation(channel)
+  return async (event, ...args) => {
+    try {
+      return await handler(event, ...args)
+    } catch (error) {
+      reportFailure(operation, error)
+      throw error
+    }
+  }
 }
 
 function disposeWindowSubscriptions(mainWindow: BrowserWindow): void {

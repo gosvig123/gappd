@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
 import type { StartupSettings } from '../shared/ipc-contract'
+import { logFailure } from './error-log'
 
 const MACOS_PLATFORM = 'darwin'
 const STARTUP_MARKER_FILE = 'startup-initialized'
@@ -16,7 +17,7 @@ export function initializeStartupSettings(): void {
     markInitialized()
     app.setLoginItemSettings({ openAtLogin: true })
   } catch (error) {
-    console.error('Failed to enable Gappd at macOS login during first launch', error)
+    logFailure('startup.open-at-login', 'Failed to enable Gappd at macOS login during first launch', error)
   }
 }
 
@@ -25,7 +26,7 @@ export function shouldStartHidden(): boolean {
   try {
     return app.getLoginItemSettings().wasOpenedAtLogin
   } catch (error) {
-    console.error('Failed to detect whether macOS opened Gappd at login', error)
+    logFailure('startup.detect-login', 'Failed to detect whether macOS opened Gappd at login', error)
     return false
   }
 }

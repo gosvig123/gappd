@@ -34,6 +34,8 @@ type Auth struct {
 	Clients *ClientDirectory
 	// StatsToken lets the private stats dashboard read Usage totals. Empty leaves the route absent.
 	StatsToken string
+	// Alerts sends error reports to Discord. Nil only logs them.
+	Alerts *Alerts
 }
 
 var errScope = errors.New("insufficient scope")
@@ -144,6 +146,7 @@ func (a *Auth) grantAllowed(w http.ResponseWriter, r *http.Request, id caller) b
 	}
 	revoked, err := a.Revocations.Revoked(r.Context(), id.owner, id.client)
 	if err != nil {
+		noteFailure(r.Context(), err)
 		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 		return false
 	}

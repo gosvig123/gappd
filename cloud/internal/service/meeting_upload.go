@@ -43,7 +43,7 @@ func storeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document Meetin
 	if _, err := tx.Exec(ctx, `INSERT INTO meeting_lifecycle(id,owner_id,local_id,accepted_at,expires_at)
  VALUES($1,$2,$3,statement_timestamp(),statement_timestamp()+interval '720 hours') ON CONFLICT DO NOTHING`,
 		id, owner, document.MeetingID); err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if err := checkCopyOpen(ctx, tx, owner, id); err != nil {
 		return err
@@ -64,7 +64,7 @@ func checkCopyOpen(ctx context.Context, tx pgx.Tx, owner, id string) error {
 	err := tx.QueryRow(ctx, `SELECT deleted_at IS NULL AND expires_at>clock_timestamp() FROM meeting_lifecycle
  WHERE id=$1 AND owner_id=$2`, id, owner).Scan(&open)
 	if err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if !open {
 		return errCopyClosed
@@ -82,7 +82,7 @@ func writeCopy(ctx context.Context, tx pgx.Tx, owner, id string, document Meetin
  WHERE cloud_meetings.revision<EXCLUDED.revision`,
 		id, owner, document.Title, document.Summary, document.Transcript(), document.StartedAt, document.Revision, string(data))
 	if err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func verifyStored(ctx context.Context, tx pgx.Tx, owner, id string, document Mee
  FROM cloud_meetings WHERE id=$1 AND owner_id=$2`,
 		id, owner, document.Title, document.Summary, string(data)).Scan(&revision, &live, &same)
 	if err != nil || !live {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if revision == document.Revision && !same {
 		return errors.New("revision conflict")
@@ -120,10 +120,10 @@ func DeleteMeeting(ctx context.Context, pool *pgxpool.Pool, owner, localID strin
  VALUES($1,$2,$3,statement_timestamp())
  ON CONFLICT (owner_id,id) DO UPDATE SET deleted_at=coalesce(meeting_lifecycle.deleted_at,excluded.deleted_at)`,
 			id, owner, localID); err != nil {
-			return errors.New("cloud copy unavailable")
+			return WithCause("cloud copy unavailable", err)
 		}
 		if _, err := tx.Exec(ctx, `DELETE FROM cloud_meetings WHERE id=$1 AND owner_id=$2`, id, owner); err != nil {
-			return errors.New("cloud copy unavailable")
+			return WithCause("cloud copy unavailable", err)
 		}
 		return verifyDeleted(ctx, tx, owner, id)
 	})
@@ -135,14 +135,14 @@ func verifyDeleted(ctx context.Context, tx pgx.Tx, owner, id string) error {
  AND NOT EXISTS (SELECT FROM cloud_meetings m WHERE m.id=$2 AND m.owner_id=$1)
  FROM meeting_lifecycle WHERE owner_id=$1 AND id=$2`, owner, id).Scan(&removed)
 	if err != nil || !removed {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	return nil
 }
 
 func lockOwner(ctx context.Context, tx pgx.Tx, owner string) error {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,74812003))`, owner); err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	return nil
 }
@@ -152,17 +152,17 @@ func inMeetingTx(ctx context.Context, pool *pgxpool.Pool, owner string, fn func(
 	defer cancel()
 	tx, err := pool.Begin(ctx)
 	if err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	defer tx.Rollback(context.Background())
 	if _, err = tx.Exec(ctx, `SELECT set_config('app.owner_id',$1,true)`, owner); err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if err = fn(tx); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	return nil
 }
