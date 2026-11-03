@@ -273,33 +273,42 @@ type searchToken struct {
 
 // ftsQuery turns web search syntax (the cloud's websearch_to_tsquery) into an FTS5 query.
 // Words and phrases become quoted FTS5 strings, so no input text is read as FTS5 syntax.
-// Excluded words follow the group of wanted words: in FTS5, "a NOT b c" means "a NOT (b c)".
+// Like websearch_to_tsquery, OR splits the query into choices, and each choice needs all of its
+// words and none of its -words. FTS5 has no NOT on its own, so each choice needs a word to find.
 func ftsQuery(input string) (string, error) {
-	var parts, excluded []string
-	pendingOr := false
+	type choice struct{ wanted, excluded []string }
+	choices := []choice{{}}
 	for _, token := range searchTokens(input) {
+		last := &choices[len(choices)-1]
 		switch {
 		case token.or:
-			pendingOr = len(parts) > 0
+			if len(last.wanted)+len(last.excluded) > 0 {
+				choices = append(choices, choice{})
+			}
 		case token.negated:
-			if len(parts) == 0 {
-				return "", errors.New("search_meetings: query needs a word to find before -word, such as: budget -draft")
-			}
-			excluded, pendingOr = append(excluded, "NOT "+ftsString(token.text)), false
+			last.excluded = append(last.excluded, " NOT "+ftsString(token.text))
 		default:
-			if pendingOr {
-				parts = append(parts, "OR")
-			}
-			parts, pendingOr = append(parts, ftsString(token.text)), false
+			last.wanted = append(last.wanted, ftsString(token.text))
 		}
 	}
-	if len(parts) == 0 {
-		return "", errors.New("search_meetings: query needs at least one word to find")
+	if last := choices[len(choices)-1]; len(choices) > 1 && len(last.wanted)+len(last.excluded) == 0 {
+		choices = choices[:len(choices)-1] // A trailing OR.
 	}
-	if len(excluded) == 0 {
-		return strings.Join(parts, " "), nil
+	parts := make([]string, len(choices))
+	for i, c := range choices {
+		if len(c.wanted) == 0 {
+			if len(c.excluded) > 0 {
+				return "", errors.New("search_meetings: each -word needs a word to find in the same OR choice, such as: budget -draft")
+			}
+			return "", errors.New("search_meetings: query needs at least one word to find")
+		}
+		// "a NOT b c" means "a NOT (b c)" in FTS5, so the wanted words are grouped first.
+		parts[i] = "((" + strings.Join(c.wanted, " ") + ")" + strings.Join(c.excluded, "") + ")"
 	}
-	return "(" + strings.Join(parts, " ") + ") " + strings.Join(excluded, " "), nil
+	if len(parts) == 1 && len(choices[0].excluded) == 0 {
+		return strings.Join(choices[0].wanted, " "), nil
+	}
+	return strings.Join(parts, " OR "), nil
 }
 
 func searchTokens(input string) []searchToken {
