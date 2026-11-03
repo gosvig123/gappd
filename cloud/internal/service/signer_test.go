@@ -31,9 +31,12 @@ func signerScopes(t *testing.T, scope, clientID string) (*service.Auth, func(str
 	host := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(set) }))
 	t.Cleanup(host.Close)
 	a := &service.Auth{Issuer: host.URL, Resource: "https://example.test/mcp", Keys: service.NewKeys(host.URL)}
+	// One expiry per signer makes the token for an account the same on every call (RS256 is
+	// deterministic), so testDevice.register does not consent again when a second boundary passes.
+	expires := time.Now().Add(time.Hour).Unix()
 	return a, func(owner string) string {
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{"iss": a.Issuer, "aud": a.Resource, "sub": owner,
-			"exp": time.Now().Add(time.Hour).Unix(), "scp": []string{scope}, "client_id": clientID})
+			"exp": expires, "scp": []string{scope}, "client_id": clientID})
 		token.Header["kid"], token.Header["typ"] = "synthetic", "at+jwt"
 		raw, err := token.SignedString(key)
 		if err != nil {

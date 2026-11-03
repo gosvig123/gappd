@@ -69,7 +69,7 @@ together and raise `v` when a field changes meaning.
 | `main` | A failed IPC operation (`ipc.<group>.<operation>`), an uncaught exception or unhandled rejection in the main process, and each background step that logs through `logFailure` in `desktop/src/main/error-log.ts` |
 | `renderer` | An uncaught error (`renderer.error`) or unhandled rejection (`renderer.unhandled-rejection`) in the window |
 | `process` | The window or a helper process ended other than cleanly (`process.renderer-gone`, `process.gpu-gone`, …) |
-| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes). The app keeps the failed keys (Meeting id and step) in `error-report.json`; they are never sent |
+| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes, first 2 minutes after launch). The app keeps the failed keys (Meeting id and step) in `error-report.json`; they are never sent |
 
 To report a new failure, call `logFailure('area.step', 'local log message', error)`. The message
 stays in the local log; only the operation and the error's name, code and frames are sent.
@@ -78,8 +78,20 @@ stays in the local log; only the operation and the error's name, code and frames
 
 `desktop/src/main/error-report.ts` sends `POST /errors` at once, with a 10-second timeout. The same
 failure (source, operation, name and code) is sent at most once in 10 minutes; later ones are counted
-in `repeats` of the next send. A Mac sends at most 30 reports an hour. A failed send is dropped,
-never retried and never reported, so reporting cannot loop.
+in `repeats` of the next send. A Mac sends at most 30 reports an hour, and only one at a time: a
+report that comes while a send is open is dropped. A failed send is dropped, never retried and never
+reported, so reporting cannot loop.
+
+Reporting must never harm the app, also on a slow or broken network:
+
+- The failure path never waits for the send and never sees its errors. 20,000 reports in a burst
+  take about 80 ms in total, and a server that never answers, a lost address, a missing DNS name or
+  a refused connection each hold one connection until the 10-second timeout.
+- The response body is not read. Reporting never throws, also for error values whose getters throw.
+- With reports off, nothing is sent and the Meeting check does not call the backend. Turning reports
+  off forgets the failed Meetings, so turning them on again does not send old failures.
+- The Meeting check starts 2 minutes after launch, runs one at a time, and a backend that does not
+  answer or a full disk only skips that check.
 
 A development run never sends to production. It sends only when `GAPPD_ERROR_REPORT_URL` is set,
 for example to a local cloud server (`http://127.0.0.1:58080/errors`).
