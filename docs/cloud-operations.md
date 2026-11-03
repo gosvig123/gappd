@@ -28,6 +28,12 @@ for `gappd_reader`; no service holds administrator credentials. Builder (Dockerf
 `/ready` healthcheck are explicit service settings, because the CLI did not persist the nested
 `/cloud/railway.toml` path.
 
+`cloud/.railway/railway.ts` is the Infrastructure as Code file that `railway config migrate
+--variables=unmanaged --apply` wrote from the live services (Railway stops reading `railway.toml`
+on 2026-12-01). It does not manage variables. Railway ignores it until `railway config migrate
+cutover` (which redeploys each service), then `railway config plan` and `railway config apply`;
+delete `railway.toml` only after that cutover.
+
 Link the CLI explicitly before an infrastructure change:
 
 ```sh
