@@ -23,6 +23,8 @@ Native runtimes and diarization models ship with the application. Managed setup 
 - release verification checks the packaged app and expected artifacts;
 - GitHub release publishing includes updater metadata and a generated release manifest.
 
+The release workflow runs no tests. A manual stable run first needs the latest CI `test-and-build` check on the tagged commit to have passed (`.github/scripts/require-ci-success.sh`): it waits up to 15 minutes for a CI run that is still going, and stops before building if CI failed or never ran. CI runs on branch pushes and pull requests, not on tags, so tag a commit that is already on `beta`. When a test fails on a commit that passed elsewhere, fix the test; rerun it only to prove that it is flaky.
+
 ### Release notes
 
 Before you tag a stable release, commit `desktop/release-notes/vMAJOR.MINOR.PATCH.md` on `beta`. Write it for people who use Gappd: what changed for them, in short `-` items, with no internal changes (CI, migrations, docs). The workflow checks out the tag and uses this file as the GitHub release body. Without the file, the body is a placeholder line. [getgappd.com/releases/](https://getgappd.com/releases/) shows the body of each stable release (markdown headings, `-` lists, paragraphs, `**bold**`, `` `code` ``, and `https` links) and shows "Fixes and improvements." for the placeholder. To fix the notes of a published release, edit the file and run `gh release edit <tag> --notes-file desktop/release-notes/<tag>.md`; the website shows the change within 10 minutes.

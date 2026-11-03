@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  checks: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
@@ -37,6 +38,12 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Require passing CI for a stable release
+        if: github.event_name == 'workflow_dispatch'
+        run: .github/scripts/require-ci-success.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
