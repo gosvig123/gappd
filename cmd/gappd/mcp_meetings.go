@@ -219,9 +219,14 @@ func optionalRFC3339(value string) (time.Time, error) {
 	return time.Parse(time.RFC3339, value)
 }
 
+// storedTime formats a bound like the stored times, which have whole seconds. A fraction rounds
+// up, so ">= since" and "< until" give the same Meetings as an exact comparison.
 func storedTime(t time.Time) string {
 	if t.IsZero() {
 		return ""
+	}
+	if whole := t.Truncate(time.Second); !whole.Equal(t) {
+		t = whole.Add(time.Second)
 	}
 	return t.UTC().Format(storedTimeLayout)
 }
@@ -268,29 +273,33 @@ type searchToken struct {
 
 // ftsQuery turns web search syntax (the cloud's websearch_to_tsquery) into an FTS5 query.
 // Words and phrases become quoted FTS5 strings, so no input text is read as FTS5 syntax.
+// Excluded words follow the group of wanted words: in FTS5, "a NOT b c" means "a NOT (b c)".
 func ftsQuery(input string) (string, error) {
-	var parts []string
-	positive, pendingOr := false, false
+	var parts, excluded []string
+	pendingOr := false
 	for _, token := range searchTokens(input) {
 		switch {
 		case token.or:
 			pendingOr = len(parts) > 0
 		case token.negated:
-			if !positive {
+			if len(parts) == 0 {
 				return "", errors.New("search_meetings: query needs a word to find before -word, such as: budget -draft")
 			}
-			parts, pendingOr = append(parts, "NOT", ftsString(token.text)), false
+			excluded, pendingOr = append(excluded, "NOT "+ftsString(token.text)), false
 		default:
 			if pendingOr {
 				parts = append(parts, "OR")
 			}
-			parts, positive, pendingOr = append(parts, ftsString(token.text)), true, false
+			parts, pendingOr = append(parts, ftsString(token.text)), false
 		}
 	}
-	if !positive {
+	if len(parts) == 0 {
 		return "", errors.New("search_meetings: query needs at least one word to find")
 	}
-	return strings.Join(parts, " "), nil
+	if len(excluded) == 0 {
+		return strings.Join(parts, " "), nil
+	}
+	return "(" + strings.Join(parts, " ") + ") " + strings.Join(excluded, " "), nil
 }
 
 func searchTokens(input string) []searchToken {

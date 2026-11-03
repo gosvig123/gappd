@@ -10,8 +10,7 @@ export default defineRailway(() => {
     source: gappd,
     build: { buildEnvironment: "V3", builder: "DOCKERFILE", dockerfilePath: "Dockerfile", watchPatterns: ["/cloud/**"] },
     start: "/cleanup",
-    healthcheck: "/ready",
-    healthcheckTimeout: 60,
+    // A cron job that exits after one run serves no HTTP, so it has no healthcheck.
     replicas: { "europe-west4-drams3a": 1 },
     deploy: { cronSchedule: "0 * * * *", restartPolicyType: "NEVER" },
   });

@@ -22,6 +22,8 @@ const (
 	MaxRelayReply = 4 << 20
 	// relayWait stays under the 10-second bound on every /mcp request.
 	relayWait = 8 * time.Second
+	// relayAnswerMargin is the time kept to write the offline answer before the request deadline.
+	relayAnswerMargin = time.Second
 	// relayLifetime ends a connection well before its access token can expire, so a revoked
 	// device or a removed account cannot keep a connection open.
 	relayLifetime = time.Hour
@@ -175,7 +177,7 @@ func (r *Relay) forward(ctx context.Context, owner, token string, body []byte) (
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, relayWait)
+	ctx, cancel := context.WithTimeout(ctx, answerWait(ctx))
 	defer cancel()
 	if err := m.conn.Write(ctx, websocket.MessageText, frame); err != nil {
 		return nil, errMacOffline
@@ -188,6 +190,16 @@ func (r *Relay) forward(ctx context.Context, owner, token string, body []byte) (
 	case <-ctx.Done():
 		return nil, errMacOffline
 	}
+}
+
+// answerWait is relayWait, cut short so the offline answer is written before the request's own
+// deadline (http.TimeoutHandler), which counts from before the token check.
+func answerWait(ctx context.Context) time.Duration {
+	wait := relayWait
+	if deadline, ok := ctx.Deadline(); ok {
+		wait = min(wait, time.Until(deadline)-relayAnswerMargin)
+	}
+	return wait
 }
 
 // relayTransport is the stateless Streamable HTTP side of /mcp: one JSON-RPC message per POST,

@@ -96,7 +96,11 @@ export async function checkFailedMeetings(): Promise<void> {
       if (!stored.failedMeetings.includes(key)) reportError('meeting', `meeting.${key.split(' ')[1]}`, { name: 'MeetingFailed' })
     }
   }
-  writeStored({ ...readStored(), failedMeetings: failed })
+  try {
+    writeStored({ ...readStored(), failedMeetings: failed })
+  } catch {
+    // A full or locked disk: the next check compares against the old keys. Reporting this could loop.
+  }
 }
 
 function reportError(source: ErrorSource, operation: string, error: unknown): void {

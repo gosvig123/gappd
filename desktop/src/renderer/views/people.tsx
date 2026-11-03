@@ -123,12 +123,15 @@ function PossibleDuplicates({ view, duplicates, dismiss }: { view: AppView; dupl
 /** The header's "⋯" menu; it keeps the Google contacts import one click away after the first answer. */
 function PeopleMenu({ state }: { state: ContactsImportState }) {
   const [open, setOpen] = useState(false)
+  const trigger = useRef<HTMLButtonElement>(null)
+  // Closing removes the focused item, so focus goes back to the button that opened the menu.
+  const close = () => { setOpen(false); trigger.current?.focus() }
   return (
-    <div className="people-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.stopPropagation(); setOpen(false) } }}>
-      <button type="button" className="app-icon-action" aria-label="More People actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Ellipsis aria-hidden="true" /></button>
+    <div className="people-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.stopPropagation(); close() } }}>
+      <button ref={trigger} type="button" className="app-icon-action" aria-label="More People actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Ellipsis aria-hidden="true" /></button>
       {open ? (
         <div className="ui-card people-menu-list" role="menu">
-          <button type="button" role="menuitem" className="list-row" disabled={state.busy} onClick={() => { setOpen(false); void state.run() }}>Import Google contacts</button>
+          <button type="button" role="menuitem" className="list-row" disabled={state.busy} onClick={() => { close(); void state.run() }}>Import Google contacts</button>
         </div>
       ) : null}
     </div>
