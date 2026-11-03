@@ -5,7 +5,7 @@ import { remoteAccess } from './cloud/remote-access-service'
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
-import { requestDrains } from './drain-coordinator'
+import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureAgent, findAgents, providerModels, providerStatus, useLocalProvider } from './ai-provider'
@@ -51,7 +51,12 @@ const IPC_HANDLERS: MainHandlers = {
     updatePerson: (_event, input) => updatePerson(input),
     mergePeople: (_event, input) => mergePeople(input),
     personActionItems: (_event, id: string) => personActionItems(id),
-    importGoogleContacts: () => importGoogleContacts(),
+    // New People with emails can match Calendar invitees in recognition.
+    importGoogleContacts: async () => {
+      const result = await importGoogleContacts()
+      requestSpeakerRecognition()
+      return result
+    },
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),

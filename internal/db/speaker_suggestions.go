@@ -50,6 +50,17 @@ func unlabeledSamples(tx *sql.Tx, meetingID string, taken map[string]bool) ([]Sp
 }
 
 func saveSuggestions(tx *sql.Tx, meetingID string, matches []speakerMatch) error {
+	saved, err := suggestionsIn(tx, meetingID)
+	if err != nil {
+		return err
+	}
+	next := map[string]string{}
+	for _, match := range matches {
+		next[match.Key] = match.PersonID
+	}
+	if sameIdentities(saved, next) {
+		return nil
+	}
 	if _, err := tx.Exec(`DELETE FROM speaker_suggestions WHERE meeting_id=?`, meetingID); err != nil {
 		return err
 	}
@@ -71,7 +82,16 @@ func retractSuggestions(tx *sql.Tx, meetingID, key string) error {
 
 // SpeakerSuggestions maps speaker keys to suggested Person IDs.
 func (d *DB) SpeakerSuggestions(meetingID string) (map[string]string, error) {
-	rows, err := d.Conn.Query(`SELECT speaker_key,person_id FROM speaker_suggestions WHERE meeting_id=?`, meetingID)
+	return suggestionsIn(d.Conn, meetingID)
+}
+
+// A *sql.DB or a *sql.Tx.
+type rowsQueryer interface {
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func suggestionsIn(q rowsQueryer, meetingID string) (map[string]string, error) {
+	rows, err := q.Query(`SELECT speaker_key,person_id FROM speaker_suggestions WHERE meeting_id=?`, meetingID)
 	if err != nil {
 		return nil, err
 	}

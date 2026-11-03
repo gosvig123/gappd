@@ -3,19 +3,23 @@ import { withSavedCalendarContexts } from './participant-calendar'
 import type { ParticipantContext } from '../shared/participant-contract'
 import { logFailure } from './error-log'
 
-// This processing hook runs before summary claims and at startup/retry, never on a view read.
-export async function recognizePendingSpeakers(signal?: AbortSignal): Promise<void> {
-  await withSavedCalendarContexts(async contexts => {
+// The drain coordinator runs this as its own step, never on a view read. It returns false when a
+// Meeting failed, so the coordinator repeats the pass later. The backend skips a Meeting that
+// changed after it was listed: the change that moved it asks for recognition again.
+export async function recognizePendingSpeakers(signal?: AbortSignal): Promise<boolean> {
+  return withSavedCalendarContexts(async contexts => {
+    let complete = true
     let after = ''
     while (true) {
       const { targets } = await requestCommand('meetings.voiceTargets', { after }, {}, signal)
-      if (!targets.length) return
+      if (!targets.length) return complete
       for (const target of targets) {
         try {
           const constraint = speakerConstraint(contexts[target.id])
           await requestCommand('meetings.recognizeSpeakers', { ...target, ...constraint }, {}, signal)
         } catch (error) {
           if (signal?.aborted) throw error
+          complete = false
           logFailure('speakers.recognize', `Recognize speakers for Meeting ${target.id}: skipped; manual labeling remains available.`, error)
         }
       }

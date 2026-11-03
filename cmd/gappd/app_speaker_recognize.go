@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
+	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +23,8 @@ func appRecognizeSpeakersCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		if err := store.RecognizeSpeakers(args[0], revision, strings.Split(emails, ","), calendar); err != nil {
+		// A stale target is skipped, not failed: the change that moved it asks for recognition again.
+		if err := store.RecognizeSpeakers(args[0], revision, strings.Split(emails, ","), calendar); err != nil && !errors.Is(err, db.ErrRecognitionStale) {
 			return err
 		}
 		return writeAppMeeting(store, args[0])

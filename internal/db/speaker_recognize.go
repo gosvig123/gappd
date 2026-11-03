@@ -2,9 +2,16 @@ package db
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 )
 
+// ErrRecognitionStale means the Meeting changed or started processing after its target was read.
+// The change that moved it asks for recognition again, so callers can skip it.
+var ErrRecognitionStale = errors.New("recognize speakers: Meeting changed or is processing; retry with current revision")
+
+// RecognizeSpeakers writes only when its result differs from the stored one. A pass over unchanged
+// Meetings then only reads, so it never takes the write lock or conflicts with other writers.
 func (d *DB) RecognizeSpeakers(meetingID string, revision int, emails []string, calendar bool) error {
 	tx, err := d.Conn.Begin()
 	if err != nil {
@@ -132,7 +139,7 @@ func checkRecognitionRevision(tx *sql.Tx, meetingID string, revision int) error 
 		return err
 	}
 	if !ready {
-		return fmt.Errorf("recognize speakers: Meeting changed or is processing; retry with current revision")
+		return ErrRecognitionStale
 	}
 	return nil
 }

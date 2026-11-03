@@ -1,7 +1,7 @@
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
 import type { AssignSpeakerInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
-import { requestDrains } from './drain-coordinator'
+import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
 import { forgetAgendaMeeting } from './agenda'
 import { logFailure } from './error-log'
@@ -32,6 +32,8 @@ export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> 
     logFailure('meeting.delete', 'Delete Meeting failed:', cause)
     throw new Error('Could not delete this Meeting. Stop recording or wait for processing, check managed-file permissions, then retry from the Meeting list.')
   })
+  // Its labeled voices leave the profiles that name speakers in other Meetings.
+  requestSpeakerRecognition()
   await forgetMeetingCalendar(id).catch((cause) => {
     logFailure('meeting.delete-context', 'Meeting context cleanup failed:', cause)
     result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
