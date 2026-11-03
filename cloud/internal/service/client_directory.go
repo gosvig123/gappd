@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -82,18 +81,18 @@ func (d *ClientDirectory) Clients(ctx context.Context, owner string) ([]AccountC
 		rows, err := tx.Query(ctx, `SELECT client_id,first_seen_at,last_seen_at FROM account_clients
  WHERE owner_id=$1 ORDER BY last_seen_at DESC,client_id LIMIT 50`, owner)
 		if err != nil {
-			return errors.New("clients unavailable")
+			return WithCause("clients unavailable", err)
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var client AccountClient
 			if err = rows.Scan(&client.ClientID, &client.FirstSeenAt, &client.LastSeenAt); err != nil {
-				return errors.New("clients unavailable")
+				return WithCause("clients unavailable", err)
 			}
 			clients = append(clients, client)
 		}
 		if rows.Err() != nil {
-			return errors.New("clients unavailable")
+			return WithCause("clients unavailable", rows.Err())
 		}
 		return nil
 	})

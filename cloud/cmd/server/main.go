@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -15,15 +14,18 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	alerts := service.AlertsFromEnv()
+	if err := run(alerts); err != nil {
+		alerts.ReportFailure("cloud API stopped", err)
+		alerts.Flush(5 * time.Second)
 		log.Fatal("cloud startup or server failed")
 	}
 }
 
-func run() error {
+func run(alerts *service.Alerts) error {
 	issuer, resource := os.Getenv("CLERK_ISSUER_URL"), os.Getenv("MCP_RESOURCE_URL")
 	if !validURL(issuer, "") || !validURL(resource, "/mcp") || os.Getenv("DATABASE_URL") == "" {
-		return errors.New("invalid configuration")
+		return service.WithCause("invalid configuration", nil)
 	}
 	if err := productionIdentity(issuer); err != nil {
 		return err
@@ -33,10 +35,10 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
-	return serve(issuer, resource, pool)
+	return serve(issuer, resource, pool, alerts)
 }
 
-func serve(issuer, resource string, pool *pgxpool.Pool) error {
+func serve(issuer, resource string, pool *pgxpool.Pool, alerts *service.Alerts) error {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -46,10 +48,14 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 		return err
 	}
 	defer uploads.Meeting.Close()
+	// MCP_RELAY=on sends /mcp to the account's Mac. Without it, /mcp still reads cloud copies.
+	if os.Getenv("MCP_RELAY") == "on" {
+		uploads.Relay = service.NewRelay()
+	}
 	auth := &service.Auth{Issuer: issuer, Resource: resource, Keys: service.NewKeys(issuer),
 		Limits: service.NewLimiter(), Revocations: service.NewRevocations(pool),
 		// The reader pool cannot write, so the client list uses the writer pool.
-		Clients: service.NewClientDirectory(uploads.Meeting), StatsToken: statsToken()}
+		Clients: service.NewClientDirectory(uploads.Meeting), StatsToken: statsToken(), Alerts: alerts}
 	server := &http.Server{Addr: ":" + port, Handler: service.HandlerWithUploads(auth, pool, uploads),
 		ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second,
 		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 32 << 10}
@@ -60,7 +66,7 @@ func serve(issuer, resource string, pool *pgxpool.Pool) error {
 func meetingPool() (service.Uploads, error) {
 	uploads := service.Uploads{ClientID: os.Getenv("GAPPD_DESKTOP_OAUTH_CLIENT_ID")}
 	if uploads.ClientID == "" || os.Getenv("MEETING_STORAGE_DATABASE_URL") == "" {
-		return uploads, errors.New("meeting storage configuration required")
+		return uploads, service.WithCause("meeting storage configuration required", nil)
 	}
 	pool, err := service.OpenMeetingPool(context.Background(), os.Getenv("MEETING_STORAGE_DATABASE_URL"))
 	uploads.Meeting = pool
@@ -82,7 +88,7 @@ func productionIdentity(issuer string) error {
 		return nil
 	}
 	if strings.Contains(issuer, ".clerk.accounts.dev") {
-		return errors.New("production requires a production identity issuer")
+		return service.WithCause("production requires a production identity issuer", nil)
 	}
 	return nil
 }

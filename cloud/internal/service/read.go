@@ -43,7 +43,7 @@ func List(ctx context.Context, pool *pgxpool.Pool, owner string, p ListParams) (
 		rows, err := tx.Query(ctx, listMeetingsSQL,
 			owner, optionalTime(p.Since), optionalTime(p.Until), p.Offset, p.Limit+1)
 		if err != nil {
-			return errors.New("Meetings unavailable")
+			return WithCause("Meetings unavailable", err)
 		}
 		defer rows.Close()
 		if result.Meetings, err = scanSummaries(rows); err != nil {
@@ -69,12 +69,12 @@ func scanSummaries(rows pgx.Rows) ([]MeetingSummary, error) {
 	for rows.Next() {
 		var s MeetingSummary
 		if err := rows.Scan(&s.ID, &s.Title, &s.StartedAt, &s.UpdatedAt); err != nil {
-			return nil, errors.New("Meetings unavailable")
+			return nil, WithCause("Meetings unavailable", err)
 		}
 		items = append(items, s)
 	}
 	if rows.Err() != nil {
-		return nil, errors.New("Meetings unavailable")
+		return nil, WithCause("Meetings unavailable", rows.Err())
 	}
 	return items, nil
 }
@@ -107,7 +107,7 @@ func Search(ctx context.Context, pool *pgxpool.Pool, owner, query string, limit 
 	err := withReadTx(ctx, pool, owner, func(ctx context.Context, tx pgx.Tx) error {
 		rows, err := tx.Query(ctx, searchMeetingsSQL, owner, query, limit)
 		if err != nil {
-			return errors.New("Meetings unavailable")
+			return WithCause("Meetings unavailable", err)
 		}
 		defer rows.Close()
 		result.Matches, err = scanHits(rows)
@@ -121,13 +121,13 @@ func scanHits(rows pgx.Rows) ([]SearchHit, error) {
 	for rows.Next() {
 		var h SearchHit
 		if err := rows.Scan(&h.ID, &h.Title, &h.StartedAt, &h.Passage); err != nil {
-			return nil, errors.New("Meetings unavailable")
+			return nil, WithCause("Meetings unavailable", err)
 		}
 		h.Passage = plainPassage(h.Passage)
 		items = append(items, h)
 	}
 	if rows.Err() != nil {
-		return nil, errors.New("Meetings unavailable")
+		return nil, WithCause("Meetings unavailable", rows.Err())
 	}
 	return items, nil
 }

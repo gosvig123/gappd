@@ -65,6 +65,7 @@ func deviceHandler(pool *pgxpool.Pool) http.Handler {
 			return
 		}
 		if err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "device unavailable", http.StatusServiceUnavailable)
 			return
 		}

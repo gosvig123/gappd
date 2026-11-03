@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -15,7 +14,7 @@ func CleanupMeeting(ctx context.Context, conn *pgx.Conn) (int64, error) {
  AND NOT EXISTS (SELECT FROM pg_class WHERE relname IN ('cloud_meetings','meeting_lifecycle') AND relowner=pg_roles.oid)
  FROM pg_roles WHERE rolname=current_user`).Scan(&safe)
 	if err != nil || !safe {
-		return 0, errors.New("isolated cleanup role required")
+		return 0, WithCause("isolated cleanup role required", nil)
 	}
 	tx, err := conn.Begin(ctx)
 	if err != nil {

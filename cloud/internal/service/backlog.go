@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,7 +28,7 @@ func ReadBacklog(ctx context.Context, pool *pgxpool.Pool) (Backlog, error) {
 	err := pool.QueryRow(ctx, `SELECT expired_copies,oldest_expired_seconds FROM cleanup_backlog()`).
 		Scan(&backlog.ExpiredCopies, &backlog.OldestExpiredSeconds)
 	if err != nil {
-		return Backlog{}, errors.New("backlog unavailable")
+		return Backlog{}, WithCause("backlog unavailable", err)
 	}
 	backlog.Behind = backlog.OldestExpiredSeconds > CleanupTargetSeconds
 	return backlog, nil

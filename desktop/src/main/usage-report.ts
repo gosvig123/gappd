@@ -12,6 +12,7 @@ import { listMeetings } from './meetings'
 import { cloudResource } from './service-config'
 import { getStartupSettings } from './startup-settings'
 import { resolveUpdateChannel } from './update-channel-preference'
+import { logFailure } from './error-log'
 
 // One anonymous Usage report per day the app ran, sent only when the user shares usage counts.
 // It is built from data already on this Mac when it is sent, so Gappd keeps no usage log. A failed
@@ -41,10 +42,10 @@ export function startUsageReports(): void {
   try {
     noteToday()
   } catch (error) {
-    console.error('Usage report could not note the launch day', error)
+    logFailure('usage-report.note-day', 'Usage report could not note the launch day', error)
   }
   timer = setTimeout(function tick() {
-    void reportPreviousDay().catch((error) => console.error('Usage report skipped for today', error))
+    void reportPreviousDay().catch((error) => logFailure('usage-report.send', 'Usage report skipped for today', error))
     timer = setTimeout(tick, CHECK_INTERVAL_MS)
   }, process.env[URL_ENV]?.trim() ? PROBE_FIRST_CHECK_MS : FIRST_CHECK_MIN_MS + Math.random() * FIRST_CHECK_SPREAD_MS)
 }

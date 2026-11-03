@@ -1,6 +1,7 @@
 import { requestCommand } from './app-protocol'
 import { withSavedCalendarContexts } from './participant-calendar'
 import type { ParticipantContext } from '../shared/participant-contract'
+import { logFailure } from './error-log'
 
 // This processing hook runs before summary claims and at startup/retry, never on a view read.
 export async function recognizePendingSpeakers(signal?: AbortSignal): Promise<void> {
@@ -15,7 +16,7 @@ export async function recognizePendingSpeakers(signal?: AbortSignal): Promise<vo
           await requestCommand('meetings.recognizeSpeakers', { ...target, ...constraint }, {}, signal)
         } catch (error) {
           if (signal?.aborted) throw error
-          console.error(`Recognize speakers for Meeting ${target.id}: skipped; manual labeling remains available.`, error)
+          logFailure('speakers.recognize', `Recognize speakers for Meeting ${target.id}: skipped; manual labeling remains available.`, error)
         }
       }
       after = targets[targets.length - 1].id

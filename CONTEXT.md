@@ -40,8 +40,14 @@ An earlier **Meeting** with notes whose linked Calendar event is in the same rec
 **Cloud upload consent**:
 Explicit permission to sync Meeting text from this Mac under one Gappd account authorization.
 
+**Remote access**:
+An optional connection from this Mac to Gappd Cloud that lets AI services elsewhere list, search and read **Meetings** while Gappd is open; the Mac answers each request itself.
+
 **Usage report**:
 One anonymous daily set of counts and settings (buckets and fixed values only) that the app sends when the user shares usage counts.
+
+**Error report**:
+One anonymous description of one failure in the app (step, error type and code, place in Gappd's own code; never error text) that the app sends to the cloud service, which forwards it to the team's error channel.
 
 ## Relationships
 
@@ -53,6 +59,8 @@ One anonymous daily set of counts and settings (buckets and fixed values only) t
 - Each **Google Calendar connection** owns its encrypted on-device tokens and Calendar cache.
 - **Cloud upload consent** is separate from sign-in, survives app restarts and token refresh, and never transfers to another account authorization; turning sync off or reconnecting clears it, while destructive cloud actions require separate one-use confirmation.
 - A **Usage report** is separate from sign-in and from **Cloud upload consent**: it carries no account, device or install id, is off until the user says yes, and the server keeps only per-field daily totals.
+- An **Error report** is separate from a **Usage report** and from sign-in: it is on until the user turns it off, carries no account, device or install id, and the cloud service forwards it without keeping a database record.
+- **Remote access** needs the signed-in Gappd account but not **Cloud upload consent**: the cloud passes requests to this Mac and stores nothing. The Mac checks each caller's token, never offers raw database queries, and drops the connection when the account changes; a newer Mac on the same account turns it off on the older one.
 - Deleting a **Meeting** that was synced also deletes its cloud copy: the deletion is recorded on this Mac first and sent while **Cloud upload consent** is active.
 - Assigning a **Person** to a **Meeting speaker** names their transcript turns and refreshes the meeting's summary.
 - A **Person** page lists that Person's upcoming Calendar events (matched by email), their **Meetings**, and the action items they own in those Meetings' notes. An action item belongs to a **Person** when its owner is the speaker key labeled as that Person in the same Meeting, or the Person's full name; action items have no done state.

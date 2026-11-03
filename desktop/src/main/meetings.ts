@@ -4,6 +4,7 @@ import { requestCommand } from './app-protocol'
 import { requestDrains } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
 import { forgetAgendaMeeting } from './agenda'
+import { logFailure } from './error-log'
 
 export async function getDevices(): Promise<Device[]> {
   const result = await requestCommand('devices.list', {})
@@ -28,15 +29,15 @@ export async function retryDiarization(id: string): Promise<MeetingDetail> {
 
 export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
   const result = await requestCommand('meetings.delete', { id }).catch((cause) => {
-    console.error('Delete Meeting failed:', cause)
+    logFailure('meeting.delete', 'Delete Meeting failed:', cause)
     throw new Error('Could not delete this Meeting. Stop recording or wait for processing, check managed-file permissions, then retry from the Meeting list.')
   })
   await forgetMeetingCalendar(id).catch((cause) => {
-    console.error('Meeting context cleanup failed:', cause)
+    logFailure('meeting.delete-context', 'Meeting context cleanup failed:', cause)
     result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
   })
   await forgetAgendaMeeting(id).catch((cause) => {
-    console.error('Meeting agenda cleanup failed:', cause)
+    logFailure('meeting.delete-agenda', 'Meeting agenda cleanup failed:', cause)
     result.artifactWarning = 'The Meeting was deleted, but related local context could not be removed.'
   })
   return result

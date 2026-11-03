@@ -6,6 +6,7 @@ import { childEnv, resolveCaptureBinary } from './native-runtime'
 import { dismissMeetingPrompt, showMeetingPrompt, stopMeetingPrompts } from './meeting-notification'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
+import { logFailure } from './error-log'
 
 const DEBOUNCE_MS = 4_000
 const OBSERVER_RESTART_MS = 2_000
@@ -126,7 +127,7 @@ async function recordSignal(signal: MeetingSignal): Promise<void> {
     assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
   } catch (error) {
     showApp()
-    console.error(`Start recording for ${signal.provider} failed:`, error)
+    logFailure('recording.auto-start', `Start recording for ${signal.provider} failed:`, error)
   }
 }
 

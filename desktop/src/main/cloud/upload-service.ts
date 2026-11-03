@@ -17,7 +17,8 @@ import type { MeetingDeleteResponse } from '../../shared/contracts'
 let instance: MeetingUpload | null = null
 let authorization: CloudAuth | null = null
 
-function meetingUploadAuthorization(): CloudAuth {
+/** The signed-in Gappd account. Uploads and remote access share it. */
+export function meetingUploadAuthorization(): CloudAuth {
   authorization ||= new CloudAuth({ ...cloudAuthConfig(), resource: cloudResource(), refreshTokens: true },
     createSecureStore<CloudCredential>('cloud-upload-development.enc'), {
       openExternal: (url) => shell.openExternal(url), requireSecureStorage: requireEncryption,

@@ -1,96 +1,183 @@
-import { useState } from 'react'
+import { useRef, useState, type RefObject } from 'react'
+import { Ellipsis, Search, X } from 'lucide-react'
 import type { GoogleAccess } from '../../shared/calendar-contract'
 import type { SavedPerson } from '../../shared/participant-contract'
-import { PersonEmail } from '../components/person-email'
-import { errorText, PersonEditor, PersonMerge } from '../components/person-forms'
-import { Button, EmptyState } from '../components/ui'
+import { errorText, PersonMerge } from '../components/person-forms'
+import { Button, EmptyState, cx } from '../components/ui'
 import type { AppView } from '../lib/app-view'
 import { initialsOf, personMeetings, shortDate } from '../lib/person-activity'
-import { isEmailName, likelyDuplicates, mergeOrder, readableName, type DuplicatePair } from '../lib/person-identity'
+import { likelyDuplicates, mergeOrder, readableName, type DuplicatePair } from '../lib/person-identity'
 import { PersonPage } from './person-page'
-import { SpeakerQueue } from './speaker-queue'
+import { SpeakerQueue, unnamedSpeakerCount } from './speaker-queue'
+import './people.css'
 
-type PersonRow = { person: SavedPerson; meetings: number; lastSeen?: string }
-type Change = { mode: 'edit' | 'email'; personId: string } | { mode: 'merge'; personId: string; otherId?: string; pairId?: string }
+type PersonRow = { person: SavedPerson; meetings: number; lastStartedAt?: string }
+type PersonGroup = { label: string; rows: PersonRow[] }
+type PairMerge = { pairId: string; personId: string; otherId: string }
+type ContactsImportState = ReturnType<typeof useContactsImport>
 const DISMISSED_DUPLICATES_KEY = 'gappd.people.notDuplicates'
+// Set on this machine after the first import or "Not now"; the prompt then moves to the header menu only.
+const CONTACTS_IMPORT_ANSWERED_KEY = 'gappd.people.contactsImportAnswered'
+const SEARCH_LABEL = 'Search People by name or email'
+const RECENT_DAYS = 30
+const LETTERS = [...'ABCDEFGHIJKLMNOPQRSTUVWXYZ', '#']
 
+/** The People list on the left; the chosen Person opens beside it, so the list keeps its place. */
 export function PeopleView({ view }: { view: AppView }) {
-  const rows = view.people.map((person) => personRow(person, view)).sort((left, right) => right.meetings - left.meetings)
-  const [change, setChange] = useState<Change | null>(null)
+  const rows = view.people.map((person) => personRow(person, view)).sort(byLastMeeting)
+  const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   const [dismissed, dismiss] = useDismissedDuplicates()
+  const listRef = useRef<HTMLDivElement>(null)
+  const contactsImport = useContactsImport(view.actions.peopleChanged)
   const duplicates = likelyDuplicates(view.people).filter((pair) => !dismissed.has(pair.id))
-  const done = (people: SavedPerson[]) => { view.actions.peopleChanged(people); setChange(null) }
   const hasAccess = (access: GoogleAccess) => Boolean(view.calendar?.connections.some((connection) => connection.access?.includes(access)))
-  // A merge can remove the open Person; the list shows again then.
+  const canImport = hasAccess('contacts')
+  const shown = rows.filter((row) => matchesQuery(row.person, query))
+  // A merge can remove the open Person; the list then shows alone again.
   const open = view.people.find((person) => person.id === openId)
-  if (open) return <PersonPage person={open} view={view} canEmail={hasAccess('gmail')} onBack={() => setOpenId(null)} />
+  const importStatus = contactsImport.busy ? 'Importing Google contacts…' : contactsImport.error ? <span className="app-error">{contactsImport.error}</span> : contactsImport.note
   return (
-    <div className="app-stack">
-      <header className="app-section-head">
-        <p className="ui-eyebrow">Saved identities</p>
-        <h1 className="ui-title">People</h1>
-        <p className="app-section-sub">{rows.length} saved {rows.length === 1 ? 'person' : 'people'} · assigning a Person to a Meeting speaker names their turns and refreshes the summary</p>
+    <div className={cx('people-workspace', open && 'has-selection')}>
+      <header className="people-head">
+        <div className="people-title">
+          <h1 className="ui-title">People</h1>
+          {rows.length ? <span className="people-count" role="status">{query.trim() ? `${shown.length} of ${rows.length}` : peopleCount(rows.length)}</span> : null}
+          {canImport ? <PeopleMenu state={contactsImport} /> : null}
+        </div>
+        {importStatus ? <p className="app-section-sub" role="status">{importStatus}</p> : null}
+        {rows.length ? (
+          <label className="app-search people-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={SEARCH_LABEL} aria-label={SEARCH_LABEL} />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><X aria-hidden="true" /></button> : null}</label>
+        ) : null}
       </header>
-      <SpeakerQueue view={view} />
-      {hasAccess('contacts') ? <ContactsImport onDone={view.actions.peopleChanged} /> : null}
-      {duplicates.length ? (
-        <section className="app-people-duplicates" aria-label="Possible duplicates">
-          {duplicates.map((pair) => (
-            <div key={pair.id} className="app-person-duplicate">
-              <span><strong>{pair.first.name}</strong> and <strong>{pair.second.name}</strong> may be the same person.</span>
-              <Button className="compact-action" aria-expanded={isPairChange(change, pair)} onClick={() => setChange(isPairChange(change, pair) ? null : duplicateMerge(pair))}>Review merge</Button>
-              <Button className="compact-action" onClick={() => dismiss(pair.id)}>Not the same</Button>
-              {/* The review opens where it was asked for, not in a Person row further down the list. */}
-              {change?.mode === 'merge' && isPairChange(change, pair) ? <PersonMerge key={pair.id} person={mergeOrder(pair)[0]} people={view.people} otherId={change.otherId} onDone={done} onCancel={() => setChange(null)} /> : null}
-            </div>
-          ))}
-        </section>
-      ) : null}
-      {rows.length ? (
-        <ul className="app-people">
-          {rows.map((row) => (
-            <li key={row.person.id} className="app-person">
-              <span className="app-avatar" aria-hidden="true">{initialsOf(readableName(row.person))}</span>
-              <div className="app-person-copy">
-                <button type="button" className="app-person-name" onClick={() => setOpenId(row.person.id)}>{row.person.name}</button>
-                <span>{personDetail(row.person)}</span>
-              </div>
-              <span className="app-person-count">{row.meetings} {row.meetings === 1 ? 'Meeting' : 'Meetings'}</span>
-              <span className="app-person-seen">{row.lastSeen ? `Last ${row.lastSeen}` : 'Not labeled yet'}</span>
-              <span className="app-person-actions">
-                {hasAccess('gmail') && row.person.email ? <Button className="compact-action" aria-label={`Email with ${row.person.name}`} aria-expanded={change?.personId === row.person.id && change.mode === 'email'} onClick={() => setChange(change?.personId === row.person.id && change.mode === 'email' ? null : { mode: 'email', personId: row.person.id })}>Email</Button> : null}
-                <Button className="compact-action" aria-label={`Edit ${row.person.name}`} onClick={() => setChange({ mode: 'edit', personId: row.person.id })}>Edit</Button>
-                {view.people.length > 1 ? <Button className="compact-action" aria-label={`Merge ${row.person.name}`} onClick={() => setChange({ mode: 'merge', personId: row.person.id })}>Merge…</Button> : null}
-              </span>
-              {change?.personId === row.person.id && change.mode === 'edit' ? <PersonEditor person={row.person} onDone={done} onCancel={() => setChange(null)} /> : null}
-              {change?.personId === row.person.id && change.mode === 'email' && row.person.email ? <PersonEmail name={row.person.name} email={row.person.email} /> : null}
-              {change?.personId === row.person.id && change.mode === 'merge' && !change.pairId ? <PersonMerge person={row.person} people={view.people} onDone={done} onCancel={() => setChange(null)} /> : null}
-            </li>
-          ))}
-        </ul>
-      ) : <EmptyState>No saved People yet. Label a Meeting speaker to save them here.</EmptyState>}
+      <div className={cx('people-columns', !open && shown.length > 0 && 'has-jump')}>
+        <div ref={listRef} className="people-list ui-scroll">
+          {/* Work on the whole list waits while one Person is open. */}
+          {open ? null : <ToReview view={view} duplicates={duplicates} dismiss={dismiss} askImport={canImport && !contactsImport.answered} contactsImport={contactsImport} />}
+          {shown.length ? groupByLastMeeting(shown).map((group) => (
+            <section key={group.label} className="people-group" aria-label={group.label}>
+              <h2>{group.label} <span>{group.rows.length}</span></h2>
+              <ul className="people-rows">
+                {group.rows.map((row) => (
+                  <li key={row.person.id} data-letter={letterOf(row.person)}>
+                    <button type="button" className="people-row" aria-current={row.person.id === open?.id ? 'true' : undefined} onClick={() => setOpenId(row.person.id)}>
+                      <span className="app-avatar" aria-hidden="true">{initialsOf(readableName(row.person))}</span>
+                      <span className="people-row-name">{readableName(row.person)}</span>
+                      <span className="people-row-detail">{row.person.email ?? ''}</span>
+                      <span className="people-row-meta">{row.lastStartedAt ? `${shortDate(row.lastStartedAt)} · ${meetingCount(row.meetings)}` : ''}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )) : rows.length ? (
+            <EmptyState>No People match "{query.trim()}". <button type="button" className="app-link" onClick={() => setQuery('')}>Clear search</button></EmptyState>
+          )
+            : <EmptyState>No saved People yet. Label a Meeting speaker to save them here.</EmptyState>}
+        </div>
+        {!open && shown.length ? <LetterJump rows={shown} listRef={listRef} /> : null}
+        {open ? <div className="people-content ui-scroll"><PersonPage key={open.id} person={open} view={view} canEmail={hasAccess('gmail')} onBack={() => setOpenId(null)} /></div> : null}
+      </div>
     </div>
   )
 }
 
-function ContactsImport({ onDone }: { onDone: (people: SavedPerson[]) => void }) {
+/** One line for the list's open work: speakers to name, possible duplicates, and the first contacts import. */
+function ToReview({ view, duplicates, dismiss, askImport, contactsImport }: { view: AppView; duplicates: DuplicatePair[]; dismiss: (id: string) => void; askImport: boolean; contactsImport: ContactsImportState }) {
+  const speakers = unnamedSpeakerCount(view)
+  const parts = [
+    speakers ? `${speakers} unnamed ${speakers === 1 ? 'speaker' : 'speakers'}` : '',
+    duplicates.length ? `${duplicates.length} possible ${duplicates.length === 1 ? 'duplicate' : 'duplicates'}` : '',
+    askImport ? 'Google contacts to import' : '',
+  ].filter(Boolean)
+  if (!parts.length) return null
+  return (
+    <details className="people-review">
+      <summary>{speakers + duplicates.length + Number(askImport)} to review: {parts.join(', ')}</summary>
+      <div className="people-review-body">
+        <SpeakerQueue view={view} />
+        {duplicates.length ? <PossibleDuplicates view={view} duplicates={duplicates} dismiss={dismiss} /> : null}
+        {askImport ? <ContactsImportPrompt state={contactsImport} /> : null}
+      </div>
+    </details>
+  )
+}
+
+function PossibleDuplicates({ view, duplicates, dismiss }: { view: AppView; duplicates: DuplicatePair[]; dismiss: (id: string) => void }) {
+  const [pairMerge, setPairMerge] = useState<PairMerge | null>(null)
+  const done = (people: SavedPerson[]) => { view.actions.peopleChanged(people); setPairMerge(null) }
+  return (
+    <section className="app-people-duplicates" aria-label="Possible duplicates">
+      {duplicates.map((pair) => (
+        <div key={pair.id} className="app-person-duplicate">
+          <span><strong>{pair.first.name}</strong> and <strong>{pair.second.name}</strong> may be the same person.</span>
+          <Button className="compact-action" aria-expanded={pairMerge?.pairId === pair.id} onClick={() => setPairMerge(pairMerge?.pairId === pair.id ? null : duplicateMerge(pair))}>Review merge</Button>
+          <Button className="compact-action" onClick={() => dismiss(pair.id)}>Not the same</Button>
+          {pairMerge?.pairId === pair.id ? <PersonMerge key={pair.id} person={mergeOrder(pair)[0]} people={view.people} otherId={pairMerge.otherId} onDone={done} onCancel={() => setPairMerge(null)} /> : null}
+        </div>
+      ))}
+    </section>
+  )
+}
+
+/** The header's "⋯" menu; it keeps the Google contacts import one click away after the first answer. */
+function PeopleMenu({ state }: { state: ContactsImportState }) {
+  const [open, setOpen] = useState(false)
+  const trigger = useRef<HTMLButtonElement>(null)
+  // Closing removes the focused item, so focus goes back to the button that opened the menu.
+  const close = () => { setOpen(false); trigger.current?.focus() }
+  return (
+    <div className="people-menu" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }} onKeyDown={(event) => { if (event.key === 'Escape' && open) { event.stopPropagation(); close() } }}>
+      <button ref={trigger} type="button" className="app-icon-action" aria-label="More People actions" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}><Ellipsis aria-hidden="true" /></button>
+      {open ? (
+        <div className="ui-card people-menu-list" role="menu">
+          <button type="button" role="menuitem" className="list-row" disabled={state.busy} onClick={() => { close(); void state.run() }}>Import Google contacts</button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** A letter scrolls the list to the first shown Person whose name starts with it. */
+function LetterJump({ rows, listRef }: { rows: PersonRow[]; listRef: RefObject<HTMLDivElement | null> }) {
+  const present = new Set(rows.map((row) => letterOf(row.person)))
+  const jump = (letter: string) => {
+    const item = listRef.current?.querySelector(`[data-letter="${letter}"]`)
+    item?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    item?.querySelector('button')?.focus({ preventScroll: true })
+  }
+  return (
+    <nav className="people-jump" aria-label="Jump to letter">
+      {LETTERS.map((letter) => <button key={letter} type="button" disabled={!present.has(letter)} aria-label={letter === '#' ? 'Jump to names that do not start with a letter' : `Jump to ${letter}`} onClick={() => jump(letter)}>{letter}</button>)}
+    </nav>
+  )
+}
+
+function useContactsImport(onDone: (people: SavedPerson[]) => void) {
+  const [answered, setAnswered] = useState(() => window.localStorage.getItem(CONTACTS_IMPORT_ANSWERED_KEY) === 'true')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const answer = () => { window.localStorage.setItem(CONTACTS_IMPORT_ANSWERED_KEY, 'true'); setAnswered(true) }
   const run = async () => {
     setBusy(true); setError(null); setNote('')
     try {
       const result = await window.gappd.meetings.importGoogleContacts()
       onDone(result.people)
       setNote(importNote(result.added, result.updated))
+      answer()
     } catch (cause) { setError(errorText(cause)) }
     finally { setBusy(false) }
   }
+  return { answered, note, error, busy, run, answer }
+}
+
+function ContactsImportPrompt({ state }: { state: ContactsImportState }) {
   return (
     <div className="app-people-import">
-      <Button className="compact-action" disabled={busy} onClick={() => void run()}>{busy ? 'Importing…' : 'Import Google contacts'}</Button>
-      <span role="status">{error ? <span className="app-error">{error}</span> : note || 'Adds every saved Google contact with an email who is not already a Person.'}</span>
+      <Button className="compact-action" disabled={state.busy} onClick={() => void state.run()}>{state.busy ? 'Importing…' : 'Import Google contacts'}</Button>
+      <Button className="compact-action" disabled={state.busy} onClick={state.answer}>Not now</Button>
+      <span>Adds every saved Google contact with an email who is not already a Person.</span>
     </div>
   )
 }
@@ -120,21 +207,48 @@ function readDismissed(): string[] {
   }
 }
 
-function duplicateMerge(pair: DuplicatePair): Change {
+function duplicateMerge(pair: DuplicatePair): PairMerge {
   const [kept, merged] = mergeOrder(pair)
-  return { mode: 'merge', personId: kept.id, otherId: merged.id, pairId: pair.id }
+  return { pairId: pair.id, personId: kept.id, otherId: merged.id }
 }
 
-function isPairChange(change: Change | null, pair: DuplicatePair): boolean {
-  return change?.mode === 'merge' && change.pairId === pair.id
+/** Groups in list order: Meetings in the last 30 days, older Meetings, then People without a Meeting. */
+function groupByLastMeeting(rows: PersonRow[], now = Date.now()): PersonGroup[] {
+  const since = now - RECENT_DAYS * 24 * 60 * 60 * 1000
+  const startedAt = (row: PersonRow) => (row.lastStartedAt ? new Date(row.lastStartedAt).getTime() : null)
+  return [
+    { label: `Last ${RECENT_DAYS} days`, rows: rows.filter((row) => (startedAt(row) ?? -Infinity) >= since) },
+    { label: 'Earlier', rows: rows.filter((row) => { const time = startedAt(row); return time !== null && time < since }) },
+    { label: 'No Meetings yet', rows: rows.filter((row) => startedAt(row) === null) },
+  ].filter((group) => group.rows.length)
 }
 
-function personDetail(person: SavedPerson): string {
-  if (isEmailName(person.name)) return 'Name not set · Edit to add one'
-  return person.email ?? 'No email saved'
+function letterOf(person: SavedPerson): string {
+  const letter = readableName(person).normalize('NFD').charAt(0).toUpperCase()
+  return letter >= 'A' && letter <= 'Z' ? letter : '#'
+}
+
+function matchesQuery(person: SavedPerson, query: string): boolean {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const text = `${person.name} ${person.email ?? ''}`.toLowerCase()
+  return words.every((word) => text.includes(word))
+}
+
+/** Most recent Meeting first; People without a Meeting follow by name. */
+function byLastMeeting(left: PersonRow, right: PersonRow): number {
+  if (left.lastStartedAt !== right.lastStartedAt) return (right.lastStartedAt ?? '').localeCompare(left.lastStartedAt ?? '')
+  return readableName(left.person).localeCompare(readableName(right.person))
+}
+
+function peopleCount(count: number): string {
+  return `${count} ${count === 1 ? 'Person' : 'People'}`
+}
+
+function meetingCount(count: number): string {
+  return `${count} ${count === 1 ? 'Meeting' : 'Meetings'}`
 }
 
 function personRow(person: SavedPerson, view: AppView): PersonRow {
   const meetings = personMeetings(person, view)
-  return { person, meetings: meetings.length, lastSeen: meetings[0] ? shortDate(meetings[0].startedAt) : undefined }
+  return { person, meetings: meetings.length, lastStartedAt: meetings[0]?.startedAt }
 }

@@ -7,13 +7,14 @@ import { resolveBinary } from './binaries'
 import { meetingMediaPath } from './meeting-media'
 import { showMeeting } from './meetings'
 import { resolveFfmpegBinary } from './native-runtime'
+import { logFailure } from './error-log'
 
 const run = promisify(execFile)
 
 export async function exportRecording(id: string): Promise<boolean> {
   try { return await exportMeetingFile(id) }
   catch (cause) {
-    console.error('Export recording failed:', cause)
+    logFailure('meeting.export', 'Export recording failed:', cause)
     throw new Error('Could not export this Meeting. Check its video, both audio files, and the destination space or permissions; then retry. The Meeting was kept.')
   }
 }

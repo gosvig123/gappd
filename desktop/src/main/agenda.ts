@@ -7,6 +7,7 @@ import { getStartupSettings } from './startup-settings'
 import { usingSummaryRuntime } from './summary-runtime'
 import { calendarEventKey, type CalendarEventSummary } from '../shared/calendar-contract'
 import { agendaDueEvents, agendaRequest, cleanAgendaItems, draftedAgenda, type Agenda } from '../shared/agenda'
+import { logFailure } from './error-log'
 
 // Agendas belong to Calendar events, so they are kept encrypted like the Calendar links of Meetings.
 const STORE_FILE = 'meeting-agendas.enc'
@@ -82,7 +83,7 @@ export async function saveAgendaItems(eventKey: string, items: unknown): Promise
 
 export function startAgendaAutoDraft(): void {
   if (timer) return
-  timer = setInterval(() => void draftDueAgendas().catch((error) => console.error('Automatic agenda drafting failed; it will retry on the next check', error)), TICK_MS)
+  timer = setInterval(() => void draftDueAgendas().catch((error) => logFailure('agenda.auto-draft', 'Automatic agenda drafting failed; it will retry on the next check', error)), TICK_MS)
 }
 
 export function stopAgendaAutoDraft(): void {
@@ -109,7 +110,7 @@ async function draftDueAgendas(): Promise<void> {
       if (!agendaDueEvents(events, () => Boolean(current[key]) || attempted.has(key)).length) continue
       attempted.add(key)
       try { await draftAgenda(key) }
-      catch (error) { console.error(`Draft agenda for "${event.title}" automatically: skipped; Prepare agenda remains available.`, error) }
+      catch (error) { logFailure('agenda.auto-draft-event', `Draft agenda for "${event.title}" automatically: skipped; Prepare agenda remains available.`, error) }
     }
   } finally { checking = false }
 }

@@ -44,11 +44,11 @@ func withReadTx(ctx context.Context, pool *pgxpool.Pool, owner string, fn func(c
 	defer cancel()
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{AccessMode: pgx.ReadOnly})
 	if err != nil {
-		return errors.New("Meetings unavailable")
+		return WithCause("Meetings unavailable", err)
 	}
 	defer tx.Rollback(context.Background())
 	if _, err = tx.Exec(ctx, `SELECT set_config('app.owner_id', $1, true)`, owner); err != nil {
-		return errors.New("Meetings unavailable")
+		return WithCause("Meetings unavailable", err)
 	}
 	return fn(ctx, tx)
 }
@@ -61,7 +61,7 @@ func readMeeting(ctx context.Context, tx pgx.Tx, owner, id string) (Meeting, err
 		return Meeting{}, unavailable
 	}
 	if err != nil {
-		return Meeting{}, errors.New("Meeting unavailable")
+		return Meeting{}, WithCause("Meeting unavailable", err)
 	}
 	return m, nil
 }

@@ -52,6 +52,9 @@
   cursor: pointer;
 }
 
+.ai-app-row { cursor: default; }
+.ai-app-row .danger { color: var(--color-danger); }
+
 .startup-setting-copy {
   display: grid;
   flex: 1 1 20rem;

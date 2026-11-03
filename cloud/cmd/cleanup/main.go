@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"github.com/gosvig123/gappd/cloud/internal/service"
 	"github.com/jackc/pgx/v5"
 	"log"
@@ -12,6 +11,9 @@ import (
 
 func main() {
 	if err := run(); err != nil {
+		alerts := service.AlertsFromEnv()
+		alerts.ReportFailure("Meeting cleanup failed", err)
+		alerts.Flush(5 * time.Second)
 		log.Fatal("Meeting cleanup failed (details suppressed)")
 	}
 }
@@ -19,7 +21,7 @@ func main() {
 func run() error {
 	url := os.Getenv("MEETING_CLEANUP_DATABASE_URL")
 	if url == "" {
-		return errors.New("cleanup configuration required")
+		return service.WithCause("cleanup configuration required", nil)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

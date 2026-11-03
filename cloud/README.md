@@ -8,8 +8,10 @@ see the [Meeting document contract](../docs/cloud-meeting-document.md) and the
 
 ## Runtime
 
-Railway uses root `/cloud`, branch `beta`, explicit Dockerfile builder and `/ready` healthcheck.
+Railway uses root `/cloud`, explicit Dockerfile builder and `/ready` healthcheck.
 These settings are configured on the service: the CLI did not persist the nested TOML path.
+Automatic deployment is off: a push or merge to `beta` or `main` deploys nothing (see
+[Deploying the API](../docs/cloud-operations.md#deploying-the-api)).
 Runtime variables. The server refuses to start without the first five:
 
 - `DATABASE_URL`: private PostgreSQL URL for **gappd_reader**, never the administrator.
@@ -20,12 +22,15 @@ Runtime variables. The server refuses to start without the first five:
 - `GAPPD_PRODUCTION_MODE=true`: refuses a development Clerk issuer.
 - `PORT`: Railway listening port; default `8080`.
 - `GAPPD_STATS_TOKEN` (optional, 32+ characters): enables `GET /usage/totals` for the stats dashboard.
+- `DISCORD_ERRORS_WEBHOOK_URL` (optional, API and cleanup services): posts 5xx answers, panics, a stopped server, failed cleanups and desktop Error reports to a private Discord channel. See [error reports](../docs/error-reports.md).
+- `MCP_RELAY=on` (optional): `/mcp` forwards to the account's Mac instead of reading cloud copies. See [Remote access relay](#remote-access-relay).
 
 `GET /health` is public liveness; `GET /ready` checks a runtime database connection.
 Both protected-resource metadata paths are public:
 `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`.
 `/mcp` is authenticated Streamable HTTP, stateless, with three read-only tools over the caller's
-synced cloud copies: `get_meeting({id})`, `list_meetings({since,until,offset,limit})` and
+synced cloud copies (or local Meetings with `MCP_RELAY=on`): `get_meeting({id})`,
+`list_meetings({since,until,offset,limit})` and
 `search_meetings({query,limit})`. List returns summaries only; search returns ranked passages.
 Search uses web search syntax (`websearch_to_tsquery`): all words must match, `OR` adds alternatives,
 quotes match a phrase and `-word` excludes.
@@ -38,14 +43,15 @@ with `resource_metadata` and `scope`. Bearer query parameters are rejected.
 JWKS fetches use a five-second timeout, 128 KiB limit, no redirects, and a five-minute
 cache including failures. Unknown keys fail closed until the next refresh. JWT
 revocation is NOT immediate: signed tokens remain valid until expiration. No
-Clerk secret key, token forwarding, credential logging, or token persistence exists.
+Clerk secret key, credential logging, or token persistence exists. Only the relay forwards a
+token, and only to the caller's own Mac.
 
 Requests: 16 KiB bodies, 32 KiB headers, ten-second handler limit. Database: four
 connections, three-second statements, read-only transaction, transaction-local owner.
 Forced row-level security (RLS) plus parameterized ID/owner filters enforce isolation.
 Runtime connection setup rejects administrator, owner, bypass-RLS, and member roles.
-The read tools query `cloud_meetings` directly. Its reader policy returns only the owner's copies
-that are neither deleted nor expired. Schema limits in UTF-8 bytes: title 512, summary 65536,
+Without `MCP_RELAY=on`, the read tools query `cloud_meetings` directly. Its reader policy returns
+only the owner's copies that are neither deleted nor expired. Schema limits in UTF-8 bytes: title 512, summary 65536,
 transcript 1 MiB. JSON escaping and SDK text/structured duplication can expand the response but
 remain bounded by these constraints.
 
@@ -99,6 +105,16 @@ field value's daily total in `usage_daily` and keeps no report. Only the owner c
 and uses the read budget. It returns `{"totals":[{day,field,value,reports}]}` from
 `usage_totals()` on the reader pool: the last 400 days, without any total under 5.
 Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
+
+## Error reports
+
+`POST /errors` takes one anonymous desktop Error report: no token, no device signature, bounded to
+4 KiB (413), one shared budget of 300 a minute (429 beyond), and cross-origin protection (403). It
+answers 204, or 400 for any field or value outside the allowlist. It keeps no database record: it
+writes the report line to the application log and forwards it to the Discord error channel when
+`DISCORD_ERRORS_WEBHOOK_URL` is set. The service also reports its own 5xx
+answers and panics there, with the route and the kind of each cause, never error text. Fields and
+setup: [error reports](../docs/error-reports.md).
 
 ## Client inventory
 
@@ -189,6 +205,31 @@ because the service must not claim a token is good when it cannot tell.
 
 The runtime role only needs SELECT on `revoked_grants`; the Meeting writer inserts the rows. An
 admin can also revoke directly with SQL if the API is unreachable.
+
+## Remote access relay
+
+With `MCP_RELAY=on`, `/mcp` stores and reads nothing. Code: `internal/service/relay.go`.
+
+- The desktop app opens a WebSocket to `GET /relay` with its own token (`meetings:sync`, Desktop
+  client). The route skips the ten-second handler limit; the server clears the connection's read and
+  write deadlines. One connection per account: a newer one closes the older with code 1008, and
+  that Mac stops until the user turns Remote access on again. The server pings every 30 seconds and
+  ends each connection after one hour with code 1000, so the Mac reconnects with a fresh token.
+- Each `/mcp` POST must hold one JSON-RPC message (no batches, no SSE: `GET` answers 405). After the
+  usual token checks, the server sends `{"id","token","body"}` over the account's connection and
+  waits up to 8 seconds for `{"id","body"}`. A `null` body answers 202. No connection, a timeout or a
+  closed connection answers JSON-RPC error -32001 "Gappd on your Mac is not reachable".
+- The Mac allows 30 seconds of clock skew from Clerk for expiry and optional `nbf` and `iat`
+  checks; expiry is required.
+- The Mac checks the token again (issuer keys, audience, expiry, `meetings:read`, and the subject
+  must be the signed-in account), so a relay cannot make up a request. It cannot check grant
+  revocations. Answers are capped at 4 MiB. The Mac serves `gappd mcp --remote`: the three Meeting
+  tools, never `query`.
+- The relay keeps connections in process memory, so it needs exactly one instance.
+
+To check it end to end without Railway, run the real handler with a fake issuer (an
+`httptest` JWKS and RS256 tokens) and drive `RemoteAccess` from
+`desktop/src/main/cloud/remote-access.ts` with Node type stripping against a copied database.
 
 ## Request and storage limits
 
@@ -324,7 +365,7 @@ reset, runtime write/admin rejection, schema/input limits, and fixed JWKS fetch 
 ## Live gates (parent-owned)
 
 1. Apply migration/provision privately; configure reader URL and canonical resource.
-2. Deploy from beta with Railway root `/cloud`; check health/readiness and metadata.
+2. Deploy a pushed commit with Railway root `/cloud`; check health/readiness and metadata.
 3. Register distinct read-only clients with actual callbacks. Do NOT reuse Desktop
    client `iFaeusoYBwClQRoP`. Keep DCR OFF and S256 required. Request `resource` exactly
    equal to MCP_RESOURCE_URL so Clerk includes audience; request `meetings:read`.

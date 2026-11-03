@@ -56,7 +56,7 @@ function useShellController(view: AppView) {
 function ShellMain({ view, shell, account }: { view: AppView; shell: ReturnType<typeof useShellController>; account: ReturnType<typeof useAccountRequirement> }) {
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} account={account} />
     <AccountPrompt view={view} account={account} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
-    <div className={`app-scroll ui-scroll ${shell.section === 'meetings' ? 'is-workspace' : ''}`}>
+    <div className={`app-scroll ui-scroll ${shell.section === 'meetings' || shell.section === 'people' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}

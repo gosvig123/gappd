@@ -108,7 +108,7 @@ export class MeetingUpload {
   async forgetLocal(localId: unknown): Promise<void> {
     if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
     await this.queue.forget(localId)
-    void this.syncNew().catch(() => console.error('Cloud deletion of a deleted Meeting could not start; sync retries it automatically.'))
+    void this.syncNew().catch((error) => { console.error('Cloud deletion of a deleted Meeting could not start; sync retries it automatically.'); reportFailure('cloud-sync.delete-start', error) })
   }
 
   /** Sends queued deletions and copies while consent and the account still hold. */
@@ -291,7 +291,7 @@ export class MeetingUpload {
     if (this.retryTimer) return
     // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
     this.retryTimer = setInterval(() => {
-      void this.syncNew().catch(() => console.error('Automatic Meeting sync failed. Unlock this Mac and check the connection; retrying next minute.'))
+      void this.syncNew().catch((error) => { console.error('Automatic Meeting sync failed. Unlock this Mac and check the connection; retrying next minute.'); reportFailure('cloud-sync.automatic', error) })
     }, 60_000)
     this.retryTimer.unref()
   }
@@ -321,3 +321,5 @@ import { deleteCloudCopy } from './upload-delete.ts'
 import { syncUploads } from './upload-sync.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import type { UploadContext } from './upload-context.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { reportFailure } from '../error-log.ts'

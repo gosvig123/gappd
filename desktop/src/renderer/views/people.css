@@ -1,0 +1,76 @@
+/* People: title, count, and search above a grouped list; the chosen Person opens beside the list. */
+.people-workspace { container: people-workspace / inline-size; display: grid; grid-template-rows: auto minmax(0, 1fr); block-size: 100%; min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
+.people-head { display: grid; gap: var(--space-4); min-inline-size: 0; }
+.people-head .app-section-sub { margin: 0; }
+.people-title { display: flex; align-items: center; gap: var(--space-4); }
+.people-title .ui-title { margin: 0; }
+.people-search { max-inline-size: 32rem; }
+.people-count { color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.people-menu { position: relative; }
+.people-menu .app-icon-action svg { inline-size: 1.1rem; block-size: 1.1rem; }
+.people-menu-list { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: grid; min-inline-size: 13rem; padding: 6px; border: 1px solid var(--color-border-strong); box-shadow: var(--shadow-raised); }
+.people-menu-list .list-row { padding: var(--space-2) var(--space-3); white-space: nowrap; text-align: start; }
+
+/* Open list work (speakers to name, duplicates, the first import) folds into one line above the list. */
+.people-review { border: 1px solid var(--color-accent-border); border-radius: var(--radius-md); background: var(--color-accent-tint); }
+.people-review > summary { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); cursor: pointer; list-style: none; font-size: var(--font-size-small); }
+.people-review > summary::-webkit-details-marker { display: none; }
+.people-review > summary::before { content: ''; flex: none; inline-size: 0.5rem; block-size: 0.5rem; border-radius: 50%; background: var(--color-accent); }
+.people-review > summary::after { content: '›'; margin-inline-start: auto; color: var(--color-text-muted); font-size: var(--font-size-body); transition: transform var(--transition-quick); }
+.people-review[open] > summary::after { transform: rotate(90deg); }
+.people-review > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; border-radius: var(--radius-md); }
+.people-review-body { display: grid; gap: var(--space-5); padding: 0 var(--space-5) var(--space-5); }
+
+.people-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
+.people-columns.has-jump { grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-3); }
+.has-selection .people-columns { grid-template-columns: minmax(240px, 30%) minmax(0, 1fr); }
+.people-list { display: grid; align-content: start; gap: var(--space-5); overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-4) var(--space-7) 2px; overscroll-behavior: contain; }
+/* Inline padding holds the negative margin of .app-person-list, so the pane does not scroll sideways. */
+.people-content { overflow: auto; min-block-size: 0; min-inline-size: 0; padding: 2px var(--space-5) var(--space-7); overscroll-behavior: contain; }
+
+.people-group { display: grid; gap: var(--space-2); }
+.people-group h2 { margin: 0; padding: 0 var(--space-4); color: var(--color-text-muted); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); letter-spacing: 0.04em; text-transform: uppercase; }
+.people-group h2 span { margin-inline-start: var(--space-2); font-variant-numeric: tabular-nums; }
+.people-rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; }
+.people-rows > li { scroll-margin-block-start: var(--space-3); }
+/* One line per Person: name, email, then the last Meeting. Without a Meeting the right side stays empty. */
+.people-row {
+  display: grid;
+  grid-template-columns: auto minmax(8rem, 14rem) minmax(0, 1fr) auto;
+  grid-template-areas: "avatar name detail meta";
+  align-items: center;
+  column-gap: var(--space-5);
+  row-gap: 1px;
+  inline-size: 100%;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  text-align: start;
+  cursor: pointer;
+}
+.people-row:hover { background: var(--surface-hover); }
+.people-row[aria-current] { background: var(--color-accent-tint); box-shadow: inset 3px 0 var(--color-accent); }
+.people-row:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+.people-row .app-avatar { grid-area: avatar; inline-size: 1.75rem; block-size: 1.75rem; font-size: var(--font-size-xs); }
+.people-row-name { grid-area: name; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--font-weight-medium); }
+.people-row-detail { grid-area: detail; min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.people-row-meta { grid-area: meta; color: var(--color-text-muted); font-size: var(--font-size-small); white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The open Person shows the Meeting count, so the narrow list keeps only name and email. */
+.has-selection .people-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar name" "avatar detail"; }
+.has-selection .people-row-meta { display: none; }
+
+/* Letters on the right edge jump through a long list. */
+.people-jump { display: flex; flex-direction: column; justify-content: center; padding-block-end: var(--space-7); }
+.people-jump button { padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--color-accent); font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); line-height: 1.3; cursor: pointer; }
+.people-jump button:hover:not(:disabled) { background: var(--surface-hover); }
+.people-jump button:disabled { color: var(--color-text-muted); opacity: 0.45; cursor: default; }
+.people-jump button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -1px; }
+
+/* A narrow window shows the list or the open Person, not both. "← People" goes back to the list. */
+@container people-workspace (max-width: 760px) {
+  .has-selection .people-columns { grid-template-columns: minmax(0, 1fr); }
+  .has-selection :is(.people-list, .people-search) { display: none; }
+  .people-row { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "avatar name meta" "avatar detail meta"; }
+}

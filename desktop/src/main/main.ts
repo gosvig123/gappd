@@ -18,6 +18,9 @@ import { startAgendaAutoDraft, stopAgendaAutoDraft } from './agenda'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 import { startUsageReports, stopUsageReports } from './usage-report'
+import { startErrorReports, stopErrorReports } from './error-report'
+import { remoteAccess } from './cloud/remote-access-service'
+import { logFailure, reportFailure } from './error-log'
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
@@ -37,7 +40,7 @@ function applyDevDockIcon(): void {
 function migrateScreenCapturePermission(): void {
   if (process.platform !== 'darwin' || !app.isPackaged) return
   try { migrateScreenCaptureIdentity(process.execPath, app.getPath('userData')) }
-  catch (error) { console.error('ScreenCapture identity migration failed', error) }
+  catch (error) { logFailure('startup.screen-capture-migration', 'ScreenCapture identity migration failed', error) }
 }
 
 function createWindow(show = true): void {
@@ -106,28 +109,30 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 }
 
 app.whenReady().then(async () => {
+  startErrorReports()
   registerMeetingMedia()
   applyDevDockIcon()
   migrateScreenCapturePermission()
   const startHidden = shouldStartHidden()
   initializeStartupSettings()
   createWindow(!startHidden)
-  void meetingUpload().syncNew().catch(() => console.error('Saved Meeting sync could not start. Unlock this Mac; sync will retry automatically.'))
+  void meetingUpload().syncNew().catch((error) => { console.error('Saved Meeting sync could not start. Unlock this Mac; sync will retry automatically.'); reportFailure('cloud-sync.start', error) })
   await bootstrapManagedRuntime()
   startDrainCoordinator()
   // A finished record joins the cloud queue on its own; without consent it stays local.
-  onMeetingProcessingFinished(() => { void meetingUpload().syncNew().catch((error) => console.error('Meeting upload after processing failed', error)) })
+  onMeetingProcessingFinished(() => { void meetingUpload().syncNew().catch((error) => logFailure('cloud-sync.after-processing', 'Meeting upload after processing failed', error)) })
   startMeetingPresence(showMainWindow)
   startStorageCompaction()
   startCalendarRefresh()
   startAgendaAutoDraft()
   startAutoUpdateChecks()
   startUsageReports()
+  remoteAccess().start()
   logMainProcessMemory('ready')
 
   app.on('activate', showMainWindow)
-  powerMonitor.on('suspend', () => { void pauseDrains('sleep').catch((error) => console.error('Failed to pause drains for sleep', error)) })
-  powerMonitor.on('resume', () => resumeDrains('sleep'))
+  powerMonitor.on('suspend', () => { void pauseDrains('sleep').catch((error) => logFailure('processing.pause-for-sleep', 'Failed to pause drains for sleep', error)) })
+  powerMonitor.on('resume', () => { resumeDrains('sleep'); remoteAccess().reconnect() })
 })
 
 nativeAutoUpdater.on(BEFORE_QUIT_FOR_UPDATE_EVENT, () => { updateInstallRequested = true })
@@ -156,6 +161,8 @@ async function shutdown(): Promise<void> {
   stopMeetingPresence()
   stopAutoUpdateChecks()
   stopUsageReports()
+  stopErrorReports()
+  remoteAccess().stop()
   await stopActiveRecordingForQuit()
   await managedRuntime.close()
   logMainProcessMemory('shutdown:done')

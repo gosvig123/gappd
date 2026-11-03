@@ -50,6 +50,7 @@ func accountAction(pool *pgxpool.Pool, run func(ctx context.Context, owner strin
 		owner, _ := r.Context().Value(ownerKey{}).(string)
 		result, err := run(r.Context(), owner)
 		if err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "account action unavailable", http.StatusServiceUnavailable)
 			return
 		}

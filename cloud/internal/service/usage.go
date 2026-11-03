@@ -98,7 +98,7 @@ func RecordUsage(ctx context.Context, pool *pgxpool.Pool, report UsageReport) er
 	defer cancel()
 	fields, values := report.totals()
 	if _, err := pool.Exec(ctx, `SELECT record_usage($1,$2)`, fields, values); err != nil {
-		return errors.New("usage unavailable")
+		return WithCause("usage unavailable", err)
 	}
 	return nil
 }
@@ -123,6 +123,7 @@ func usageHandler(limits *Limiter, pool *pgxpool.Pool) http.Handler {
 			return
 		}
 		if err = RecordUsage(r.Context(), pool, report); err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "usage unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -144,18 +145,18 @@ func ReadUsageTotals(ctx context.Context, pool *pgxpool.Pool) ([]UsageTotal, err
 	defer cancel()
 	rows, err := pool.Query(ctx, `SELECT to_char(day,'YYYY-MM-DD'),field,value,reports FROM usage_totals()`)
 	if err != nil {
-		return nil, errors.New("usage totals unavailable")
+		return nil, WithCause("usage totals unavailable", err)
 	}
 	totals := []UsageTotal{}
 	for rows.Next() {
 		var total UsageTotal
 		if err = rows.Scan(&total.Day, &total.Field, &total.Value, &total.Reports); err != nil {
-			return nil, errors.New("usage totals unavailable")
+			return nil, WithCause("usage totals unavailable", err)
 		}
 		totals = append(totals, total)
 	}
 	if rows.Err() != nil {
-		return nil, errors.New("usage totals unavailable")
+		return nil, WithCause("usage totals unavailable", rows.Err())
 	}
 	return totals, nil
 }
@@ -175,6 +176,7 @@ func usageTotalsHandler(token string, limits *Limiter, pool *pgxpool.Pool) http.
 		}
 		totals, err := ReadUsageTotals(r.Context(), pool)
 		if err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "usage totals unavailable", http.StatusServiceUnavailable)
 			return
 		}

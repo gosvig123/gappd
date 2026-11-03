@@ -45,7 +45,7 @@ func blockUploads(ctx context.Context, tx pgx.Tx, owner string) error {
  ON CONFLICT (owner_id) DO UPDATE SET generation=account_state.generation+1,uploads_allowed=false,
  updated_at=statement_timestamp()`, owner)
 	if err != nil {
-		return errors.New("account deletion unavailable")
+		return WithCause("account deletion unavailable", err)
 	}
 	return nil
 }
@@ -55,11 +55,11 @@ func eraseCopies(ctx context.Context, tx pgx.Tx, owner string) (int, error) {
 	_, err := tx.Exec(ctx, `UPDATE meeting_lifecycle SET deleted_at=coalesce(deleted_at,statement_timestamp())
  WHERE owner_id=$1 AND deleted_at IS NULL`, owner)
 	if err != nil {
-		return 0, errors.New("account deletion unavailable")
+		return 0, WithCause("account deletion unavailable", err)
 	}
 	tag, err := tx.Exec(ctx, `DELETE FROM cloud_meetings WHERE owner_id=$1`, owner)
 	if err != nil {
-		return 0, errors.New("account deletion unavailable")
+		return 0, WithCause("account deletion unavailable", err)
 	}
 	return int(tag.RowsAffected()), nil
 }
@@ -72,7 +72,7 @@ func verifyAccountEmpty(ctx context.Context, tx pgx.Tx, owner string) error {
  (SELECT count(*) FROM cloud_meetings WHERE owner_id=$1),
  (SELECT count(*) FROM meeting_lifecycle WHERE owner_id=$1 AND deleted_at IS NULL)`, owner).Scan(&allowed, &remaining, &unmarked)
 	if err != nil || allowed || remaining != 0 || unmarked != 0 {
-		return errors.New("account deletion unavailable")
+		return WithCause("account deletion unavailable", err)
 	}
 	return nil
 }
@@ -93,7 +93,7 @@ func ConsentUploads(ctx context.Context, pool *pgxpool.Pool, owner string) (int,
  generation=CASE WHEN account_state.uploads_allowed THEN account_state.generation ELSE account_state.generation+1 END,
  updated_at=statement_timestamp() RETURNING generation`, owner).Scan(&generation)
 		if err != nil {
-			return errors.New("consent unavailable")
+			return WithCause("consent unavailable", err)
 		}
 		return nil
 	})
@@ -114,7 +114,7 @@ func checkAccountUploads(ctx context.Context, tx pgx.Tx, owner string, generatio
 		return errUploadsBlocked
 	}
 	if err != nil {
-		return errors.New("cloud copy unavailable")
+		return WithCause("cloud copy unavailable", err)
 	}
 	if !allowed {
 		return errUploadsBlocked

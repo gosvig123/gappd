@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import * as errorLog from './error-log.ts'
 
 // Load the actual module with fake process/runtime boundaries. No child processes run.
 export function loadSourceModule(path: URL, imports: Record<string, unknown>, globals: Record<string, unknown> = {}) {
@@ -8,6 +10,8 @@ export function loadSourceModule(path: URL, imports: Record<string, unknown>, gl
   const { outputText } = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } })
   const exports: Record<string, any> = {}
   runInNewContext(outputText, { exports, ...globals, require: (name: string) => {
+    // Failure logging has no boundary to fake, so modules get the real one unless a test replaces it.
+    if (!(name in imports) && /(^|\/)error-log$/.test(name)) return errorLog
     if (!(name in imports)) throw new Error(`Unexpected dependency: ${name}`)
     return imports[name]
   } })

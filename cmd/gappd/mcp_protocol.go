@@ -48,7 +48,7 @@ type toolContent struct {
 	Text string `json:"text"`
 }
 
-func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcResponse {
+func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest, remote bool) *rpcResponse {
 	if len(request.ID) == 0 {
 		return nil
 	}
@@ -58,20 +58,26 @@ func handleRPC(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcRespon
 	case "ping":
 		return rpcSuccess(request.ID, map[string]any{})
 	case "tools/list":
-		return rpcSuccess(request.ID, queryToolList())
+		return rpcSuccess(request.ID, toolList(remote))
 	case "tools/call":
-		return handleToolCall(ctx, conn, request)
+		return handleToolCall(ctx, conn, request, remote)
 	default:
 		return rpcFailure(request.ID, -32601, "method not found")
 	}
 }
 
-func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcResponse {
+func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest, remote bool) *rpcResponse {
 	var call toolCallParams
 	if err := json.Unmarshal(request.Params, &call); err != nil {
 		return rpcFailure(request.ID, -32602, "invalid tools/call params")
 	}
-	if call.Name != "query" {
+	if result, known, err := callMeetingTool(ctx, conn, call.Name, call.Arguments); known {
+		if err != nil {
+			return rpcSuccess(request.ID, errorToolResult(err.Error()))
+		}
+		return rpcSuccess(request.ID, jsonToolResult(result))
+	}
+	if call.Name != "query" || remote {
 		return rpcFailure(request.ID, -32602, "unknown tool")
 	}
 	var args queryArgs
@@ -82,15 +88,15 @@ func handleToolCall(ctx context.Context, conn *sql.DB, request rpcRequest) *rpcR
 	if err != nil {
 		return rpcSuccess(request.ID, errorToolResult(err.Error()))
 	}
-	return rpcSuccess(request.ID, successToolResult(result))
+	return rpcSuccess(request.ID, jsonToolResult(result))
 }
 
 func decodeToolArguments(raw json.RawMessage, target any) error {
 	if len(raw) == 0 {
-		return fmt.Errorf("query arguments are required")
+		return fmt.Errorf("tool arguments are required")
 	}
 	if err := json.Unmarshal(raw, target); err != nil {
-		return fmt.Errorf("invalid query arguments: %w", err)
+		return fmt.Errorf("invalid tool arguments: %w", err)
 	}
 	return nil
 }
@@ -103,7 +109,10 @@ func initializeResult() map[string]any {
 	}
 }
 
-func queryToolList() map[string]any {
+func toolList(remote bool) map[string]any {
+	if remote {
+		return map[string]any{"tools": meetingToolDefinitions()}
+	}
 	primitive := []map[string]any{{"type": "string"}, {"type": "number"}, {"type": "boolean"}, {"type": "null"}}
 	properties := map[string]any{
 		"sql":      map[string]any{"type": "string", "description": "One SELECT or WITH statement."},
@@ -114,13 +123,13 @@ func queryToolList() map[string]any {
 		"name": "query", "description": "Run one bounded read-only SELECT or WITH query against the local Gappd SQLite database. List tables and columns with SELECT name, sql FROM sqlite_master WHERE type = 'table' (no information_schema or PRAGMA). Results stop at 48 KB (truncation_reason byte_limit): size long text with length(column) and read it in chunks with substr(column, start, 20000).",
 		"inputSchema": map[string]any{"type": "object", "properties": properties, "required": []string{"sql"}, "additionalProperties": false},
 	}
-	return map[string]any{"tools": []any{tool}}
+	return map[string]any{"tools": append(meetingToolDefinitions(), tool)}
 }
 
-func successToolResult(result queryResult) toolResult {
+func jsonToolResult(result any) toolResult {
 	data, err := json.Marshal(result)
 	if err != nil {
-		return errorToolResult("encode query result: " + err.Error())
+		return errorToolResult("encode tool result: " + err.Error())
 	}
 	return toolResult{Content: []toolContent{{Type: "text", Text: string(data)}}}
 }

@@ -12,6 +12,9 @@ import { LocalAIErrorBanner } from '../components/settings/local-ai-error-banner
 import { GoogleCalendarPanel } from '../components/settings/google-calendar-panel'
 import { NotesProviderPanel } from '../components/settings/notes-provider-panel'
 import { UsagePanel } from '../components/settings/usage-panel'
+import { ErrorReportsPanel } from '../components/settings/error-reports-panel'
+import { AIAppsPanel } from '../components/settings/ai-apps-panel'
+import { RemoteAccessPanel } from '../components/settings/remote-access-panel'
 import { THEME_OPTIONS, type ThemeName } from '../hooks/use-theme'
 import '../components/atoms.css'
 import type { GoogleCalendarController } from '../hooks/use-google-calendar'
@@ -30,9 +33,9 @@ type SettingsViewProps = {
 
 export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, developerDebugEnabled, initialCategory }: SettingsViewProps) {
   const categories = [
-    { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><UsagePanel /></> },
+    { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><UsagePanel /><ErrorReportsPanel /></> },
     { label: 'Meeting processing', content: <><NotesProviderPanel runtime={localAI.status} onRepair={localAI.onRepair} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
-    { label: 'Connections', content: <><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
+    { label: 'Connections', content: <><AIAppsPanel /><RemoteAccessPanel /><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
   return <SettingsLayout categories={categories} initialCategory={initialCategory} />

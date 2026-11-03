@@ -20,13 +20,20 @@ site and OAuth relay project. Railway names the environment `production`.
 | Database service | `Postgres`: `1e6d7e2d-b50a-4685-ab97-cacc4557aeae`, image `ghcr.io/railwayapp-templates/postgres-ssl:18` |
 | Database volume | `postgres-volume`: `09e2971f-5fba-4cc9-8d60-729a27812e94`, mounted at `/var/lib/postgresql/data` |
 | Region | `europe-west4-drams3a` (EU West) |
-| Source | `gosvig123/gappd`, branch `beta`, root `/cloud`, watch `/cloud/**` |
+| Source | `gosvig123/gappd`, no branch trigger (automatic deployment off), root `/cloud`, watch `/cloud/**` |
 | Public MCP URL | `https://gappd-cloud-api-production.up.railway.app/mcp` |
 
 PostgreSQL is private, with no public TCP proxy. The API's `DATABASE_URL` is a private-network URL
 for `gappd_reader`; no service holds administrator credentials. Builder (Dockerfile) and the
 `/ready` healthcheck are explicit service settings, because the CLI did not persist the nested
 `/cloud/railway.toml` path.
+
+`cloud/.railway/railway.ts` is the Infrastructure as Code file that `railway config migrate
+--variables=unmanaged --apply` wrote from the live services (Railway stops reading `railway.toml`
+on 2026-12-01). It does not manage variables. `railway config migrate status` shows that no
+service reads Config as Code, so no cutover is needed. Railway ignores the file until `railway
+config apply`; `railway config plan` previews it but needs the `railway` npm package, which this
+repo does not have yet.
 
 Link the CLI explicitly before an infrastructure change:
 
@@ -41,7 +48,8 @@ supply a JSON patch on stdin and verify the persisted configuration.
 
 ## Deploying the API
 
-A push to `beta` does NOT deploy `gappd-cloud-api`; automatic deployment is off. `railway redeploy`
+A push or merge to `beta` or `main` does NOT deploy `gappd-cloud-api`; the service has no deployment
+trigger. `railway redeploy`
 rebuilds the same commit and cannot ship a newer one. Upload from the repository root with a clean
 working tree, because the service sets `rootDirectory=/cloud` with `dockerfilePath=Dockerfile` and
 an upload deploys the working tree, not a commit:
@@ -204,7 +212,7 @@ printf "SELECT owner_id, left(id::text,8), left(local_id,8), deleted_at IS NOT N
 | Second account and hosted ChatGPT | Deferred. Pi's owned read is proven; a second real account and ChatGPT developer mode are needed for cross-account and client checks. |
 | Revocation timing | `POST /revoke` is checked on every request with a 30-second per-instance cache. Clerk refresh tokens do not expire, and signed access tokens stay valid until expiry outside that check. |
 | Limits and instances | Rate buckets and the storage check live in one process. Move them to a shared store before running a second instance. |
-| Staging | There is no separate staging environment; `beta` is the deploy branch. |
+| Staging | There is no separate staging environment; production runs whichever pushed commit was last deployed by hand. |
 
 ## Primary sources
 

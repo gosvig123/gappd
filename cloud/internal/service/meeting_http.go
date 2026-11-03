@@ -48,7 +48,7 @@ func acknowledgeMeetingUpload(w http.ResponseWriter, r *http.Request, pool *pgxp
 	}
 	id, err := UploadMeeting(r.Context(), pool, owner, generation, body)
 	if err != nil {
-		writeUploadRefusal(w, err)
+		writeUploadRefusal(w, r, err)
 		return
 	}
 	acknowledgeMeeting(w, r, pool, owner, "accepted", id)
@@ -56,7 +56,7 @@ func acknowledgeMeetingUpload(w http.ResponseWriter, r *http.Request, pool *pgxp
 
 // writeUploadRefusal maps one upload failure to one status, so an absent copy and another
 // account's copy can never be told apart by a different message.
-func writeUploadRefusal(w http.ResponseWriter, err error) {
+func writeUploadRefusal(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, errDocument):
 		http.Error(w, "invalid document", http.StatusBadRequest)
@@ -69,6 +69,7 @@ func writeUploadRefusal(w http.ResponseWriter, err error) {
 	case errors.Is(err, errCopyClosed):
 		http.Error(w, "cloud copy deleted or expired", http.StatusGone)
 	default:
+		noteFailure(r.Context(), err)
 		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
 	}
 }
@@ -85,6 +86,7 @@ func acknowledgeMeetingDelete(w http.ResponseWriter, r *http.Request, pool *pgxp
 		return
 	}
 	if err := DeleteMeeting(r.Context(), pool, owner, localID); err != nil {
+		noteFailure(r.Context(), err)
 		http.Error(w, "cloud copy unavailable", http.StatusServiceUnavailable)
 		return
 	}
@@ -124,6 +126,7 @@ func acknowledgeMeeting(w http.ResponseWriter, r *http.Request, pool *pgxpool.Po
 	if status == "accepted" {
 		revision, expiry, err := copyState(r, pool, owner, id)
 		if err != nil {
+			noteFailure(r.Context(), err)
 			http.Error(w, "acknowledgment unavailable", http.StatusServiceUnavailable)
 			return
 		}

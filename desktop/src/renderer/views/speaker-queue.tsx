@@ -52,6 +52,11 @@ function QueueMeetingSpeakers({ item, view, contacts }: { item: QueueMeeting; vi
   )
 }
 
+/** How many speakers the queue asks to name. */
+export function unnamedSpeakerCount(view: Pick<AppView, 'meetings' | 'meetingDetails'>): number {
+  return speakerQueue(view).reduce((count, item) => count + item.speakers.length, 0)
+}
+
 /** Unlabeled remote speakers per recent Meeting; speakers with a voice suggestion come first. */
 function speakerQueue(view: Pick<AppView, 'meetings' | 'meetingDetails'>, now = Date.now()): QueueMeeting[] {
   const since = now - QUEUE_DAYS * 24 * 60 * 60 * 1000
