@@ -8,8 +8,12 @@ export function installErrorReports(): void {
 
 function send(operation: RendererError['operation'], error: unknown): void {
   if (error === null || error === undefined) return
-  const fields = typeof error === 'object' ? error as { name?: unknown; code?: unknown; message?: unknown; stack?: unknown } : {}
-  const text = (value: unknown) => typeof value === 'string' ? value : ''
-  void window.gappd.errorReports.report({ operation, name: text(fields.name), code: text(fields.code), stack: stackFrames(fields.stack, fields.message) })
-    .catch(() => undefined)
+  try {
+    const fields = typeof error === 'object' ? error as { name?: unknown; code?: unknown; message?: unknown; stack?: unknown } : {}
+    const text = (value: unknown) => typeof value === 'string' ? value : ''
+    void window.gappd.errorReports.report({ operation, name: text(fields.name), code: text(fields.code), stack: stackFrames(fields.stack, fields.message) })
+      .catch(() => undefined)
+  } catch {
+    // A getter that throws, or no preload bridge: the window goes on as if nothing was sent.
+  }
 }
