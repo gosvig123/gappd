@@ -13,23 +13,16 @@ import './people.css'
 
 type PersonRow = { person: SavedPerson; meetings: number; lastStartedAt?: string }
 type PairMerge = { pairId: string; personId: string; otherId: string }
-type PeopleTab = 'all' | 'met' | 'not-met'
 type ContactsImportState = ReturnType<typeof useContactsImport>
 const DISMISSED_DUPLICATES_KEY = 'gappd.people.notDuplicates'
 // Set on this machine after the first import or "Not now"; the prompt then shrinks to a link in the header.
 const CONTACTS_IMPORT_ANSWERED_KEY = 'gappd.people.contactsImportAnswered'
 const SEARCH_LABEL = 'Search People by name or email'
-const TABS: Array<{ id: PeopleTab; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'met', label: 'Met' },
-  { id: 'not-met', label: 'Not met yet' },
-]
 
 /** The People list on the left; the chosen Person opens beside it, so the list keeps its place. */
 export function PeopleView({ view }: { view: AppView }) {
   const rows = view.people.map((person) => personRow(person, view)).sort(byLastMeeting)
   const [query, setQuery] = useState('')
-  const [tab, setTab] = useState<PeopleTab>('all')
   const [pairMerge, setPairMerge] = useState<PairMerge | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [dismissed, dismiss] = useDismissedDuplicates()
@@ -37,9 +30,7 @@ export function PeopleView({ view }: { view: AppView }) {
   const duplicates = likelyDuplicates(view.people).filter((pair) => !dismissed.has(pair.id))
   const hasAccess = (access: GoogleAccess) => Boolean(view.calendar?.connections.some((connection) => connection.access?.includes(access)))
   const canImport = hasAccess('contacts')
-  const matches = rows.filter((row) => matchesQuery(row.person, query))
-  const counts = Object.fromEntries(TABS.map(({ id }) => [id, matches.filter((row) => inTab(row, id)).length])) as Record<PeopleTab, number>
-  const shown = matches.filter((row) => inTab(row, tab))
+  const shown = rows.filter((row) => matchesQuery(row.person, query))
   // A merge can remove the open Person; the list then shows alone again.
   const open = view.people.find((person) => person.id === openId)
   const done = (people: SavedPerson[]) => { view.actions.peopleChanged(people); setPairMerge(null) }
@@ -48,19 +39,13 @@ export function PeopleView({ view }: { view: AppView }) {
       <header className="people-head">
         <div className="app-section-head">
           <h1 className="ui-title">People</h1>
-          <p className="app-section-sub">{rows.length} saved {rows.length === 1 ? 'person' : 'people'} · assigning a Person to a Meeting speaker names their turns and refreshes the summary</p>
+          <p className="app-section-sub">Assigning a Person to a Meeting speaker names their turns and refreshes the summary</p>
           {canImport && contactsImport.answered ? <ContactsImportLink state={contactsImport} /> : null}
         </div>
         {rows.length ? (
           <div className="people-toolbar">
             <label className="app-search people-search"><Search aria-hidden="true" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={SEARCH_LABEL} aria-label={SEARCH_LABEL} />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><X aria-hidden="true" /></button> : null}</label>
-            <div className="ui-segmented" role="group" aria-label="Show People">
-              {TABS.map(({ id, label }) => (
-                <button key={id} type="button" aria-pressed={tab === id} className={cx('ui-segmented-option', tab === id && 'is-active')} onClick={() => setTab(id)}>
-                  {label} <span className="people-tab-count">{counts[id]}</span>
-                </button>
-              ))}
-            </div>
+            <span className="people-count" role="status">{query.trim() ? `${shown.length} of ${rows.length}` : peopleCount(rows.length)}</span>
           </div>
         ) : null}
       </header>
@@ -95,10 +80,7 @@ export function PeopleView({ view }: { view: AppView }) {
               ))}
             </ul>
           ) : rows.length ? (
-            <EmptyState>
-              {query.trim() ? `No People in this tab match "${query.trim()}".` : 'No People in this tab.'}
-              {counts.all && tab !== 'all' ? <> <button type="button" className="app-link" onClick={() => setTab('all')}>{query.trim() ? `Show all ${counts.all} ${counts.all === 1 ? 'match' : 'matches'}` : 'Show all People'}</button></> : null}
-            </EmptyState>
+            <EmptyState>No People match "{query.trim()}". <button type="button" className="app-link" onClick={() => setQuery('')}>Clear search</button></EmptyState>
           )
             : <EmptyState>No saved People yet. Label a Meeting speaker to save them here.</EmptyState>}
         </div>
@@ -177,12 +159,6 @@ function duplicateMerge(pair: DuplicatePair): PairMerge {
   return { pairId: pair.id, personId: kept.id, otherId: merged.id }
 }
 
-function inTab(row: PersonRow, tab: PeopleTab): boolean {
-  if (tab === 'met') return row.meetings > 0
-  if (tab === 'not-met') return row.meetings === 0
-  return true
-}
-
 function matchesQuery(person: SavedPerson, query: string): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const text = `${person.name} ${person.email ?? ''}`.toLowerCase()
@@ -193,6 +169,10 @@ function matchesQuery(person: SavedPerson, query: string): boolean {
 function byLastMeeting(left: PersonRow, right: PersonRow): number {
   if (left.lastStartedAt !== right.lastStartedAt) return (right.lastStartedAt ?? '').localeCompare(left.lastStartedAt ?? '')
   return readableName(left.person).localeCompare(readableName(right.person))
+}
+
+function peopleCount(count: number): string {
+  return `${count} ${count === 1 ? 'Person' : 'People'}`
 }
 
 function meetingCount(count: number): string {

@@ -4,9 +4,7 @@
 .people-head .ui-title { margin: 0; }
 .people-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
 .people-search { flex: 1 1 18rem; max-inline-size: 32rem; }
-.people-toolbar .ui-segmented { flex-wrap: wrap; max-inline-size: 100%; }
-.people-tab-count { margin-inline-start: var(--space-1); color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
-.ui-segmented-option.is-active .people-tab-count { color: inherit; }
+.people-count { color: var(--color-text-muted); font-size: var(--font-size-small); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .people-columns { display: grid; grid-template-columns: minmax(0, 1fr); min-block-size: 0; min-inline-size: 0; gap: var(--space-7); }
 .has-selection .people-columns { grid-template-columns: minmax(240px, 30%) minmax(0, 1fr); }
