@@ -132,13 +132,13 @@ struct AppleSpeechTranscriberCLI {
 
     /// Each download reserves its locale, and Apple refuses a new one past `maximumReservedLocales`.
     /// Release another language's reservation first; the system may then remove that model, and
-    /// Gappd downloads it again when a Meeting needs it.
+    /// Gappd downloads it again when a Meeting needs it. en_US is kept: first-run setup checks it.
     static func makeRoomForReservation(_ locale: Locale) async {
         let reserved = await AssetInventory.reservedLocales
         let wanted = locale.identifier(.bcp47)
         if reserved.contains(where: { $0.identifier(.bcp47) == wanted }) { return }
         guard reserved.count >= AssetInventory.maximumReservedLocales,
-              let other = reserved.first(where: { $0.identifier(.bcp47) != wanted }) else { return }
+              let other = reserved.first(where: { ![wanted, "en-US"].contains($0.identifier(.bcp47)) }) else { return }
         _ = await AssetInventory.release(reservedLocale: other)
     }
 

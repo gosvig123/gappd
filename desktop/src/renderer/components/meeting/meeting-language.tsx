@@ -15,7 +15,8 @@ export function MeetingLanguage({ view, confirm, meeting, onError }: { view: App
   const [changing, setChanging] = useState(false)
   const busy = changing || meetingHasWork(meeting)
   // A run that failed without a transcript can be retried, also in the same language.
-  const retry = meeting.status.processing.state === 'failed' && !meeting.transcriptText
+  // A notes failure keeps its transcript segments, so it does not count.
+  const retry = meeting.status.processing.state === 'failed' && !meeting.transcriptText && meeting.segments.length === 0
   const choose = (code: string) => {
     const next = TRANSCRIPTION_LANGUAGES.find((item) => item.code === code)
     if (!next || (code === meeting.language && !retry)) return
