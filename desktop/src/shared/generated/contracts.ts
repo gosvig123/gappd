@@ -80,6 +80,7 @@ export type MeetingDetail = {
   startedAt: string
   endedAt?: string
   status: MeetingStatus
+  language: string
   transcriptText?: string
   transcriptProvisional: boolean
   summary?: string
@@ -198,6 +199,11 @@ export type SetCalendarTitleInput = {
   id: string
   title: string
   fallback?: string
+}
+
+export type MeetingLanguageInput = {
+  id: string
+  language: string
 }
 
 export type MeetingDeleteInput = {

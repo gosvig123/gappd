@@ -42,5 +42,5 @@ function keyOf(meeting: Pick<MeetingListItem, 'id' | 'status'>): string {
 }
 
 function fallbackDetail(meeting: MeetingListItem): MeetingDetail {
-  return { id: meeting.id, title: meeting.title, startedAt: meeting.startedAt, endedAt: meeting.endedAt, status: meeting.status, transcriptProvisional: false, speakers: [], summaryUpdating: false, segments: [], diarization: { state: 'not_requested' } }
+  return { id: meeting.id, title: meeting.title, startedAt: meeting.startedAt, endedAt: meeting.endedAt, status: meeting.status, language: '', transcriptProvisional: false, speakers: [], summaryUpdating: false, segments: [], diarization: { state: 'not_requested' } }
 }

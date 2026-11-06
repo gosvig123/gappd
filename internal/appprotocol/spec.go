@@ -28,6 +28,11 @@ type SetCalendarTitleInput struct {
 	Fallback string `json:"fallback,omitempty"`
 }
 
+type MeetingLanguageInput struct {
+	ID       string `json:"id"`
+	Language string `json:"language"`
+}
+
 type MeetingDeleteInput struct {
 	ID string `json:"id"`
 }
@@ -111,6 +116,7 @@ var Commands = []CommandSpec{
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},
 	{ID: "meetings.retryDiarization", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("retry-diarization"), field("id"), lit("--json")}},
 	{ID: "meetings.setCalendarTitle", Mode: CommandModeRequest, Input: typeOf[SetCalendarTitleInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("set-calendar-title"), field("id"), flag("title", "title", true), flag("fallback", "fallback", true), lit("--json")}},
+	{ID: "meetings.setLanguage", Mode: CommandModeRequest, Input: typeOf[MeetingLanguageInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("set-language"), field("id"), flag("language", "language", false), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.aiStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AIStatusResponse](), Args: literalArgs("app", "config", "ai-status", "--json")},

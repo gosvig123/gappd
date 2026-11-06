@@ -43,6 +43,9 @@
 .app-record-device select:focus { outline: none; box-shadow: none; }
 .app-record-device:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -3px; border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
 .app-record-device:has(select:disabled) { opacity: 0.6; }
+.app-record-language { padding: 0 var(--space-4); border-inline-start: 1px solid var(--color-border); }
+.app-record-language select { max-inline-size: 9rem; }
+.app-record-language:has(select:focus-visible) { border-radius: 0; }
 
 .app-record-button {
   display: inline-flex;

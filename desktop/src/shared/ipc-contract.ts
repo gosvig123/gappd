@@ -15,6 +15,8 @@ export type CapturePermissionTarget = 'microphone' | 'screen-recording'
 export type CapturePermissionDetails = Record<string, string>
 export type CapturePermissions = { microphone: string; screen: string; details?: CapturePermissionDetails }
 export type StartRecordingInput = { title?: string; device?: number; mode?: string; language?: string; speakerLabelsEnabled?: boolean; eventSourceId?: string }
+/** Whether the Apple speech model for one language is on this Mac. message explains a failed download. */
+export type SpeechLanguageStatus = { language: string; ready: boolean; message?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
 export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean; agendaAutoDraftEnabled: boolean }
 export type { AgentId } from './agents'
@@ -42,6 +44,7 @@ export type IpcInvokeContract = {
     list: OperationSpec<[], MeetingListItem[]>
     show: OperationSpec<[id: string], MeetingDetail>
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
+    setLanguage: OperationSpec<[id: string, language: string], MeetingDetail>
     delete: OperationSpec<[id: string], MeetingDeleteResponse>
     people: OperationSpec<[], SavedPerson[]>
     updatePerson: OperationSpec<[input: UpdatePersonInput], SavedPerson[]>
@@ -63,6 +66,7 @@ export type IpcInvokeContract = {
     start: OperationSpec<[input: StartRecordingInput], RecordingState>
     stop: OperationSpec<[], RecordingState>
     getStatus: OperationSpec<[], RecordingState>
+    prepareLanguage: OperationSpec<[language: string], SpeechLanguageStatus>
   }
   managedRuntime: {
     status: OperationSpec<[], ManagedRuntimeSnapshot>
@@ -138,13 +142,13 @@ export const IPC_OPERATIONS = {
     relaunch: 'system:relaunch',
   },
   meetings: {
-    list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', delete: 'meetings:delete',
+    list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', setLanguage: 'meetings:setLanguage', delete: 'meetings:delete',
     people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', personActionItems: 'meetings:personActionItems', importGoogleContacts: 'meetings:importGoogleContacts', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
     participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
     exportRecording: 'meetings:exportRecording',
   },
   agenda: { list: 'agenda:list', draft: 'agenda:draft', save: 'agenda:save' },
-  recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus' },
+  recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus', prepareLanguage: 'recording:prepareLanguage' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureAgent: 'aiProvider:configureAgent', useLocal: 'aiProvider:useLocal' },
   googleCalendar: {

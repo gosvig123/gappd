@@ -55,6 +55,13 @@
   background: var(--color-surface-soft);
 }
 
+/* The Meeting language sits beside Delete Meeting; the auto margin keeps Copy on the right. */
+.app-panel-language { display: inline-flex; align-items: center; gap: var(--space-2); margin-inline-end: auto; color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-panel-language svg { inline-size: 0.85rem; block-size: 0.85rem; flex: 0 0 auto; }
+.app-panel-language select { padding: var(--space-1) var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--color-text); font-size: var(--font-size-small); }
+.app-panel-language select:hover:not(:disabled) { border-color: var(--color-border); }
+.app-panel-language:has(select:disabled) { opacity: 0.6; }
+
 .app-notice {
   display: flex;
   align-items: center;

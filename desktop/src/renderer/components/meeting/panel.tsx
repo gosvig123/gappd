@@ -14,6 +14,7 @@ import { NotesChoicePanel, useNotesChoice } from '../notes-choice'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
+import { MeetingLanguage } from './meeting-language'
 
 type TabId = 'summary' | 'recording'
 const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
@@ -50,7 +51,7 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button><MeetingLanguage view={view} confirm={confirm} meeting={meeting} onError={setError} />{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
 }
 
 function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {

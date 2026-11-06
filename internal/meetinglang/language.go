@@ -33,3 +33,8 @@ func Name(code string) string {
 	}
 	return Normalize(code)
 }
+
+// Supported reports whether Gappd offers code as a Meeting language.
+func Supported(code string) bool {
+	return names[strings.TrimSpace(code)] != ""
+}

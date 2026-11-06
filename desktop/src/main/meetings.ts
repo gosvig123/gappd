@@ -27,6 +27,13 @@ export async function retryDiarization(id: string): Promise<MeetingDetail> {
   return result.meeting
 }
 
+/** The new transcript, speaker labels and notes come from the processing queue. */
+export async function setMeetingLanguage(id: string, language: string): Promise<MeetingDetail> {
+  const result = await requestCommand('meetings.setLanguage', { id: String(id), language: String(language) })
+  requestDrains()
+  return result.meeting
+}
+
 export async function deleteMeeting(id: string): Promise<MeetingDeleteResponse> {
   const result = await requestCommand('meetings.delete', { id }).catch((cause) => {
     logFailure('meeting.delete', 'Delete Meeting failed:', cause)

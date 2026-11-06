@@ -82,6 +82,7 @@ function useAppActions(input: ActionInputs): AppActions {
     openMeeting: (id) => void dashboard.actions.loadMeeting(id),
     closeMeeting: dashboard.actions.clearSelectedMeeting,
     retryDiarization: dashboard.actions.retryDiarization,
+    setMeetingLanguage: dashboard.actions.setMeetingLanguage,
     meetingUpdated: (meeting) => { rememberMeetingDetail(meeting); dashboard.actions.updateMeeting(meeting) },
     deleteMeeting: dashboard.actions.deleteMeeting,
     setDevice: dashboard.actions.setDevice,

@@ -7,12 +7,13 @@ import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentCon
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
+import { prepareSpeechLanguage } from './managed-runtime/apple-speech'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureAgent, findAgents, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
-import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
+import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
@@ -46,6 +47,7 @@ const IPC_HANDLERS: MainHandlers = {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
+    setLanguage: (_event, id: string, language: string) => setMeetingLanguage(id, language),
     delete: (_event, id: string) => deleteMeetingAndCloudCopy(id),
     people: () => listPeople(),
     updatePerson: (_event, input) => updatePerson(input),
@@ -72,6 +74,7 @@ const IPC_HANDLERS: MainHandlers = {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
     stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
+    prepareLanguage: (_event, language: string) => prepareSpeechLanguage(String(language)),
   },
   managedRuntime: {
     status: () => managedRuntime.status(),
