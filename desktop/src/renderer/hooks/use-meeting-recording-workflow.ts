@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
+import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
 import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
@@ -34,6 +34,8 @@ export function useMeetingRecordingWorkflow(enabled: boolean, effects: Recording
   const actions = useRecordingActions(state.device, state.language, setState, effectsRef)
 
   useRecordingLifecycle(enabled, effectsRef, setState)
+  // The main process starts recordings from the meeting prompt too; tell it the chosen language.
+  useEffect(() => { if (enabled) void window.gappd.recording.setLanguage(state.language).catch(() => undefined) }, [enabled, state.language])
   useDeviceRefreshLifecycle(enabled, setState, effectsRef)
 
   const canStart = state.devices.length > 0 && canStartRecordingStatus(state.recording.status)

@@ -1,7 +1,7 @@
 .setup-checklist {
   display: grid;
   gap: var(--space-4);
-  margin: var(--space-5) var(--space-9) 0;
+  margin: var(--space-5) var(--page-gutter) 0;
   padding: var(--space-5) var(--space-6);
   border: 1px solid var(--color-accent-border);
   border-radius: var(--radius-lg);

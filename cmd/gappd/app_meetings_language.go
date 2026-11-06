@@ -58,7 +58,7 @@ func setMeetingLanguage(store *db.DB, id, language string) error {
 	if err != nil {
 		return err
 	}
-	if meetinglang.Normalize(meeting.Language) == language {
+	if meetinglang.Normalize(meeting.Language) == language && !failedWithoutTranscript(meeting) {
 		return nil
 	}
 	if meeting.CaptureStatus == db.CaptureStatusRecording || meeting.ProcessingStatus == db.ProcessingStatusProcessing {
@@ -68,6 +68,9 @@ func setMeetingLanguage(store *db.DB, id, language string) error {
 		return errors.New(meetingLanguageNoAudioMessage)
 	}
 	result, err := meetinglifecycle.New(store).ChangeLanguage(cmdContext(), id, language, time.Now())
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("meeting %s was not found; reopen the Meeting list", id)
+	}
 	if err != nil || result.Applied {
 		return err
 	}
@@ -76,6 +79,11 @@ func setMeetingLanguage(store *db.DB, id, language string) error {
 	}
 	// The Meeting started recording or processing between the check and the change.
 	return errors.New(meetingLanguageBusyMessage)
+}
+
+// failedWithoutTranscript is a run that found no speech: choosing its language again retries it.
+func failedWithoutTranscript(meeting *db.Meeting) bool {
+	return meeting.ProcessingStatus == db.ProcessingStatusFailed && meeting.Transcript == nil
 }
 
 func hasSavedAudio(meeting *db.Meeting) bool {

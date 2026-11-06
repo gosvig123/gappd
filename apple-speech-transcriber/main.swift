@@ -121,12 +121,25 @@ struct AppleSpeechTranscriberCLI {
 
     static func ensureModel(_ transcriber: SpeechTranscriber, locale: Locale) async throws {
         if await AssetInventory.status(forModules: [transcriber]) == .installed { return }
+        await makeRoomForReservation(locale)
         if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
             try await request.downloadAndInstall()
         }
         if await AssetInventory.status(forModules: [transcriber]) != .installed {
             throw TranscriptionError.modelUnavailable(locale.identifier)
         }
+    }
+
+    /// Each download reserves its locale, and Apple refuses a new one past `maximumReservedLocales`.
+    /// Release another language's reservation first; the system may then remove that model, and
+    /// Gappd downloads it again when a Meeting needs it.
+    static func makeRoomForReservation(_ locale: Locale) async {
+        let reserved = await AssetInventory.reservedLocales
+        let wanted = locale.identifier(.bcp47)
+        if reserved.contains(where: { $0.identifier(.bcp47) == wanted }) { return }
+        guard reserved.count >= AssetInventory.maximumReservedLocales,
+              let other = reserved.first(where: { $0.identifier(.bcp47) != wanted }) else { return }
+        _ = await AssetInventory.release(reservedLocale: other)
     }
 
     static func collectSegments(_ audioURL: URL, _ transcriber: SpeechTranscriber) async throws -> [TranscriptSegment] {

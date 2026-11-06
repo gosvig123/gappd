@@ -64,8 +64,15 @@ function recordingTitle(title?: string, eventTitle?: string, fallbackTitle?: str
   return { title: fallbackTitle?.trim() || genericMeetingTitle(new Date()) }
 }
 
+/** The language chosen in the record bar. A recording started outside the window, from the meeting prompt, uses it too. */
+let preferredLanguage = DEFAULT_TRANSCRIPTION_LANGUAGE
+
+export function setPreferredRecordingLanguage(language: string): void {
+  preferredLanguage = language.trim() || DEFAULT_TRANSCRIPTION_LANGUAGE
+}
+
 function recordingLanguage(language?: string): string {
-  return language?.trim() || DEFAULT_TRANSCRIPTION_LANGUAGE
+  return language?.trim() || preferredLanguage
 }
 
 function capturePermissionError(permissions: Awaited<ReturnType<typeof requestCapturePermissions>>): string | null {

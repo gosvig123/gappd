@@ -67,6 +67,7 @@ export type IpcInvokeContract = {
     stop: OperationSpec<[], RecordingState>
     getStatus: OperationSpec<[], RecordingState>
     prepareLanguage: OperationSpec<[language: string], SpeechLanguageStatus>
+    setLanguage: OperationSpec<[language: string], void>
   }
   managedRuntime: {
     status: OperationSpec<[], ManagedRuntimeSnapshot>
@@ -148,7 +149,7 @@ export const IPC_OPERATIONS = {
     exportRecording: 'meetings:exportRecording',
   },
   agenda: { list: 'agenda:list', draft: 'agenda:draft', save: 'agenda:save' },
-  recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus', prepareLanguage: 'recording:prepareLanguage' },
+  recording: { start: 'recording:start', stop: 'recording:stop', getStatus: 'recording:getStatus', prepareLanguage: 'recording:prepareLanguage', setLanguage: 'recording:setLanguage' },
   managedRuntime: { status: 'managedRuntime:status', prepare: 'managedRuntime:prepare' },
   aiProvider: { status: 'aiProvider:status', find: 'aiProvider:find', models: 'aiProvider:models', configureAgent: 'aiProvider:configureAgent', useLocal: 'aiProvider:useLocal' },
   googleCalendar: {

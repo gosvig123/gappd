@@ -14,9 +14,11 @@ export function MeetingLanguage({ view, confirm, meeting, onError }: { view: App
   const current = TRANSCRIPTION_LANGUAGES.find((item) => item.code === meeting.language)
   const [changing, setChanging] = useState(false)
   const busy = changing || meetingHasWork(meeting)
+  // A run that failed without a transcript can be retried, also in the same language.
+  const retry = meeting.status.processing.state === 'failed' && !meeting.transcriptText
   const choose = (code: string) => {
     const next = TRANSCRIPTION_LANGUAGES.find((item) => item.code === code)
-    if (!next || code === meeting.language) return
+    if (!next || (code === meeting.language && !retry)) return
     confirm.request({
       title: `Transcribe again in ${next.label}?`,
       body: `Gappd makes a new transcript in ${next.label} from the saved audio, then finds the speakers and writes the notes again. Speaker names that you set on this Meeting are cleared. This can take a few minutes.`,
@@ -31,10 +33,11 @@ export function MeetingLanguage({ view, confirm, meeting, onError }: { view: App
     })
   }
   return (
-    <label className="ui-button ui-button-secondary compact-action app-panel-language" title={busy ? 'You can change the language after recording and processing finish.' : 'Language of the transcript and notes'}>
+    <label className="ui-button ui-button-secondary compact-action app-panel-language" title={busy ? 'You can change the language after recording and processing finish.' : retry ? 'Transcription failed. Choose a language to try again.' : 'Language of the transcript and notes'}>
       <Languages aria-hidden="true" />
-      <select value={current ? current.code : ''} disabled={busy || !current} onChange={(event) => choose(event.target.value)} aria-label="Meeting language">
-        {current ? null : <option value="">{meeting.language || 'Language'}</option>}
+      <span>{current ? current.label : meeting.language || 'Language'}</span>
+      <select value={current && !retry ? current.code : ''} disabled={busy || !current} onChange={(event) => choose(event.target.value)} aria-label="Meeting language">
+        {current && !retry ? null : <option value="" disabled={retry}>{retry ? 'Try again in…' : meeting.language || 'Language'}</option>}
         {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
       </select>
       <ChevronDown className="app-panel-language-caret" aria-hidden="true" />

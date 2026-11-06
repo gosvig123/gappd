@@ -152,7 +152,7 @@
   .app-shell { grid-template-columns: 4.5rem minmax(0, 1fr); }
   .app-brand-name, .app-nav-item span { display: none; }
   .app-nav-item { grid-template-columns: auto; justify-items: center; }
-  .app-scroll { padding-inline: var(--space-6); }
+  .app-main { --page-gutter: var(--space-6); }
 }
 
 .app-person { flex-wrap: wrap; }

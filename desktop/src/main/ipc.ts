@@ -16,7 +16,7 @@ import { parseGoogleAccess } from './google/google-access'
 import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
-import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
+import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
@@ -75,6 +75,7 @@ const IPC_HANDLERS: MainHandlers = {
     stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
     prepareLanguage: (_event, language: string) => prepareSpeechLanguage(String(language)),
+    setLanguage: (_event, language: string) => setPreferredRecordingLanguage(String(language)),
   },
   managedRuntime: {
     status: () => managedRuntime.status(),
