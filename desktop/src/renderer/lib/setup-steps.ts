@@ -55,7 +55,12 @@ export type NotesAvailability = 'ready' | 'off' | 'waiting'
 export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): NotesAvailability | null {
   if (!runtime || runtime.operation === 'checking') return null
   if (runtime.capabilities.summarization.readiness === 'ready') return 'ready'
-  return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
+  return runtime.configured || notesPreparing(runtime) ? 'waiting' : 'off'
+}
+
+/** The model on this Mac is downloading or starting for notes. */
+export function notesPreparing(runtime: ManagedRuntimeSnapshot | null): boolean {
+  return Boolean(runtime && NOTES_PREPARING.has(runtime.operation))
 }
 
 /** The account comes first and has no skip. After a sign-in, a later sign-out does not ask again. */

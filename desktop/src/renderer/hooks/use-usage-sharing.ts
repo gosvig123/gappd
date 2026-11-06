@@ -10,12 +10,15 @@ export function useUsageSharing() {
     window.gappd.usage.status().then((next) => guard(() => setStatus(next)))
       .catch((cause) => guard(() => setError(errorMessage(cause))))
   }, [])
-  const setSharing = useCallback(async (enabled: boolean) => {
+  /** Saves the choice and reports whether it was saved. */
+  const setSharing = useCallback(async (enabled: boolean): Promise<boolean> => {
     try {
       setStatus(await window.gappd.usage.setSharing(enabled))
       setError(null)
+      return true
     } catch (cause) {
       setError(`Could not save the usage sharing choice: ${errorMessage(cause)}. Try again.`)
+      return false
     }
   }, [])
   return { status, error, setSharing }

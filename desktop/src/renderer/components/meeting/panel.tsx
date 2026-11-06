@@ -10,6 +10,7 @@ import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
 import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
 import { notesAvailability } from '../../lib/setup-steps'
+import { NotesChoicePanel, useNotesChoice } from '../notes-choice'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
@@ -103,10 +104,19 @@ function SummaryPane({ view, transcript }: { view: AppView; transcript: string }
   if (view.selectedMeeting && meetingFailed(view.selectedMeeting) && !transcript.trim()) return <EmptyState>No notes: Gappd could not make a transcript for this Meeting.</EmptyState>
   const openNotesSettings = () => view.actions.openSettings('Meeting processing')
   switch (notesAvailability(view.runtime)) {
-    case 'off': return <EmptyState><p>Notes are off, so this Meeting has a transcript only. Turn on notes and Gappd writes them for this Meeting too.</p><Button className="compact-action" onClick={openNotesSettings}>Turn on notes</Button></EmptyState>
+    case 'off': return <NotesOffPane view={view} />
     case 'waiting': return <EmptyState><p>Notes are waiting. {view.runtime?.message}</p><Button className="compact-action" onClick={openNotesSettings}>Open notes settings</Button></EmptyState>
     default: return <EmptyState>No notes yet. Gappd writes notes after the recording ends.</EmptyState>
   }
+}
+
+/** Notes are off: choose where they are made here, and Gappd writes them for this Meeting too. */
+function NotesOffPane({ view }: { view: AppView }) {
+  const choice = useNotesChoice(true)
+  return <div className="app-reading meeting-notes-off">
+    <p>Notes are off, so this Meeting has a transcript only. Choose where Gappd makes notes, and it writes them for this Meeting too.</p>
+    <NotesChoicePanel view={view} choice={choice} />
+  </div>
 }
 
 /** The recording and its transcript. Without a playable Screen video, the transcript fills the tab. */

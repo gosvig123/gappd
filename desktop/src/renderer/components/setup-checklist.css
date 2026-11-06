@@ -77,8 +77,12 @@
 .setup-choice .ui-button { justify-self: start; }
 
 .setup-finished { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
-.setup-finished h2 { margin: 0; font-size: var(--font-size-body); }
-.setup-finished p { margin: 0; max-inline-size: 64ch; color: var(--color-text-soft); font-size: var(--font-size-small); }
+/* A Feature prompt can hold choices, so its buttons stay at the top. */
+.feature-prompt { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.setup-finished h2,
+.feature-prompt h2 { margin: 0; font-size: var(--font-size-body); }
+.setup-finished p,
+.feature-prompt p { margin: 0; max-inline-size: 64ch; color: var(--color-text-soft); font-size: var(--font-size-small); }
 /* The accent link colour misses contrast on the tinted card in light mode. */
 .setup-step-note .app-link { color: var(--color-text); text-decoration: underline; }
 /* The test recording spans the ready card under its text and buttons. */
@@ -87,3 +91,13 @@
 .setup-test-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: var(--color-danger); animation: setup-test-pulse 1.2s ease-in-out infinite; }
 @keyframes setup-test-pulse { 50% { opacity: 0.35; } }
 @media (prefers-reduced-motion: reduce) { .setup-test-dot { animation: none; } }
+
+/* Notes: one option leads, the rest wait behind a disclosure. */
+.meeting-notes-off { display: grid; gap: var(--space-3); color: var(--color-text-soft); }
+.meeting-notes-off > p { margin: 0; }
+.notes-choice-more summary { color: var(--color-text); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); cursor: pointer; }
+.notes-choice-more[open] summary { margin-block-end: var(--space-2); }
+.feature-prompt-apps { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.feature-prompt-app { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.feature-prompt-app strong { color: var(--color-text); }
+.feature-prompt-app span { color: var(--color-success); }
