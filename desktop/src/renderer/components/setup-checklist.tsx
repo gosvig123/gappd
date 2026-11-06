@@ -11,21 +11,37 @@ import './setup-checklist.css'
 type ButtonVariant = 'primary' | 'secondary'
 type Step = { key: string; title: string; state: SetupStepState; detail: ReactNode; actions?: ReactNode }
 
+export type SetupState = ReturnType<typeof useSetupState>
+
+/**
+ * First-run setup, shared by the checklist and the Feature prompts. open is true
+ * while setup may still show anything (status still loading, a step open, or the
+ * "Gappd is ready" card), so a Feature prompt never stacks on it.
+ */
+export function useSetupState(view: AppView, account: ReturnType<typeof useAccountRequirement>) {
+  const { cloud, asks, signedIn } = account
+  const steps = setupSteps(view.permissionStatus, view.runtime, { account: cloud.account, asks, signedIn })
+  const visible = setupVisible(steps)
+  const [opened, setOpened] = useState(false)
+  const [closed, setClosed] = useState(() => window.localStorage.getItem(FINISHED_SHOWN_KEY) === 'true')
+  if (visible && !opened) setOpened(true)
+  // Until Gappd knows whether to ask for an account, it shows nothing, so "Gappd is ready" never comes early.
+  const hidden = asks === null || (asks === true && !signedIn && !cloud.account)
+  const finished = !visible && opened && !closed
+  const loading = view.permissionStatus === 'waiting' || view.runtime === null
+  return { steps, visible, finished, hidden, open: hidden || loading || visible || finished, closeFinished: () => setClosed(true) }
+}
+
 /**
  * First-run setup: only what Record needs, one step at a time. It explains what
  * Gappd records before macOS asks, and it leaves once those steps are done.
  * Other features are asked later, when they first help (feature-prompt.tsx).
  */
-export function SetupChecklist({ view, account }: { view: AppView; account: ReturnType<typeof useAccountRequirement> }) {
-  const { cloud, asks: accountAsks, signedIn } = account
-  const steps = setupSteps(view.permissionStatus, view.runtime, { account: cloud.account, asks: accountAsks, signedIn })
-  const visible = setupVisible(steps)
-  const [opened, setOpened] = useState(false)
-  const [closed, setClosed] = useState(() => window.localStorage.getItem(FINISHED_SHOWN_KEY) === 'true')
-  // Until Gappd knows whether to ask for an account, it shows nothing, so "Gappd is ready" never comes early.
-  if (accountAsks === null || (accountAsks && !signedIn && !cloud.account)) return null
-  if (visible && !opened) setOpened(true)
-  if (!visible) return opened && !closed ? <SetupFinished view={view} onClose={() => setClosed(true)} /> : null
+export function SetupChecklist({ view, account, setup }: { view: AppView; account: ReturnType<typeof useAccountRequirement>; setup: SetupState }) {
+  const { cloud } = account
+  const { steps } = setup
+  if (setup.hidden) return null
+  if (!setup.visible) return setup.finished ? <SetupFinished view={view} onClose={setup.closeFinished} /> : null
   const current = (Object.keys(steps) as Array<keyof typeof steps>).find((key) => steps[key] !== null && !isFinished(steps[key]))
   const primary = (key: keyof typeof steps) => key === current ? 'primary' : 'secondary'
   const rows: Step[] = []

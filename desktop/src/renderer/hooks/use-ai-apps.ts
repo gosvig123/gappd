@@ -5,7 +5,8 @@ import { useGuardedEffect } from './use-guarded-effect'
 
 /**
  * The AI apps on this Mac and their connection to the local Gappd MCP server.
- * It reads the status only while enabled, so a closed prompt costs no check.
+ * It reads the status only while enabled, so a closed prompt costs no check. The
+ * Feature prompt shows only after a good read, so a failed read shows only in Settings.
  */
 export function useAIApps(enabled = true) {
   const [apps, setApps] = useState<AIAppStatus[] | null>(null)
@@ -26,7 +27,7 @@ export function useAIApps(enabled = true) {
       setRestart(app.name)
     } catch (cause) {
       setRestart(null)
-      setError(`Could not ${connect ? 'connect' : 'disconnect'} ${app.name}: ${errorText(cause)}`)
+      setError(`Could not ${connect ? 'connect' : 'disconnect'} ${app.name}: ${errorText(cause)} Try again.`)
       await window.gappd.aiApps.status().then(setApps).catch(() => undefined)
     } finally {
       setBusy(null)
@@ -38,7 +39,7 @@ export function useAIApps(enabled = true) {
       setApps(await window.gappd.aiApps.status())
       setError(null)
     } catch (cause) {
-      setError(`Could not check AI apps: ${errorText(cause)}`)
+      setError(`Could not check AI apps: ${errorText(cause)} Try again.`)
     } finally {
       setBusy(null)
     }

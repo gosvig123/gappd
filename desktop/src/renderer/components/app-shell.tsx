@@ -13,7 +13,7 @@ import { PageSearch } from './page-search'
 import { RecordBar } from './record-bar'
 import { SettingsDialog } from './settings/dialog'
 import { FeaturePrompt } from './feature-prompt'
-import { SetupChecklist } from './setup-checklist'
+import { SetupChecklist, useSetupState } from './setup-checklist'
 import '../app.css'
 import '../views/views.css'
 import './atoms.css'
@@ -54,8 +54,9 @@ function useShellController(view: AppView) {
 }
 
 function ShellMain({ view, shell, account }: { view: AppView; shell: ReturnType<typeof useShellController>; account: ReturnType<typeof useAccountRequirement> }) {
-  return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} account={account} />
-    <FeaturePrompt view={view} account={account} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
+  const setup = useSetupState(view, account)
+  return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} account={account} setup={setup} />
+    <FeaturePrompt view={view} account={account} setupOpen={setup.open} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
     <div className={`app-scroll ui-scroll ${shell.section === 'meetings' || shell.section === 'people' ? 'is-workspace' : ''}`}>
       {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}
