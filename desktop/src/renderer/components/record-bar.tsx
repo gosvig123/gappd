@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Languages, Mic, Monitor, Square } from 'lucide-react'
+import { ChevronDown, Mic, Monitor, MonitorOff, Square } from 'lucide-react'
 import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import type { AppView } from '../lib/app-view'
 import { cx } from './ui'
 
 /**
  * Recording is app chrome, so it sits in the main toolbar rather than floating
- * over the content. Choose audio and Screen video before starting; the action
- * label carries the live elapsed time. The language applies to the next
+ * over the content. The chips show icons and short codes; each one keeps a
+ * native select laid over it, so the full names appear in the macOS menu and in
+ * the tooltip. Choose audio and Screen video before starting; the action label
+ * carries the live elapsed time. The language applies to the next
  * Meeting and is remembered; it is locked while recording because the Live
  * Transcript cannot change language mid-run.
  */
@@ -30,25 +32,29 @@ export function RecordBar({ view }: { view: AppView }) {
     finally { setSaving(false) }
   }
   const speech = useSpeechLanguage(view.language)
+  const language = TRANSCRIPTION_LANGUAGES.find((item) => item.code === view.language)
+  const deviceName = view.devices.find((device) => device.index === view.device)?.name ?? 'none'
   const chooseLanguage = (language: string) => { view.actions.setLanguage(language); speech.prepare(language) }
   const disabled = saving || stopping || (live ? !view.canStop : !view.canStart)
   const video = view.meetings.find(meeting => meeting.id === view.recording.meetingId)?.status.video
   return (
     <div className="app-toolbar">
       <div className={cx('app-record', live && 'is-recording')}>
-        <label className="app-record-device" title="Audio input">
+        <label className="app-record-chip" title={`Audio input: ${deviceName}`}>
           <Mic aria-hidden="true" />
+          <ChevronDown className="app-record-caret" aria-hidden="true" />
           <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
             {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
           </select>
         </label>
-        <label className="app-record-device app-record-language" title="Meeting language for the transcript and notes">
-          <Languages aria-hidden="true" />
+        <label className="app-record-chip" title={live || stopping ? `Meeting language: ${language?.label ?? view.language}` : `Meeting language: ${language?.label ?? view.language}. Used for the transcript and notes.`}>
+          <span className="app-record-code">{language?.short ?? view.language}</span>
+          {live || stopping ? null : <ChevronDown className="app-record-caret" aria-hidden="true" />}
           <select value={view.language} onChange={(event) => chooseLanguage(event.target.value)} disabled={live || stopping} aria-label="Meeting language">
             {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
           </select>
         </label>
-        {!live && !stopping ? <button type="button" className="app-record-video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title="Remember this choice for future Meetings. Choose a window or display each time you record."><Monitor aria-hidden="true" />Screen video: {videoEnabled ? 'On' : 'Off'}</button> : null}
+        {!live && !stopping ? <button type="button" className="app-record-chip app-record-video" aria-label="Screen video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title={videoEnabled ? 'Screen video is on. You choose a window or display when you record.' : 'Screen video is off. Click to also record a window or display.'}>{videoEnabled ? <Monitor aria-hidden="true" /> : <MonitorOff aria-hidden="true" />}</button> : null}
         <button
           type="button"
           className={cx('app-record-button', live && 'is-recording')}
@@ -56,7 +62,7 @@ export function RecordBar({ view }: { view: AppView }) {
           title={view.canStart || live ? undefined : 'Connect an audio input to record'}
           onClick={() => (live || stopping ? view.actions.stop() : view.actions.start())}
         >
-          {live || stopping ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+          {live || stopping ? <Square aria-hidden="true" /> : <span className="app-record-dot" aria-hidden="true" />}
           {stopping ? 'Stopping…' : live ? `Stop · ${elapsed}` : 'Record'}
         </button>
       </div>
