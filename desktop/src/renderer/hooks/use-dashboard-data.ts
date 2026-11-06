@@ -52,6 +52,7 @@ function useDashboardActions(setState: SetDashboardState, refs: MeetingRefs, sel
     loadMeeting: (id: string) => { refreshRequest.cancel(); return loadMeeting(id, refs, setState, selectedRequest) },
     clearSelectedMeeting: () => { refreshRequest.cancel(); selectedRequest.cancel(); clearSelectedMeeting(refs, setState) },
     retryDiarization: (id: string) => retryDiarization(id, refs, setState, selectedRequest, refreshRequest),
+    setMeetingLanguage: (id: string, language: string) => setMeetingLanguage(id, language, refs, setState, selectedRequest, refreshRequest),
     deleteMeeting: (id: string) => deleteMeeting(id, refs, setState, selectedRequest, refreshRequest),
     setError: (error: string | null) => setState((current) => ({ ...current, error })),
   }
@@ -87,6 +88,13 @@ function clearSelectedMeeting(refs: MeetingRefs, setState: SetDashboardState) {
 async function retryDiarization(id: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {
   await window.gappd.meetings.retryDiarization(id)
   await refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest)
+}
+
+async function setMeetingLanguage(id: string, language: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {
+  const meeting = await window.gappd.meetings.setLanguage(id, language)
+  if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }
+  // The change is saved; a failed list reload is a dashboard error, not a failed change.
+  void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState))
 }
 
 async function deleteMeeting(id: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {

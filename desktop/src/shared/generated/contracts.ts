@@ -80,6 +80,7 @@ export type MeetingDetail = {
   startedAt: string
   endedAt?: string
   status: MeetingStatus
+  language: string
   transcriptText?: string
   transcriptProvisional: boolean
   summary?: string
@@ -194,6 +195,17 @@ export type MeetingListItem = {
   searchText?: string
 }
 
+export type SetCalendarTitleInput = {
+  id: string
+  title: string
+  fallback?: string
+}
+
+export type MeetingLanguageInput = {
+  id: string
+  language: string
+}
+
 export type MeetingDeleteInput = {
   id: string
 }
@@ -289,6 +301,7 @@ export type RecoverStaleRecordingsResponse = {
 
 export type RecordStartInput = {
   title: string
+  titleSource?: string
   device: number
   mode: string
   language: string

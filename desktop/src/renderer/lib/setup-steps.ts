@@ -1,21 +1,18 @@
-import type { CalendarSnapshot } from '../../shared/calendar-contract'
 import type { CloudAuthStatus } from '../../shared/cloud-auth-contract'
 import type { ManagedRuntimeSnapshot } from '../../shared/contracts'
-import type { UsageSharing } from '../../shared/usage-report'
 import type { SetupPermissionStatus } from '../hooks/use-setup-permissions'
 
-export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done' | 'skipped'
+export type SetupStepState = 'todo' | 'working' | 'blocked' | 'error' | 'done'
 
+/**
+ * First-run setup has only what Record needs. Notes, AI apps, Calendar, and
+ * usage sharing are asked later, when they first help (see feature-prompts.ts).
+ */
 export type SetupSteps = {
   account: SetupStepState | null
   recording: SetupStepState | null
   speech: SetupStepState | null
-  notes: SetupStepState | null
-  calendar: SetupStepState | null
-  usage: SetupStepState | null
 }
-
-export type SetupSkips = { notes: boolean; calendar: boolean }
 
 /** The account step asks only new installs. signedIn is true after the first sign-in. */
 export type AccountAsk = { account: CloudAuthStatus | null; asks: boolean | null; signedIn: boolean }
@@ -27,17 +24,20 @@ const NOTES_PREPARING = new Set<ManagedRuntimeSnapshot['operation']>(['starting_
  * not apply. Unknown steps never show the checklist, so returning users do not
  * see it flash while status loads.
  */
-export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, calendar: CalendarSnapshot | null, skips: SetupSkips, usage: UsageSharing | null, account: AccountAsk): SetupSteps {
-  return { account: accountStep(account), recording: recordingStep(permission), speech: speechStep(runtime), notes: notesStep(runtime, skips.notes), calendar: calendarStep(calendar, skips.calendar), usage: usageStep(usage) }
-}
-
-/** The checklist stays while any step that applies is not done or skipped. */
-export function setupVisible(steps: SetupSteps): boolean {
-  return Object.values(steps).some((state) => state !== null && state !== 'done' && state !== 'skipped')
+export function setupSteps(permission: SetupPermissionStatus, runtime: ManagedRuntimeSnapshot | null, account: AccountAsk): SetupSteps {
+  return { account: accountStep(account), recording: recordingStep(permission), speech: speechStep(runtime) }
 }
 
 /**
- * First-time notes setup belongs to the checklist. A runtime that was set up
+ * The checklist stays while the account or recording step is open, or while the
+ * speech model failed. A speech model that is still downloading needs no action.
+ */
+export function setupVisible(steps: SetupSteps): boolean {
+  return [steps.account, steps.recording].some((state) => state !== null && state !== 'done') || steps.speech === 'error'
+}
+
+/**
+ * First-time notes setup belongs to the notes prompt. A runtime that was set up
  * before and later needs repair stays with the notifications.
  */
 export function localAiNeedsFirstSetup(runtime: ManagedRuntimeSnapshot | null): boolean {
@@ -55,7 +55,12 @@ export type NotesAvailability = 'ready' | 'off' | 'waiting'
 export function notesAvailability(runtime: ManagedRuntimeSnapshot | null): NotesAvailability | null {
   if (!runtime || runtime.operation === 'checking') return null
   if (runtime.capabilities.summarization.readiness === 'ready') return 'ready'
-  return runtime.configured || NOTES_PREPARING.has(runtime.operation) ? 'waiting' : 'off'
+  return runtime.configured || notesPreparing(runtime) ? 'waiting' : 'off'
+}
+
+/** The model on this Mac is downloading or starting for notes. */
+export function notesPreparing(runtime: ManagedRuntimeSnapshot | null): boolean {
+  return Boolean(runtime && NOTES_PREPARING.has(runtime.operation))
 }
 
 /** The account comes first and has no skip. After a sign-in, a later sign-out does not ask again. */
@@ -85,26 +90,4 @@ function speechStep(runtime: ManagedRuntimeSnapshot | null): SetupStepState | nu
   // Every launch starts as checking with the model missing, so that state is unknown, not unfinished.
   if (readiness === 'missing' && runtime.operation === 'checking') return null
   return readiness === 'missing' ? 'error' : 'done'
-}
-
-/** Notes are optional: "Not now" finishes the step until the user chooses in Settings. */
-function notesStep(runtime: ManagedRuntimeSnapshot | null, skipped: boolean): SetupStepState | null {
-  if (runtime?.operation === 'ready') return 'done'
-  if (!localAiNeedsFirstSetup(runtime)) return null
-  if (NOTES_PREPARING.has(runtime!.operation)) return 'working'
-  if (skipped) return 'skipped'
-  return runtime!.operation === 'error' ? 'error' : 'todo'
-}
-
-/** Usage sharing is asked once, also of users who finished setup before the question existed. */
-function usageStep(sharing: UsageSharing | null): SetupStepState | null {
-  if (!sharing) return null
-  if (sharing === 'unset') return 'todo'
-  return sharing === 'on' ? 'done' : 'skipped'
-}
-
-function calendarStep(calendar: CalendarSnapshot | null, skipped: boolean): SetupStepState | null {
-  if (!calendar?.configured) return null
-  if (calendar.connections.length) return 'done'
-  return skipped ? 'skipped' : 'todo'
 }

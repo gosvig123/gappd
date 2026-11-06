@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsDeleteCmd())
+	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsSetCalendarTitleCmd(), appMeetingsDeleteCmd(), appMeetingsSetLanguageCmd())
 	return cmd
 }
 
@@ -71,6 +71,7 @@ func appRecordCmd() *cobra.Command {
 func appRecordStartCmd() *cobra.Command {
 	var deviceIdx int
 	var title string
+	var titleSource string
 	var mode string
 	var language string
 	var speakerLabelsEnabled bool
@@ -80,11 +81,12 @@ func appRecordStartCmd() *cobra.Command {
 		Use:   "start",
 		Short: "Start a recording for the desktop app",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListen(deviceIdx, title, capture.CaptureMode(mode), language, &speakerLabelsEnabled, true, screenVideoEnabled)
+			return runListen(deviceIdx, title, titleSource, capture.CaptureMode(mode), language, &speakerLabelsEnabled, true, screenVideoEnabled)
 		},
 	}
 	cmd.Flags().IntVar(&deviceIdx, "device", 0, "Audio device index")
 	cmd.Flags().StringVar(&title, "title", "", "Session title")
+	cmd.Flags().StringVar(&titleSource, "title-source", "", "Where the title came from: calendar keeps it when notes are ready")
 	cmd.Flags().StringVar(&mode, "mode", string(capture.ModeBoth), "Capture mode: mic, system, or both")
 	cmd.Flags().StringVar(&language, "language", meetinglang.DefaultCode, "Apple Speech locale for transcript and summary")
 	cmd.Flags().BoolVar(&speakerLabelsEnabled, "speaker-labels-enabled", true, "Run speaker labeling before summary")
@@ -150,6 +152,24 @@ func appMeetingsShowCmd() *cobra.Command {
 		defer store.Close()
 		return writeAppMeeting(store, args[0])
 	})
+}
+
+func appMeetingsSetCalendarTitleCmd() *cobra.Command {
+	var title, fallback string
+	cmd := meetingJSONCommand("set-calendar-title [meeting-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		if _, err := meetinglifecycle.New(store).SetCalendarTitle(cmdContext(), args[0], title, fallback); err != nil {
+			return err
+		}
+		return writeAppMeeting(store, args[0])
+	})
+	cmd.Flags().StringVar(&title, "title", "", "Calendar event title; empty unlinks the event")
+	cmd.Flags().StringVar(&fallback, "fallback", "", "Title after unlinking when the Meeting has no AI title")
+	return cmd
 }
 
 func appMeetingsRetryDiarizationCmd() *cobra.Command {

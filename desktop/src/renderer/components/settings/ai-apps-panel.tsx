@@ -1,45 +1,10 @@
-import { useState } from 'react'
-import type { AIAppId, AIAppState, AIAppStatus } from '../../../shared/ai-apps'
-import { useGuardedEffect } from '../../hooks/use-guarded-effect'
-import { errorText } from '../person-forms'
+import type { AIAppState } from '../../../shared/ai-apps'
+import { useAIApps } from '../../hooks/use-ai-apps'
 import { Button, Card, cx } from '../ui'
 
 /** Connects AI apps on this Mac to the local Gappd MCP server. */
 export function AIAppsPanel() {
-  const [apps, setApps] = useState<AIAppStatus[] | null>(null)
-  const [busy, setBusy] = useState<AIAppId | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [restart, setRestart] = useState<string | null>(null)
-  useGuardedEffect((guard) => {
-    window.gappd.aiApps.status().then((next) => guard(() => setApps(next)))
-      .catch((cause) => guard(() => setError(`Could not check AI apps: ${errorText(cause)} Reopen Settings to try again.`)))
-  }, [])
-  const change = async (app: AIAppStatus) => {
-    const connect = app.state !== 'on'
-    setBusy(app.id)
-    try {
-      setApps(await (connect ? window.gappd.aiApps.connect(app.id) : window.gappd.aiApps.disconnect(app.id)))
-      setError(null)
-      setRestart(app.name)
-    } catch (cause) {
-      setRestart(null)
-      setError(`Could not ${connect ? 'connect' : 'disconnect'} ${app.name}: ${errorText(cause)}`)
-      await window.gappd.aiApps.status().then(setApps).catch(() => undefined)
-    } finally {
-      setBusy(null)
-    }
-  }
-  const checkAgain = async (app: AIAppStatus) => {
-    setBusy(app.id)
-    try {
-      setApps(await window.gappd.aiApps.status())
-      setError(null)
-    } catch (cause) {
-      setError(`Could not check AI apps: ${errorText(cause)}`)
-    } finally {
-      setBusy(null)
-    }
-  }
+  const { apps, busy, error, restart, change, checkAgain } = useAIApps()
   const note = error || (restart ? `If ${restart} is open, quit and reopen it to load the change.` : null)
   return (
     <Card className="settings-section">

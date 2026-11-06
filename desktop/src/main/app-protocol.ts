@@ -74,10 +74,20 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
   child.once('error', (error) => { processError = spawnError(error); if (!signal?.aborted) reject(processError) })
   child.once('close', (code) => {
     if (processError) return reject(processError)
-    if (code !== 0) return reject(new Error(stderr || stdout || `gappd exited with code ${code}`))
+    if (code !== 0) return reject(backendError(stderr || stdout || `gappd exited with code ${code}`))
     if (stderr.trim()) console.warn(stderr.trim())
     resolve(stdout)
   })
+}
+
+// An Error report keeps a code but never the message, so a lock failure carries its SQLite code.
+const SQLITE_LOCK_CODES: Record<string, string> = { '5': 'SQLITE_BUSY', '6': 'SQLITE_LOCKED', '261': 'SQLITE_BUSY_RECOVERY', '517': 'SQLITE_BUSY_SNAPSHOT', '773': 'SQLITE_BUSY_TIMEOUT' }
+
+function backendError(output: string): Error {
+  const error: Error & { code?: string } = new Error(output)
+  const sqlite = / is locked \((\d{1,4})\)/.exec(output)
+  if (sqlite) error.code = SQLITE_LOCK_CODES[sqlite[1]] ?? `SQLITE_${sqlite[1]}`
+  return error
 }
 
 function wireStream<ID extends AppStreamID>(child: ReturnType<typeof spawn>, id: ID, handlers: StreamHandlers<ID>): void {

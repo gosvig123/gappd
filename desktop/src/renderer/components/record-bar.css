@@ -1,22 +1,13 @@
 /* The record toolbar: the one place recording starts and stops. */
 
-.app-toolbar { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); padding: var(--space-6) var(--space-9) 0; }
+.app-toolbar { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); padding: var(--space-6) var(--page-gutter) 0; }
 .app-record-hint:empty { display: none; }
 .app-record-hint { max-width: 65ch; color: var(--color-text-soft); font-size: var(--font-size-small); text-align: right; }
-.app-record-video { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border: 0; border-inline-start: 1px solid var(--color-border); background: transparent; font-size: var(--font-size-small); white-space: nowrap; }
-.app-record-video[aria-pressed="true"] { color: var(--color-accent); background: var(--color-accent-tint); }
-.app-record-video svg { width: 1rem; height: 1rem; }
-.app-record-video:disabled { opacity: .6; }
-.app-record button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
-@media (max-width: 760px) {
-  .app-record { flex-wrap: wrap; justify-content: flex-end; border-radius: var(--radius-md); }
-  .app-record-device { flex: 1; }
-  .app-record-hint { text-align: left; }
-}
 
 .app-record {
   display: flex;
   align-items: stretch;
+  /* The compact control height used by page buttons (Agenda, Delete Meeting). */
   min-block-size: 2.25rem;
   overflow: hidden;
   border: 1px solid var(--color-accent-border-strong);
@@ -24,40 +15,60 @@
   background: var(--color-surface-elevated);
   box-shadow: inset 0 1px 0 var(--highlight-subtle);
 }
-
 .app-record.is-recording { border-color: var(--color-danger-border); }
-.app-record-device { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-5); min-inline-size: 0; }
-.app-record-device svg { inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-text-muted); flex: 0 0 auto; }
 
-.app-record-device select {
-  max-inline-size: 11rem;
-  padding: 0;
+/* A chip shows an icon or a short code. Its select covers it without being seen, so the
+   native menu, the keyboard and VoiceOver still work and show the full names. */
+.app-record-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  min-inline-size: 2.75rem;
+  padding: 0 var(--space-4);
   border: 0;
   background: transparent;
+  color: var(--color-text-muted);
   font-size: var(--font-size-small);
-  text-overflow: ellipsis;
-  appearance: none;
+  cursor: pointer;
 }
+.app-record-chip + .app-record-chip { border-inline-start: 1px solid var(--color-border); }
+.app-record-chip:first-child { padding-inline-start: var(--space-5); }
+.app-record-chip:hover:not(:has(select:disabled)):not(:disabled) { color: var(--color-text); background: var(--color-surface-soft); }
+.app-record-chip svg { inline-size: 1rem; block-size: 1rem; flex: 0 0 auto; }
+.app-record-chip .app-record-caret { inline-size: 0.7rem; block-size: 0.7rem; opacity: 0.7; }
+.app-record-chip select { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; opacity: 0; cursor: pointer; appearance: none; }
+.app-record-chip select:disabled { cursor: default; }
+.app-record-chip:has(select:disabled), .app-record-chip:disabled { opacity: 0.6; cursor: default; }
+.app-record-chip:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -3px; }
+.app-record-chip:first-child:has(select:focus-visible) { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
 
-/* The bare select has no padding, so the keyboard focus ring goes on the whole device chip. */
-.app-record-device select:focus { outline: none; box-shadow: none; }
-.app-record-device:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -3px; border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
-.app-record-device:has(select:disabled) { opacity: 0.6; }
+.app-record-code { color: var(--color-text); font-weight: var(--font-weight-semibold); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+.app-record-video[aria-pressed="true"] { color: var(--color-accent); background: var(--color-accent-tint); }
+.app-record button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
 
 .app-record-button {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-6);
+  padding: 0 var(--space-6) 0 var(--space-5);
   border: 0;
+  border-inline-start: 1px solid var(--color-border);
   background: var(--gradient-accent);
   color: var(--color-accent-contrast);
   font-size: var(--font-size-small);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-
-.app-record-button svg { inline-size: 0.85rem; block-size: 0.85rem; }
+.app-record-button svg { inline-size: 0.75rem; block-size: 0.75rem; }
 .app-record-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
 .app-record-button:disabled { opacity: 0.55; cursor: not-allowed; }
 .app-record-button.is-recording { background: var(--color-danger); }
+/* The record dot: the one sign every recorder uses. */
+.app-record-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: var(--color-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-contrast) 85%, transparent); }
+
+@media (max-width: 760px) {
+  .app-record-hint { text-align: left; }
+}

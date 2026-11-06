@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,8 +131,16 @@ printf '%s\n' '{"type":"video_started","sourceType":"window","hostSeconds":1000}
 	defer cancel()
 	service := New(meetinglifecycle.New(store), livetranscript.New(store, meetinglifecycle.New(store), fakeTranscriber{}))
 	service.BaseDir, service.Store, service.Out, service.ErrOut = t.TempDir(), store, io.Discard, io.Discard
+	// The video helper can finish before audio capture is ready, and a stop before ready fails the
+	// recording, so stop only after both.
+	var mu sync.Mutex
+	started, finalized := false, false
 	service.Events = testEventSink(func(name EventName, _ db.Meeting, _ error) error {
-		if name == EventVideoFinalized {
+		mu.Lock()
+		defer mu.Unlock()
+		started = started || name == EventStarted
+		finalized = finalized || name == EventVideoFinalized
+		if started && finalized {
 			cancel()
 		}
 		return nil

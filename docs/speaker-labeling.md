@@ -5,7 +5,10 @@ speaker name in the transcript. Play a short clip, then choose a saved person,
 select a calendar invitee, or add a name. Use another clip if the first is unclear.
 
 Starting a recording from a calendar event saves that event with the meeting.
-For other recordings, choose a suggested event near the recording time in the
+When you press Record without choosing an event, Gappd saves the event that is
+on now (from 5 minutes before its start) if it is the only one with other
+invitees that you did not decline. The meeting takes the event's title, and the AI title does not replace
+it. For other recordings, choose a suggested event near the recording time in the
 Calendar event menu under the meeting title. Choose **Not a Calendar event** to
 stop automatic Calendar matching for that meeting. Invitees of the chosen event
 are listed first in the speaker picker. Calendar
@@ -100,9 +103,19 @@ Desktop processing uses `voice-targets --after MEETING_ID --json` to page throug
 eligible Meetings (use an empty `--after` for the first page). It calls
 `recognize-speakers MEETING_ID --revision REVISION --emails INVITEE_EMAILS
 --calendar=true --json` with the confirmed snapshot constraint. With no confirmed
-snapshot it passes `--calendar=false` and an empty email list. The backend rejects
-stale revisions and active processing claims. Neither history reads nor Meeting
-detail reads run recognition. Speaker views expose `identityOrigin` as `manual`
+snapshot it passes `--calendar=false` and an empty email list. The backend skips
+a Meeting whose revision moved or that has an active processing claim, and exits
+successfully: the change that moved it asks for recognition again. Recognition
+writes only when its labels or suggestions change, so a pass over unchanged
+Meetings only reads. The drain coordinator
+(`desktop/src/main/drain-coordinator.ts`) runs recognition as its own step after
+speaker detection and before notes, never beside another processing step. It
+runs at launch, after speaker detection completes, after a speaker or Person
+edit, a Calendar link, a Google contacts import, or a deleted Meeting, before
+each notes step (this covers a Meeting a pass skipped while it was claimed), even
+when speaker detection failed part way, and again on the 60 s retry only when the
+last pass had a failed Meeting. Neither history
+reads nor Meeting detail reads run recognition. Speaker views expose `identityOrigin` as `manual`
 or `automatic` when a Person is assigned, and `suggestedPersonId` when an
 unlabeled speaker has a voice suggestion. The same recognition call stores
 suggestions; history and Meeting detail reads only read them.

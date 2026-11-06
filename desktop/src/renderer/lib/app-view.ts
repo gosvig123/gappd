@@ -54,6 +54,8 @@ export type AppActions = {
   openMeeting: (id: string) => void
   closeMeeting: () => void
   retryDiarization: (id: string) => Promise<void>
+  /** Transcribes a saved Meeting again in another language; speaker labels and notes follow. */
+  setMeetingLanguage: (id: string, language: string) => Promise<void>
   meetingUpdated: (meeting: MeetingDetail) => void
   peopleChanged: (people: SavedPerson[]) => void
   linkMeetingCalendar: (input: LinkCalendarInput) => Promise<ParticipantContext>

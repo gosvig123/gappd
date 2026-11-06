@@ -49,7 +49,7 @@ carry a title, a name, a path or an email address.
 | `source` | `main`, `renderer`, `process`, `meeting` | Where it failed |
 | `operation` | Fixed name, such as `calendar.refresh` or `ipc.meeting-upload.sync` | The step that failed |
 | `error_name` | `TypeError`, `Error`, `ProcessGone`, `MeetingFailed`, … | Error class name: a name that ends in `Error` or `Exception`, else `Error` |
-| `error_code` | `ENOENT`, `ERR_INVALID_ARG_TYPE`, `crashed`, or empty | An upper-case code constant, a number up to 4 digits, or an Electron exit reason |
+| `error_code` | `ENOENT`, `ERR_INVALID_ARG_TYPE`, `crashed`, `SQLITE_BUSY_SNAPSHOT` (a backend command failed on a database lock), or empty | An upper-case code constant, a number up to 4 digits, or an Electron exit reason |
 | `stack` | Up to 10 frames, such as `connect dist-electron/main/main.js:21886:43` | Frames in Gappd's own code |
 | `repeats` | `0` to `100000` | Same failure since the last send |
 

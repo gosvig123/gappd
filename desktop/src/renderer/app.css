@@ -57,7 +57,9 @@
 
 .app-sidebar-foot { border-block-start: 1px solid var(--color-border); padding-block-start: var(--space-5); }
 
+/* --page-gutter: the side space of the record bar, setup cards and scroll view, so their edges line up. */
 .app-main {
+  --page-gutter: var(--space-9);
   min-inline-size: 0;
   display: grid;
   /* Record bar, setup checklist, account prompt, then the scrolling view. */
@@ -65,7 +67,7 @@
   overflow: hidden;
 }
 
-.app-scroll { grid-row: 4; min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
+.app-scroll { grid-row: 4; min-block-size: 0; overflow: auto; scrollbar-gutter: stable; padding: var(--space-7) max(0px, calc(var(--page-gutter) - var(--scrollbar-gutter, 0px))) var(--space-9) var(--page-gutter); }
 
 .app-icon-action {
   display: grid;
@@ -103,6 +105,7 @@
   .app-brand-name, .app-nav-item > span { display: none; }
   .app-sidebar-foot { padding: 0; border: 0; }
   .app-nav-item { padding: var(--space-4); grid-template-columns: auto; }
-  .app-scroll { padding: var(--space-5); }
+  .app-main { --page-gutter: var(--space-5); }
+  .app-scroll { padding-block: var(--space-5); }
   .app-main { min-block-size: 0; }
 }

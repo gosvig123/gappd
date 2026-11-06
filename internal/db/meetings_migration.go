@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 type lifecycleMigration struct {
@@ -103,6 +104,17 @@ func (m lifecycleMigration) backfillProcessingFailure(ctx context.Context, conn 
 
 func (m lifecycleMigration) execBackfill(ctx context.Context, conn *sql.Conn, column, query, where string) error {
 	if m.columns[column] {
+		// Touch only rows whose value changes. An UPDATE takes the write lock even when it changes
+		// nothing, so look first: a migrated store must open without the write lock.
+		value := strings.TrimPrefix(query, "UPDATE meetings SET "+column+" = ")
+		where = "(" + where + ") AND " + column + " IS NOT (" + value + ")"
+		var pending bool
+		if err := conn.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM meetings WHERE `+where+`)`).Scan(&pending); err != nil {
+			return fmt.Errorf("inspect meetings.%s backfill: %w", column, err)
+		}
+		if !pending {
+			return nil
+		}
 		query += " WHERE " + where
 	}
 	if _, err := conn.ExecContext(ctx, query); err != nil {

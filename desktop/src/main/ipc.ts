@@ -5,17 +5,18 @@ import { remoteAccess } from './cloud/remote-access-service'
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
-import { requestDrains } from './drain-coordinator'
+import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
 import { managedRuntime } from './managed-runtime/runtime'
+import { prepareSpeechLanguage } from './managed-runtime/apple-speech'
 import { isManagedLocal } from './managed-runtime/status'
 import { configureAgent, findAgents, providerModels, providerStatus, useLocalProvider } from './ai-provider'
 import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
-import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, updatePerson, showMeeting, speakerClip } from './meetings'
+import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
-import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
+import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
 import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
@@ -46,12 +47,18 @@ const IPC_HANDLERS: MainHandlers = {
     list: () => listMeetings(),
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
+    setLanguage: (_event, id: string, language: string) => setMeetingLanguage(id, language),
     delete: (_event, id: string) => deleteMeetingAndCloudCopy(id),
     people: () => listPeople(),
     updatePerson: (_event, input) => updatePerson(input),
     mergePeople: (_event, input) => mergePeople(input),
     personActionItems: (_event, id: string) => personActionItems(id),
-    importGoogleContacts: () => importGoogleContacts(),
+    // New People with emails can match Calendar invitees in recognition.
+    importGoogleContacts: async () => {
+      const result = await importGoogleContacts()
+      requestSpeakerRecognition()
+      return result
+    },
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
@@ -67,6 +74,8 @@ const IPC_HANDLERS: MainHandlers = {
     start: (_event, input: StartRecordingInput) => startMeetingRecordingWorkflow(input),
     stop: () => stopMeetingRecordingWorkflow(),
     getStatus: () => getRecordingState(),
+    prepareLanguage: (_event, language: string) => prepareSpeechLanguage(String(language)),
+    setLanguage: (_event, language: string) => setPreferredRecordingLanguage(String(language)),
   },
   managedRuntime: {
     status: () => managedRuntime.status(),

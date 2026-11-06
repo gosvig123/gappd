@@ -55,6 +55,19 @@
   background: var(--color-surface-soft);
 }
 
+/* The Meeting language sits beside Delete Meeting and looks like it (ui-button classes);
+   the bare select inside carries the value, and the auto margin keeps Copy on the right. */
+.app-panel-language { position: relative; margin-inline-end: auto; cursor: pointer; }
+.app-panel-language:active { transform: none; }
+/* The global `label span` style is for form captions; this span is the button text. */
+.app-panel-language > span { color: inherit; font-size: inherit; }
+/* The select covers the whole control, so a click anywhere opens the menu; the span shows the value. */
+.app-panel-language select { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; padding: 0; border: 0; opacity: 0; cursor: inherit; appearance: none; }
+.app-panel-language select:focus { outline: none; box-shadow: none; }
+.app-panel-language:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.app-panel-language > .app-panel-language-caret { inline-size: 0.7rem; block-size: 0.7rem; margin-inline-start: calc(-1 * var(--space-1)); opacity: 0.7; }
+.app-panel-language:has(select:disabled) { opacity: 0.55; cursor: not-allowed; }
+
 .app-notice {
   display: flex;
   align-items: center;

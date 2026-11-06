@@ -6,7 +6,7 @@ import { loadSourceModule } from './source-module-test-helper.ts'
 function meetings(deleteResult: () => Promise<unknown>, cleanup: () => Promise<void>, agendaCleanup: (id: string) => Promise<void> = async () => {}) {
   return loadSourceModule(new URL('./meetings.ts', import.meta.url), {
     './app-protocol': { requestCommand: deleteResult },
-    './drain-coordinator': { requestDrains() {} },
+    './drain-coordinator': { requestDrains() {}, requestSpeakerRecognition() {} },
     './participant-calendar': { forgetMeetingCalendar: cleanup },
     './agenda': { forgetAgendaMeeting: agendaCleanup },
   }, { console: { error() {} } })

@@ -10,9 +10,11 @@ import { SpeakerLabels } from './speaker-labels'
 import { TranscriptText, meetingHasSegments, meetingTranscript, meetingTranscriptEmptyText } from './transcript'
 import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
 import { notesAvailability } from '../../lib/setup-steps'
+import { NotesChoicePanel, useNotesChoice } from '../notes-choice'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
+import { MeetingLanguage } from './meeting-language'
 
 type TabId = 'summary' | 'recording'
 const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
@@ -49,7 +51,7 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button>{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
+  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button><MeetingLanguage view={view} confirm={confirm} meeting={meeting} onError={setError} />{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
 }
 
 function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -103,10 +105,19 @@ function SummaryPane({ view, transcript }: { view: AppView; transcript: string }
   if (view.selectedMeeting && meetingFailed(view.selectedMeeting) && !transcript.trim()) return <EmptyState>No notes: Gappd could not make a transcript for this Meeting.</EmptyState>
   const openNotesSettings = () => view.actions.openSettings('Meeting processing')
   switch (notesAvailability(view.runtime)) {
-    case 'off': return <EmptyState><p>Notes are off, so this Meeting has a transcript only. Turn on notes and Gappd writes them for this Meeting too.</p><Button className="compact-action" onClick={openNotesSettings}>Turn on notes</Button></EmptyState>
+    case 'off': return <NotesOffPane view={view} />
     case 'waiting': return <EmptyState><p>Notes are waiting. {view.runtime?.message}</p><Button className="compact-action" onClick={openNotesSettings}>Open notes settings</Button></EmptyState>
     default: return <EmptyState>No notes yet. Gappd writes notes after the recording ends.</EmptyState>
   }
+}
+
+/** Notes are off: choose where they are made here, and Gappd writes them for this Meeting too. */
+function NotesOffPane({ view }: { view: AppView }) {
+  const choice = useNotesChoice(true)
+  return <div className="app-reading meeting-notes-off">
+    <p>Notes are off, so this Meeting has a transcript only. Choose where Gappd makes notes, and it writes them for this Meeting too.</p>
+    <NotesChoicePanel view={view} choice={choice} />
+  </div>
 }
 
 /** The recording and its transcript. Without a playable Screen video, the transcript fills the tab. */

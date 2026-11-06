@@ -61,8 +61,8 @@ func (w meetingRecordingWorkflow) createSessionDir(title string) (string, error)
 	return dir, nil
 }
 
-func (w meetingRecordingWorkflow) startMeeting(title, sessionDir, language string, speakerLabelsEnabled *bool) (*db.Meeting, error) {
-	start := meetinglifecycle.RecordingStart{Title: title, SessionDir: sessionDir, Language: language,
+func (w meetingRecordingWorkflow) startMeeting(title, titleSource, sessionDir, language string, speakerLabelsEnabled *bool) (*db.Meeting, error) {
+	start := meetinglifecycle.RecordingStart{Title: title, TitleSource: titleSource, SessionDir: sessionDir, Language: language,
 		SpeakerLabelsEnabled: speakerLabelsEnabled, At: time.Now()}
 	meeting, err := w.lifecycle.BeginRecording(context.Background(), start)
 	if err != nil {
@@ -85,9 +85,16 @@ func (w meetingRecordingWorkflow) printRecorded(startedAt string) {
 	}
 }
 
+// sessionNameMaxRunes keeps a session folder name under the 255-byte file name limit, even for
+// 4-byte letters, because a Calendar event can have a long title.
+const sessionNameMaxRunes = 40
+
 func sanitize(s string) string {
 	var b strings.Builder
-	for _, r := range s {
+	for i, r := range []rune(s) {
+		if i == sessionNameMaxRunes {
+			break
+		}
 		switch {
 		case unicode.IsLetter(r), unicode.IsDigit(r):
 			b.WriteRune(unicode.ToLower(r))

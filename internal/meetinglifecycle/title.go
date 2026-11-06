@@ -9,6 +9,10 @@ const (
 	genericMeetingTitleRecordedDialogue = "recorded conversation"
 )
 
+// CalendarMeetingTitle is the title a Calendar event gives its Meeting, or "" when the event title
+// is empty or generic ("Meeting"), so that the AI title can replace it.
+func CalendarMeetingTitle(title string) string { return cleanGeneratedMeetingTitle(title) }
+
 func cleanGeneratedMeetingTitle(title string) string {
 	title = strings.TrimSpace(title)
 	title = strings.Trim(title, `"'“”‘’`)

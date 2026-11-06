@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"fmt"
 
-	_ "modernc.org/sqlite"
+	"modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 )
 
 type DB struct {
@@ -77,8 +79,25 @@ func prepareInitConnection(ctx context.Context, conn *sql.Conn) error {
 	return nil
 }
 
-func (d *DB) initializeSchema(ctx context.Context, conn *sql.Conn) (err error) {
-	if _, err = conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
+// Every command opens the store, and most only read. A current schema needs no write, so the
+// first pass takes no write lock and cannot block or break other processes. Only when a migration
+// must write and another process holds or moved the database does the pass run again under the
+// write lock, which serializes concurrent migrations.
+func (d *DB) initializeSchema(ctx context.Context, conn *sql.Conn) error {
+	err := d.initializeSchemaIn(ctx, conn, "BEGIN")
+	if isBusy(err) {
+		err = d.initializeSchemaIn(ctx, conn, "BEGIN IMMEDIATE")
+	}
+	return err
+}
+
+func isBusy(err error) bool {
+	var sqliteErr *sqlite.Error
+	return errors.As(err, &sqliteErr) && sqliteErr.Code()&0xff == sqlite3.SQLITE_BUSY
+}
+
+func (d *DB) initializeSchemaIn(ctx context.Context, conn *sql.Conn, begin string) (err error) {
+	if _, err = conn.ExecContext(ctx, begin); err != nil {
 		return fmt.Errorf("begin init tx: %w", err)
 	}
 	defer func() {
@@ -113,6 +132,9 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 		return fmt.Errorf("init schema: %w", err)
 	}
 	if err := migrateMeetingVideo(ctx, conn); err != nil {
+		return err
+	}
+	if err := migrateMeetingTitleSource(ctx, conn); err != nil {
 		return err
 	}
 	if err := migrateMeetingsSearchTrigger(ctx, conn); err != nil {

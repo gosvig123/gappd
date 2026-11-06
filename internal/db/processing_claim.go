@@ -48,7 +48,8 @@ func claimArgs(meeting *Meeting, token string) []any {
 		meeting.ID, ProcessingStatusProcessing, token}
 }
 
-const commitClaimSQL = `UPDATE meetings SET title=?, transcript=?, transcript_revision=MAX(transcript_revision,?), summary=?, summary_transcript_revision=?, extraction_json=?,
+// A Calendar title stays even when the user links the event while processing runs.
+const commitClaimSQL = `UPDATE meetings SET title=CASE WHEN title_source='calendar' THEN title ELSE ? END, transcript=?, transcript_revision=MAX(transcript_revision,?), summary=?, summary_transcript_revision=?, extraction_json=?,
 	processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
 	processing_claim_token=NULL, processing_claim_expires_at=NULL
 	WHERE id=? AND processing_status=? AND processing_claim_token=?`

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/gappd-dev/gappd/internal/db"
+	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 type MeetingListItem struct {
@@ -23,6 +24,7 @@ type MeetingDetail struct {
 	StartedAt             string           `json:"startedAt"`
 	EndedAt               *string          `json:"endedAt,omitempty"`
 	Status                MeetingStatus    `json:"status"`
+	Language              string           `json:"language"`
 	TranscriptText        string           `json:"transcriptText,omitempty"`
 	TranscriptProvisional bool             `json:"transcriptProvisional"`
 	Summary               string           `json:"summary,omitempty"`
@@ -72,7 +74,7 @@ func buildMeetingDetail(meeting db.Meeting, segments []db.Segment, transcript st
 	status := MeetingStatusFor(meeting)
 	visible := visibleTranscriptSegments(meeting, segments)
 	provisional := meeting.Transcript == nil && len(visible) > 0
-	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Speakers: buildSpeakerViews(visible), SummaryUpdating: summaryUpdating(meeting), Diarization: diarizationInfo(meeting)}
+	return MeetingDetail{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: status, Language: meetinglang.Normalize(meeting.Language), TranscriptText: transcript, TranscriptProvisional: provisional, Summary: stringValue(meeting.Summary), Segments: buildSegmentViews(visible), Speakers: buildSpeakerViews(visible), SummaryUpdating: summaryUpdating(meeting), Diarization: diarizationInfo(meeting)}
 }
 
 func diarizationInfo(meeting db.Meeting) DiarizationInfo {

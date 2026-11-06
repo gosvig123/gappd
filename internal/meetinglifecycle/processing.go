@@ -154,7 +154,7 @@ func (t ProcessingCompleted) apply(meeting *db.Meeting) (bool, error) {
 }
 
 func applyCompletion(meeting *db.Meeting, completion Completion) {
-	if title := cleanGeneratedMeetingTitle(completion.Title); title != "" {
+	if title := cleanGeneratedMeetingTitle(completion.Title); title != "" && meeting.TitleSource != db.TitleSourceCalendar {
 		meeting.Title = title
 	}
 	if !sameText(meeting.Transcript, completion.Transcript) {
