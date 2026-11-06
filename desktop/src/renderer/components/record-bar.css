@@ -3,9 +3,9 @@
 .app-toolbar { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); padding: var(--space-6) var(--space-9) 0; }
 .app-record-hint:empty { display: none; }
 .app-record-hint { max-width: 65ch; color: var(--color-text-soft); font-size: var(--font-size-small); text-align: right; }
-.app-record-video { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); border: 0; border-inline-start: 1px solid var(--color-border); background: transparent; font-size: var(--font-size-small); white-space: nowrap; }
+.app-record-video { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 0 var(--space-4); border: 0; border-inline-start: 1px solid var(--color-border); background: transparent; font-size: var(--font-size-xs); white-space: nowrap; }
 .app-record-video[aria-pressed="true"] { color: var(--color-accent); background: var(--color-accent-tint); }
-.app-record-video svg { width: 1rem; height: 1rem; }
+.app-record-video svg { width: 0.8rem; height: 0.8rem; }
 .app-record-video:disabled { opacity: .6; }
 .app-record button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
 @media (max-width: 760px) {
@@ -17,7 +17,7 @@
 .app-record {
   display: flex;
   align-items: stretch;
-  min-block-size: 2.25rem;
+  min-block-size: 1.75rem;
   overflow: hidden;
   border: 1px solid var(--color-accent-border-strong);
   border-radius: var(--radius-pill);
@@ -26,15 +26,15 @@
 }
 
 .app-record.is-recording { border-color: var(--color-danger-border); }
-.app-record-device { display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-5); min-inline-size: 0; }
-.app-record-device svg { inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-text-muted); flex: 0 0 auto; }
+.app-record-device { display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-4); min-inline-size: 0; }
+.app-record-device svg { inline-size: 0.75rem; block-size: 0.75rem; color: var(--color-text-muted); flex: 0 0 auto; }
 
 .app-record-device select {
-  max-inline-size: 11rem;
+  max-inline-size: 9rem;
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   appearance: none;
 }
@@ -43,24 +43,24 @@
 .app-record-device select:focus { outline: none; box-shadow: none; }
 .app-record-device:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -3px; border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
 .app-record-device:has(select:disabled) { opacity: 0.6; }
-.app-record-language { padding: 0 var(--space-4); border-inline-start: 1px solid var(--color-border); }
-.app-record-language select { max-inline-size: 9rem; }
+.app-record-language { padding: 0 var(--space-3); border-inline-start: 1px solid var(--color-border); }
+.app-record-language select { max-inline-size: 7.5rem; }
 .app-record-language:has(select:focus-visible) { border-radius: 0; }
 
 .app-record-button {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-6);
+  gap: var(--space-1);
+  padding: 0 var(--space-5);
   border: 0;
   background: var(--gradient-accent);
   color: var(--color-accent-contrast);
-  font-size: var(--font-size-small);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
-.app-record-button svg { inline-size: 0.85rem; block-size: 0.85rem; }
+.app-record-button svg { inline-size: 0.75rem; block-size: 0.75rem; }
 .app-record-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
 .app-record-button:disabled { opacity: 0.55; cursor: not-allowed; }
 .app-record-button.is-recording { background: var(--color-danger); }
