@@ -1,6 +1,6 @@
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { LinkCalendarInput, ParticipantContext } from '../shared/participant-contract'
-import { genericMeetingTitle } from '../shared/meeting-title'
+import { calendarMeetingTitle, genericMeetingTitle } from '../shared/meeting-title'
 import { requestCommand } from './app-protocol'
 import { createSecureStore } from './electron-secure-store'
 import { requestDrains } from './drain-coordinator'
@@ -39,8 +39,10 @@ export async function linkCalendar(input: LinkCalendarInput): Promise<Participan
   return serialize(async () => {
     const { meeting } = await requestCommand('meetings.show', { id: input.id })
     const updated = { ...context, event, inferenceDisabled: !input.eventSourceId }
+    // Rename first: a failed rename then leaves the old link, and choosing the event again retries both.
+    await requestCommand('meetings.setCalendarTitle', { id: input.id, title: calendarMeetingTitle(event?.title), fallback: genericMeetingTitle(new Date(meeting.startedAt)) })
+      .catch((error: unknown) => { throw new Error(`Link calendar event: could not rename the Meeting (${String(error)}). Choose the event again.`) })
     await saveContext(await readLinks(), input.id, updated)
-    await requestCommand('meetings.setCalendarTitle', { id: input.id, title: event?.title ?? '', fallback: genericMeetingTitle(new Date(meeting.startedAt)) })
     requestDrains()
     return updated
   })

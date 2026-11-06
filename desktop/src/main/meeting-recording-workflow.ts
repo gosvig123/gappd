@@ -1,6 +1,6 @@
 import type { Device, RecordingState } from '../shared/contracts'
 import type { StartRecordingInput } from '../shared/ipc-contract'
-import { genericMeetingTitle } from '../shared/meeting-title'
+import { calendarMeetingTitle, genericMeetingTitle } from '../shared/meeting-title'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE } from '../shared/transcription-languages'
 import { requestCapturePermissions } from './capture-permissions'
 import { pauseDrains, resumeDrains } from './drain-coordinator'
@@ -59,7 +59,8 @@ function selectedDeviceIndex(devices: Device[], requested?: number): number | nu
 /** A title the caller chose wins; then the Calendar event's title, which the AI title never replaces. */
 function recordingTitle(title?: string, eventTitle?: string, fallbackTitle?: string): { title: string; titleSource?: 'calendar' } {
   if (title) return { title }
-  if (eventTitle?.trim()) return { title: eventTitle.trim(), titleSource: 'calendar' }
+  const calendarTitle = calendarMeetingTitle(eventTitle)
+  if (calendarTitle) return { title: calendarTitle, titleSource: 'calendar' }
   return { title: fallbackTitle?.trim() || genericMeetingTitle(new Date()) }
 }
 

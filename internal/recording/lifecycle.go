@@ -85,9 +85,16 @@ func (w meetingRecordingWorkflow) printRecorded(startedAt string) {
 	}
 }
 
+// sessionNameMaxRunes keeps a session folder name under the 255-byte file name limit, even for
+// 4-byte letters, because a Calendar event can have a long title.
+const sessionNameMaxRunes = 40
+
 func sanitize(s string) string {
 	var b strings.Builder
-	for _, r := range s {
+	for i, r := range []rune(s) {
+		if i == sessionNameMaxRunes {
+			break
+		}
 		switch {
 		case unicode.IsLetter(r), unicode.IsDigit(r):
 			b.WriteRune(unicode.ToLower(r))

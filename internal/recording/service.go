@@ -103,6 +103,14 @@ func (w meetingRecordingWorkflow) run(ctx context.Context, req Request) error {
 	if req.TitleSource != "" && req.TitleSource != db.TitleSourceCalendar {
 		return fmt.Errorf("start recording: unknown title source %q; use %q or leave it empty", req.TitleSource, db.TitleSourceCalendar)
 	}
+	if req.TitleSource == db.TitleSourceCalendar {
+		// Clean it as a picker link does. A generic event title is kept only as a placeholder.
+		if title := meetinglifecycle.CalendarMeetingTitle(req.Title); title != "" {
+			req.Title = title
+		} else {
+			req.TitleSource = ""
+		}
+	}
 	if req.Mode == "" {
 		req.Mode = capture.ModeBoth
 	}

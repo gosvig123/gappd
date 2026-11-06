@@ -1,9 +1,10 @@
 import type { CalendarAttendee, CalendarEventSummary, CalendarParticipant } from '../../shared/calendar-contract'
+// @ts-expect-error Node type stripping requires explicit TypeScript extension.
+import { UNTITLED_EVENT_TITLE } from '../../shared/meeting-title.ts'
 
 const PRIMARY_CALENDAR_ID = 'primary'
 const CANCELLED_STATUS = 'cancelled'
 const CONFIRMED_STATUS = 'confirmed'
-const UNTITLED_EVENT = 'Untitled event'
 
 type GoogleParticipant = { email?: string; displayName?: string }
 type GoogleAttendee = GoogleParticipant & { responseStatus?: string; self?: boolean; resource?: boolean }
@@ -32,7 +33,7 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
     eventId: item.id,
     recurringEventId: item.recurringEventId,
     sourceId: `${connectionId}:${PRIMARY_CALENDAR_ID}:${item.id}`,
-    title: item.summary?.trim() || UNTITLED_EVENT,
+    title: item.summary?.trim() || UNTITLED_EVENT_TITLE,
     start, end, allDay,
     status: item.status || CONFIRMED_STATUS,
     location: item.location?.trim() || undefined,

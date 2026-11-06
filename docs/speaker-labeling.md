@@ -5,8 +5,9 @@ speaker name in the transcript. Play a short clip, then choose a saved person,
 select a calendar invitee, or add a name. Use another clip if the first is unclear.
 
 Starting a recording from a calendar event saves that event with the meeting.
-Record also saves the event that is on now when it is the only one with other
-invitees. The meeting takes the event's title, and the AI title does not replace
+When you press Record without choosing an event, Gappd saves the event that is
+on now (from 5 minutes before its start) if it is the only one with other
+invitees that you did not decline. The meeting takes the event's title, and the AI title does not replace
 it. For other recordings, choose a suggested event near the recording time in the
 Calendar event menu under the meeting title. Choose **Not a Calendar event** to
 stop automatic Calendar matching for that meeting. Invitees of the chosen event
