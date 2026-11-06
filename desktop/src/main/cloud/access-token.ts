@@ -70,6 +70,15 @@ export class AccessTokenVerifier {
   }
 }
 
+/**
+ * The OAuth client that a token was issued to. It reads the claim without a check, so call it only
+ * after verify accepted the same token.
+ */
+export function tokenClientId(token: string): string | null {
+  const claims = decodePart(token.split('.')[1] ?? '') as { client_id?: unknown } | null
+  return typeof claims?.client_id === 'string' && claims.client_id !== '' ? claims.client_id : null
+}
+
 function validClaims(claims: Claims, rules: AccessTokenRules, now: number): boolean {
   const audience = typeof claims.aud === 'string' ? [claims.aud] : claims.aud
   if (claims.iss !== rules.issuer || !Array.isArray(audience) || audience.length !== 1 || audience[0] !== rules.resource) return false

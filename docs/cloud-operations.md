@@ -82,6 +82,7 @@ Production uses the Clerk production instance of the `Gappd` application.
 | Domain | `getgappd.com`, `dmn_3JJlwp7Zpv6SzqzzzNsDF7PgADO`, verified |
 | Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
 | Dynamic Client Registration | Off; the metadata has no registration endpoint |
+| Client ID Metadata Documents (CIMD) | On since 2026-11-06 (OAuth applications → Settings): any compatible client may start sign-in; allowed and default scopes `meetings:read`, `offline_access`. Claude (`https://claude.ai/oauth/mcp-oauth-client-metadata`) and ChatGPT (`https://chatgpt.com/oauth/client.json`) sign in this way, so users paste no Client ID. |
 | Branding | Logo and favicon are PNG renders of `gappd-site/apps/web/public/app-logo.svg` (Clerk takes no SVG). Account Portal colours follow `desktop/src/renderer/theme.css`: primary `#2F6FB5` on `#F5F6F9` (light), `#2B70BD` on `#282C33` (dark; the lighter app accent fails contrast under white button text). No Terms or Privacy links: Clerk shows them only with a required consent checkbox at sign-up. |
 
 Not advertising `meetings:sync` is not an authorization boundary. The server accepts writes only
@@ -91,8 +92,10 @@ from the Desktop client, with that scope and a registered device signature.
 | --- | --- | --- | --- |
 | `Gappd Desktop` | `t3RzfAuaxamgqOQV` | `email`, `profile`, `offline_access`, `meetings:sync` | `http://127.0.0.1/callback` |
 | `Gappd MCP - Pi` | `WFvlqsHImvP7f14t` | `meetings:read`, `offline_access` | `http://localhost:19876/callback`, `http://127.0.0.1/callback` |
+| `Gappd MCP - Claude` (fallback) | `FmSnhlCckRBBfi59` | `meetings:read`, `offline_access` | `https://claude.ai/api/mcp/auth_callback`, `https://claude.com/api/mcp/auth_callback` |
+| `Gappd MCP - ChatGPT` (fallback) | `HD2LmmYRi9G1izg9` | `meetings:read`, `offline_access` | `https://chatgpt.com/connector_platform_oauth_redirect` |
 
-Both clients are public, use PKCE and show a consent screen; no client secret is stored. The bare
+All clients are public, use PKCE and show a consent screen; no client secret is stored. The two fallback clients are for a user who enters a Client ID by hand in Claude's or ChatGPT's advanced OAuth settings; the desktop does not show them, and the Mac does not count their tokens as Claude or ChatGPT (`REMOTE_AI_SERVICES` in `desktop/src/shared/remote-access.ts` matches the CIMD URLs). The bare
 `http://127.0.0.1/callback` is deliberate: the desktop binds a random loopback port and Clerk accepts
 the port at request time. The release workflow bakes the identity into the desktop build from the
 repository variables `GAPPD_CLERK_ISSUER_URL` and `GAPPD_CLERK_CLIENT_ID`. The development instance

@@ -1,7 +1,8 @@
 import { exportRecording } from './meeting-export'
 import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
-import { remoteAccess } from './cloud/remote-access-service'
+import { addToRemoteAIService, remoteAccess } from './cloud/remote-access-service'
+import { isRemoteAIServiceId, type RemoteAIServiceId } from '../shared/remote-access'
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
@@ -120,6 +121,10 @@ const IPC_HANDLERS: MainHandlers = {
   remoteAccess: {
     status: () => remoteAccess().status(),
     setEnabled: (_event, enabled: boolean) => remoteAccess().setEnabled(enabled === true),
+    addToService: (_event, id: RemoteAIServiceId) => {
+      if (!isRemoteAIServiceId(id)) throw new Error('Unknown AI service. Reopen Settings and try again.')
+      return addToRemoteAIService(id)
+    },
   },
   usage: {
     status: () => usageReportStatus(),
