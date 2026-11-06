@@ -93,7 +93,8 @@ async function retryDiarization(id: string, refs: MeetingRefs, setState: SetDash
 async function setMeetingLanguage(id: string, language: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {
   const meeting = await window.gappd.meetings.setLanguage(id, language)
   if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }
-  await refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest)
+  // The change is saved; a failed list reload is a dashboard error, not a failed change.
+  void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState))
 }
 
 async function deleteMeeting(id: string, refs: MeetingRefs, setState: SetDashboardState, selectedRequest: RequestGate, refreshRequest: RequestGate) {

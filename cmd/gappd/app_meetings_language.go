@@ -4,7 +4,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+
+	"github.com/gappd-dev/gappd/internal/audioartifact"
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
@@ -13,7 +16,7 @@ import (
 )
 
 const (
-	meetingLanguageBusyMessage    = "change the language after this Meeting finishes recording and processing"
+	meetingLanguageBusyMessage    = "this Meeting is still recording or processing; try again when it finishes"
 	meetingLanguageNoAudioMessage = "this Meeting has no complete saved audio, so it cannot be transcribed in another language"
 )
 
@@ -26,6 +29,7 @@ func appMeetingsSetLanguageCmd() *cobra.Command {
 		if !asJSON {
 			return fmt.Errorf("app meetings set-language requires --json")
 		}
+		language = strings.TrimSpace(language)
 		if !meetinglang.Supported(language) {
 			return fmt.Errorf("gappd does not support the language %q; choose one from the language list", language)
 		}
@@ -44,23 +48,39 @@ func appMeetingsSetLanguageCmd() *cobra.Command {
 	return cmd
 }
 
+// setMeetingLanguage checks the audio files before it clears the transcript: without audio the
+// Meeting would lose its transcript and end failed. The SQL guards still cover a race with the queue.
 func setMeetingLanguage(store *db.DB, id, language string) error {
-	result, err := meetinglifecycle.New(store).ChangeLanguage(cmdContext(), id, language, time.Now())
+	meeting, err := store.GetMeeting(id)
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("meeting %s was not found; reopen the Meeting list", id)
 	}
+	if err != nil {
+		return err
+	}
+	if meetinglang.Normalize(meeting.Language) == language {
+		return nil
+	}
+	if meeting.CaptureStatus == db.CaptureStatusRecording || meeting.ProcessingStatus == db.ProcessingStatusProcessing {
+		return errors.New(meetingLanguageBusyMessage)
+	}
+	if !hasSavedAudio(meeting) {
+		return errors.New(meetingLanguageNoAudioMessage)
+	}
+	result, err := meetinglifecycle.New(store).ChangeLanguage(cmdContext(), id, language, time.Now())
 	if err != nil || result.Applied {
 		return err
 	}
-	meeting := result.Meeting
-	switch {
-	case meeting == nil:
-		return fmt.Errorf("meeting %s was not found; reopen the Meeting list", id)
-	case meetinglang.Normalize(meeting.Language) == language:
+	if result.Meeting != nil && meetinglang.Normalize(result.Meeting.Language) == language {
 		return nil
-	case meeting.CaptureStatus == db.CaptureStatusRecording || meeting.ProcessingStatus == db.ProcessingStatusProcessing:
-		return errors.New(meetingLanguageBusyMessage)
-	default:
-		return errors.New(meetingLanguageNoAudioMessage)
 	}
+	// The Meeting started recording or processing between the check and the change.
+	return errors.New(meetingLanguageBusyMessage)
+}
+
+func hasSavedAudio(meeting *db.Meeting) bool {
+	if meeting.CaptureStatus == db.CaptureStatusFailed || meeting.AudioPath == nil || strings.TrimSpace(*meeting.AudioPath) == "" {
+		return false
+	}
+	return audioartifact.New(*meeting.AudioPath).HasAudio()
 }

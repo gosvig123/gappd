@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Languages } from 'lucide-react'
 import type { MeetingDetail } from '../../../shared/contracts'
 import { TRANSCRIPTION_LANGUAGES } from '../../../shared/transcription-languages'
@@ -11,7 +12,8 @@ import { meetingHasWork } from './progress'
  */
 export function MeetingLanguage({ view, confirm, meeting, onError }: { view: AppView; confirm: ConfirmController; meeting: MeetingDetail; onError: (message: string) => void }) {
   const current = TRANSCRIPTION_LANGUAGES.find((item) => item.code === meeting.language)
-  const busy = meetingHasWork(meeting)
+  const [changing, setChanging] = useState(false)
+  const busy = changing || meetingHasWork(meeting)
   const choose = (code: string) => {
     const next = TRANSCRIPTION_LANGUAGES.find((item) => item.code === code)
     if (!next || code === meeting.language) return
@@ -21,8 +23,10 @@ export function MeetingLanguage({ view, confirm, meeting, onError }: { view: App
       confirmLabel: 'Transcribe again',
       onConfirm: async () => {
         onError('')
+        setChanging(true)
         try { await view.actions.setMeetingLanguage(meeting.id, code) }
         catch (cause) { onError(languageErrorMessage(cause)) }
+        finally { setChanging(false) }
       },
     })
   }

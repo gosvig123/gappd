@@ -7,6 +7,8 @@ import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 const SPEECH_LOCALE_ENV = 'GAPPD_SPEECH_LOCALE'
 const DEFAULT_SPEECH_LOCALE = 'en_US'
 const SPEECH_STATUS_NOT_INSTALLED = 2
+// A model download that hangs must end, or the record bar keeps waiting for it.
+const SPEECH_PREPARE_TIMEOUT_MS = 10 * 60 * 1000
 
 type AppleSpeechProgressUpdate = { message?: string; progress?: number; pullStage?: 'preparing' | 'downloading' | 'verifying' }
 
@@ -21,7 +23,7 @@ export async function ensureAppleSpeechAsset(onProgress?: (update: AppleSpeechPr
   const bin = resolveSpeechTranscriberBinary()
   if (!(await isExecutableFile(bin))) throw new Error(missingAppleSpeechHelperMessage(bin))
   onProgress?.({ message: `Preparing Apple speech model ${locale}`, pullStage: 'preparing' })
-  const result = await runSpeechHelper(['--prepare', locale])
+  const result = await runSpeechHelper(['--prepare', locale], SPEECH_PREPARE_TIMEOUT_MS)
   if (!result.ok) throw new Error(result.error)
   onProgress?.({ message: `Apple speech model ${locale} is ready`, progress: 100, pullStage: 'verifying' })
 }
@@ -37,11 +39,20 @@ export function prepareSpeechLanguage(language: string): Promise<SpeechLanguageS
   if (!pending) {
     pending = ensureAppleSpeechAsset(undefined, language)
       .then((): SpeechLanguageStatus => ({ language, ready: true }))
-      .catch((): SpeechLanguageStatus => ({ language, ready: false, message: `${option.label} needs a one-time speech model download. Connect to the internet; Gappd tries again when it transcribes.` }))
+      .catch((error): SpeechLanguageStatus => ({ language, ready: false, message: prepareFailureMessage(option.label, error) }))
       .finally(() => languagePrepares.delete(language))
     languagePrepares.set(language, pending)
   }
   return pending
+}
+
+function prepareFailureMessage(label: string, error: unknown): string {
+  const cause = error instanceof Error ? error.message : String(error)
+  console.warn(`Apple speech model ${label} was not prepared: ${cause}`)
+  if (/does not support locale/.test(cause)) return `This Mac cannot transcribe ${label}. Choose another language.`
+  if (/timed out/.test(cause)) return `The ${label} speech model download did not finish. Gappd tries again when it transcribes.`
+  if (/not installed|could not be downloaded/.test(cause)) return `${label} needs a one-time speech model download. Connect to the internet; Gappd tries again when it transcribes.`
+  return `Could not get the ${label} speech model ready: ${cause}`
 }
 
 export function missingAppleSpeechAssetMessage(): string {
@@ -56,10 +67,11 @@ function speechLocale(): string {
   return process.env[SPEECH_LOCALE_ENV]?.trim() || DEFAULT_SPEECH_LOCALE
 }
 
-function runSpeechHelper(args: string[]): Promise<{ ok: true; stdout: string } | { ok: false; error: string }> {
+function runSpeechHelper(args: string[], timeout = 0): Promise<{ ok: true; stdout: string } | { ok: false; error: string }> {
   return new Promise((resolve) => {
-    execFile(resolveSpeechTranscriberBinary(), args, { env: childEnv() }, (error, stdout, stderr) => {
+    execFile(resolveSpeechTranscriberBinary(), args, { env: childEnv(), timeout }, (error, stdout, stderr) => {
       if (!error) return resolve({ ok: true, stdout })
+      if (error.killed) return resolve({ ok: false, error: `Apple speech helper timed out after ${Math.round(timeout / 60000)} minutes` })
       if ('code' in error && error.code === SPEECH_STATUS_NOT_INSTALLED) return resolve({ ok: false, error: missingAppleSpeechAssetMessage() })
       resolve({ ok: false, error: (stderr || error.message).trim() })
     })
