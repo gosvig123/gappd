@@ -25,7 +25,21 @@ const showScrollbar = (element: Element): void => {
   scrollTimers.set(element, window.setTimeout(() => hideScrollbar(element), SCROLLBAR_IDLE_DELAY_MS))
 }
 
+/**
+ * Publish the width a scrollbar takes from layout as --scrollbar-gutter (0 with overlay
+ * scrollbars). The scroll view keeps that gutter and gives it back from its padding, so its
+ * content lines up with the record bar above it whether or not the page scrolls.
+ */
+const publishScrollbarGutter = (): void => {
+  const probe = document.createElement('div')
+  probe.style.cssText = 'position:absolute;top:-999px;inline-size:100px;block-size:100px;overflow:scroll'
+  document.body.append(probe)
+  document.documentElement.style.setProperty('--scrollbar-gutter', `${probe.offsetWidth - probe.clientWidth}px`)
+  probe.remove()
+}
+
 export const installTransientScrollbars = (): void => {
+  publishScrollbarGutter()
   document.addEventListener('scroll', (event) => {
     const element = scrollElementFor(event.target)
     if (!element) return

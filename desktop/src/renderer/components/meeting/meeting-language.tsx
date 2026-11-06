@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Languages } from 'lucide-react'
+import { ChevronDown, Languages } from 'lucide-react'
 import type { MeetingDetail } from '../../../shared/contracts'
 import { TRANSCRIPTION_LANGUAGES } from '../../../shared/transcription-languages'
 import type { ConfirmController } from '../confirm'
@@ -31,12 +31,13 @@ export function MeetingLanguage({ view, confirm, meeting, onError }: { view: App
     })
   }
   return (
-    <label className="app-panel-language" title={busy ? 'You can change the language after recording and processing finish.' : 'Language of the transcript and notes'}>
+    <label className="ui-button ui-button-secondary compact-action app-panel-language" title={busy ? 'You can change the language after recording and processing finish.' : 'Language of the transcript and notes'}>
       <Languages aria-hidden="true" />
       <select value={current ? current.code : ''} disabled={busy || !current} onChange={(event) => choose(event.target.value)} aria-label="Meeting language">
         {current ? null : <option value="">{meeting.language || 'Language'}</option>}
         {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
       </select>
+      <ChevronDown className="app-panel-language-caret" aria-hidden="true" />
     </label>
   )
 }

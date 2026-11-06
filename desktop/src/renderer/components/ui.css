@@ -158,7 +158,8 @@ button:focus-visible {
 }
 
 .ui-button-primary {
-  border: none;
+  /* Transparent, so a primary button is as tall as a secondary one beside it. */
+  border: 1px solid transparent;
   background: var(--gradient-accent);
   color: var(--color-accent-contrast);
   box-shadow: inset 0 1px 0 var(--highlight-strong), var(--shadow-accent);

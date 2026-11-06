@@ -65,7 +65,7 @@
   overflow: hidden;
 }
 
-.app-scroll { grid-row: 4; min-block-size: 0; overflow: auto; padding: var(--space-7) var(--space-9) var(--space-9); }
+.app-scroll { grid-row: 4; min-block-size: 0; overflow: auto; scrollbar-gutter: stable; padding: var(--space-7) max(0px, calc(var(--space-9) - var(--scrollbar-gutter, 0px))) var(--space-9) var(--space-9); }
 
 .app-icon-action {
   display: grid;
