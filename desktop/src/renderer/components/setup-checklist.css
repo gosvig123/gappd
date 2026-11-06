@@ -38,24 +38,13 @@
 
 .setup-step-marker svg { inline-size: 0.9rem; block-size: 0.9rem; }
 .setup-step.current .setup-step-marker { border-color: var(--color-accent); color: var(--color-text); }
-.setup-step.done .setup-step-marker,
-.setup-step.skipped .setup-step-marker { border-color: var(--color-success-border); background: var(--color-success-bg); color: var(--color-success); }
+.setup-step.done .setup-step-marker { border-color: var(--color-success-border); background: var(--color-success-bg); color: var(--color-success); }
 
 .setup-step-body { display: grid; gap: var(--space-2); min-inline-size: 0; }
 .setup-step-body strong { display: flex; align-items: center; gap: var(--space-3); font-size: var(--font-size-body); line-height: 1.5rem; }
 /* A finished step takes one line: its title, then its short result. */
-.setup-step:is(.done, .skipped) .setup-step-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); }
-.setup-step.done .setup-step-body strong,
-.setup-step.skipped .setup-step-body strong { color: var(--color-text-soft); font-weight: 500; }
-
-.setup-step-tag {
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text-soft);
-  font-size: var(--font-size-small);
-  font-weight: 500;
-}
+.setup-step.done .setup-step-body { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-4); }
+.setup-step.done .setup-step-body strong { color: var(--color-text-soft); font-weight: 500; }
 
 .setup-step-detail,
 .setup-step-progress { display: grid; gap: var(--space-2); color: var(--color-text-soft); font-size: var(--font-size-small); }
