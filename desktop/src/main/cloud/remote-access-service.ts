@@ -34,27 +34,28 @@ export function remoteAccess(): RemoteAccess {
   return instance
 }
 
-/** Opens the page where the user adds Gappd to one AI service. Only the fixed pages can open. */
 /**
  * Opens the page where the user adds Gappd to a service. A service needs remote access, so this
- * turns it on first. ChatGPT cannot take the server URL from a link, so it goes on the clipboard.
+ * turns it on first, unless another Mac took it over: the user chooses Use this Mac for that.
+ * ChatGPT cannot take the server URL from a link, so it goes on the clipboard.
  */
 export async function addToRemoteAIService(id: RemoteAIServiceId): Promise<RemoteAccessStatus> {
   const access = remoteAccess()
   const current = access.status()
-  const status = current.enabled ? current : access.setEnabled(true)
+  const status = current.enabled || current.state === 'replaced' ? current : access.setEnabled(true)
   if (id === 'chatgpt') clipboard.writeText(status.address)
   await shell.openExternal(remoteAIServiceAddUrl(id, status.address), { activate: true })
   return status
 }
 
-// strict: a file that exists but cannot be read throws, so a write never replaces a saved setting with defaults.
+// strict: a file that exists but cannot be read throws, so a write never replaces a saved setting
+// with defaults. A file that is not valid JSON holds nothing worth keeping, so it never blocks a write.
 function readState(strict = false): SavedState {
   try {
     const value: unknown = JSON.parse(fs.readFileSync(statePath(), 'utf8'))
     return value && typeof value === 'object' && !Array.isArray(value) ? value as SavedState : {}
   } catch (cause) {
-    if (strict && (cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
+    if (strict && !(cause instanceof SyntaxError) && (cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
     return {}
   }
 }

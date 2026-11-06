@@ -149,9 +149,13 @@ export class RemoteAccess {
       if (this.socket !== socket) return
       this.socket = null
       if (event.code === REPLACED) {
-        this.app.writeEnabled(false)
         this.state = 'replaced'
         this.mcp.close()
+        try {
+          this.app.writeEnabled(false)
+        } catch {
+          // The state already stops this Mac; the saved setting is fixed when the user turns remote access on or off.
+        }
         return
       }
       const planned = event.code === PLANNED_END
