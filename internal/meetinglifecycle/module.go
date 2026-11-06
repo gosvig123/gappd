@@ -15,6 +15,7 @@ const speakerDiarizationAvailable = true
 
 type RecordingStart struct {
 	Title                string
+	TitleSource          string
 	SessionDir           string
 	Language             string
 	SpeakerLabelsEnabled *bool
@@ -35,7 +36,7 @@ func (w Module) BeginRecording(_ context.Context, start RecordingStart) (*db.Mee
 		diarizationState = db.DiarizationStatePending
 	}
 	meeting := &db.Meeting{
-		Title: start.Title, StartedAt: at, AudioPath: &start.SessionDir,
+		Title: start.Title, TitleSource: start.TitleSource, StartedAt: at, AudioPath: &start.SessionDir,
 		CaptureStatus: db.CaptureStatusRecording, CaptureStatusUpdatedAt: at,
 		ProcessingStatus: db.ProcessingStatusNotStarted, ProcessingStatusUpdatedAt: at,
 		DiarizationState: diarizationState,

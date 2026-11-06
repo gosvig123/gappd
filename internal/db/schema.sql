@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS meetings (
     language   TEXT NOT NULL DEFAULT 'en_US',
     tags       TEXT NOT NULL DEFAULT '[]',
     source     TEXT NOT NULL DEFAULT 'manual',
+    title_source TEXT NOT NULL DEFAULT '' CHECK (title_source IN ('', 'calendar')),
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 

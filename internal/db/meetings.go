@@ -48,9 +48,13 @@ var (
 	AllDiarizationStates  = []DiarizationState{DiarizationStateNotRequested, DiarizationStateNotApplicable, DiarizationStatePending, DiarizationStateProcessing, DiarizationStateCompleted, DiarizationStateDegraded}
 )
 
+// TitleSourceCalendar marks a title copied from the Meeting's Calendar event. The AI title never replaces it.
+const TitleSourceCalendar = "calendar"
+
 type Meeting struct {
 	ID                        string
 	Title                     string
+	TitleSource               string // TitleSourceCalendar, or empty for a placeholder or AI title
 	StartedAt                 string
 	EndedAt                   *string
 	CaptureStatus             CaptureStatus
@@ -96,7 +100,7 @@ const selectMeetingsSQL = `SELECT id, title, started_at, ended_at, capture_statu
 	processing_status, processing_status_updated_at, processing_failure_message,
 	processing_claim_token, processing_claim_expires_at, audio_path,
 	transcript, transcript_revision, summary, summary_transcript_revision, extraction_json,
-	diarization_state, diarization_error, diarization_json, language, tags, source, created_at, video_state, video_source_type, video_file, video_start_sec, video_end_sec, video_message, video_origin_host_sec, video_end_host_sec, mic_start_host_sec, system_start_host_sec
+	diarization_state, diarization_error, diarization_json, language, tags, source, created_at, video_state, video_source_type, video_file, video_start_sec, video_end_sec, video_message, video_origin_host_sec, video_end_host_sec, mic_start_host_sec, system_start_host_sec, title_source
 	FROM meetings`
 
 const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, capture_status, capture_status_updated_at, capture_failure_message,
@@ -104,7 +108,7 @@ const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, cap
 	processing_claim_token, processing_claim_expires_at, audio_path,
 	transcript IS NOT NULL AND trim(transcript)<>'', transcript_revision,
 	summary IS NOT NULL AND trim(summary)<>'', summary_transcript_revision, extraction_json,
-	diarization_state, diarization_error, diarization_json, language, tags, source, created_at, video_state, video_source_type, video_file, video_start_sec, video_end_sec, video_message, video_origin_host_sec, video_end_host_sec, mic_start_host_sec, system_start_host_sec
+	diarization_state, diarization_error, diarization_json, language, tags, source, created_at, video_state, video_source_type, video_file, video_start_sec, video_end_sec, video_message, video_origin_host_sec, video_end_host_sec, mic_start_host_sec, system_start_host_sec, title_source
 	FROM meetings`
 
 func (d *DB) CreateMeeting(m *Meeting) error {
@@ -128,14 +132,14 @@ func (d *DB) CreateMeeting(m *Meeting) error {
 const insertMeetingSQL = `INSERT INTO meetings (id,title,started_at,ended_at,capture_status,capture_status_updated_at,
 	capture_failure_message,processing_status,processing_status_updated_at,processing_failure_message,
 	processing_claim_token,processing_claim_expires_at,audio_path,transcript,transcript_revision,summary,summary_transcript_revision,
-	extraction_json,diarization_state,diarization_error,diarization_json,language,tags,source)
-	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+	extraction_json,diarization_state,diarization_error,diarization_json,language,tags,source,title_source)
+	VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
 func meetingInsertArgs(m *Meeting) []any {
 	return []any{m.ID, m.Title, m.StartedAt, m.EndedAt, m.CaptureStatus, m.CaptureStatusUpdatedAt, m.CaptureFailureMessage,
 		m.ProcessingStatus, m.ProcessingStatusUpdatedAt, m.ProcessingFailureMessage, m.ProcessingClaimToken,
 		m.ProcessingClaimExpiresAt, m.AudioPath, m.Transcript, m.TranscriptRevision, m.Summary, m.SummaryTranscriptRevision,
-		m.ExtractionJSON, m.DiarizationState, m.DiarizationError, m.DiarizationJSON, m.Language, m.Tags, m.Source}
+		m.ExtractionJSON, m.DiarizationState, m.DiarizationError, m.DiarizationJSON, m.Language, m.Tags, m.Source, m.TitleSource}
 }
 
 func (d *DB) GetMeeting(id string) (*Meeting, error) {

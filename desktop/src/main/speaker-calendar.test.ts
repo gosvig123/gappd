@@ -13,6 +13,7 @@ test('relink persists constraint before requesting processing; reading preserves
     './electron-secure-store': { createSecureStore: () => ({ read: async () => document, write: async () => { calls.push('save') } }) },
     './google/calendar-service': { googleCalendarSnapshot: async () => ({ events: [fresh] }) },
     './drain-coordinator': { requestDrains: () => { calls.push('drain') } },
+    '../shared/meeting-title': { genericMeetingTitle: () => 'Meeting' },
   })
   assert.equal((await module.participantContext('meeting')).event.title, 'old')
   assert.equal(calls.includes('drain'), false)

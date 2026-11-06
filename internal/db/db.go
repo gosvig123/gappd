@@ -134,6 +134,9 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 	if err := migrateMeetingVideo(ctx, conn); err != nil {
 		return err
 	}
+	if err := migrateMeetingTitleSource(ctx, conn); err != nil {
+		return err
+	}
 	if err := migrateMeetingsSearchTrigger(ctx, conn); err != nil {
 		return err
 	}

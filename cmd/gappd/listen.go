@@ -25,7 +25,7 @@ func listenCmd() *cobra.Command {
 		Short: "Record audio and transcribe on stop",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			m := capture.CaptureMode(mode)
-			return runListen(deviceIdx, title, m, language, &speakerLabelsEnabled, false)
+			return runListen(deviceIdx, title, "", m, language, &speakerLabelsEnabled, false)
 		},
 	}
 	cmd.Flags().IntVarP(&deviceIdx, "device", "d", 0, "Audio device index")
@@ -53,7 +53,7 @@ func devicesCmd() *cobra.Command {
 	}
 }
 
-func runListen(deviceIdx int, title string, mode capture.CaptureMode, language string, speakerLabelsEnabled *bool, desktop bool, screenVideoEnabled ...bool) error {
+func runListen(deviceIdx int, title, titleSource string, mode capture.CaptureMode, language string, speakerLabelsEnabled *bool, desktop bool, screenVideoEnabled ...bool) error {
 	_, store, err := loadStore()
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func runListen(deviceIdx int, title string, mode capture.CaptureMode, language s
 	if err != nil {
 		return err
 	}
-	req := recording.Request{DeviceIdx: deviceIdx, Title: title, Mode: mode, Language: language, SpeakerLabelsEnabled: speakerLabelsEnabled}
+	req := recording.Request{DeviceIdx: deviceIdx, Title: title, TitleSource: titleSource, Mode: mode, Language: language, SpeakerLabelsEnabled: speakerLabelsEnabled}
 	if len(screenVideoEnabled) > 0 {
 		req.ScreenVideoEnabled = screenVideoEnabled[0]
 	}

@@ -20,6 +20,14 @@ type MeetingShowInput struct {
 	ID string `json:"id"`
 }
 
+// SetCalendarTitleInput names a Meeting after its linked Calendar event. An empty title unlinks it;
+// Fallback then names a Meeting that has no AI title.
+type SetCalendarTitleInput struct {
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Fallback string `json:"fallback,omitempty"`
+}
+
 type MeetingDeleteInput struct {
 	ID string `json:"id"`
 }
@@ -61,6 +69,7 @@ type ProcessingDrainInput struct {
 
 type RecordStartInput struct {
 	Title                string `json:"title"`
+	TitleSource          string `json:"titleSource,omitempty"`
 	Device               int    `json:"device"`
 	Mode                 string `json:"mode"`
 	Language             string `json:"language"`
@@ -101,6 +110,7 @@ var Commands = []CommandSpec{
 	{ID: "meetings.list", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[MeetingsResponse](), Args: literalArgs("app", "meetings", "list", "--json")},
 	{ID: "meetings.show", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("show"), field("id"), lit("--json")}},
 	{ID: "meetings.retryDiarization", Mode: CommandModeRequest, Input: typeOf[MeetingShowInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("retry-diarization"), field("id"), lit("--json")}},
+	{ID: "meetings.setCalendarTitle", Mode: CommandModeRequest, Input: typeOf[SetCalendarTitleInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("set-calendar-title"), field("id"), flag("title", "title", true), flag("fallback", "fallback", true), lit("--json")}},
 	{ID: "meetings.delete", Mode: CommandModeRequest, Input: typeOf[MeetingDeleteInput](), Output: typeOf[MeetingDeleteResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("delete"), field("id"), lit("--json")}},
 	{ID: "config.show", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ConfigResponse](), Args: literalArgs("app", "config", "show", "--json")},
 	{ID: "config.aiStatus", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[AIStatusResponse](), Args: literalArgs("app", "config", "ai-status", "--json")},
@@ -111,7 +121,7 @@ var Commands = []CommandSpec{
 	{ID: "processing.pending", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[ProcessingPendingResponse](), Args: literalArgs("app", "processing", "pending", "--json")},
 	{ID: "processing.drain", Mode: CommandModeRequest, Input: typeOf[ProcessingDrainInput](), Output: typeOf[ProcessingDrainResponse](), Args: []CommandArg{lit("app"), lit("processing"), lit("drain"), flag("capability", "capability", false), lit("--json")}, Env: []string{"GAPPD_DIARIZER_BIN", "GAPPD_DIARIZATION_MODELS"}},
 	{ID: "record.recoverStale", Mode: CommandModeRequest, Input: typeOf[EmptyInput](), Output: typeOf[RecoverStaleRecordingsResponse](), Args: literalArgs("app", "record", "recover-stale", "--json")},
-	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true), flag("screen-video-enabled", "screenVideoEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
+	{ID: "record.start", Mode: CommandModeStream, Input: typeOf[RecordStartInput](), Event: typeOf[RecordingEvent](), Args: []CommandArg{lit("app"), lit("record"), lit("start"), flag("title", "title", false), flag("title-source", "titleSource", true), flag("device", "device", false), flag("mode", "mode", false), flag("language", "language", false), flag("speaker-labels-enabled", "speakerLabelsEnabled", true), flag("screen-video-enabled", "screenVideoEnabled", true)}, Env: []string{"GAPPD_CAPTURE_HELPER_PATH"}, Terminal: []recording.EventName{recording.EventCaptured, recording.EventFailed}},
 	{ID: "meetings.voiceTargets", Mode: CommandModeRequest, Input: typeOf[VoiceTargetsInput](), Output: typeOf[VoiceTargetsResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("voice-targets"), flag("after", "after", false), lit("--json")}},
 	{ID: "meetings.agenda", Mode: CommandModeRequest, Input: typeOf[AgendaInput](), Output: typeOf[AgendaResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("agenda"), flag("event", "event", false), flag("linked", "linked", false), lit("--json")}},
 	{ID: "meetings.recognizeSpeakers", Mode: CommandModeRequest, Input: typeOf[RecognizeSpeakersInput](), Output: typeOf[MeetingResponse](), Args: []CommandArg{lit("app"), lit("meetings"), lit("recognize-speakers"), field("id"), flag("revision", "revision", false), flag("emails", "emails", false), flag("calendar", "calendar", false), lit("--json")}},

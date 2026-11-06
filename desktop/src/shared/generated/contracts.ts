@@ -194,6 +194,12 @@ export type MeetingListItem = {
   searchText?: string
 }
 
+export type SetCalendarTitleInput = {
+  id: string
+  title: string
+  fallback?: string
+}
+
 export type MeetingDeleteInput = {
   id: string
 }
@@ -289,6 +295,7 @@ export type RecoverStaleRecordingsResponse = {
 
 export type RecordStartInput = {
   title: string
+  titleSource?: string
   device: number
   mode: string
   language: string

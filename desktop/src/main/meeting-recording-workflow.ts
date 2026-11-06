@@ -13,15 +13,19 @@ import { recordingCalendarContext, rememberRecordingCalendar } from './participa
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
 
-export async function startMeetingRecordingWorkflow(input: StartRecordingInput = {}): Promise<RecordingState> {
+/** fallbackTitle names the Meeting when it has no title and no Calendar event, such as "Zoom call". */
+export type RecordingWorkflowInput = StartRecordingInput & { fallbackTitle?: string }
+
+export async function startMeetingRecordingWorkflow(input: RecordingWorkflowInput = {}): Promise<RecordingState> {
   const selectedDevice = selectedDeviceIndex(await getDevices(), input.device)
   if (selectedDevice === null) throw new Error(NO_INPUT_DEVICE_ERROR)
   const permissionError = capturePermissionError(await requestCapturePermissions())
   if (permissionError) throw new Error(permissionError)
-  const calendar = await prepareCalendar(input.eventSourceId)
+  const title = input.title?.trim()
+  const calendar = await prepareCalendar(input.eventSourceId, !title)
   await pauseDrains('recording')
   try {
-    await startRecording({ title: recordingTitle(input.title), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
+    await startRecording({ ...recordingTitle(title, calendar?.event?.title, input.fallbackTitle), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
       language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled,
       screenVideoEnabled: getStartupSettings().screenVideoEnabled },
     (id) => { if (calendar) void rememberRecordingCalendar(id, calendar).catch((error) => console.warn('Save recording calendar context:', error)) })
@@ -32,8 +36,8 @@ export async function startMeetingRecordingWorkflow(input: StartRecordingInput =
   }
 }
 
-async function prepareCalendar(eventSourceId?: string) {
-  try { return await recordingCalendarContext(eventSourceId) }
+async function prepareCalendar(eventSourceId: string | undefined, pickCurrent: boolean) {
+  try { return await recordingCalendarContext(eventSourceId, pickCurrent) }
   catch (error) {
     if (eventSourceId) throw error
     console.warn('Read optional recording calendar context:', error)
@@ -52,8 +56,11 @@ function selectedDeviceIndex(devices: Device[], requested?: number): number | nu
   return devices.some((device) => device.index === requested) ? requested : devices[0].index
 }
 
-function recordingTitle(title?: string): string {
-  return title?.trim() || genericMeetingTitle(new Date())
+/** A title the caller chose wins; then the Calendar event's title, which the AI title never replaces. */
+function recordingTitle(title?: string, eventTitle?: string, fallbackTitle?: string): { title: string; titleSource?: 'calendar' } {
+  if (title) return { title }
+  if (eventTitle?.trim()) return { title: eventTitle.trim(), titleSource: 'calendar' }
+  return { title: fallbackTitle?.trim() || genericMeetingTitle(new Date()) }
 }
 
 function recordingLanguage(language?: string): string {

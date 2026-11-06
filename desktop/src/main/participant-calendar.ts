@@ -1,5 +1,6 @@
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { LinkCalendarInput, ParticipantContext } from '../shared/participant-contract'
+import { genericMeetingTitle } from '../shared/meeting-title'
 import { requestCommand } from './app-protocol'
 import { createSecureStore } from './electron-secure-store'
 import { requestDrains } from './drain-coordinator'
@@ -7,6 +8,8 @@ import { googleCalendarSnapshot } from './google/calendar-service'
 
 const STORE_FILE = 'meeting-calendar.enc'
 const EVENT_MARGIN_MS = 15 * 60 * 1000
+/** Recording this long before an event starts still counts as recording that event. */
+const EARLY_START_MS = 5 * 60 * 1000
 type CalendarLinks = { version: 1; meetings: Record<string, ParticipantContext> }
 let queue: Promise<unknown> = Promise.resolve()
 
@@ -34,18 +37,20 @@ export async function linkCalendar(input: LinkCalendarInput): Promise<Participan
   const event = context.candidates.find((candidate) => candidate.sourceId === input.eventSourceId)
   if (input.eventSourceId && !event) throw new Error('Link calendar event: event unavailable. Refresh the meeting and choose a suggested event.')
   return serialize(async () => {
-    await requestCommand('meetings.show', { id: input.id })
+    const { meeting } = await requestCommand('meetings.show', { id: input.id })
     const updated = { ...context, event, inferenceDisabled: !input.eventSourceId }
     await saveContext(await readLinks(), input.id, updated)
+    await requestCommand('meetings.setCalendarTitle', { id: input.id, title: event?.title ?? '', fallback: genericMeetingTitle(new Date(meeting.startedAt)) })
     requestDrains()
     return updated
   })
 }
 
-export async function recordingCalendarContext(eventSourceId?: string): Promise<ParticipantContext> {
+/** With no chosen event and pickCurrent set, links the one Calendar meeting that is on now. */
+export async function recordingCalendarContext(eventSourceId?: string, pickCurrent = false): Promise<ParticipantContext> {
   const { events } = await googleCalendarSnapshot()
   const context = calendarCandidates(events, new Date().toISOString())
-  if (!eventSourceId) return context
+  if (!eventSourceId) return pickCurrent ? { ...context, event: currentMeetingEvent(context.candidates, Date.now()) } : context
   const event = events.find((candidate) => candidate.sourceId === eventSourceId)
   if (!event) throw new Error('Start calendar recording: event unavailable. Refresh Calendar and select the event again.')
   return { event, candidates: context.candidates.some((item) => item.sourceId === eventSourceId) ? context.candidates : [event, ...context.candidates] }
@@ -74,6 +79,18 @@ function calendarCandidates(events: CalendarEventSummary[], startedAt: string, e
   if (saved?.event) retained.add(saved.event.sourceId)
   const candidates = events.filter((event) => retained.has(event.sourceId) || !event.allDay && Date.parse(event.start) <= end + EVENT_MARGIN_MS && Date.parse(event.end) >= start - EVENT_MARGIN_MS)
   return { candidates }
+}
+
+/** The one timed event with other invitees, not declined, that is on now. Two such events are ambiguous, so none is chosen. */
+export function currentMeetingEvent(events: CalendarEventSummary[], now: number): CalendarEventSummary | undefined {
+  const live = new Map<string, CalendarEventSummary>()
+  for (const event of events) {
+    const attendees = event.attendees ?? []
+    if (event.allDay || event.status === 'cancelled' || now < Date.parse(event.start) - EARLY_START_MS || now >= Date.parse(event.end)) continue
+    if (!attendees.some((attendee) => !attendee.self) || attendees.some((attendee) => attendee.self && attendee.responseStatus === 'declined')) continue
+    live.set(event.eventId, event)
+  }
+  return live.size === 1 ? [...live.values()][0] : undefined
 }
 
 async function readLinks(): Promise<CalendarLinks> {

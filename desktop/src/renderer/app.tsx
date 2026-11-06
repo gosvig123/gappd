@@ -107,7 +107,13 @@ function useAppActions(input: ActionInputs): AppActions {
     disconnectCalendar: calendar.disconnect,
     ...updateActions(update),
     dismissAlert: (id) => setDismissals((current) => new Set([...current, id])),
-    setTheme, linkMeetingCalendar,
+    setTheme,
+    // Linking an event renames the Meeting after it, so reload the Meeting.
+    linkMeetingCalendar: async (link) => {
+      const context = await linkMeetingCalendar(link)
+      void window.gappd.meetings.show(link.id).then((meeting) => { rememberMeetingDetail(meeting); dashboard.actions.updateMeeting(meeting) }).catch(console.error)
+      return context
+    },
     // Renames and merges rewrite Meeting transcripts, so reload the Meetings with the People.
     peopleChanged: (people) => { setPeople(people); void dashboard.actions.refreshMeetings().catch(console.error) },
   }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail])

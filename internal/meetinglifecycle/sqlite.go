@@ -45,7 +45,7 @@ func updateArgs(m *db.Meeting, v meetingVersion) []any {
 	}
 }
 
-const updateMeetingSQL = `UPDATE meetings SET title=?, ended_at=?,
+const updateMeetingSQL = `UPDATE meetings SET title=CASE WHEN title_source='calendar' THEN title ELSE ? END, ended_at=?,
 	capture_status=?, capture_status_updated_at=?, capture_failure_message=?,
 	processing_status=?, processing_status_updated_at=?, processing_failure_message=?,
 	transcript=?, transcript_revision=?, summary=?, summary_transcript_revision=?, extraction_json=?

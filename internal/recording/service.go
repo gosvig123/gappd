@@ -46,6 +46,7 @@ type EventSink interface {
 type Request struct {
 	DeviceIdx            int
 	Title                string
+	TitleSource          string // db.TitleSourceCalendar when Title is the Calendar event's title
 	Mode                 capture.CaptureMode
 	Language             string
 	SpeakerLabelsEnabled *bool
@@ -97,7 +98,10 @@ func (s Service) recordingWorkflow() meetingRecordingWorkflow {
 
 func (w meetingRecordingWorkflow) run(ctx context.Context, req Request) error {
 	if req.Title == "" {
-		req.Title = time.Now().Format("2006-01-02 15:04 recording")
+		req.Title, req.TitleSource = time.Now().Format("2006-01-02 15:04 recording"), ""
+	}
+	if req.TitleSource != "" && req.TitleSource != db.TitleSourceCalendar {
+		return fmt.Errorf("start recording: unknown title source %q; use %q or leave it empty", req.TitleSource, db.TitleSourceCalendar)
 	}
 	if req.Mode == "" {
 		req.Mode = capture.ModeBoth
@@ -107,7 +111,7 @@ func (w meetingRecordingWorkflow) run(ctx context.Context, req Request) error {
 	if err != nil {
 		return err
 	}
-	meeting, err := w.startMeeting(req.Title, sessionDir, req.Language, req.SpeakerLabelsEnabled)
+	meeting, err := w.startMeeting(req.Title, req.TitleSource, sessionDir, req.Language, req.SpeakerLabelsEnabled)
 	if err != nil {
 		return errors.Join(err, audioartifact.DeleteSessionUnder(w.baseDir, sessionDir))
 	}

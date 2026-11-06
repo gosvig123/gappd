@@ -123,7 +123,7 @@ function promptForSignal(key: string): void {
 
 async function recordSignal(signal: MeetingSignal): Promise<void> {
   try {
-    const state = await startMeetingRecordingWorkflow({ title: signal.title })
+    const state = await startMeetingRecordingWorkflow({ fallbackTitle: signal.title })
     assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
   } catch (error) {
     showApp()
