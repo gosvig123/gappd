@@ -189,3 +189,72 @@
     flex: 1;
   }
 }
+
+/* Connect an AI: apps on this Mac, then Claude and ChatGPT accounts. */
+.connect-ai-group {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.connect-ai-group + .connect-ai-group {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.connect-ai-group h3 {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.connect-ai-service {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.connect-ai-connected {
+  color: var(--color-success);
+}
+
+.connect-ai-intro {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+/* Kept in the page while empty, so a screen reader announces the text when it appears. */
+.connect-ai-status:empty {
+  margin-block-start: calc(-1 * var(--space-2));
+}
+
+.connect-ai-hint {
+  margin: 0;
+  color: var(--color-text-soft);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.connect-ai-copy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.connect-ai-copy code {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  user-select: all;
+}

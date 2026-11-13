@@ -3,7 +3,7 @@ import { requestCommand } from './app-protocol'
 import { managedRuntime } from './managed-runtime/runtime'
 import { recognizePendingSpeakers } from './speaker-recognition'
 import { usingSummaryRuntime } from './summary-runtime'
-import { logFailure } from './error-log'
+import { logFailure, reportFailure } from './error-log'
 
 const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization', 'summarization']
 // Speaker recognition is a step between speaker detection and notes, so names are filled before
@@ -14,6 +14,11 @@ const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization'
 type DrainStep = ManagedRuntimeCapability | 'speakers'
 const STEPS: DrainStep[] = ['transcription', 'diarization', 'speakers', 'summarization']
 const DRAIN_RETRY_INTERVAL_MS = 60_000
+// Transcription work waits while the Apple speech model is not ready. Only launch and the setup card
+// download the model, so the retry check asks for it again, at most every 5 minutes. A wait longer
+// than an hour is a processing.stalled Error report, sent at most every 10 minutes while it lasts.
+const SPEECH_RETRY_INTERVAL_MS = 5 * 60_000
+const TRANSCRIPTION_STALL_MS = 60 * 60_000
 export type DrainPauseReason = 'recording' | 'sleep'
 type Flight = { capability: DrainStep; controller: AbortController; done?: Promise<void> }
 const pending = new Set<DrainStep>()
@@ -26,6 +31,9 @@ let stopObserving: (() => void) | null = null
 let readinessKey = ''
 let stopped = true
 let speakersIncomplete = false
+let transcriptionWaitSince: number | null = null
+let nextSpeechRetryAt = 0
+let stallLogged = false
 
 /**
  * Registers a listener for Meetings whose processing just finished. It is notified once per drain
@@ -55,6 +63,8 @@ export async function stopDrainCoordinator(): Promise<void> {
   pending.clear()
   pauseCounts.clear()
   speakersIncomplete = false
+  transcriptionWaitSince = null
+  stallLogged = false
   const current = flight
   current?.controller.abort()
   await current?.done
@@ -117,11 +127,32 @@ export async function requestPendingDrains(): Promise<void> {
     for (const capability of result.capabilities) {
       if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
     }
+    noteTranscriptionWait(result.capabilities.includes('transcription') && snapshot.capabilities.transcription.readiness !== 'ready')
   } catch (error) {
     logFailure('processing.pending-check', 'pending processing check failed', error)
   } finally {
     pendingCheckRunning = false
   }
+}
+
+function noteTranscriptionWait(waiting: boolean): void {
+  if (stopped) return
+  if (!waiting) {
+    transcriptionWaitSince = null
+    stallLogged = false
+    return
+  }
+  const now = Date.now()
+  if (now >= nextSpeechRetryAt) {
+    nextSpeechRetryAt = now + SPEECH_RETRY_INTERVAL_MS
+    void managedRuntime.prepare('speech').catch(() => undefined)
+  }
+  transcriptionWaitSince ??= now
+  if (now - transcriptionWaitSince < TRANSCRIPTION_STALL_MS) return
+  const error = new Error('Transcription has waited more than an hour for the Apple speech model')
+  if (stallLogged) return reportFailure('processing.stalled', error)
+  stallLogged = true
+  logFailure('processing.stalled', error.message, error)
 }
 
 function startNextFlight(): void {
@@ -145,11 +176,17 @@ async function runDrain(current: Flight): Promise<void> {
   } catch (error) {
     // A failed or paused speaker detection drain can have finished Meetings before it stopped.
     if (current.capability === 'diarization') requestDrain('speakers')
-    if (!current.controller.signal.aborted) logFailure('processing.drain', `${current.capability} drain failed`, error)
+    // A capability can stop being ready between the pending check and the drain. The next check waits for it.
+    if (isNotReady(error)) console.warn(`${current.capability} drain waits: ${error.message}`)
+    else if (!current.controller.signal.aborted) logFailure('processing.drain', `${current.capability} drain failed`, error)
   } finally {
     if (flight === current) flight = null
     startNextFlight()
   }
+}
+
+function isNotReady(error: unknown): error is Error {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'CAPABILITY_NOT_READY'
 }
 
 async function recognizeSpeakers(signal: AbortSignal): Promise<void> {

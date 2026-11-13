@@ -6,7 +6,7 @@ import type { AgentId } from './agents'
 import type { UsageReportStatus, UsageReportView } from './usage-report'
 import type { ErrorReportStatus, RendererError } from './error-report'
 import type { AIAppId, AIAppStatus } from './ai-apps'
-import type { RemoteAccessStatus } from './remote-access'
+import type { RemoteAccessStatus, RemoteAIServiceId } from './remote-access'
 import type { Agenda, AgendaItem } from './agenda'
 import type { AssignSpeakerInput, ImportPeopleResult, LinkCalendarInput, MergePeopleInput, ParticipantContext, PersonActionItem, SavedPerson, UpdatePersonInput, SpeakerClip, SpeakerClipInput } from './participant-contract'
 export type { ManagedRuntimeSnapshot, RecordingState, UpdateStatus } from './contracts'
@@ -111,6 +111,7 @@ export type IpcInvokeContract = {
   remoteAccess: {
     status: OperationSpec<[], RemoteAccessStatus>
     setEnabled: OperationSpec<[enabled: boolean], RemoteAccessStatus>
+    addToService: OperationSpec<[id: RemoteAIServiceId], RemoteAccessStatus>
   }
   usage: {
     status: OperationSpec<[], UsageReportStatus>
@@ -170,7 +171,7 @@ export const IPC_OPERATIONS = {
     setAgendaAutoDraftEnabled: 'startup:setAgendaAutoDraftEnabled',
   },
   aiApps: { status: 'aiApps:status', connect: 'aiApps:connect', disconnect: 'aiApps:disconnect' },
-  remoteAccess: { status: 'remoteAccess:status', setEnabled: 'remoteAccess:setEnabled' },
+  remoteAccess: { status: 'remoteAccess:status', setEnabled: 'remoteAccess:setEnabled', addToService: 'remoteAccess:addToService' },
   usage: { status: 'usage:status', setSharing: 'usage:setSharing', report: 'usage:report' },
   errorReports: { status: 'errorReports:status', setSharing: 'errorReports:setSharing', report: 'errorReports:report' },
 } as const satisfies IpcOperationChannels

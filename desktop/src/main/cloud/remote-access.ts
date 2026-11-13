@@ -1,6 +1,8 @@
-import type { RemoteAccessState, RemoteAccessStatus } from '../../shared/remote-access'
+import type { RemoteAccessState, RemoteAccessStatus, RemoteAIServiceId } from '../../shared/remote-access'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { AccessTokenVerifier } from './access-token.ts'
+import { remoteAIServiceForClient } from '../../shared/remote-access.ts'
+// @ts-ignore Node type stripping requires explicit TypeScript extension.
+import { AccessTokenVerifier, tokenClientId } from './access-token.ts'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
 import { LocalMcp, rpcError, type LocalMcpCommand } from './local-mcp.ts'
 
@@ -18,6 +20,10 @@ const MAX_ANSWER_BYTES = (4 << 20) - 4096
 // Close codes the cloud sends: the planned end of a connection, and a newer connection that replaced it.
 const PLANNED_END = 1000
 const REPLACED = 1008
+// A service's last use is saved at most this often; the panel shows it in minutes at best.
+const LAST_USED_SAVE_MS = 5 * 60_000
+
+export type LastUsed = Partial<Record<RemoteAIServiceId, string>>
 
 /** What remote access needs from the app: the account, the cloud addresses, the setting and Gappd. */
 export type RemoteAccessDependencies = {
@@ -27,7 +33,10 @@ export type RemoteAccessDependencies = {
   resource(): string
   readEnabled(): boolean
   writeEnabled(enabled: boolean): void
+  readLastUsed(): LastUsed
+  writeLastUsed(lastUsed: LastUsed): void
   command(): LocalMcpCommand
+  now?: () => number
 }
 
 type Frame = { id: number; token: string; body: { id?: unknown; jsonrpc?: unknown; method?: unknown } }
@@ -42,6 +51,7 @@ export class RemoteAccess {
   private readonly verifier = new AccessTokenVerifier()
   private readonly mcp: LocalMcp
   private readonly app: RemoteAccessDependencies
+  private lastUsed: LastUsed | null = null
 
   constructor(app: RemoteAccessDependencies) {
     this.app = app
@@ -49,7 +59,29 @@ export class RemoteAccess {
   }
 
   status(): RemoteAccessStatus {
-    return { enabled: this.app.readEnabled(), state: this.state, address: this.app.resource() }
+    return { enabled: this.app.readEnabled(), state: this.state, address: this.app.resource(), lastUsed: { ...this.readLastUsed() } }
+  }
+
+  private readLastUsed(): LastUsed {
+    this.lastUsed ||= this.app.readLastUsed()
+    return this.lastUsed
+  }
+
+  /** Notes that a known AI service sent a request with a valid Meeting read token, so the panel can show that its setup worked. */
+  private noteUse(token: string): void {
+    const clientId = tokenClientId(token)
+    const service = clientId ? remoteAIServiceForClient(clientId) : null
+    if (!service) return
+    const now = (this.app.now ?? Date.now)()
+    const lastUsed = this.readLastUsed()
+    const previous = Date.parse(lastUsed[service] ?? '')
+    if (Number.isFinite(previous) && now >= previous && now - previous < LAST_USED_SAVE_MS) return
+    lastUsed[service] = new Date(now).toISOString()
+    try {
+      this.app.writeLastUsed({ ...lastUsed })
+    } catch {
+      // The status still shows the use until Gappd quits; a failed save only loses it after that.
+    }
   }
 
   start(): void {
@@ -117,9 +149,13 @@ export class RemoteAccess {
       if (this.socket !== socket) return
       this.socket = null
       if (event.code === REPLACED) {
-        this.app.writeEnabled(false)
         this.state = 'replaced'
         this.mcp.close()
+        try {
+          this.app.writeEnabled(false)
+        } catch {
+          // The state already stops this Mac; the saved setting is fixed when the user turns remote access on or off.
+        }
         return
       }
       const planned = event.code === PLANNED_END
@@ -140,6 +176,7 @@ export class RemoteAccess {
     const id = frame.body.id
     const allowed = await this.verifier.verify(frame.token, { issuer: this.app.issuer(), resource: this.app.resource(), subject })
     if (this.socket !== socket || generation !== this.generation) return
+    if (allowed) this.noteUse(frame.token)
     let answer = allowed
       ? await this.mcp.call(JSON.stringify(frame.body), id)
       : rpcError(id, -32001, 'This token cannot read Meetings on this Mac. Reconnect Gappd in your AI service.')
