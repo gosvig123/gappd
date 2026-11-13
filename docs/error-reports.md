@@ -74,6 +74,13 @@ together and raise `v` when a field changes meaning.
 To report a new failure, call `logFailure('area.step', 'local log message', error)`. The message
 stays in the local log; only the operation and the error's name, code and frames are sent.
 
+Work that waits is not a failure. A drain that finds its capability not ready (error code
+`CAPABILITY_NOT_READY`) writes only a local warning. When Meetings wait for transcription because the
+Apple speech model is not ready, the drain retry check downloads it again at most every 5 minutes;
+after an hour of waiting it sends `processing.stalled`, again every 10 minutes while the wait lasts
+(`desktop/src/main/drain-coordinator.ts`). A later `processing.stalled` with `repeats` above 0 means a
+Mac is still stuck; no new line means it recovered or quit.
+
 ### How it is sent
 
 `desktop/src/main/error-report.ts` sends `POST /errors` at once, with a 10-second timeout. The same
