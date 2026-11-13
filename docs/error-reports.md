@@ -75,11 +75,13 @@ To report a new failure, call `logFailure('area.step', 'local log message', erro
 stays in the local log; only the operation and the error's name, code and frames are sent.
 
 Work that waits is not a failure. A drain that finds its capability not ready (error code
-`CAPABILITY_NOT_READY`) writes only a local warning. When Meetings wait for transcription because the
+`CAPABILITY_NOT_READY`) writes only a local warning; a failed status check is still reported as
+`processing.drain`. When Meetings wait for transcription because the
 Apple speech model is not ready, the drain retry check downloads it again at most every 5 minutes;
-after an hour of waiting it sends `processing.stalled`, again every 10 minutes while the wait lasts
-(`desktop/src/main/drain-coordinator.ts`). A later `processing.stalled` with `repeats` above 0 means a
-Mac is still stuck; no new line means it recovered or quit.
+after an hour of continuous waiting, each pending check reports `processing.stalled`
+(`desktop/src/main/drain-coordinator.ts`). The sender allows at most one report per 10 minutes. A
+report with `repeats` above 0 shows repeated waiting checks. Missing reports do not prove recovery:
+the user can turn reports off, and a busy, rate-limited or failed send is dropped.
 
 ### How it is sent
 

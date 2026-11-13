@@ -168,8 +168,11 @@ async function acquireRuntimeLease(): Promise<ManagedLlamaCppLease> {
 
 function assertCapabilities(snapshot: ManagedRuntimeSnapshot, capabilities: ManagedRuntimeCapability[]): void {
   const missing = capabilities.find((name) => snapshot.capabilities[name].readiness !== 'ready')
+  if (!missing) return
+  const error = new Error(snapshot.capabilities[missing].message || `${missing} is unavailable`)
   // The code marks a capability that is not ready yet: drain work waits for it, so it is not a failure.
-  if (missing) throw Object.assign(new Error(snapshot.capabilities[missing].message || `${missing} is unavailable`), { code: 'CAPABILITY_NOT_READY' })
+  // A failed status check (operation error) stays a failure, so it is still reported.
+  throw snapshot.operation === 'error' ? error : Object.assign(error, { code: 'CAPABILITY_NOT_READY' })
 }
 
 async function releaseUse(lease: ManagedLlamaCppLease | null): Promise<void> {

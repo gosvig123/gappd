@@ -136,6 +136,7 @@ export async function requestPendingDrains(): Promise<void> {
 }
 
 function noteTranscriptionWait(waiting: boolean): void {
+  if (stopped) return
   if (!waiting) {
     transcriptionWaitSince = null
     stallLogged = false
