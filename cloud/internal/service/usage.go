@@ -131,15 +131,16 @@ func usageHandler(limits *Limiter, pool *pgxpool.Pool) http.Handler {
 	})
 }
 
-// UsageTotal is one daily total of one field value. usage_totals() never returns a total under 5.
+// UsageTotal is one weekly total of one field value. Week is the Monday of the ISO week (UTC).
+// usage_totals() never returns a total under 5.
 type UsageTotal struct {
-	Day     string `json:"day"`
+	Week    string `json:"week"`
 	Field   string `json:"field"`
 	Value   string `json:"value"`
 	Reports int64  `json:"reports"`
 }
 
-// ReadUsageTotals returns the daily totals of the last 400 days.
+// ReadUsageTotals returns the weekly totals of the last 400 days.
 func ReadUsageTotals(ctx context.Context, pool *pgxpool.Pool) ([]UsageTotal, error) {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
@@ -150,7 +151,7 @@ func ReadUsageTotals(ctx context.Context, pool *pgxpool.Pool) ([]UsageTotal, err
 	totals := []UsageTotal{}
 	for rows.Next() {
 		var total UsageTotal
-		if err = rows.Scan(&total.Day, &total.Field, &total.Value, &total.Reports); err != nil {
+		if err = rows.Scan(&total.Week, &total.Field, &total.Value, &total.Reports); err != nil {
 			return nil, WithCause("usage totals unavailable", err)
 		}
 		totals = append(totals, total)

@@ -102,8 +102,9 @@ The route uses the writer pool, which can only call `record_usage()`: that funct
 field value's daily total in `usage_daily` and keeps no report. Only the owner can read the table.
 `GET /usage/totals` serves the totals to the private stats dashboard. It exists only when
 `GAPPD_STATS_TOKEN` (32+ characters) is set, needs `Authorization: Bearer <token>` (401 otherwise),
-and uses the read budget. It returns `{"totals":[{day,field,value,reports}]}` from
-`usage_totals()` on the reader pool: the last 400 days, without any total under 5.
+and uses the read budget. It returns `{"totals":[{week,field,value,reports}]}` from
+`usage_totals()` on the reader pool: weekly totals (`week` is the Monday, UTC) of the last 400 days,
+without any total under 5.
 Fields, client behavior and example queries: [usage reports](../docs/usage-reports.md).
 
 ## Error reports
