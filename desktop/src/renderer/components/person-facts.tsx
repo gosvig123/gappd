@@ -104,12 +104,13 @@ function usePersonFacts(personId: string, view: AppView) {
 }
 
 /**
- * Shows the saved summary at once. When the shown facts changed after it was written, it asks the
- * notes provider for a new one, once per set of facts.
+ * Shows the saved summary when it matches the shown facts. Otherwise it asks the notes provider
+ * for a new one, once per set of facts, and never shows the old one: it can hold a hidden fact.
  */
 function usePersonSummary(personId: string, facts: PersonFact[] | null) {
   const [state, setState] = useState<{ text: string; note: string; failed: boolean }>({ text: '', note: '', failed: false })
-  const shownKey = facts?.filter((fact) => !fact.hidden).map((fact) => fact.id).join(',') ?? null
+  // Fact texts, not IDs: a new read of a Meeting can give new texts the same IDs.
+  const shownKey = facts?.filter((fact) => !fact.hidden).map((fact) => `${fact.kind}:${fact.text}`).sort().join('\n') ?? null
   useEffect(() => {
     if (shownKey === null) return
     let active = true
@@ -117,12 +118,11 @@ function usePersonSummary(personId: string, facts: PersonFact[] | null) {
     window.gappd.meetings.personSummary(personId, false)
       .then(async (saved) => {
         if (saved.current) return show(saved.summary)
-        show(saved.summary, 'Updating the summary…')
+        show('', 'Updating the summary…')
         const written = await window.gappd.meetings.personSummary(personId, true)
         show(written.summary)
       })
-      // A failed write keeps the older summary on screen.
-      .catch((cause) => { if (active) setState((current) => ({ ...current, note: `Could not update the summary: ${errorText(cause)}`, failed: true })) })
+      .catch((cause) => show('', `Could not update the summary: ${errorText(cause)}`, true))
     return () => { active = false }
   }, [personId, shownKey])
   return state
