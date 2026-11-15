@@ -62,8 +62,29 @@ type PersonFact struct {
 	Hidden       bool     `json:"hidden"`
 }
 
+// PersonFactsResponse holds a Person's facts. EarlierMeetings counts their Meetings saved before
+// Person facts and not read; PendingMeetings counts the ones the background step still reads.
 type PersonFactsResponse struct {
-	Facts []PersonFact `json:"facts"`
+	Facts           []PersonFact `json:"facts"`
+	EarlierMeetings int          `json:"earlierMeetings"`
+	PendingMeetings int          `json:"pendingMeetings"`
+}
+
+type QueuePersonFactsInput struct {
+	ID string `json:"id"`
+}
+
+// PersonSummaryInput reads the saved About summary; Write writes a new one when it is not current.
+type PersonSummaryInput struct {
+	ID    string `json:"id"`
+	Write bool   `json:"write,omitempty"`
+}
+
+// PersonSummaryResponse is the About summary. Current is false when the shown facts changed
+// after it was written.
+type PersonSummaryResponse struct {
+	Summary string `json:"summary"`
+	Current bool   `json:"current"`
 }
 
 func BuildPersonFacts(person string, facts []db.PersonFact) []PersonFact {

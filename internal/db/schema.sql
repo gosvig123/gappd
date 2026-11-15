@@ -149,6 +149,13 @@ CREATE TABLE IF NOT EXISTS person_facts (
     hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_person_facts_speaker ON person_facts(meeting_id, speaker_key);
+-- The About summary of a Person, written from the text of their shown facts (facts_key).
+CREATE TABLE IF NOT EXISTS person_summaries (
+    person_id TEXT PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE,
+    facts_key TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 -- One row per Meeting whose transcript revision was read for Person facts. 'skipped' marks a
 -- Meeting that existed before Person facts, which is read only on request.
 CREATE TABLE IF NOT EXISTS person_fact_runs (

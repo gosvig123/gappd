@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appPersonFactsCmd(), appExtractPersonFactsCmd(), appHidePersonFactCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsSetCalendarTitleCmd(), appMeetingsDeleteCmd(), appMeetingsSetLanguageCmd())
+	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appPersonFactsCmd(), appExtractPersonFactsCmd(), appHidePersonFactCmd(), appQueuePersonFactsCmd(), appPersonSummaryCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsSetCalendarTitleCmd(), appMeetingsDeleteCmd(), appMeetingsSetLanguageCmd())
 	return cmd
 }
 

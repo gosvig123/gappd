@@ -46,6 +46,25 @@ func appHidePersonFactCmd() *cobra.Command {
 	return cmd
 }
 
+func appQueuePersonFactsCmd() *cobra.Command {
+	cmd := meetingJSONCommand("queue-person-facts [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		if _, err := personName(store, args[0]); err != nil {
+			return err
+		}
+		if err := store.QueueEarlierPersonFacts(args[0]); err != nil {
+			return err
+		}
+		return writePersonFacts(store, args[0])
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	return cmd
+}
+
 func writePersonFacts(store *db.DB, personID string) error {
 	name, err := personName(store, personID)
 	if err != nil {
@@ -55,7 +74,77 @@ func writePersonFacts(store *db.DB, personID string) error {
 	if err != nil {
 		return err
 	}
-	return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(name, facts)})
+	earlier, pending, err := store.PersonFactMeetings(personID)
+	if err != nil {
+		return err
+	}
+	return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(name, facts), EarlierMeetings: earlier, PendingMeetings: pending})
+}
+
+func appPersonSummaryCmd() *cobra.Command {
+	var write bool
+	cmd := meetingJSONCommand("person-summary [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		return runPersonSummary(args[0], write)
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().BoolVar(&write, "write", false, "Write a new summary with the notes provider when the facts changed")
+	return cmd
+}
+
+// runPersonSummary gives the saved About summary, and with write replaces it when the shown facts
+// changed after it was written.
+func runPersonSummary(personID string, write bool) error {
+	ctx, stop := signal.NotifyContext(cmdContext(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	cfg, store, err := loadStore()
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if _, err := personName(store, personID); err != nil {
+		return err
+	}
+	facts, err := store.PersonFacts(personID)
+	if err != nil {
+		return err
+	}
+	summary, savedKey, err := store.PersonSummary(personID)
+	if err != nil {
+		return err
+	}
+	key := db.PersonFactsKey(facts)
+	if key == savedKey || !write {
+		return writeJSON(appprotocol.PersonSummaryResponse{Summary: summary, Current: key == savedKey})
+	}
+	shown := make([]string, 0, len(facts))
+	language := ""
+	for _, fact := range facts {
+		if fact.Hidden {
+			continue
+		}
+		if language == "" {
+			language = fact.Language
+		}
+		shown = append(shown, fmt.Sprintf("%s (%s, %s)", fact.Text, fact.Kind, fact.StartedAt[:min(10, len(fact.StartedAt))]))
+	}
+	if len(shown) > 0 {
+		provider, err := newAIProvider(cfg.AI)
+		if err != nil {
+			return fmt.Errorf("write person summary: %w; choose a notes provider in Settings", err)
+		}
+		if err := provider.Available(); err != nil {
+			return fmt.Errorf("write person summary: notes provider is not ready: %w", err)
+		}
+		if summary, err = ai.SummarizePerson(ctx, provider, shown, language); err != nil {
+			return err
+		}
+	} else {
+		summary = ""
+	}
+	if err := store.SavePersonSummary(personID, key, summary); err != nil {
+		return err
+	}
+	return writeJSON(appprotocol.PersonSummaryResponse{Summary: summary, Current: true})
 }
 
 func appExtractPersonFactsCmd() *cobra.Command {

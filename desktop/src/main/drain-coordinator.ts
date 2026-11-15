@@ -26,6 +26,7 @@ export type DrainPauseReason = 'recording' | 'sleep'
 type Flight = { capability: DrainStep; controller: AbortController; done?: Promise<void> }
 const pending = new Set<DrainStep>()
 const observers = new Set<() => void>()
+const factObservers = new Set<(at: number) => void>()
 const pauseCounts = new Map<DrainPauseReason, number>()
 let flight: Flight | null = null
 let pendingCheckRunning = false
@@ -45,6 +46,17 @@ let stallLogged = false
  */
 export function onMeetingProcessingFinished(observer: () => void): void {
   observers.add(observer)
+}
+
+/** Registers a listener for saved Person facts, called with the save time; it returns the unsubscribe function. */
+export function onPersonFactsChanged(listener: (at: number) => void): () => void {
+  factObservers.add(listener)
+  return () => { factObservers.delete(listener) }
+}
+
+/** For Meetings queued for Person facts outside the processing flow. */
+export function requestPersonFacts(): void {
+  requestFacts()
 }
 
 export function startDrainCoordinator(): void {
@@ -221,6 +233,7 @@ async function extractPersonFacts(signal: AbortSignal): Promise<void> {
     }
     const result = await usingSummaryRuntime((env) => requestCommand('meetings.extractPersonFacts', {}, env, signal))
     factsIncomplete = result.failed > 0
+    if (result.completed > 0) for (const listener of factObservers) listener(Date.now())
   } catch (error) {
     // A paused pass is queued again; a failed one repeats on the retry interval.
     factsIncomplete = !signal.aborted

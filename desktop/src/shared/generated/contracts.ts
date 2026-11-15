@@ -59,6 +59,8 @@ export type PersonFactsInput = {
 
 export type PersonFactsResponse = {
   facts: PersonFact[]
+  earlierMeetings: number
+  pendingMeetings: number
 }
 
 export type PersonFact = {
@@ -77,6 +79,20 @@ export type HidePersonFactInput = {
   id: string
   fact: number
   hidden: boolean
+}
+
+export type QueuePersonFactsInput = {
+  id: string
+}
+
+export type PersonSummaryInput = {
+  id: string
+  write?: boolean
+}
+
+export type PersonSummaryResponse = {
+  summary: string
+  current: boolean
 }
 
 export type ExtractPersonFactsInput = {

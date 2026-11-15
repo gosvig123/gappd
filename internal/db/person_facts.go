@@ -2,9 +2,12 @@ package db
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -38,15 +41,82 @@ type PersonFact struct {
 	Text         string
 	Quotes       []string
 	Hidden       bool
+	Language     string
+}
+
+// personFactTargetSQL selects a Meeting m with current notes whose transcript revision still needs
+// Person facts. Its arguments are ProcessingStatusCompleted and maxPersonFactAttempts.
+const personFactTargetSQL = `m.processing_status=? AND json_valid(m.extraction_json) AND m.summary_transcript_revision=m.transcript_revision
+ AND NOT EXISTS (SELECT 1 FROM person_fact_runs r WHERE r.meeting_id=m.id AND r.transcript_revision=m.transcript_revision
+  AND (r.state<>'failed' OR r.attempts>=?))`
+
+// PersonFactMeetings counts the Meetings of one Person that were saved before Person facts and
+// are not read (earlier), and the ones the background step still has to read (pending).
+func (d *DB) PersonFactMeetings(personID string) (earlier, pending int, err error) {
+	err = d.Conn.QueryRow(`SELECT
+ (SELECT count(*) FROM meetings m JOIN person_fact_runs r ON r.meeting_id=m.id
+  WHERE r.state='skipped' AND r.transcript_revision=m.transcript_revision AND m.processing_status=? AND json_valid(m.extraction_json)
+  AND m.id IN (SELECT meeting_id FROM meeting_speakers WHERE person_id=?)),
+ (SELECT count(*) FROM meetings m WHERE `+personFactTargetSQL+` AND m.id IN (SELECT meeting_id FROM meeting_speakers WHERE person_id=?))`,
+		ProcessingStatusCompleted, personID, ProcessingStatusCompleted, maxPersonFactAttempts, personID).Scan(&earlier, &pending)
+	if err != nil {
+		return 0, 0, fmt.Errorf("count meetings for facts of person %s: %w", personID, err)
+	}
+	return earlier, pending, nil
+}
+
+// QueueEarlierPersonFacts lets the background step read the earlier Meetings of one Person.
+func (d *DB) QueueEarlierPersonFacts(personID string) error {
+	_, err := d.Conn.Exec(`DELETE FROM person_fact_runs WHERE state='skipped'
+ AND meeting_id IN (SELECT meeting_id FROM meeting_speakers WHERE person_id=?)`, personID)
+	if err != nil {
+		return fmt.Errorf("read earlier meetings of person %s: %w", personID, err)
+	}
+	return nil
+}
+
+// PersonSummary gives the saved About summary of a Person and the facts key it was written from.
+func (d *DB) PersonSummary(personID string) (summary, factsKey string, err error) {
+	err = d.Conn.QueryRow(`SELECT summary, facts_key FROM person_summaries WHERE person_id=?`, personID).Scan(&summary, &factsKey)
+	if err == sql.ErrNoRows {
+		return "", "", nil
+	}
+	if err != nil {
+		return "", "", fmt.Errorf("read summary of person %s: %w", personID, err)
+	}
+	return summary, factsKey, nil
+}
+
+// SavePersonSummary saves the About summary written from the facts with factsKey.
+func (d *DB) SavePersonSummary(personID, factsKey, summary string) error {
+	_, err := d.Conn.Exec(`INSERT INTO person_summaries(person_id, facts_key, summary, updated_at) VALUES (?,?,?,?)
+ON CONFLICT(person_id) DO UPDATE SET facts_key=excluded.facts_key, summary=excluded.summary, updated_at=excluded.updated_at`,
+		personID, factsKey, summary, stamp(time.Now()))
+	if err != nil {
+		return fmt.Errorf("save summary of person %s: %w", personID, err)
+	}
+	return nil
+}
+
+// PersonFactsKey identifies the shown facts by their text, so a new read with the same facts
+// keeps the summary.
+func PersonFactsKey(facts []PersonFact) string {
+	texts := make([]string, 0, len(facts))
+	for _, fact := range facts {
+		if !fact.Hidden {
+			texts = append(texts, fact.Kind+":"+factText(fact.Text))
+		}
+	}
+	slices.Sort(texts)
+	sum := sha256.Sum256([]byte(strings.Join(texts, "\n")))
+	return hex.EncodeToString(sum[:])
 }
 
 // PersonFactTargets lists Meetings with current notes whose transcript revision has no Person
 // facts yet, newest first. A failed Meeting comes back until it failed maxPersonFactAttempts times.
 func (d *DB) PersonFactTargets() ([]PersonFactTarget, error) {
 	rows, err := d.Conn.Query(`SELECT m.id, m.transcript_revision, m.language FROM meetings m
-LEFT JOIN person_fact_runs r ON r.meeting_id=m.id
-WHERE m.processing_status=? AND json_valid(m.extraction_json) AND m.summary_transcript_revision=m.transcript_revision
- AND (r.meeting_id IS NULL OR r.transcript_revision<>m.transcript_revision OR (r.state='failed' AND r.attempts<?))
+WHERE `+personFactTargetSQL+`
 ORDER BY m.started_at DESC`, ProcessingStatusCompleted, maxPersonFactAttempts)
 	if err != nil {
 		return nil, fmt.Errorf("list meetings for person facts: %w", err)
@@ -212,7 +282,7 @@ ON CONFLICT(meeting_id) DO UPDATE SET
 // to the Person labeled on its speaker in its Meeting, so a relabel or merge moves it without a
 // new read. A fact repeated in several Meetings is listed once, from the newest.
 func (d *DB) PersonFacts(personID string) ([]PersonFact, error) {
-	rows, err := d.Conn.Query(`SELECT f.id, m.id, COALESCE(m.title,''), m.started_at, f.kind, f.text, f.quotes_json, f.hidden
+	rows, err := d.Conn.Query(`SELECT f.id, m.id, COALESCE(m.title,''), m.started_at, f.kind, f.text, f.quotes_json, f.hidden, m.language
 FROM person_facts f
 JOIN meeting_speakers s ON s.meeting_id=f.meeting_id AND s.speaker_key=f.speaker_key
 JOIN meetings m ON m.id=f.meeting_id
@@ -227,7 +297,7 @@ ORDER BY m.started_at DESC, f.id`, personID)
 	for rows.Next() {
 		var fact PersonFact
 		var quotes string
-		if err := rows.Scan(&fact.ID, &fact.MeetingID, &fact.MeetingTitle, &fact.StartedAt, &fact.Kind, &fact.Text, &quotes, &fact.Hidden); err != nil {
+		if err := rows.Scan(&fact.ID, &fact.MeetingID, &fact.MeetingTitle, &fact.StartedAt, &fact.Kind, &fact.Text, &quotes, &fact.Hidden, &fact.Language); err != nil {
 			return nil, fmt.Errorf("list facts of person %s: %w", personID, err)
 		}
 		key := factText(fact.Text)

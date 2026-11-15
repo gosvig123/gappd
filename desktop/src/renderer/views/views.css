@@ -100,4 +100,6 @@
 .app-fact:is(:hover, :focus-within) .app-fact-hide, .app-fact.is-hidden .app-fact-hide { opacity: 1; }
 .app-fact.is-hidden .app-fact-text { color: var(--color-text-muted); text-decoration: line-through; }
 .app-fact-quote { margin: var(--space-1) 0 0; padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--color-accent-border-strong); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-fact-summary { margin: 0; font-size: var(--font-size-body); line-height: 1.5; }
+.app-fact-earlier { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 .app-fact-hidden-toggle { margin-inline-start: auto; font-size: var(--font-size-small); }
