@@ -54,7 +54,7 @@ function LocalApps() {
           <span className="startup-setting-copy"><strong>{app.name}</strong><span className={app.state === 'error' ? 'danger' : undefined}>{app.error ?? `${APP_KIND[app.id] ?? ''} ${appStateText(app.state)}`.trim()}</span></span>
           {app.state === 'error'
             ? <Button variant="secondary" aria-label={`Check ${app.name} again`} disabled={busy !== null} onClick={() => void checkAgain(app)}>{busy === app.id ? 'Checking…' : 'Check again'}</Button>
-            : <Button variant={app.state === 'on' ? 'secondary' : 'primary'} aria-label={`${appButtonText(app.state)} ${app.name}`} disabled={busy !== null} onClick={() => void change(app)}>{busy === app.id ? 'Working…' : appButtonText(app.state)}</Button>}
+            : <Button aria-label={`${appButtonText(app.state)} ${app.name}`} disabled={busy !== null} onClick={() => void change(app)}>{busy === app.id ? 'Working…' : appButtonText(app.state)}</Button>}
         </div>
       ))}
       {apps && missing.length > 0 ? (
@@ -119,7 +119,7 @@ function RemoteServices() {
           <div className="connect-ai-service" key={service.id}>
             <div className="startup-setting ai-app-row">
               <span className="startup-setting-copy"><strong>{service.name}</strong><span>{text.where}</span><span className={connected ? 'connect-ai-connected' : undefined}>{serviceText(connected, service.name, lastUsed)}</span></span>
-              <Button variant={connected ? 'secondary' : 'primary'} disabled={busy !== null} onClick={() => void add(service.id, service.name)}>
+              <Button disabled={busy !== null} onClick={() => void add(service.id, service.name)}>
                 {busy === service.id ? 'Opening…' : `Add to ${service.name}`}
               </Button>
             </div>

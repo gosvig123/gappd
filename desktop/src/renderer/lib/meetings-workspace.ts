@@ -6,19 +6,24 @@ import { calendarEventKey } from '../../shared/calendar-contract.ts'
 export type CalendarTarget = { key: string; sourceId: string; title: string; start: string; accountEmail: string }
 export type WorkspaceRow = { key: string; title: string; start: string; searchText: string } & (
   | { kind: 'meeting'; meeting: MeetingListItem; event?: CalendarEventSummary }
-  | { kind: 'planned'; target: CalendarTarget }
+  | { kind: 'planned'; target: CalendarTarget; end: string }
 )
-type WorkspaceData = { meetings: MeetingListItem[]; meetingEvents: Map<string, CalendarEventSummary>; calendar: CalendarSnapshot | null }
+type WorkspaceData = { meetings: MeetingListItem[]; meetingEvents: Map<string, CalendarEventSummary>; calendar: CalendarSnapshot | null; agendas?: Record<string, unknown> | null }
 
-/** Only confirmed Calendar links collapse an event row into an existing Meeting. */
+/**
+ * Only confirmed Calendar links collapse an event row into an existing Meeting.
+ * A past event that was not recorded stays in history only when it has a saved Agenda.
+ */
 export function workspaceRows(data: WorkspaceData, now = new Date()): { upcoming: WorkspaceRow[]; history: WorkspaceRow[] } {
   const linked = new Set(data.meetings.flatMap(meeting => {
     const event = data.meetingEvents.get(meeting.id)
     return event ? [calendarEventKey(event)] : []
   }))
-  const events = (data.calendar?.events ?? []).filter(event => new Date(event.end).getTime() >= now.getTime())
-  const upcoming = events.filter(event => !linked.has(calendarEventKey(event))).map(eventRow)
-  const history = data.meetings.map(meeting => meetingRow(meeting, data.meetingEvents.get(meeting.id)))
+  const unrecorded = (data.calendar?.events ?? []).filter(event => !linked.has(calendarEventKey(event)))
+  const ended = (event: CalendarEventSummary) => new Date(event.end).getTime() < now.getTime()
+  const upcoming = unrecorded.filter(event => !ended(event)).map(eventRow)
+  const pastAgendas = unrecorded.filter(event => ended(event) && data.agendas?.[calendarEventKey(event)]).map(eventRow)
+  const history = [...data.meetings.map(meeting => meetingRow(meeting, data.meetingEvents.get(meeting.id))), ...pastAgendas]
   return { upcoming: upcoming.sort(ascending), history: history.sort((a, b) => ascending(b, a)) }
 }
 
@@ -33,7 +38,7 @@ export function currentEvent(target: CalendarTarget, calendar: CalendarSnapshot 
 
 function eventRow(event: CalendarEventSummary): WorkspaceRow {
   const target = { key: calendarEventKey(event), sourceId: event.sourceId, title: event.title, start: event.start, accountEmail: event.accountEmail }
-  return { key: `event:${target.key}`, title: target.title, start: target.start, kind: 'planned', target, searchText: eventText(event) }
+  return { key: `event:${target.key}`, title: target.title, start: target.start, end: event.end, kind: 'planned', target, searchText: eventText(event) }
 }
 
 function meetingRow(meeting: MeetingListItem, event: CalendarEventSummary | undefined): WorkspaceRow {

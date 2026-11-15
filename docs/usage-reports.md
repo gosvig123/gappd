@@ -58,8 +58,11 @@ retention period.
 
 The private stats dashboard (`stats.getgappd.com`, in the `gappd-site` repository) shows these
 totals. It reads them from `GET /usage/totals` with the `GAPPD_STATS_TOKEN` bearer token. The
-route calls `usage_totals()` (migration 015): the daily totals of the last 400 days, without any
-total under 5. The reader role can call that function but still cannot read `usage_daily`.
+route calls `usage_totals()` (migrations 015 and 017): the weekly totals of the last 400 days (each
+ISO week by its Monday, UTC), without any total under 5. Daily totals hid almost everything, because
+a day rarely has 5 reports of one value. Weeks do not overlap and the filter runs after the sum, so
+no hidden total can be found by subtracting one total from another. The reader role can call that
+function but still cannot read `usage_daily`.
 
 Each install sends at most one report per day, so the reports for a day equal the installs that ran
 on the day before (or on their last day of use, when the app was closed for a while). To query by

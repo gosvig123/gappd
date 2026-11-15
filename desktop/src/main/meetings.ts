@@ -1,7 +1,8 @@
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
-import type { AssignSpeakerInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
+import type { AssignSpeakerInput, HidePersonFactInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
-import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
+import { requestDrains, requestPersonFacts, requestSpeakerRecognition } from './drain-coordinator'
+import { usingSummaryRuntime } from './summary-runtime'
 import { forgetMeetingCalendar } from './participant-calendar'
 import { forgetAgendaMeeting } from './agenda'
 import { logFailure } from './error-log'
@@ -65,6 +66,39 @@ export async function updatePerson(input: UpdatePersonInput) {
 
 export async function personActionItems(id: string) {
   return (await requestCommand('meetings.personActionItems', { id })).items
+}
+
+export async function personFacts(id: string) {
+  return requestCommand('meetings.personFacts', { id })
+}
+
+export async function hidePersonFact(input: HidePersonFactInput) {
+  return requestCommand('meetings.hidePersonFact', input)
+}
+
+// The background step reads the queued Meetings; the page hears of new facts from onPersonFactsChanged.
+export async function queuePersonFacts(id: string) {
+  const facts = await requestCommand('meetings.queuePersonFacts', { id })
+  requestPersonFacts()
+  return facts
+}
+
+const summaryWrites = new Map<string, ReturnType<typeof writePersonSummary>>()
+
+// Writing a summary uses the notes provider, so it needs Local AI when that is the provider.
+// Writes for one Person run one after another. A write that finds the facts unchanged returns the
+// saved summary without the provider, so a page opened again during a write costs no second call,
+// and a Hide during a write still gets a summary of the facts shown after it.
+export async function personSummary(id: string, write: boolean) {
+  if (!write) return requestCommand('meetings.personSummary', { id })
+  const previous = summaryWrites.get(id)
+  const next = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() => writePersonSummary(id))
+  summaryWrites.set(id, next)
+  return next.finally(() => { if (summaryWrites.get(id) === next) summaryWrites.delete(id) })
+}
+
+function writePersonSummary(id: string) {
+  return usingSummaryRuntime((env) => requestCommand('meetings.personSummary', { id, write: true }, env))
 }
 
 export async function mergePeople(input: MergePeopleInput) {

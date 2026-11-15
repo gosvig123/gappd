@@ -28,7 +28,7 @@ All inference stays on the Mac. Network access is used for application updates a
 
 ### Electron desktop
 
-`desktop/src/renderer` owns user interface state: `views/` holds the top-level screens (Today, Meetings, People, Settings), `components/` holds shared pieces with `meeting/` and `settings/` subfolders, and `hooks/` and `lib/` hold state and pure helpers. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
+`desktop/src/renderer` owns user interface state: `views/` holds the top-level screens (Meetings, which is home, People, Settings), `components/` holds shared pieces with `meeting/` and `settings/` subfolders, and `hooks/` and `lib/` hold state and pure helpers. A context-isolated preload exposes typed Inter-Process Communication (IPC) operations from `desktop/src/shared/ipc-contract.ts`.
 
 `desktop/src/main` owns operating-system integration and process orchestration:
 

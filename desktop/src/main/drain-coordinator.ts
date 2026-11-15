@@ -11,8 +11,11 @@ const CAPABILITIES: ManagedRuntimeCapability[] = ['transcription', 'diarization'
 // change a Meeting's speaker names changed (launch, speaker detection, a user edit, a deleted
 // Meeting) and before notes work, which covers a Meeting a pass skipped while it was claimed. A
 // pass with a failed Meeting repeats on the retry interval.
-type DrainStep = ManagedRuntimeCapability | 'speakers'
-const STEPS: DrainStep[] = ['transcription', 'diarization', 'speakers', 'summarization']
+// Person facts come last: they read the labeled transcript after its notes are current. The step
+// runs on launch, on a readiness change, after a notes drain, and on the retry interval while a
+// Meeting failed; it counts waiting Meetings first, so it starts Local AI only for real work.
+type DrainStep = ManagedRuntimeCapability | 'speakers' | 'facts'
+const STEPS: DrainStep[] = ['transcription', 'diarization', 'speakers', 'summarization', 'facts']
 const DRAIN_RETRY_INTERVAL_MS = 60_000
 // Transcription work waits while the Apple speech model is not ready. Only launch and the setup card
 // download the model, so the retry check asks for it again, at most every 5 minutes. A wait longer
@@ -23,6 +26,7 @@ export type DrainPauseReason = 'recording' | 'sleep'
 type Flight = { capability: DrainStep; controller: AbortController; done?: Promise<void> }
 const pending = new Set<DrainStep>()
 const observers = new Set<() => void>()
+const factObservers = new Set<(at: number) => void>()
 const pauseCounts = new Map<DrainPauseReason, number>()
 let flight: Flight | null = null
 let pendingCheckRunning = false
@@ -31,6 +35,7 @@ let stopObserving: (() => void) | null = null
 let readinessKey = ''
 let stopped = true
 let speakersIncomplete = false
+let factsIncomplete = false
 let transcriptionWaitSince: number | null = null
 let nextSpeechRetryAt = 0
 let stallLogged = false
@@ -41,6 +46,17 @@ let stallLogged = false
  */
 export function onMeetingProcessingFinished(observer: () => void): void {
   observers.add(observer)
+}
+
+/** Registers a listener for saved Person facts, called with the save time; it returns the unsubscribe function. */
+export function onPersonFactsChanged(listener: (at: number) => void): () => void {
+  factObservers.add(listener)
+  return () => { factObservers.delete(listener) }
+}
+
+/** For Meetings queued for Person facts outside the processing flow. */
+export function requestPersonFacts(): void {
+  requestFacts()
 }
 
 export function startDrainCoordinator(): void {
@@ -63,6 +79,7 @@ export async function stopDrainCoordinator(): Promise<void> {
   pending.clear()
   pauseCounts.clear()
   speakersIncomplete = false
+  factsIncomplete = false
   transcriptionWaitSince = null
   stallLogged = false
   const current = flight
@@ -101,7 +118,12 @@ function requestReadinessChange(snapshot: ManagedRuntimeSnapshot): void {
   const next = CAPABILITIES.map((name) => snapshot.capabilities[name].readiness).join(':')
   if (next === readinessKey) return
   readinessKey = next
+  requestFacts(snapshot)
   void requestPendingDrains()
+}
+
+function requestFacts(snapshot: ManagedRuntimeSnapshot = managedRuntime.status()): void {
+  if (snapshot.capabilities.summarization.readiness === 'ready') requestDrain('facts')
 }
 
 function requestReadyDrains(snapshot: ManagedRuntimeSnapshot): void {
@@ -124,6 +146,7 @@ export async function requestPendingDrains(): Promise<void> {
     if (speakersIncomplete && flight?.capability !== 'speakers') requestDrain('speakers')
     const result = await requestCommand('processing.pending', {})
     const snapshot = managedRuntime.status()
+    if (factsIncomplete) requestFacts(snapshot)
     for (const capability of result.capabilities) {
       if (capability === 'diarization' || snapshot.capabilities[capability].readiness === 'ready') requestDrain(capability)
     }
@@ -168,8 +191,10 @@ function startNextFlight(): void {
 async function runDrain(current: Flight): Promise<void> {
   try {
     if (current.capability === 'speakers') return await recognizeSpeakers(current.controller.signal)
+    if (current.capability === 'facts') return await extractPersonFacts(current.controller.signal)
     const result = await drainCapability(current, current.capability)
     if (result.completed > 0) for (const observer of observers) observer()
+    if (current.capability === 'summarization' && result.completed > 0) requestFacts()
     if (current.capability === 'transcription' && result.completed > 0) requestDrain('diarization')
     if (current.capability === 'diarization' && result.completed > 0) requestDrain('speakers')
     if (current.capability === 'diarization' && result.completed + result.failed > 0) requestDrain('summarization')
@@ -195,6 +220,25 @@ async function recognizeSpeakers(signal: AbortSignal): Promise<void> {
   } catch (error) {
     // A paused pass is queued again; a failed one repeats on the retry interval.
     speakersIncomplete = !signal.aborted
+    throw error
+  }
+}
+
+async function extractPersonFacts(signal: AbortSignal): Promise<void> {
+  try {
+    const { pending } = await requestCommand('meetings.extractPersonFacts', { count: true }, {}, signal)
+    if (!pending) {
+      factsIncomplete = false
+      return
+    }
+    const result = await usingSummaryRuntime((env) => requestCommand('meetings.extractPersonFacts', {}, env, signal))
+    factsIncomplete = result.failed > 0
+    if (result.completed > 0) for (const listener of factObservers) listener(Date.now())
+    // Each run reads one Meeting; queue the next after any waiting step, such as new notes.
+    if (result.completed > 0 && result.pending > 0) requestFacts()
+  } catch (error) {
+    // A paused pass is queued again; a failed one repeats on the retry interval.
+    factsIncomplete = !signal.aborted
     throw error
   }
 }

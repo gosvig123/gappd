@@ -43,7 +43,16 @@ export function FeaturePrompt({ view, account, setupOpen, notesReady }: { view: 
   return null
 }
 
-function PromptCard({ id, title, children, actions }: { id: string; title: string; children: ReactNode; actions: ReactNode }) {
+/**
+ * A prompt with an `expandLabel` starts as one line (title and buttons), so it does
+ * not push the Meetings list down; its button opens the full card with the choices.
+ */
+function PromptCard({ id, title, children, actions, expandLabel }: { id: string; title: string; children: ReactNode; actions: ReactNode; expandLabel?: string }) {
+  const [expanded, setExpanded] = useState(false)
+  if (expandLabel && !expanded) return <section className="setup-checklist feature-prompt is-compact" aria-labelledby={id}>
+    <h2 id={id}>{title}</h2>
+    <div className="setup-step-actions"><Button variant="primary" onClick={() => setExpanded(true)}>{expandLabel}</Button>{actions}</div>
+  </section>
   return <section className="setup-checklist feature-prompt ui-scroll" aria-labelledby={id}>
     <div className="setup-step-body">
       <h2 id={id}>{title}</h2>
@@ -65,7 +74,7 @@ function NotesPrompt({ view, onAnswer, onHide }: { view: AppView; onAnswer: () =
   if (on || choice.saved) return <PromptCard id="notes-prompt-title" title="Notes are on" actions={<Button onClick={onAnswer}>Done</Button>}>
     <p>Gappd writes notes for your Meetings, also the ones you already recorded. Change where notes are made in Settings › Meeting processing.</p>
   </PromptCard>
-  return <PromptCard id="notes-prompt-title" title="Your transcript is ready. Get notes too?" actions={preparing ? <Button onClick={onHide}>Hide</Button> : <Button disabled={choice.busy !== null} onClick={onAnswer}>Not now</Button>}>
+  return <PromptCard id="notes-prompt-title" title="Your transcript is ready. Get notes too?" expandLabel="Set up notes" actions={preparing ? <Button onClick={onHide}>Hide</Button> : <Button disabled={choice.busy !== null} onClick={onAnswer}>Not now</Button>}>
     <p>Gappd can turn each transcript into notes: a summary, decisions, and action items. It writes them for the Meetings you already recorded too.</p>
     <NotesChoicePanel view={view} choice={choice} />
     {preparing ? null : <p className="setup-step-note">Not now keeps transcripts only. You can turn on notes later in Settings.</p>}
@@ -76,7 +85,7 @@ function NotesPrompt({ view, onAnswer, onHide }: { view: AppView; onAnswer: () =
 function AIAppsPrompt({ aiApps, onClose }: { aiApps: ReturnType<typeof useAIApps>; onClose: () => void }) {
   const installed = (aiApps.apps ?? []).filter((app) => app.state !== 'missing')
   const connected = installed.some((app) => app.state === 'on')
-  return <PromptCard id="ai-apps-prompt-title" title="Ask your AI app about your Meetings" actions={<Button onClick={onClose}>{connected ? 'Done' : 'Not now'}</Button>}>
+  return <PromptCard id="ai-apps-prompt-title" title="Ask your AI app about your Meetings" expandLabel={connected ? undefined : 'Connect an AI app'} actions={<Button onClick={onClose}>{connected ? 'Done' : 'Not now'}</Button>}>
     <p>Connect an AI app on this Mac, then ask it things like "What did we decide in my last meeting?" It reads your Meetings through Gappd on this Mac, only when you ask.</p>
     <div className="feature-prompt-apps">
       {installed.map((app) => <div className="feature-prompt-app" key={app.id}>

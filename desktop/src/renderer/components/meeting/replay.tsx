@@ -30,7 +30,7 @@ export function ReplayNote({ meeting }: { meeting: MeetingDetail }) {
   </section>
 }
 
-/** The Recording tab: Screen video and controls beside a column that shows the transcript, following playback, or the people. */
+/** The Transcript tab: Screen video and controls beside a column that shows the transcript, following playback, or the people. */
 export function MeetingReplay({ meeting, seekTo, startSec, onTimeChange, people, children }: { meeting: MeetingDetail; seekTo: { sec: number; request: number } | null; startSec: number; onTimeChange: (sec: number) => void; people: ReactNode; children: ReactNode }) {
   const player = useRef<HTMLDivElement>(null)
   const transcript = useRef<HTMLDivElement>(null)

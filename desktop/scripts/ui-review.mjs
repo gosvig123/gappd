@@ -18,10 +18,9 @@ const settle = () => new Promise((done) => setTimeout(done, 800))
 const meeting = [['click-prefix', 'Meetings'], ['click-prefix', 'SYNTHETIC']]
 const settings = [['click-text', 'Settings']]
 const views = [
-  { name: 'Today', steps: [['click-prefix', 'Today']] },
   { name: 'Meetings', steps: [['click-prefix', 'Meetings']] },
-  { name: 'Meeting summary', steps: [...meeting, ['click-text', 'Summary']] },
-  { name: 'Meeting recording', steps: [...meeting, ['click-text', 'Recording']] },
+  { name: 'Meeting notes', steps: [...meeting, ['click-text', 'Notes']] },
+  { name: 'Meeting transcript', steps: [...meeting, ['click-text', 'Transcript']] },
   { name: 'People', steps: [['click-prefix', 'People']] },
   { name: 'Settings general', steps: [...settings, ['click-text', 'General']] },
   { name: 'Settings processing', steps: [...settings, ['click-text', 'Meeting processing']] },

@@ -138,6 +138,40 @@ CREATE TABLE IF NOT EXISTS speaker_suggestions (
     PRIMARY KEY(meeting_id,speaker_key),
     FOREIGN KEY(meeting_id,speaker_key) REFERENCES meeting_speaker_embeddings(meeting_id,speaker_key) ON DELETE CASCADE
 );
+-- Person facts are kept by speaker label; meeting_speakers gives the Person labeled on it.
+CREATE TABLE IF NOT EXISTS person_facts (
+    id INTEGER PRIMARY KEY,
+    meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker_key TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    text TEXT NOT NULL,
+    quotes_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_person_facts_speaker ON person_facts(meeting_id, speaker_key);
+-- Fact texts (factText form) that the user hid on a Person. Kept apart from person_facts, so a new
+-- read of a Meeting or the same fact from another Meeting stays hidden.
+CREATE TABLE IF NOT EXISTS person_hidden_facts (
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    text_key TEXT NOT NULL,
+    PRIMARY KEY (person_id, text_key)
+);
+-- The About summary of a Person, written from the text of their shown facts (facts_key).
+CREATE TABLE IF NOT EXISTS person_summaries (
+    person_id TEXT PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE,
+    facts_key TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+-- One row per Meeting whose transcript revision was read for Person facts. 'skipped' marks a
+-- Meeting that existed before Person facts, which is read only on request.
+CREATE TABLE IF NOT EXISTS person_fact_runs (
+    meeting_id TEXT PRIMARY KEY REFERENCES meetings(id) ON DELETE CASCADE,
+    transcript_revision INTEGER NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('done','failed','skipped')),
+    attempts INTEGER NOT NULL DEFAULT 0,
+    error TEXT,
+    updated_at TEXT NOT NULL
+);
 CREATE TRIGGER IF NOT EXISTS retract_voice_assignment AFTER UPDATE OF person_id ON meeting_speakers
 WHEN old.person_id IS NOT new.person_id BEGIN
     DELETE FROM voice_samples WHERE meeting_id=old.meeting_id AND speaker_key=old.speaker_key;

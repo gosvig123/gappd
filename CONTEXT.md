@@ -19,6 +19,12 @@ A voice identified within one meeting, optionally linked to a saved person.
 **Voice suggestion**:
 A likely **Person** for an unlabeled **Meeting speaker**, based on voice similarity, that the user confirms or ignores.
 
+**Person fact**:
+A durable fact about a **Meeting speaker** (work, personal, preference, interest, or goal) that AI reads from what that speaker said, with the quote it comes from. It is kept by speaker label, so it belongs to the **Person** labeled on that speaker. It never names a person; others are referred to by role ("their daughter"). The user can hide a fact; it stays hidden after a new read of the Meeting.
+
+**About summary**:
+One to three sentences about a **Person**, written by the notes provider from their shown **Person facts**. It is saved with a key of those facts and written again only when they change.
+
 **Calendar invitee**:
 A person listed on a calendar event whose attendance and voice identity still need confirmation.
 

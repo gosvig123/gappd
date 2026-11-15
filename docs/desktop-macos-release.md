@@ -35,11 +35,13 @@ The signing setup exports `CSC_KEYCHAIN` so Electron Builder uses the verified k
 
 Calendar-enabled releases also require the public `GAPPD_GOOGLE_OAUTH_CLIENT_ID` repository variable and the `GAPPD_GOOGLE_OAUTH_CLIENT_SECRET` repository secret, both from the Desktop client in the Gappd Production Google Cloud project. The build bakes both into the app, which exchanges and refreshes Google tokens directly with Google. Google requires the Desktop client secret at its token endpoint but does not treat it as confidential in an installed app.
 
+Releases are signed by the Apple Developer team `7ZM2H3RN94` (Apple Account kristian_gosvig@hotmail.com); the certificate and the app-specific password are in NordPass. Builds up to 0.1.37 were signed by team `X95828B7PG`: macOS does not install an update signed by another team, so those installs do not update themselves, and their users download Gappd again once.
+
 Required secrets:
 
 - `APPLE_CERTIFICATE_P12_BASE64`
 - `APPLE_CERTIFICATE_PASSWORD`
-- `APPLE_SIGNING_IDENTITY`
+- `APPLE_SIGNING_IDENTITY`: the certificate name without the `Developer ID Application:` prefix, `kristian gosvig (7ZM2H3RN94)`; Electron Builder rejects the prefix
 - `APPLE_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `APPLE_TEAM_ID`

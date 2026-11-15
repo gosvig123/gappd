@@ -53,6 +53,59 @@ export type PersonActionItem = {
   deadline?: string
 }
 
+export type PersonFactsInput = {
+  id: string
+}
+
+export type PersonFactsResponse = {
+  facts: PersonFact[]
+  earlierMeetings: number
+  pendingMeetings: number
+}
+
+export type PersonFact = {
+  id: number
+  person: string
+  meetingId: string
+  meetingTitle: string
+  startedAt: string
+  kind: string
+  text: string
+  quotes: string[]
+  hidden: boolean
+}
+
+export type HidePersonFactInput = {
+  id: string
+  fact: number
+  hidden: boolean
+}
+
+export type QueuePersonFactsInput = {
+  id: string
+}
+
+export type PersonSummaryInput = {
+  id: string
+  write?: boolean
+}
+
+export type PersonSummaryResponse = {
+  summary: string
+  current: boolean
+}
+
+export type ExtractPersonFactsInput = {
+  meeting?: string
+  count?: boolean
+}
+
+export type ExtractPersonFactsResponse = {
+  pending: number
+  completed: number
+  failed: number
+}
+
 export type ImportPeopleInput = {
   contacts: string
 }

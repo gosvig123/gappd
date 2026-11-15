@@ -44,6 +44,78 @@ func BuildPersonActionItems(items []db.PersonActionItem) []PersonActionItem {
 	return result
 }
 
+type PersonFactsInput struct {
+	ID string `json:"id"`
+}
+
+// PersonFact is one fact about a Person. Person is the name of that Person, never a speaker
+// label, and every quote is theirs.
+type PersonFact struct {
+	ID           int64    `json:"id"`
+	Person       string   `json:"person"`
+	MeetingID    string   `json:"meetingId"`
+	MeetingTitle string   `json:"meetingTitle"`
+	StartedAt    string   `json:"startedAt"`
+	Kind         string   `json:"kind"`
+	Text         string   `json:"text"`
+	Quotes       []string `json:"quotes"`
+	Hidden       bool     `json:"hidden"`
+}
+
+// PersonFactsResponse holds a Person's facts. EarlierMeetings counts their Meetings saved before
+// Person facts and not read; PendingMeetings counts the ones the background step still reads.
+type PersonFactsResponse struct {
+	Facts           []PersonFact `json:"facts"`
+	EarlierMeetings int          `json:"earlierMeetings"`
+	PendingMeetings int          `json:"pendingMeetings"`
+}
+
+type QueuePersonFactsInput struct {
+	ID string `json:"id"`
+}
+
+// PersonSummaryInput reads the saved About summary; Write writes a new one when it is not current.
+type PersonSummaryInput struct {
+	ID    string `json:"id"`
+	Write bool   `json:"write,omitempty"`
+}
+
+// PersonSummaryResponse is the About summary. Current is false when the shown facts changed
+// after it was written.
+type PersonSummaryResponse struct {
+	Summary string `json:"summary"`
+	Current bool   `json:"current"`
+}
+
+func BuildPersonFacts(person string, facts []db.PersonFact) []PersonFact {
+	result := make([]PersonFact, 0, len(facts))
+	for _, fact := range facts {
+		result = append(result, PersonFact{ID: fact.ID, Person: person, MeetingID: fact.MeetingID, MeetingTitle: fact.MeetingTitle,
+			StartedAt: fact.StartedAt, Kind: fact.Kind, Text: fact.Text, Quotes: append([]string{}, fact.Quotes...), Hidden: fact.Hidden})
+	}
+	return result
+}
+
+// HidePersonFactInput hides one fact of a Person, or shows it again when Hidden is false.
+type HidePersonFactInput struct {
+	ID     string `json:"id"`
+	Fact   int64  `json:"fact"`
+	Hidden bool   `json:"hidden"`
+}
+
+// ExtractPersonFactsInput reads one Meeting when Meeting is set, else every Meeting that needs it.
+// Count only counts the Meetings that need it, without the notes provider.
+type ExtractPersonFactsInput struct {
+	Meeting string `json:"meeting,omitempty"`
+	Count   bool   `json:"count,omitempty"`
+}
+
+type ExtractPersonFactsResponse struct {
+	Pending   int `json:"pending"`
+	Completed int `json:"completed"`
+	Failed    int `json:"failed"`
+}
+
 type UpdatePersonInput struct {
 	ID    string `json:"id"`
 	Name  string `json:"name"`
