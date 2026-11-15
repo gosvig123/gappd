@@ -41,42 +41,43 @@
   --radius-panel: 0.875rem;
   --radius-pill: 999px;
 
-  /* Zed "One Dark" inspired: warm charcoal canvas, calm sky-blue accent.
-     Light slate anchor so every "-strong" mix raises contrast on dark. */
-  --color-brand: #c2cad9;
-  --color-accent: #74ade8;
-  --color-secure: #5cba8f;
-  --color-surface: #2f343e;
-  --color-border: #404552;
-  --color-text: #dce0e5;
-  --color-card: #282c33;
-  --color-bg: var(--color-card);
+  /* Graphite: neutral greys, and one signal colour. The accent is the text ink, so
+     selection, focus and the primary button stay neutral; red means recording. */
+  --color-brand: #a1a1aa;
+  --color-accent: #ededef;
+  --color-secure: #4cc38a;
+  --color-surface: #232326;
+  --color-border: #2e2e33;
+  --color-text: #ededef;
+  --color-card: #1a1a1c;
+  --color-bg: #141415;
+  /* Record: the one red control. Dark enough that white text meets WCAG AA (4.5:1). */
+  --color-record: #dc2f26;
+  --color-record-hover: #c4261e;
+  --color-record-contrast: #ffffff;
   --color-bg-soft: color-mix(in srgb, var(--color-surface) 84%, var(--color-card));
   --color-surface-soft: color-mix(in srgb, var(--color-surface) 72%, var(--color-card));
   --color-surface-raised: var(--color-card);
   --color-surface-elevated: color-mix(in srgb, var(--color-card) 82%, white);
-  /* Reading "paper": warm, lifted sheet that stays dark enough for light text to read cleanly. */
-  --reading-paper: color-mix(in srgb, var(--color-card) 88%, #f4ead6);
   --color-surface-sunken: color-mix(in srgb, var(--color-card) 50%, #05070c);
   --color-border-strong: color-mix(in srgb, var(--color-border) 74%, var(--color-brand));
   --color-text-muted: color-mix(in srgb, var(--color-text) 64%, var(--color-surface));
   --color-text-soft: color-mix(in srgb, var(--color-text) 80%, var(--color-surface));
   --color-accent-strong: var(--color-accent);
   --color-accent-bright: color-mix(in srgb, var(--color-accent) 86%, #ffffff);
-  --color-accent-contrast: #f5f9ff;
+  --color-accent-contrast: #141415;
   --color-accent-soft: color-mix(in srgb, var(--color-accent) 22%, transparent);
-  --color-accent-tint: color-mix(in srgb, var(--color-accent) 12%, var(--color-card));
-  --color-accent-tint-strong: color-mix(in srgb, var(--color-accent) 18%, var(--color-card));
+  --color-accent-tint: color-mix(in srgb, var(--color-accent) 8%, var(--color-card));
+  --color-accent-tint-strong: color-mix(in srgb, var(--color-accent) 13%, var(--color-card));
   --color-accent-border: color-mix(in srgb, var(--color-accent) 34%, var(--color-border));
   --color-accent-border-strong: color-mix(in srgb, var(--color-accent) 52%, var(--color-border));
   --color-success: var(--color-secure);
   --color-success-bg: color-mix(in srgb, var(--color-secure) 16%, var(--color-card));
   --color-success-border: color-mix(in srgb, var(--color-secure) 36%, var(--color-border));
-  --color-warning: #d3a259;
-  --color-warning-contrast: #11151c;
+  --color-warning: #e5a50a;
   --color-warning-bg: color-mix(in srgb, var(--color-warning) 16%, var(--color-card));
   --color-warning-border: color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
-  --color-danger: #e0707b;
+  --color-danger: #f2706a;
   --color-danger-bg: color-mix(in srgb, var(--color-danger) 14%, var(--color-card));
   --color-danger-border: color-mix(in srgb, var(--color-danger) 32%, var(--color-border));
   --color-overlay-scrim: color-mix(in srgb, #05070c 62%, transparent);
@@ -91,17 +92,14 @@
   --shadow-soft: 0 1px 2px color-mix(in srgb, #05070c 50%, transparent), 0 8px 24px -16px color-mix(in srgb, #05070c 70%, transparent);
   --shadow-raised: 0 1px 2px color-mix(in srgb, #05070c 55%, transparent), 0 16px 40px -20px color-mix(in srgb, #05070c 75%, transparent);
   --shadow-sheet: 0 1.5rem 4rem color-mix(in srgb, #05070c 65%, transparent);
-  --shadow-accent: 0 1px 2px color-mix(in srgb, #05070c 50%, transparent), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 50%, transparent);
-  --shadow-logo: 0 0 12px color-mix(in srgb, var(--color-accent) 50%, transparent);
-  --focus-ring: 0 0 0 3px var(--color-accent-soft);
-  /* Deep enough that white button text meets WCAG AA (4.5:1) at every stop, in both themes.
-     Hover darkens rather than lightens so it keeps that contrast. */
-  --gradient-accent: linear-gradient(180deg, #2b70bd, #2864ae);
-  --gradient-accent-hover: linear-gradient(180deg, #2867b0, #225797);
+  /* Flat: no coloured glow under primary controls. */
+  --shadow-accent: 0 1px 2px color-mix(in srgb, #05070c 40%, transparent);
+  /* Solid ink ring with a background-coloured gap: at least 3:1 on every surface in both themes. */
+  --focus-ring: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-accent);
+  /* The primary button is the ink colour with card-coloured text; hover steps toward the card. */
+  --color-accent-hover: color-mix(in srgb, var(--color-accent) 86%, var(--color-card));
   /* Speaker names in transcripts: hue per speaker, lightness per theme. */
   --speaker-ink-lightness: 78%;
-  /* Zed is flat and calm — drop the colored glows, keep a whisper of top sheen. */
-  --shell-glow: linear-gradient(180deg, color-mix(in srgb, #ffffff 2.5%, transparent), transparent 22%);
 
   --transition-quick: 140ms ease;
   --transition-smooth: 220ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -126,35 +124,35 @@
  */
 [data-theme='light'] {
   color-scheme: light;
-  --color-brand: #4a5364;
-  --color-accent: #2f6fb5;
-  --color-secure: #2f855a;
-  --color-surface: #e9ecf1;
-  --color-border: #d2d7df;
-  --color-text: #1b1f27;
+  --color-brand: #52525b;
+  --color-accent: #18181b;
+  --color-secure: #16804b;
+  --color-surface: #f1f1f2;
+  --color-border: #e4e4e7;
+  --color-text: #18181b;
   --color-card: #ffffff;
-  --color-bg: #f5f6f9;
+  --color-bg: #fafafa;
+  --color-record: #dc2f26;
+  --color-record-hover: #c4261e;
   --color-surface-raised: #ffffff;
   --color-surface-elevated: #ffffff;
   --surface-panel: #ffffff;
   --surface-control: #ffffff;
-  --surface-hover: color-mix(in srgb, #1b1f27 6%, #ffffff);
-  --color-surface-sunken: color-mix(in srgb, var(--color-card) 92%, #9aa3b2);
-  --color-overlay-scrim: color-mix(in srgb, #1b1f27 38%, transparent);
-  --highlight-subtle: color-mix(in srgb, #1b1f27 5%, transparent);
-  --highlight-strong: color-mix(in srgb, #1b1f27 9%, transparent);
-  --color-danger: #b42331;
-  --color-warning: #8f5d0d;
+  --surface-hover: color-mix(in srgb, #18181b 5%, #ffffff);
+  --color-surface-sunken: color-mix(in srgb, var(--color-card) 94%, #a1a1aa);
+  --color-overlay-scrim: color-mix(in srgb, #18181b 38%, transparent);
+  --highlight-subtle: color-mix(in srgb, #18181b 5%, transparent);
+  --highlight-strong: color-mix(in srgb, #18181b 9%, transparent);
+  --color-danger: #c8261d;
+  --color-warning: #a15c00;
   --color-danger-bg: color-mix(in srgb, var(--color-danger) 10%, var(--color-card));
   --color-warning-bg: color-mix(in srgb, var(--color-warning) 12%, var(--color-card));
   --color-success-bg: color-mix(in srgb, var(--color-secure) 12%, var(--color-card));
   --color-accent-contrast: #ffffff;
-  --reading-paper: color-mix(in srgb, var(--color-card) 94%, #f4ead6);
-  --shadow-soft: 0 1px 2px rgb(27 31 39 / 6%), 0 8px 24px -16px rgb(27 31 39 / 20%);
-  --shadow-raised: 0 1px 2px rgb(27 31 39 / 8%), 0 16px 40px -20px rgb(27 31 39 / 24%);
-  --shadow-sheet: 0 1.5rem 4rem rgb(27 31 39 / 22%);
-  --shadow-accent: 0 1px 2px rgb(27 31 39 / 10%), 0 6px 20px -8px color-mix(in srgb, var(--color-accent) 45%, transparent);
+  --shadow-soft: 0 1px 2px rgb(24 24 27 / 6%), 0 8px 24px -16px rgb(24 24 27 / 18%);
+  --shadow-raised: 0 1px 2px rgb(24 24 27 / 8%), 0 16px 40px -20px rgb(24 24 27 / 22%);
+  --shadow-sheet: 0 1.5rem 4rem rgb(24 24 27 / 20%);
+  --shadow-accent: 0 1px 2px rgb(24 24 27 / 10%);
   /* 28% keeps every speaker hue at 5:1 or more on white and on reading paper. */
   --speaker-ink-lightness: 28%;
-  --shell-glow: linear-gradient(180deg, rgb(255 255 255 / 60%), transparent 24%);
 }

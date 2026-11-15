@@ -29,6 +29,20 @@
 .workspace-row-note { grid-area: note; display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-small); white-space: nowrap; }
 .workspace-row-note.is-failed { color: var(--color-text-soft); }
 .workspace-row-note svg { flex: none; inline-size: 0.85rem; block-size: 0.85rem; color: var(--color-danger); }
+.workspace-row-note.is-working { color: var(--color-text-soft); }
+/* A Meeting that is recording or processing shows a dot: red while recording, grey while processing. */
+.workspace-row-pulse { flex: none; inline-size: 0.45rem; block-size: 0.45rem; border-radius: 50%; background: var(--color-text-muted); animation: workspace-pulse 1.6s ease-in-out infinite; }
+.is-recording .workspace-row-pulse { background: var(--color-record); }
+@keyframes workspace-pulse { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .workspace-row-pulse { animation: none; } }
+.workspace-next-empty { display: grid; justify-items: start; gap: var(--space-3); }
+.workspace-next-empty p { margin: 0; }
+.workspace-event-body { display: grid; align-content: start; gap: var(--space-7); }
+.workspace-event-facts { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; color: var(--color-text-soft); }
+.workspace-event-facts li { display: flex; align-items: center; gap: var(--space-3); }
+.workspace-event-facts svg { flex: none; inline-size: 1rem; block-size: 1rem; color: var(--color-text-muted); }
+.workspace-event-agenda { display: grid; gap: var(--space-4); }
+.workspace-event-agenda h2 { margin: 0; font-size: var(--font-size-title); letter-spacing: var(--tracking-tight); }
 :is(.workspace-row.is-next, .workspace-row[aria-current]) :is(.workspace-row-time, .workspace-row-note) { color: var(--color-text-soft); }
 /* Beside an open Meeting the list is narrow: title on its own line, time and note under it. */
 .has-selection .workspace-row { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "title title" "time note"; row-gap: var(--space-1); column-gap: var(--space-4); }

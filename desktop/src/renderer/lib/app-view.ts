@@ -84,14 +84,6 @@ export type AppActions = {
   setTheme: (theme: ThemeName) => void
 }
 
-export function upcomingEvents(calendar: CalendarSnapshot | null, limit = 6, now = new Date()): CalendarEventSummary[] {
-  if (!calendar) return []
-  return calendar.events
-    .filter((event) => new Date(event.end).getTime() >= now.getTime())
-    .sort((left, right) => left.start.localeCompare(right.start))
-    .slice(0, limit)
-}
-
 export function eventTimeRange(event: CalendarEventSummary): string {
   const start = new Date(event.start)
   const end = new Date(event.end)
@@ -99,10 +91,6 @@ export function eventTimeRange(event: CalendarEventSummary): string {
   const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' })
   const day = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
   return sameDay ? `${day.format(start)} · ${time.format(start)}–${time.format(end)}` : `${day.format(start)} → ${day.format(end)}`
-}
-
-export function eventIsNow(event: CalendarEventSummary, now = new Date()): boolean {
-  return new Date(event.start).getTime() <= now.getTime() && new Date(event.end).getTime() >= now.getTime()
 }
 
 const COMPLETE_ARTIFACTS = 'Notes and transcript available'
@@ -114,10 +102,10 @@ export function artifactLine(meeting: MeetingListItem): string {
   if (meeting.status.processing.state === 'processing' && !meeting.hasSummary) return 'Creating summary…'
   if (meeting.status.processing.state === 'processing') return 'Finalizing notes…'
   if (meeting.status.state === 'failed') return meeting.status.processing.failureMessage ?? meeting.status.capture.failureMessage ?? 'Recording failed'
-  if (meeting.status.state === 'pending') return meeting.hasTranscript ? 'Transcript available · notes waiting' : 'Audio captured · waiting to process'
+  if (meeting.status.state === 'pending') return meeting.hasTranscript ? 'Notes waiting' : 'Audio captured · waiting to process'
   if (meeting.hasSummary && meeting.hasTranscript) return COMPLETE_ARTIFACTS
   if (meeting.hasSummary) return 'Notes available'
-  if (meeting.hasTranscript) return 'Transcript available'
+  if (meeting.hasTranscript) return 'No notes yet'
   return 'Artifacts pending'
 }
 

@@ -79,6 +79,8 @@
 .setup-finished { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 /* A Feature prompt can hold choices, so its buttons stay at the top. */
 .feature-prompt { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+/* One line: the title and its buttons, no card body. */
+.feature-prompt.is-compact { align-items: center; padding-block: var(--space-3); border-color: var(--color-border); background: var(--color-surface-soft); }
 .setup-finished h2,
 .feature-prompt h2 { margin: 0; font-size: var(--font-size-body); }
 .setup-finished p,

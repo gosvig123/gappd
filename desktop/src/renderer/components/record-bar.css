@@ -1,74 +1,62 @@
-/* The record toolbar: the one place recording starts and stops. */
+/* The record toolbar: the one place recording starts and stops. Record is the only red control. */
 
-.app-toolbar { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); padding: var(--space-6) var(--page-gutter) 0; }
+.app-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-6); padding: var(--space-6) var(--page-gutter) 0; }
 .app-record-hint:empty { display: none; }
-.app-record-hint { max-width: 65ch; color: var(--color-text-soft); font-size: var(--font-size-small); text-align: right; }
+.app-record-hint { max-width: 65ch; color: var(--color-text-soft); font-size: var(--font-size-small); }
 
-.app-record {
-  display: flex;
-  align-items: stretch;
-  /* The compact control height used by page buttons (Agenda, Delete Meeting). */
-  min-block-size: 2.25rem;
-  overflow: hidden;
-  border: 1px solid var(--color-accent-border-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-elevated);
-  box-shadow: inset 0 1px 0 var(--highlight-subtle);
-}
-.app-record.is-recording { border-color: var(--color-danger-border); }
+.app-record { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
 
-/* A chip shows an icon or a short code. Its select covers it without being seen, so the
+/* A chip names its value in words. Its select covers it without being seen, so the
    native menu, the keyboard and VoiceOver still work and show the full names. */
 .app-record-chip {
   position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.125rem;
-  min-inline-size: 2.75rem;
+  gap: var(--space-2);
+  min-block-size: 2rem;
+  max-inline-size: 15rem;
   padding: 0 var(--space-4);
-  border: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text-soft);
   font-size: var(--font-size-small);
   cursor: pointer;
 }
-.app-record-chip + .app-record-chip { border-inline-start: 1px solid var(--color-border); }
-.app-record-chip:first-child { padding-inline-start: var(--space-5); }
-.app-record-chip:hover:not(:has(select:disabled)):not(:disabled) { color: var(--color-text); background: var(--color-surface-soft); }
-.app-record-chip svg { inline-size: 1rem; block-size: 1rem; flex: 0 0 auto; }
+.app-record-chip:hover:not(:has(select:disabled)):not(:disabled) { color: var(--color-text); background: var(--surface-hover); }
+.app-record-chip svg { inline-size: 0.9rem; block-size: 0.9rem; flex: 0 0 auto; }
+.app-record-label { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-record-chip .app-record-caret { inline-size: 0.7rem; block-size: 0.7rem; opacity: 0.7; }
 .app-record-chip select { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; opacity: 0; cursor: pointer; appearance: none; }
 .app-record-chip select:disabled { cursor: default; }
 .app-record-chip:has(select:disabled), .app-record-chip:disabled { opacity: 0.6; cursor: default; }
-.app-record-chip:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: -3px; }
-.app-record-chip:first-child:has(select:focus-visible) { border-radius: var(--radius-pill) 0 0 var(--radius-pill); }
+.app-record-chip:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-.app-record-code { color: var(--color-text); font-weight: var(--font-weight-semibold); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+.app-record-video[aria-pressed="true"] { border-color: var(--color-border-strong); color: var(--color-text); }
+.app-record button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
-.app-record-video[aria-pressed="true"] { color: var(--color-accent); background: var(--color-accent-tint); }
-.app-record button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -3px; }
-
-.app-record-button {
+.app-record-button, .ui-button.record-action {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-6) 0 var(--space-5);
+  gap: var(--space-3);
+  min-block-size: 2.5rem;
+  padding: 0 var(--space-7) 0 var(--space-6);
   border: 0;
-  border-inline-start: 1px solid var(--color-border);
-  background: var(--gradient-accent);
-  color: var(--color-accent-contrast);
-  font-size: var(--font-size-small);
+  border-radius: var(--radius-pill);
+  background: var(--color-record);
+  color: var(--color-record-contrast);
+  box-shadow: none;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.app-record-button svg { inline-size: 0.75rem; block-size: 0.75rem; }
-.app-record-button:hover:not(:disabled) { background: var(--gradient-accent-hover); }
-.app-record-button:disabled { opacity: 0.55; cursor: not-allowed; }
-.app-record-button.is-recording { background: var(--color-danger); }
+.ui-button.record-action { min-block-size: 2.25rem; font-size: var(--font-size-small); }
+.app-record-button svg { inline-size: 0.8rem; block-size: 0.8rem; fill: currentColor; }
+:is(.app-record-button, .ui-button.record-action):hover:not(:disabled) { background: var(--color-record-hover); }
+:is(.app-record-button, .ui-button.record-action):disabled { opacity: 0.55; cursor: not-allowed; }
+/* While recording, the red pulses slowly so the state shows from across the room. */
+.app-record-button.is-recording { animation: app-record-pulse 2s ease-in-out infinite; }
+@keyframes app-record-pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-record) 30%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .app-record-button.is-recording { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-record) 30%, transparent); } }
 /* The record dot: the one sign every recorder uses. */
-.app-record-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: var(--color-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-contrast) 85%, transparent); }
-
-@media (max-width: 760px) {
-  .app-record-hint { text-align: left; }
-}
+.app-record-dot { inline-size: 0.6rem; block-size: 0.6rem; border-radius: 50%; background: currentColor; }

@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
-import { ChevronDown, Mic, Monitor, MonitorOff, Square } from 'lucide-react'
+import { ChevronDown, Languages, Mic, Monitor, MonitorOff, Square } from 'lucide-react'
 import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import type { AppView } from '../lib/app-view'
 import { cx } from './ui'
 
 /**
- * Recording is app chrome, so it sits in the main toolbar rather than floating
- * over the content. The chips show icons and short codes; each one keeps a
- * native select laid over it, so the full names appear in the macOS menu and in
- * the tooltip. Choose audio and Screen video before starting; the action label
- * carries the live elapsed time. The language applies to the next
- * Meeting and is remembered; it is locked while recording because the Live
- * Transcript cannot change language mid-run.
+ * Recording is app chrome, so it sits at the top of every view. Record is the one
+ * red control. The chips beside it name the audio input, the Meeting language and
+ * Screen video in words; each select chip keeps a native select laid over it, so
+ * the macOS menu, the keyboard and VoiceOver still work. The language applies to
+ * the next Meeting and is remembered; it is locked while recording because the
+ * Live Transcript cannot change language mid-run.
  */
 export function RecordBar({ view }: { view: AppView }) {
   const live = view.recording.status === 'recording'
@@ -33,28 +32,13 @@ export function RecordBar({ view }: { view: AppView }) {
   }
   const speech = useSpeechLanguage(view.language)
   const language = TRANSCRIPTION_LANGUAGES.find((item) => item.code === view.language)
-  const deviceName = view.devices.find((device) => device.index === view.device)?.name ?? 'none'
+  const deviceName = view.devices.find((device) => device.index === view.device)?.name ?? 'No audio input'
   const chooseLanguage = (language: string) => { view.actions.setLanguage(language); speech.prepare(language) }
   const disabled = saving || stopping || (live ? !view.canStop : !view.canStart)
   const video = view.meetings.find(meeting => meeting.id === view.recording.meetingId)?.status.video
   return (
     <div className="app-toolbar">
       <div className={cx('app-record', live && 'is-recording')}>
-        <label className="app-record-chip" title={`Audio input: ${deviceName}`}>
-          <Mic aria-hidden="true" />
-          <ChevronDown className="app-record-caret" aria-hidden="true" />
-          <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
-            {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
-          </select>
-        </label>
-        <label className="app-record-chip" title={live || stopping ? `Meeting language: ${language?.label ?? view.language}` : `Meeting language: ${language?.label ?? view.language}. Used for the transcript and notes.`}>
-          <span className="app-record-code">{language?.short ?? view.language}</span>
-          {live || stopping ? null : <ChevronDown className="app-record-caret" aria-hidden="true" />}
-          <select value={view.language} onChange={(event) => chooseLanguage(event.target.value)} disabled={live || stopping} aria-label="Meeting language">
-            {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
-          </select>
-        </label>
-        {!live && !stopping ? <button type="button" className="app-record-chip app-record-video" aria-label="Screen video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title={videoEnabled ? 'Screen video is on. You choose a window or display when you record.' : 'Screen video is off. Click to also record a window or display.'}>{videoEnabled ? <Monitor aria-hidden="true" /> : <MonitorOff aria-hidden="true" />}</button> : null}
         <button
           type="button"
           className={cx('app-record-button', live && 'is-recording')}
@@ -65,6 +49,23 @@ export function RecordBar({ view }: { view: AppView }) {
           {live || stopping ? <Square aria-hidden="true" /> : <span className="app-record-dot" aria-hidden="true" />}
           {stopping ? 'Stopping…' : live ? `Stop · ${elapsed}` : 'Record'}
         </button>
+        <label className="app-record-chip" title={`Audio input: ${deviceName}`}>
+          <Mic aria-hidden="true" />
+          <span className="app-record-label">{deviceName}</span>
+          <ChevronDown className="app-record-caret" aria-hidden="true" />
+          <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
+            {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
+          </select>
+        </label>
+        <label className="app-record-chip" title={live || stopping ? 'Meeting language. Locked while recording.' : 'Meeting language. Used for the transcript and notes.'}>
+          <Languages aria-hidden="true" />
+          <span className="app-record-label">{language?.label ?? view.language}</span>
+          {live || stopping ? null : <ChevronDown className="app-record-caret" aria-hidden="true" />}
+          <select value={view.language} onChange={(event) => chooseLanguage(event.target.value)} disabled={live || stopping} aria-label="Meeting language">
+            {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+          </select>
+        </label>
+        {!live && !stopping ? <button type="button" className="app-record-chip app-record-video" aria-label="Screen video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title={videoEnabled ? 'You choose a window or display when you record. Click to record audio only.' : 'Click to also record a window or display.'}>{videoEnabled ? <Monitor aria-hidden="true" /> : <MonitorOff aria-hidden="true" />}<span className="app-record-label">{videoEnabled ? 'Screen video on' : 'No screen video'}</span></button> : null}
       </div>
       <div className="app-record-hint" role="status">
         {error || (live || stopping ? video?.state === 'selecting' ? 'Choose a window or display in the macOS picker. Audio is recording.' : video?.state === 'recording' ? `Recording ${video.sourceType === 'window' ? 'window' : video.sourceType === 'display' ? 'display' : 'screen'} and audio` : video?.state === 'ended' ? 'Screen video ended. Audio continues.' : video && ['failed', 'cancelled', 'skipped'].includes(video.state) ? 'Audio only. Screen video did not start.' : stopping ? 'Saving your recording…' : 'Recording audio' : speech.note)}

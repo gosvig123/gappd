@@ -3,7 +3,6 @@ import type { AppView } from '../lib/app-view'
 import { buildAlerts } from '../lib/alerts'
 import { MeetingsView } from '../views/meetings'
 import { PeopleView } from '../views/people'
-import { TodayView } from '../views/today'
 import { useAccountRequirement } from '../hooks/use-account-requirement'
 import { AccountGate } from './account-gate'
 import { AppSidebar, type SectionKey } from './app-sidebar'
@@ -39,7 +38,7 @@ export function AppShell({ view }: { view: AppView }) {
 }
 
 function useShellController(view: AppView) {
-  const [section, setSection] = useState<SectionKey>('today')
+  const [section, setSection] = useState<SectionKey>('meetings')
   const [settingsCategory, setSettingsCategory] = useState<string | null>(null)
   const [wantsSearch, setWantsSearch] = useState(false)
   const [notices, dismissNotice] = useMeetingReadyNotices(view.meetings)
@@ -55,10 +54,11 @@ function useShellController(view: AppView) {
 
 function ShellMain({ view, shell, account }: { view: AppView; shell: ReturnType<typeof useShellController>; account: ReturnType<typeof useAccountRequirement> }) {
   const setup = useSetupState(view, account)
+  // Feature prompts are about Meetings (notes, AI apps, usage), so they show only on the Meetings home.
+  // They stay mounted on People, so a download or a connection keeps its state.
   return <main className="app-main"><RecordBar view={view} /><SetupChecklist view={view} account={account} setup={setup} />
-    <FeaturePrompt view={view} account={account} setupOpen={setup.open} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} />
-    <div className={`app-scroll ui-scroll ${shell.section === 'meetings' || shell.section === 'people' ? 'is-workspace' : ''}`}>
-      {shell.section === 'today' ? <TodayView view={view} onOpenMeetings={() => shell.setSection('meetings')} /> : null}
+    <div hidden={shell.section !== 'meetings'}><FeaturePrompt view={view} account={account} setupOpen={setup.open} notesReady={shell.notices.some((notice) => notice.kind === 'ready')} /></div>
+    <div className="app-scroll ui-scroll is-workspace">
       {shell.section === 'meetings' ? <MeetingsView view={view} searchRef={shell.searchRef} confirm={shell.confirm} /> : null}
       {shell.section === 'people' ? <PeopleView view={view} /> : null}
     </div>

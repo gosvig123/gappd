@@ -6,6 +6,7 @@ import { MeetingPanel } from '../components/meeting/panel'
 import { WorkspaceEvent } from '../components/meeting/workspace-event'
 import { searchMeetings } from '../lib/meeting-grouping'
 import { filterWorkspaceRows, workspaceRows, type CalendarTarget, type WorkspaceRow } from '../lib/meetings-workspace'
+import { Button } from '../components/ui'
 import { WorkspaceList } from './workspace-list'
 import './meetings-workspace.css'
 
@@ -31,7 +32,7 @@ export function MeetingsView({ view, searchRef, confirm }: Props) {
   const selectedKey = view.selectedMeetingId ? `meeting:${view.selectedMeetingId}` : event ? `event:${event.key}` : null
   return <div className={`meetings-workspace ${selectedKey ? 'has-selection' : ''} ${query.trim() && browsingResults ? 'is-searching' : ''}`}>
     <WorkspaceHeader view={view} query={query} setQuery={search} searchRef={searchRef} />
-    <div className="workspace-columns"><div className="workspace-list ui-scroll"><WorkspaceList {...rows} selectedKey={selectedKey} searching={Boolean(query.trim())} onSelect={select} /></div>
+    <div className="workspace-columns"><div className="workspace-list ui-scroll"><WorkspaceList {...rows} selectedKey={selectedKey} searching={Boolean(query.trim())} calendarHint={<CalendarHint view={view} />} onSelect={select} /></div>
       {selectedKey ? <div className="workspace-content">{view.selectedMeetingId ? <MeetingPanel view={{ ...view, actions: { ...view.actions, closeMeeting: close } }} confirm={confirm} /> : event ? <WorkspaceEvent target={event} view={view} onClose={close} /> : null}</div> : null}
     </div>
   </div>
@@ -43,12 +44,19 @@ function useWorkspaceRows(view: AppView, query: string) {
   return useMemo(() => {
     const rows = workspaceRows(view, now)
     const matches = new Set(searchMeetings(view.meetings, view.meetingDetails, query).map(hit => hit.meeting.id))
-    return { upcoming: filterWorkspaceRows(rows.upcoming, query, matches), history: filterWorkspaceRows(rows.history, query, matches) }
-  }, [view.meetings, view.meetingDetails, view.meetingEvents, view.calendar, query, now])
+    return { upcoming: filterWorkspaceRows(rows.upcoming, query, matches), history: filterWorkspaceRows(rows.history, query, matches), now }
+  }, [view.meetings, view.meetingDetails, view.meetingEvents, view.calendar, view.agendas, query, now])
 }
 
 function WorkspaceHeader({ view, query, setQuery, searchRef }: Pick<Props, 'view' | 'searchRef'> & { query: string; setQuery: (value: string) => void }) {
   return <header className="workspace-head"><div className="workspace-heading"><h1 className="ui-title">Meetings</h1></div>
     <label className="app-search workspace-search"><Search aria-hidden="true" /><input ref={searchRef} value={query} onChange={event => setQuery(event.target.value)} placeholder={SEARCH_LABEL} aria-label={SEARCH_LABEL} />{query ? <button type="button" aria-label="Clear search" onClick={() => setQuery('')}><X aria-hidden="true" /></button> : <kbd>⌘F</kbd>}</label>
   </header>
+}
+
+/** Without a connected calendar, the empty Next up offers to connect one. */
+function CalendarHint({ view }: { view: AppView }) {
+  const calendar = view.calendar
+  if (!calendar?.configured || calendar.connections.length) return null
+  return <Button className="compact-action" disabled={Boolean(view.calendarBusy)} onClick={() => void view.actions.connectCalendar()}>{view.calendarBusy === 'connect' ? 'Connecting…' : 'Connect Google Calendar'}</Button>
 }

@@ -55,10 +55,13 @@
   background: var(--color-surface-soft);
 }
 
-/* The Meeting language sits beside Delete Meeting and looks like it (ui-button classes);
-   the bare select inside carries the value, and the auto margin keeps Copy on the right. */
+/* The Meeting language looks like the footer buttons (ui-button classes); the bare select
+   inside carries the value, and the auto margin keeps Copy and Delete on the right. */
 .app-panel-language { position: relative; margin-inline-end: auto; cursor: pointer; }
 .app-panel-language:active { transform: none; }
+/* Delete is last and quiet: red text, no fill, so it never reads as the main action. */
+.app-panel-delete.ui-button { border-color: transparent; background: transparent; box-shadow: none; color: var(--color-danger); }
+.app-panel-delete.ui-button:hover:not(:disabled) { border-color: var(--color-danger-border); background: var(--color-danger-bg); }
 /* The global `label span` style is for form captions; this span is the button text. */
 .app-panel-language > span { color: inherit; font-size: inherit; }
 /* The select covers the whole control, so a click anywhere opens the menu; the span shows the value. */
@@ -66,7 +69,8 @@
 .app-panel-language select:focus { outline: none; box-shadow: none; }
 .app-panel-language:has(select:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .app-panel-language > .app-panel-language-caret { inline-size: 0.7rem; block-size: 0.7rem; margin-inline-start: calc(-1 * var(--space-1)); opacity: 0.7; }
-.app-panel-language:has(select:disabled) { opacity: 0.55; cursor: not-allowed; }
+/* Muted colour, not opacity: disabled text still meets 4.5:1 in both themes. */
+.app-panel-language:has(select:disabled) { color: var(--color-text-muted); cursor: not-allowed; }
 
 .app-notice {
   display: flex;
@@ -107,7 +111,7 @@
 
 .app-panel-pane:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 
-/* Recording tab without a playable Screen video: the note, then the transcript. */
+/* Transcript tab without a playable Screen video: the note, then the transcript. */
 .app-recording-text { display: grid; gap: var(--space-6); }
 
 /* One wide measure for the whole card: it fills the panel, and caps lines only on very wide windows. */

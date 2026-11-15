@@ -31,5 +31,3 @@
 .app-agenda-foot { display: flex; gap: var(--space-3); }
 
 .app-timeline-actions { display: inline-flex; align-items: center; gap: var(--space-3); }
-.app-upcoming > ul > li { flex-wrap: wrap; }
-.app-upcoming > ul > li > .app-agenda { flex-basis: 100%; }

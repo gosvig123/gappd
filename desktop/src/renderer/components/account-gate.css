@@ -4,7 +4,7 @@
   block-size: 100dvh;
   padding: var(--space-10);
   overflow: auto;
-  background: var(--shell-glow), var(--color-bg);
+  background: var(--color-bg);
 }
 
 .account-gate-card {

@@ -12,14 +12,16 @@ import { artifactNote, statusLabel, type AppView } from '../../lib/app-view'
 import { notesAvailability } from '../../lib/setup-steps'
 import { NotesChoicePanel, useNotesChoice } from '../notes-choice'
 import { meetingDurationLabel } from '../../lib/meeting-grouping'
+import { calendarEventKey } from '../../../shared/calendar-contract'
+import { AgendaPanel } from '../agenda'
 import type { ConfirmController } from '../confirm'
 import { MeetingEventPicker, useMeetingCalendar, type MeetingCalendar } from './calendar-event'
 import { MeetingLanguage } from './meeting-language'
 
 type TabId = 'summary' | 'recording'
 const TABS: ReadonlyArray<{ id: TabId; label: string }> = [
-  { id: 'summary', label: 'Summary' },
-  { id: 'recording', label: 'Recording' },
+  { id: 'summary', label: 'Notes' },
+  { id: 'recording', label: 'Transcript' },
 ]
 
 /** Inline Meeting content. No modal or focus trap: the list remains interactive. */
@@ -51,7 +53,7 @@ function PanelFooter({ view, confirm, meeting, tab, transcript }: { view: AppVie
     catch { setError('Could not copy. Select the text and copy it manually.') }
   }
   const remove = () => confirm.request({ title: 'Delete this Meeting?', body: `Removes the summary, transcript, speaker labels, audio, and managed Screen video for “${meeting.title || 'Untitled meeting'}”, and its Gappd Cloud copy if it was synced. This cannot be undone.`, confirmLabel: 'Delete Meeting', tone: 'danger', onConfirm: async () => { await view.actions.deleteMeeting(meeting.id); view.actions.closeMeeting() } })
-  return <footer className="app-panel-foot"><Button className="compact-action" disabled={meetingHasWork(meeting)} onClick={remove}>Delete Meeting</Button><MeetingLanguage view={view} confirm={confirm} meeting={meeting} onError={setError} />{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button></footer>
+  return <footer className="app-panel-foot"><MeetingLanguage view={view} confirm={confirm} meeting={meeting} onError={setError} />{error ? <span role="alert">{error}</span> : null}<Button className="compact-action" disabled={!text.trim()} title={text.trim() ? undefined : tab === 'summary' ? 'No notes to copy yet' : 'No transcript to copy yet'} onClick={() => void copy()}><Copy aria-hidden="true" />{copied ? 'Copied' : tab === 'summary' ? 'Copy notes' : 'Copy transcript'}</Button><Button className="compact-action app-panel-delete" disabled={meetingHasWork(meeting)} onClick={remove}>Delete</Button></footer>
 }
 
 function PanelHead({ meeting, transcript, calendar, closeRef, onClose }: { meeting: MeetingDetail; transcript: string; calendar: MeetingCalendar; closeRef: React.RefObject<HTMLButtonElement | null>; onClose: () => void }) {
@@ -83,7 +85,7 @@ function PanelHeadFallback({ closeRef, onClose }: { closeRef: React.RefObject<HT
 /** Only the pane scrolls, so the speaker controls and the tabs stay reachable. */
 function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek, currentSec, onTimeChange }: { view: AppView; meeting: MeetingDetail; transcript: string; tab: TabId; calendar: MeetingCalendar; seekTo: { sec: number; request: number } | null; onSeek: (sec: number) => void; currentSec: number; onTimeChange: (sec: number) => void }) {
   const row = { ...meeting, hasTranscript: Boolean(transcript), hasSummary: Boolean(meeting.summary) }
-  // With a playable Screen video, the Recording tab shows the people in its side column, so the player keeps the height.
+  // With a playable Screen video, the Transcript tab shows the people in its side column, so the player keeps the height.
   const people = <SpeakerLabels key={meeting.id} meeting={meeting} event={calendar.context.event} onUpdated={view.actions.meetingUpdated} onPeopleChanged={view.actions.peopleChanged} />
   return (
     <>
@@ -92,10 +94,18 @@ function PanelContent({ view, meeting, transcript, tab, calendar, seekTo, onSeek
       {tab === 'recording' && replayReady(meeting) ? null : people}
       <section className="app-panel-pane" role="tabpanel" id={`app-pane-${tab}`} aria-labelledby={`app-tab-${tab}`} tabIndex={0}>
         {tab === 'summary' ? <SummaryPane view={view} transcript={transcript} /> : null}
+        {tab === 'summary' ? <LinkedAgenda view={view} calendar={calendar} /> : null}
         {tab === 'recording' ? <RecordingPane meeting={meeting} text={transcript} people={people} seekTo={seekTo} onSeek={onSeek} currentSec={currentSec} onTimeChange={onTimeChange} /> : null}
       </section>
     </>
   )
+}
+
+/** The Agenda written for the linked Calendar event stays with the Meeting once it is recorded. */
+function LinkedAgenda({ view, calendar }: { view: AppView; calendar: MeetingCalendar }) {
+  const event = calendar.context.event
+  if (!event || !view.agendas?.[calendarEventKey(event)]) return null
+  return <div className="workspace-event-agenda"><h2>Agenda</h2><AgendaPanel key={calendarEventKey(event)} event={event} view={view} /></div>
 }
 
 function SummaryPane({ view, transcript }: { view: AppView; transcript: string }) {
