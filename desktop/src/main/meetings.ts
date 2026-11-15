@@ -86,14 +86,15 @@ export async function queuePersonFacts(id: string) {
 const summaryWrites = new Map<string, ReturnType<typeof writePersonSummary>>()
 
 // Writing a summary uses the notes provider, so it needs Local AI when that is the provider.
-// A Person page opened again during a write shares that write instead of starting another.
+// Writes for one Person run one after another. A write that finds the facts unchanged returns the
+// saved summary without the provider, so a page opened again during a write costs no second call,
+// and a Hide during a write still gets a summary of the facts shown after it.
 export async function personSummary(id: string, write: boolean) {
   if (!write) return requestCommand('meetings.personSummary', { id })
-  const running = summaryWrites.get(id)
-  if (running) return running
-  const next = writePersonSummary(id).finally(() => summaryWrites.delete(id))
+  const previous = summaryWrites.get(id)
+  const next = (previous ? previous.catch(() => undefined) : Promise.resolve()).then(() => writePersonSummary(id))
   summaryWrites.set(id, next)
-  return next
+  return next.finally(() => { if (summaryWrites.get(id) === next) summaryWrites.delete(id) })
 }
 
 function writePersonSummary(id: string) {

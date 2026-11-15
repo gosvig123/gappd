@@ -94,7 +94,8 @@ function usePersonFacts(personId: string, view: AppView) {
   }, [personId, revision, factsRevision])
   const update = (work: Promise<PersonFactsState>, failure: string) => {
     const request = ++latest.current
-    work.then((state) => { if (latest.current === request) setResult({ state, error: null }) })
+    // A reload that started during the change can hold older facts, so read again after it.
+    work.then((state) => { if (latest.current === request) setResult({ state, error: null }); else setFactsRevision((value) => value + 1) })
       .catch((cause) => { if (latest.current === request) setResult((current) => ({ ...current, error: `${failure}: ${errorText(cause)}` })) })
   }
   const setHidden = (fact: number, hidden: boolean) => update(window.gappd.meetings.hidePersonFact({ id: personId, fact, hidden }), `Could not ${hidden ? 'hide' : 'show'} the fact`)
