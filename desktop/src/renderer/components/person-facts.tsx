@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PersonFact, PersonFacts as PersonFactsState } from '../../shared/participant-contract'
 import type { AppView } from '../lib/app-view'
 import { shortDate } from '../lib/person-activity'
@@ -81,18 +81,21 @@ function FactRow({ fact, view, onHidden }: { fact: PersonFact; view: AppView; on
 function usePersonFacts(personId: string, view: AppView) {
   const [result, setResult] = useState<{ state: PersonFactsState | null; error: string | null }>({ state: null, error: null })
   const [factsRevision, setFactsRevision] = useState(0)
+  // Only the newest request may change the list, so a slow reload cannot undo a later Hide or Show.
+  const latest = useRef(0)
   const revision = view.meetings.map((meeting) => meeting.status.updatedAt).join('|')
   useEffect(() => window.gappd.meetings.onFactsChanged(() => setFactsRevision((value) => value + 1)), [])
   useEffect(() => {
-    let active = true
+    const request = ++latest.current
     window.gappd.meetings.personFacts(personId)
-      .then((state) => { if (active) setResult({ state, error: null }) })
-      .catch((cause) => { if (active) setResult({ state: null, error: `Could not load facts: ${errorText(cause)}` }) })
-    return () => { active = false }
+      .then((state) => { if (latest.current === request) setResult({ state, error: null }) })
+      .catch((cause) => { if (latest.current === request) setResult({ state: null, error: `Could not load facts: ${errorText(cause)}` }) })
+    return () => { latest.current++ }
   }, [personId, revision, factsRevision])
   const update = (work: Promise<PersonFactsState>, failure: string) => {
-    work.then((state) => setResult({ state, error: null }))
-      .catch((cause) => setResult((current) => ({ ...current, error: `${failure}: ${errorText(cause)}` })))
+    const request = ++latest.current
+    work.then((state) => { if (latest.current === request) setResult({ state, error: null }) })
+      .catch((cause) => { if (latest.current === request) setResult((current) => ({ ...current, error: `${failure}: ${errorText(cause)}` })) })
   }
   const setHidden = (fact: number, hidden: boolean) => update(window.gappd.meetings.hidePersonFact({ id: personId, fact, hidden }), `Could not ${hidden ? 'hide' : 'show'} the fact`)
   const readEarlier = () => update(window.gappd.meetings.queuePersonFacts(personId), 'Could not read earlier Meetings')

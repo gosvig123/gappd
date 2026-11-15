@@ -83,10 +83,21 @@ export async function queuePersonFacts(id: string) {
   return facts
 }
 
+const summaryWrites = new Map<string, ReturnType<typeof writePersonSummary>>()
+
 // Writing a summary uses the notes provider, so it needs Local AI when that is the provider.
+// A Person page opened again during a write shares that write instead of starting another.
 export async function personSummary(id: string, write: boolean) {
   if (!write) return requestCommand('meetings.personSummary', { id })
-  return usingSummaryRuntime((env) => requestCommand('meetings.personSummary', { id, write }, env))
+  const running = summaryWrites.get(id)
+  if (running) return running
+  const next = writePersonSummary(id).finally(() => summaryWrites.delete(id))
+  summaryWrites.set(id, next)
+  return next
+}
+
+function writePersonSummary(id: string) {
+  return usingSummaryRuntime((env) => requestCommand('meetings.personSummary', { id, write: true }, env))
 }
 
 export async function mergePeople(input: MergePeopleInput) {

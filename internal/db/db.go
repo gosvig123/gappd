@@ -140,7 +140,7 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 			return err
 		}
 	}
-	if err := addPersonFactHidden(ctx, conn); err != nil {
+	if err := moveHiddenPersonFacts(ctx, conn); err != nil {
 		return err
 	}
 	if err := migrateMeetingVideo(ctx, conn); err != nil {

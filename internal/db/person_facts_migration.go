@@ -26,17 +26,42 @@ SELECT id, transcript_revision, 'skipped', strftime('%Y-%m-%dT%H:%M:%SZ','now') 
 	return nil
 }
 
-// addPersonFactHidden adds the hidden column to a person_facts table made before it existed.
-func addPersonFactHidden(ctx context.Context, conn *sql.Conn) error {
+// moveHiddenPersonFacts copies the hidden choices of a beta build, which kept them in a
+// person_facts.hidden column, to person_hidden_facts, and then clears the column.
+func moveHiddenPersonFacts(ctx context.Context, conn *sql.Conn) error {
 	var count int
 	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info('person_facts') WHERE name='hidden'`).Scan(&count); err != nil {
-		return fmt.Errorf("check person facts hidden column: %w", err)
+		return fmt.Errorf("check hidden person facts: %w", err)
 	}
-	if count > 0 {
+	if count == 0 {
 		return nil
 	}
-	if _, err := conn.ExecContext(ctx, `ALTER TABLE person_facts ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`); err != nil {
-		return fmt.Errorf("add person facts hidden column: %w", err)
+	rows, err := conn.QueryContext(ctx, `SELECT s.person_id, f.text FROM person_facts f
+JOIN meeting_speakers s ON s.meeting_id=f.meeting_id AND s.speaker_key=f.speaker_key WHERE f.hidden=1`)
+	if err != nil {
+		return fmt.Errorf("read hidden person facts: %w", err)
+	}
+	type hidden struct{ person, text string }
+	var found []hidden
+	for rows.Next() {
+		var item hidden
+		if err := rows.Scan(&item.person, &item.text); err != nil {
+			rows.Close()
+			return fmt.Errorf("read hidden person facts: %w", err)
+		}
+		found = append(found, item)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("read hidden person facts: %w", err)
+	}
+	for _, item := range found {
+		if _, err := conn.ExecContext(ctx, `INSERT OR IGNORE INTO person_hidden_facts(person_id, text_key) VALUES (?,?)`, item.person, factText(item.text)); err != nil {
+			return fmt.Errorf("move hidden person facts: %w", err)
+		}
+	}
+	if _, err := conn.ExecContext(ctx, `UPDATE person_facts SET hidden=0 WHERE hidden=1`); err != nil {
+		return fmt.Errorf("move hidden person facts: %w", err)
 	}
 	return nil
 }

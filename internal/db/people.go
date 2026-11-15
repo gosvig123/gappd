@@ -96,6 +96,9 @@ func (d *DB) MergePeople(kept Person, mergeID string) error {
 	if err := moveSpeakerLabels(tx, mergeID, clean.ID); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(`INSERT OR IGNORE INTO person_hidden_facts(person_id, text_key) SELECT ?, text_key FROM person_hidden_facts WHERE person_id=?`, clean.ID, mergeID); err != nil {
+		return fmt.Errorf("merge people: move hidden facts of %s: %w", mergeID, err)
+	}
 	if _, err := tx.Exec(`DELETE FROM people WHERE id=?`, mergeID); err != nil {
 		return fmt.Errorf("merge people: delete %s: %w", mergeID, err)
 	}

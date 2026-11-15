@@ -234,6 +234,8 @@ async function extractPersonFacts(signal: AbortSignal): Promise<void> {
     const result = await usingSummaryRuntime((env) => requestCommand('meetings.extractPersonFacts', {}, env, signal))
     factsIncomplete = result.failed > 0
     if (result.completed > 0) for (const listener of factObservers) listener(Date.now())
+    // Each run reads one Meeting; queue the next after any waiting step, such as new notes.
+    if (result.completed > 0 && result.pending > 0) requestFacts()
   } catch (error) {
     // A paused pass is queued again; a failed one repeats on the retry interval.
     factsIncomplete = !signal.aborted

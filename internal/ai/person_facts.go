@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
@@ -92,7 +94,7 @@ func ExtractPersonFacts(ctx context.Context, provider Provider, transcript strin
 }
 
 // speakerLabelPattern finds a speaker label in fact text, which the user must never see.
-var speakerLabelPattern = regexp.MustCompile(`(?i)\bspeaker\s*\d+\b`)
+var speakerLabelPattern = regexp.MustCompile(`(?i)\bspeaker[\s\p{Z}]*\d+\b`)
 
 // checkPersonFacts drops facts with an unknown speaker or kind, empty or repeated text, a
 // speaker label in the text, or no quote that their speaker said.
@@ -108,7 +110,7 @@ func checkPersonFacts(facts []PersonFact, transcript string, speakers []string) 
 		}
 		quotes := make([]EvidenceQuote, 0, len(fact.Evidence))
 		for _, quote := range fact.Evidence {
-			if quoteSupportedByTranscript(quote.Text, spoken[fact.Speaker]) {
+			if saidWordForWord(quote.Text, spoken[fact.Speaker]) {
 				quotes = append(quotes, EvidenceQuote{Speaker: fact.Speaker, Text: strings.TrimSpace(quote.Text)})
 			}
 		}
@@ -120,6 +122,25 @@ func checkPersonFacts(facts []PersonFact, transcript string, speakers []string) 
 		out = append(out, fact)
 	}
 	return out
+}
+
+// minQuoteRunes is the shortest quote, in letters and digits, that counts as evidence.
+const minQuoteRunes = 8
+
+// saidWordForWord reports whether the speaker said the quote word for word. Case, spaces and
+// punctuation do not count, so it works in scripts without spaces between words too.
+func saidWordForWord(quote, spoken string) bool {
+	quote = lettersAndDigits(quote)
+	return utf8.RuneCountInString(quote) >= minQuoteRunes && strings.Contains(lettersAndDigits(spoken), quote)
+}
+
+func lettersAndDigits(text string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return unicode.ToLower(r)
+		}
+		return -1
+	}, text)
 }
 
 // speakerWords joins the lines of each speaker in a labeled transcript ("[Speaker 1] text"),

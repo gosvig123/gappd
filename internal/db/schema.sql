@@ -145,10 +145,16 @@ CREATE TABLE IF NOT EXISTS person_facts (
     speaker_key TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,
-    quotes_json TEXT NOT NULL,
-    hidden INTEGER NOT NULL DEFAULT 0
+    quotes_json TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_person_facts_speaker ON person_facts(meeting_id, speaker_key);
+-- Fact texts (factText form) that the user hid on a Person. Kept apart from person_facts, so a new
+-- read of a Meeting or the same fact from another Meeting stays hidden.
+CREATE TABLE IF NOT EXISTS person_hidden_facts (
+    person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    text_key TEXT NOT NULL,
+    PRIMARY KEY (person_id, text_key)
+);
 -- The About summary of a Person, written from the text of their shown facts (facts_key).
 CREATE TABLE IF NOT EXISTS person_summaries (
     person_id TEXT PRIMARY KEY REFERENCES people(id) ON DELETE CASCADE,

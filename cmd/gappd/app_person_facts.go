@@ -197,7 +197,8 @@ func runExtractPersonFacts(meetingID string, count bool) error {
 	if err := provider.Available(); err != nil {
 		return fmt.Errorf("extract person facts: notes provider is not ready: %w", err)
 	}
-	for _, target := range targets {
+	// One Meeting per run, so the drain can run notes for a new Meeting between two reads.
+	for _, target := range targets[:1] {
 		err := extractMeetingFacts(ctx, store, provider, target)
 		if ctx.Err() != nil {
 			return fmt.Errorf("extract person facts: stopped: %w", ctx.Err())
