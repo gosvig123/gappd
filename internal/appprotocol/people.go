@@ -1,6 +1,9 @@
 package appprotocol
 
-import "github.com/gappd-dev/gappd/internal/db"
+import (
+	"github.com/gappd-dev/gappd/internal/ai"
+	"github.com/gappd-dev/gappd/internal/db"
+)
 
 type Person struct {
 	ID    string `json:"id"`
@@ -40,6 +43,41 @@ func BuildPersonActionItems(items []db.PersonActionItem) []PersonActionItem {
 	result := make([]PersonActionItem, 0, len(items))
 	for _, item := range items {
 		result = append(result, PersonActionItem(item))
+	}
+	return result
+}
+
+type PersonFactsInput struct {
+	ID string `json:"id"`
+}
+
+type PersonFactQuote struct {
+	Speaker string `json:"speaker"`
+	Text    string `json:"text"`
+}
+
+// PersonFact is one fact about a Meeting speaker. Person is the name of the Person labeled on
+// that speaker, if any.
+type PersonFact struct {
+	Speaker  string            `json:"speaker"`
+	Person   string            `json:"person,omitempty"`
+	Kind     string            `json:"kind"`
+	Text     string            `json:"text"`
+	Evidence []PersonFactQuote `json:"evidence"`
+}
+
+type PersonFactsResponse struct {
+	Facts []PersonFact `json:"facts"`
+}
+
+func BuildPersonFacts(facts []ai.PersonFact, people map[string]string) []PersonFact {
+	result := make([]PersonFact, 0, len(facts))
+	for _, fact := range facts {
+		quotes := make([]PersonFactQuote, 0, len(fact.Evidence))
+		for _, quote := range fact.Evidence {
+			quotes = append(quotes, PersonFactQuote(quote))
+		}
+		result = append(result, PersonFact{Speaker: fact.Speaker, Person: people[fact.Speaker], Kind: fact.Kind, Text: fact.Text, Evidence: quotes})
 	}
 	return result
 }

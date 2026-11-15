@@ -53,6 +53,27 @@ export type PersonActionItem = {
   deadline?: string
 }
 
+export type PersonFactsInput = {
+  id: string
+}
+
+export type PersonFactsResponse = {
+  facts: PersonFact[]
+}
+
+export type PersonFact = {
+  speaker: string
+  person?: string
+  kind: string
+  text: string
+  evidence: PersonFactQuote[]
+}
+
+export type PersonFactQuote = {
+  speaker: string
+  text: string
+}
+
 export type ImportPeopleInput = {
   contacts: string
 }
