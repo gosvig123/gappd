@@ -128,8 +128,17 @@ func installSchema(ctx context.Context, conn *sql.Conn) error {
 	if err != nil {
 		return err
 	}
+	factsExist, err := personFactRunsExist(ctx, conn)
+	if err != nil {
+		return err
+	}
 	if _, err := conn.ExecContext(ctx, schema); err != nil {
 		return fmt.Errorf("init schema: %w", err)
+	}
+	if !factsExist {
+		if err := skipEarlierMeetings(ctx, conn); err != nil {
+			return err
+		}
 	}
 	if err := migrateMeetingVideo(ctx, conn); err != nil {
 		return err

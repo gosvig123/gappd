@@ -29,10 +29,11 @@ test('startup recognizes once before summary claims; the retry check does not re
   for (let restart = 0; restart < 2; restart++) {
     f.calls.length = 0
     f.module.startDrainCoordinator(); await settle(); await settle()
-    assert.deepEqual(f.calls, ['recognize', 'processing.pending', 'summarization'])
+    // Person facts come after notes, and a pass with nothing waiting does not repeat on the retry check.
+    assert.deepEqual(f.calls, ['recognize', 'processing.pending', 'summarization', 'meetings.extractPersonFacts'])
     f.state.pending = []
     await f.module.requestPendingDrains(); await settle()
-    assert.deepEqual(f.calls.slice(3), ['processing.pending'])
+    assert.deepEqual(f.calls.slice(4), ['processing.pending'])
     f.state.pending = ['summarization']
     await f.module.stopDrainCoordinator()
   }

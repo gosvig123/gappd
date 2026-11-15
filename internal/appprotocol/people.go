@@ -1,9 +1,6 @@
 package appprotocol
 
-import (
-	"github.com/gappd-dev/gappd/internal/ai"
-	"github.com/gappd-dev/gappd/internal/db"
-)
+import "github.com/gappd-dev/gappd/internal/db"
 
 type Person struct {
 	ID    string `json:"id"`
@@ -51,35 +48,43 @@ type PersonFactsInput struct {
 	ID string `json:"id"`
 }
 
-type PersonFactQuote struct {
-	Speaker string `json:"speaker"`
-	Text    string `json:"text"`
-}
-
-// PersonFact is one fact about a Meeting speaker. Person is the name of the Person labeled on
-// that speaker, if any.
+// PersonFact is one fact about a Person. Person is the name of that Person, never a speaker
+// label, and every quote is theirs.
 type PersonFact struct {
-	Speaker  string            `json:"speaker"`
-	Person   string            `json:"person,omitempty"`
-	Kind     string            `json:"kind"`
-	Text     string            `json:"text"`
-	Evidence []PersonFactQuote `json:"evidence"`
+	ID           int64    `json:"id"`
+	Person       string   `json:"person"`
+	MeetingID    string   `json:"meetingId"`
+	MeetingTitle string   `json:"meetingTitle"`
+	StartedAt    string   `json:"startedAt"`
+	Kind         string   `json:"kind"`
+	Text         string   `json:"text"`
+	Quotes       []string `json:"quotes"`
 }
 
 type PersonFactsResponse struct {
 	Facts []PersonFact `json:"facts"`
 }
 
-func BuildPersonFacts(facts []ai.PersonFact, people map[string]string) []PersonFact {
+func BuildPersonFacts(person string, facts []db.PersonFact) []PersonFact {
 	result := make([]PersonFact, 0, len(facts))
 	for _, fact := range facts {
-		quotes := make([]PersonFactQuote, 0, len(fact.Evidence))
-		for _, quote := range fact.Evidence {
-			quotes = append(quotes, PersonFactQuote(quote))
-		}
-		result = append(result, PersonFact{Speaker: fact.Speaker, Person: people[fact.Speaker], Kind: fact.Kind, Text: fact.Text, Evidence: quotes})
+		result = append(result, PersonFact{ID: fact.ID, Person: person, MeetingID: fact.MeetingID, MeetingTitle: fact.MeetingTitle,
+			StartedAt: fact.StartedAt, Kind: fact.Kind, Text: fact.Text, Quotes: append([]string{}, fact.Quotes...)})
 	}
 	return result
+}
+
+// ExtractPersonFactsInput reads one Meeting when Meeting is set, else every Meeting that needs it.
+// Count only counts the Meetings that need it, without the notes provider.
+type ExtractPersonFactsInput struct {
+	Meeting string `json:"meeting,omitempty"`
+	Count   bool   `json:"count,omitempty"`
+}
+
+type ExtractPersonFactsResponse struct {
+	Pending   int `json:"pending"`
+	Completed int `json:"completed"`
+	Failed    int `json:"failed"`
 }
 
 type UpdatePersonInput struct {

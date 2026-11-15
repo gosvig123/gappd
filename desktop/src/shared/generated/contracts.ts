@@ -62,16 +62,25 @@ export type PersonFactsResponse = {
 }
 
 export type PersonFact = {
-  speaker: string
-  person?: string
+  id: number
+  person: string
+  meetingId: string
+  meetingTitle: string
+  startedAt: string
   kind: string
   text: string
-  evidence: PersonFactQuote[]
+  quotes: string[]
 }
 
-export type PersonFactQuote = {
-  speaker: string
-  text: string
+export type ExtractPersonFactsInput = {
+  meeting?: string
+  count?: boolean
+}
+
+export type ExtractPersonFactsResponse = {
+  pending: number
+  completed: number
+  failed: number
 }
 
 export type ImportPeopleInput = {

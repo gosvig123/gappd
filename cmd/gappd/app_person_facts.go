@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os/signal"
 	"slices"
@@ -13,15 +14,54 @@ import (
 )
 
 func appPersonFactsCmd() *cobra.Command {
-	cmd := meetingJSONCommand("person-facts [meeting-id]", cobra.ExactArgs(1), func(args []string) error {
-		return runPersonFacts(args[0])
+	cmd := meetingJSONCommand("person-facts [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		name, err := personName(store, args[0])
+		if err != nil {
+			return err
+		}
+		facts, err := store.PersonFacts(args[0])
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(name, facts)})
 	})
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	return cmd
 }
 
-// runPersonFacts extracts facts about the other speakers of one Meeting with the notes provider.
-func runPersonFacts(meetingID string) error {
+func appExtractPersonFactsCmd() *cobra.Command {
+	var meetingID string
+	var count bool
+	cmd := meetingJSONCommand("extract-person-facts", nil, func(_ []string) error {
+		return runExtractPersonFacts(meetingID, count)
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().StringVar(&meetingID, "meeting", "", "Read only this Meeting, also when it was read before")
+	cmd.Flags().BoolVar(&count, "count", false, "Only count the Meetings that need Person facts")
+	return cmd
+}
+
+func personName(store *db.DB, personID string) (string, error) {
+	people, err := store.ListPeople()
+	if err != nil {
+		return "", fmt.Errorf("list facts of person %s: %w", personID, err)
+	}
+	for _, person := range people {
+		if person.ID == personID {
+			return person.Name, nil
+		}
+	}
+	return "", fmt.Errorf("list facts: person %s not found; reload People", personID)
+}
+
+// runExtractPersonFacts reads Person facts from each Meeting that needs them, with the notes
+// provider. A failed Meeting is saved as failed and the run goes on.
+func runExtractPersonFacts(meetingID string, count bool) error {
 	ctx, stop := signal.NotifyContext(cmdContext(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	cfg, store, err := loadStore()
@@ -29,17 +69,13 @@ func runPersonFacts(meetingID string) error {
 		return err
 	}
 	defer store.Close()
-	meeting, err := store.GetMeeting(meetingID)
+	targets, err := personFactTargets(store, meetingID)
 	if err != nil {
-		return fmt.Errorf("extract person facts: %w", err)
+		return err
 	}
-	segments, err := store.GetSegments(meetingID)
-	if err != nil {
-		return fmt.Errorf("extract person facts of meeting %s: %w", meetingID, err)
-	}
-	speakers, people := otherSpeakers(segments)
-	if len(speakers) == 0 {
-		return writeJSON(appprotocol.PersonFactsResponse{Facts: []appprotocol.PersonFact{}})
+	result := appprotocol.ExtractPersonFactsResponse{Pending: len(targets)}
+	if count || len(targets) == 0 {
+		return writeJSON(result)
 	}
 	provider, err := newAIProvider(cfg.AI)
 	if err != nil {
@@ -48,30 +84,69 @@ func runPersonFacts(meetingID string) error {
 	if err := provider.Available(); err != nil {
 		return fmt.Errorf("extract person facts: notes provider is not ready: %w", err)
 	}
-	facts, err := ai.ExtractPersonFacts(ctx, provider, db.FormatLabeledTranscript(segments), speakers, meeting.Language)
+	for _, target := range targets {
+		err := extractMeetingFacts(ctx, store, provider, target)
+		if ctx.Err() != nil {
+			return fmt.Errorf("extract person facts: stopped: %w", ctx.Err())
+		}
+		if err != nil {
+			result.Failed++
+			result.Pending--
+			if saveErr := store.SavePersonFactsFailure(ctx, target.MeetingID, target.TranscriptRevision, err); saveErr != nil {
+				return saveErr
+			}
+			continue
+		}
+		result.Completed++
+		result.Pending--
+	}
+	return writeJSON(result)
+}
+
+func personFactTargets(store *db.DB, meetingID string) ([]db.PersonFactTarget, error) {
+	if meetingID == "" {
+		return store.PersonFactTargets()
+	}
+	meeting, err := store.GetMeeting(meetingID)
+	if err != nil {
+		return nil, fmt.Errorf("extract person facts: %w", err)
+	}
+	return []db.PersonFactTarget{{MeetingID: meeting.ID, TranscriptRevision: meeting.TranscriptRevision, Language: meeting.Language}}, nil
+}
+
+func extractMeetingFacts(ctx context.Context, store *db.DB, provider ai.Provider, target db.PersonFactTarget) error {
+	segments, err := store.GetSegments(target.MeetingID)
+	if err != nil {
+		return fmt.Errorf("extract person facts of meeting %s: %w", target.MeetingID, err)
+	}
+	facts, err := ai.ExtractPersonFacts(ctx, provider, db.FormatLabeledTranscript(segments), otherSpeakers(segments), target.Language)
 	if err != nil {
 		return err
 	}
-	return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(facts, people)})
+	saved := make([]db.NewPersonFact, 0, len(facts))
+	for _, fact := range facts {
+		quotes := make([]string, 0, len(fact.Evidence))
+		for _, quote := range fact.Evidence {
+			quotes = append(quotes, quote.Text)
+		}
+		saved = append(saved, db.NewPersonFact{SpeakerKey: fact.Speaker, Kind: fact.Kind, Text: fact.Text, Quotes: quotes})
+	}
+	// A transcript changed during the read is read again in the next pass.
+	_, err = store.SavePersonFacts(ctx, target.MeetingID, target.TranscriptRevision, saved)
+	return err
 }
 
-// otherSpeakers lists the speaker labels of a Meeting except the user's own ("You"), with the
-// name of the Person labeled on each.
-func otherSpeakers(segments []db.Segment) ([]string, map[string]string) {
+// otherSpeakers lists the speaker labels of a Meeting except the user's own ("You").
+func otherSpeakers(segments []db.Segment) []string {
 	var speakers []string
-	people := map[string]string{}
 	for _, segment := range segments {
 		key := segment.SpeakerKey
 		if key == "" {
 			key = segment.Speaker
 		}
-		if key == "" || key == db.SpeakerYou || slices.Contains(speakers, key) {
-			continue
-		}
-		speakers = append(speakers, key)
-		if segment.Speaker != key {
-			people[key] = segment.Speaker
+		if key != "" && key != db.SpeakerYou && !slices.Contains(speakers, key) {
+			speakers = append(speakers, key)
 		}
 	}
-	return speakers, people
+	return speakers
 }
