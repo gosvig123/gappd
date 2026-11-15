@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
@@ -128,19 +127,43 @@ func checkPersonFacts(facts []PersonFact, transcript string, speakers []string) 
 const minQuoteRunes = 8
 
 // saidWordForWord reports whether the speaker said the quote word for word. Case, spaces and
-// punctuation do not count, so it works in scripts without spaces between words too.
+// punctuation do not count. The quote must start and end on a word edge ("York" is not in
+// "Yorkshire"), except in scripts that write no spaces between words, such as Chinese.
 func saidWordForWord(quote, spoken string) bool {
-	quote = lettersAndDigits(quote)
-	return utf8.RuneCountInString(quote) >= minQuoteRunes && strings.Contains(lettersAndDigits(spoken), quote)
+	want, _ := lettersAndDigits(quote)
+	if len(want) < minQuoteRunes {
+		return false
+	}
+	have, gap := lettersAndDigits(spoken)
+	edge := func(i int) bool {
+		return i == 0 || i == len(have) || gap[i] || noSpaceScript(have[i-1]) || noSpaceScript(have[i])
+	}
+	for start := 0; start+len(want) <= len(have); start++ {
+		if slices.Equal(have[start:start+len(want)], want) && edge(start) && edge(start+len(want)) {
+			return true
+		}
+	}
+	return false
 }
 
-func lettersAndDigits(text string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsLetter(r) || unicode.IsDigit(r) {
-			return unicode.ToLower(r)
+// lettersAndDigits gives the lowercased letters and digits of text, and for each one whether
+// a space or punctuation came before it.
+func lettersAndDigits(text string) (runes []rune, gap []bool) {
+	separated := false
+	for _, r := range text {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			separated = true
+			continue
 		}
-		return -1
-	}, text)
+		runes = append(runes, unicode.ToLower(r))
+		gap = append(gap, separated)
+		separated = false
+	}
+	return runes, gap
+}
+
+func noSpaceScript(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Thai, unicode.Lao, unicode.Khmer, unicode.Myanmar)
 }
 
 // speakerWords joins the lines of each speaker in a labeled transcript ("[Speaker 1] text"),
