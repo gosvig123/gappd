@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -90,8 +91,11 @@ func ExtractPersonFacts(ctx context.Context, provider Provider, transcript strin
 	return checkPersonFacts(facts, transcript, speakers), nil
 }
 
-// checkPersonFacts drops facts with an unknown speaker or kind, empty or repeated text, or no
-// quote that their speaker said.
+// speakerLabelPattern finds a speaker label in fact text, which the user must never see.
+var speakerLabelPattern = regexp.MustCompile(`(?i)\bspeaker\s*\d+\b`)
+
+// checkPersonFacts drops facts with an unknown speaker or kind, empty or repeated text, a
+// speaker label in the text, or no quote that their speaker said.
 func checkPersonFacts(facts []PersonFact, transcript string, speakers []string) []PersonFact {
 	spoken := speakerWords(transcript)
 	seen := map[string]bool{}
@@ -99,7 +103,7 @@ func checkPersonFacts(facts []PersonFact, transcript string, speakers []string) 
 	for _, fact := range facts {
 		fact.Speaker, fact.Text = strings.TrimSpace(fact.Speaker), strings.TrimSpace(fact.Text)
 		key := strings.ToLower(fact.Speaker + "\x00" + fact.Text)
-		if fact.Text == "" || seen[key] || !slices.Contains(speakers, fact.Speaker) || !slices.Contains(PersonFactKinds, fact.Kind) {
+		if fact.Text == "" || seen[key] || !slices.Contains(speakers, fact.Speaker) || !slices.Contains(PersonFactKinds, fact.Kind) || speakerLabelPattern.MatchString(fact.Text) {
 			continue
 		}
 		quotes := make([]EvidenceQuote, 0, len(fact.Evidence))

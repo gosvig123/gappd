@@ -1,5 +1,5 @@
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem } from '../shared/contracts'
-import type { AssignSpeakerInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
+import type { AssignSpeakerInput, HidePersonFactInput, MergePeopleInput, SpeakerClipInput, UpdatePersonInput } from '../shared/participant-contract'
 import { requestCommand } from './app-protocol'
 import { requestDrains, requestSpeakerRecognition } from './drain-coordinator'
 import { forgetMeetingCalendar } from './participant-calendar'
@@ -65,6 +65,14 @@ export async function updatePerson(input: UpdatePersonInput) {
 
 export async function personActionItems(id: string) {
   return (await requestCommand('meetings.personActionItems', { id })).items
+}
+
+export async function personFacts(id: string) {
+  return (await requestCommand('meetings.personFacts', { id })).facts
+}
+
+export async function hidePersonFact(input: HidePersonFactInput) {
+  return (await requestCommand('meetings.hidePersonFact', input)).facts
 }
 
 export async function mergePeople(input: MergePeopleInput) {

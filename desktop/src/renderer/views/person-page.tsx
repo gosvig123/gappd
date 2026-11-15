@@ -3,6 +3,7 @@ import type { CalendarEventSummary } from '../../shared/calendar-contract'
 import type { PersonActionItem, SavedPerson } from '../../shared/participant-contract'
 import { AgendaButton, AgendaPanel } from '../components/agenda'
 import { PersonEmail } from '../components/person-email'
+import { PersonFacts } from '../components/person-facts'
 import { errorText, PersonEditor, PersonMerge } from '../components/person-forms'
 import { Button } from '../components/ui'
 import type { AppView } from '../lib/app-view'
@@ -12,7 +13,7 @@ import { readableName } from '../lib/person-identity'
 type Props = { person: SavedPerson; view: AppView; canEmail: boolean; onBack: () => void }
 type Change = 'edit' | 'merge' | 'email' | null
 
-/** One Person: their next Calendar events, the action items they own, and their Meetings. */
+/** One Person: their next Calendar events, facts about them, the action items they own, and their Meetings. */
 export function PersonPage({ person, view, canEmail, onBack }: Props) {
   const [change, setChange] = useState<Change>(null)
   const meetings = personMeetings(person, view)
@@ -46,6 +47,7 @@ export function PersonPage({ person, view, canEmail, onBack }: Props) {
           </ul>
         </section>
       ) : null}
+      <PersonFacts personId={person.id} firstName={firstName} view={view} />
       <section className="app-block" aria-label="Action items">
         <div className="app-block-head"><h2>Action items</h2><span className="app-block-note">From the notes of their Meetings</span></div>
         {actions.error ? <p role="alert" className="app-error">{actions.error}</p> : null}

@@ -91,3 +91,13 @@
 .app-speaker-queue-meeting h3 span { color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); }
 .app-speaker-queue-more { justify-self: start; }
 .app-person-empty { margin: 0; }
+.app-fact-group { display: grid; gap: var(--space-1); }
+.app-fact-kind { margin: var(--space-2) 0 0; color: var(--color-text-muted); font-size: var(--font-size-small); font-weight: var(--font-weight-medium); }
+.app-fact-line { display: flex; align-items: baseline; gap: var(--space-3); }
+.app-fact-text { flex: 1; min-inline-size: 0; }
+/* Opacity, not visibility, so the keyboard still reaches Hide. */
+.app-fact-hide { opacity: 0; font-size: var(--font-size-small); }
+.app-fact:is(:hover, :focus-within) .app-fact-hide, .app-fact.is-hidden .app-fact-hide { opacity: 1; }
+.app-fact.is-hidden .app-fact-text { color: var(--color-text-muted); text-decoration: line-through; }
+.app-fact-quote { margin: var(--space-1) 0 0; padding-inline-start: var(--space-3); border-inline-start: 2px solid var(--color-accent-border-strong); color: var(--color-text-muted); font-size: var(--font-size-small); }
+.app-fact-hidden-toggle { margin-inline-start: auto; font-size: var(--font-size-small); }

@@ -59,6 +59,7 @@ type PersonFact struct {
 	Kind         string   `json:"kind"`
 	Text         string   `json:"text"`
 	Quotes       []string `json:"quotes"`
+	Hidden       bool     `json:"hidden"`
 }
 
 type PersonFactsResponse struct {
@@ -69,9 +70,16 @@ func BuildPersonFacts(person string, facts []db.PersonFact) []PersonFact {
 	result := make([]PersonFact, 0, len(facts))
 	for _, fact := range facts {
 		result = append(result, PersonFact{ID: fact.ID, Person: person, MeetingID: fact.MeetingID, MeetingTitle: fact.MeetingTitle,
-			StartedAt: fact.StartedAt, Kind: fact.Kind, Text: fact.Text, Quotes: append([]string{}, fact.Quotes...)})
+			StartedAt: fact.StartedAt, Kind: fact.Kind, Text: fact.Text, Quotes: append([]string{}, fact.Quotes...), Hidden: fact.Hidden})
 	}
 	return result
+}
+
+// HidePersonFactInput hides one fact of a Person, or shows it again when Hidden is false.
+type HidePersonFactInput struct {
+	ID     string `json:"id"`
+	Fact   int64  `json:"fact"`
+	Hidden bool   `json:"hidden"`
 }
 
 // ExtractPersonFactsInput reads one Meeting when Meeting is set, else every Meeting that needs it.

@@ -145,7 +145,8 @@ CREATE TABLE IF NOT EXISTS person_facts (
     speaker_key TEXT NOT NULL,
     kind TEXT NOT NULL,
     text TEXT NOT NULL,
-    quotes_json TEXT NOT NULL
+    quotes_json TEXT NOT NULL,
+    hidden INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_person_facts_speaker ON person_facts(meeting_id, speaker_key);
 -- One row per Meeting whose transcript revision was read for Person facts. 'skipped' marks a

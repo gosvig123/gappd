@@ -25,3 +25,18 @@ SELECT id, transcript_revision, 'skipped', strftime('%Y-%m-%dT%H:%M:%SZ','now') 
 	}
 	return nil
 }
+
+// addPersonFactHidden adds the hidden column to a person_facts table made before it existed.
+func addPersonFactHidden(ctx context.Context, conn *sql.Conn) error {
+	var count int
+	if err := conn.QueryRowContext(ctx, `SELECT count(*) FROM pragma_table_info('person_facts') WHERE name='hidden'`).Scan(&count); err != nil {
+		return fmt.Errorf("check person facts hidden column: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+	if _, err := conn.ExecContext(ctx, `ALTER TABLE person_facts ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("add person facts hidden column: %w", err)
+	}
+	return nil
+}

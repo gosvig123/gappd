@@ -14,7 +14,7 @@ import { configureAgent, findAgents, providerModels, providerStatus, useLocalPro
 import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
-import { assignSpeaker, getDevices, listMeetings, listPeople, mergePeople, personActionItems, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
+import { assignSpeaker, getDevices, listMeetings, listPeople, hidePersonFact, mergePeople, personActionItems, personFacts, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
 import { linkCalendar, participantContext } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
@@ -54,6 +54,8 @@ const IPC_HANDLERS: MainHandlers = {
     updatePerson: (_event, input) => updatePerson(input),
     mergePeople: (_event, input) => mergePeople(input),
     personActionItems: (_event, id: string) => personActionItems(id),
+    personFacts: (_event, id: string) => personFacts(id),
+    hidePersonFact: (_event, input) => hidePersonFact(input),
     // New People with emails can match Calendar invitees in recognition.
     importGoogleContacts: async () => {
       const result = await importGoogleContacts()

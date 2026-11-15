@@ -70,6 +70,13 @@ export type PersonFact = {
   kind: string
   text: string
   quotes: string[]
+  hidden: boolean
+}
+
+export type HidePersonFactInput = {
+  id: string
+  fact: number
+  hidden: boolean
 }
 
 export type ExtractPersonFactsInput = {

@@ -20,18 +20,42 @@ func appPersonFactsCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		name, err := personName(store, args[0])
-		if err != nil {
-			return err
-		}
-		facts, err := store.PersonFacts(args[0])
-		if err != nil {
-			return err
-		}
-		return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(name, facts)})
+		return writePersonFacts(store, args[0])
 	})
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
 	return cmd
+}
+
+func appHidePersonFactCmd() *cobra.Command {
+	var fact int64
+	var hidden bool
+	cmd := meetingJSONCommand("hide-person-fact [person-id]", cobra.ExactArgs(1), func(args []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		if err := store.SetPersonFactHidden(args[0], fact, hidden); err != nil {
+			return err
+		}
+		return writePersonFacts(store, args[0])
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	cmd.Flags().Int64Var(&fact, "fact", 0, "Fact ID")
+	cmd.Flags().BoolVar(&hidden, "hidden", false, "Hide the fact; false shows it again")
+	return cmd
+}
+
+func writePersonFacts(store *db.DB, personID string) error {
+	name, err := personName(store, personID)
+	if err != nil {
+		return err
+	}
+	facts, err := store.PersonFacts(personID)
+	if err != nil {
+		return err
+	}
+	return writeJSON(appprotocol.PersonFactsResponse{Facts: appprotocol.BuildPersonFacts(name, facts)})
 }
 
 func appExtractPersonFactsCmd() *cobra.Command {
