@@ -3,7 +3,7 @@ import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { addToRemoteAIService, remoteAccess } from './cloud/remote-access-service'
 import { isRemoteAIServiceId, type RemoteAIServiceId } from '../shared/remote-access'
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { onPersonFactsChanged, requestDrains, requestSpeakerRecognition } from './drain-coordinator'
@@ -43,6 +43,8 @@ const IPC_HANDLERS: MainHandlers = {
     startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
     // macOS applies a new screen recording grant only to a new process. Quit runs the normal shutdown first.
     relaunch: () => { app.relaunch(); app.quit() },
+    // Prompt windows read the theme through prefers-color-scheme, which follows themeSource.
+    setTheme: (_event, theme) => { nativeTheme.themeSource = theme === 'light' ? 'light' : 'dark' },
   },
   meetings: {
     list: () => listMeetings(),

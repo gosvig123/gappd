@@ -39,6 +39,8 @@ export type IpcInvokeContract = {
     openPermissionsSettings: OperationSpec<[target?: CapturePermissionTarget], void>
     startStaleRecordingRecovery: OperationSpec<[], number>
     relaunch: OperationSpec<[], void>
+    /** The app theme, so windows outside the main one (Meeting prompts, native menus) match it. */
+    setTheme: OperationSpec<[theme: 'dark' | 'light'], void>
   }
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
@@ -146,6 +148,7 @@ export const IPC_OPERATIONS = {
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
     relaunch: 'system:relaunch',
+    setTheme: 'system:setTheme',
   },
   meetings: {
     list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', setLanguage: 'meetings:setLanguage', delete: 'meetings:delete',

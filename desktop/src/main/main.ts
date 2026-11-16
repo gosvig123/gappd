@@ -1,7 +1,7 @@
 import { initializeSelectedFixtureProfile } from './selected-fixture-profile'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, powerMonitor, protocol } from 'electron'
+import { app, autoUpdater as nativeAutoUpdater, BrowserWindow, nativeTheme, powerMonitor, protocol } from 'electron'
 import { registerIpc } from './ipc'
 import { registerMeetingMedia } from './meeting-media'
 import { onMeetingProcessingFinished, pauseDrains, resumeDrains, startDrainCoordinator, stopDrainCoordinator } from './drain-coordinator'
@@ -50,7 +50,7 @@ function createWindow(show = true): void {
     height: 780,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0b1020',
+    backgroundColor: '#141415', // Graphite --color-bg (dark, the default theme)
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -112,6 +112,8 @@ app.whenReady().then(async () => {
   startErrorReports()
   registerMeetingMedia()
   applyDevDockIcon()
+  // Dark is the default app theme; the renderer sends the chosen theme once it loads.
+  nativeTheme.themeSource = 'dark'
   migrateScreenCapturePermission()
   const startHidden = shouldStartHidden()
   initializeStartupSettings()

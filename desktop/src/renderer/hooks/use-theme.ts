@@ -15,6 +15,7 @@ export function useTheme(): [ThemeName, (theme: ThemeName) => void] {
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     storeTheme(theme)
+    void window.gappd.system.setTheme(theme)
   }, [theme])
   const choose = useCallback((next: ThemeName) => setTheme(next), [])
   return [theme, choose]
