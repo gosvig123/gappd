@@ -8,6 +8,7 @@ import (
 )
 
 // Pinned offline WeSpeaker model; changing the model requires a new identity.
+// It keeps the gappd.1 revision: gappd.2 changed only clustering, not voiceprints.
 const VoiceModel = "fluidaudio-offline-vbx/300165b240c45375add402265f62410b6df33cf1+gappd.1/wespeaker-256/v1"
 const SpeakerEmbeddingDimension = 256
 const MinimumVoiceSeconds = 15.0 // Clean speech, not total speech.

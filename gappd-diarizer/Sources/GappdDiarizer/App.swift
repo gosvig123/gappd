@@ -2,7 +2,7 @@ import Darwin
 import FluidAudio
 import Foundation
 
-private let revision = "300165b240c45375add402265f62410b6df33cf1+gappd.1"
+private let revision = "300165b240c45375add402265f62410b6df33cf1+gappd.2"
 private let engine = "fluidaudio-offline-vbx"
 
 private struct Cluster: Codable { let localClusterID: String; let centroid: [Double] }
@@ -25,7 +25,8 @@ func clippedTimeRange(start: Double, end: Double, duration: Double) -> (start: D
 }
 
 func makeOfflineDiarizerConfig() -> OfflineDiarizerConfig {
-    var config = OfflineDiarizerConfig(clusteringThreshold: 0.6, minSegmentDuration: 0.75)
+    // 0.7, not 0.6: at 0.6 two remote people with similar voices (voiceprints about 0.45-0.55 alike) merge into one speaker.
+    var config = OfflineDiarizerConfig(clusteringThreshold: 0.7, minSegmentDuration: 0.75)
     config.exposeChunkEmbeddings = true
     return config
 }
