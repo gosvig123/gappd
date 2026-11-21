@@ -1,12 +1,13 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
 import readline from 'node:readline'
-import { canStartRecordingStatus, RECORDING_STATUS_RECORDING } from '../shared/meeting-recording-workflow'
+import { canStartRecordingStatus, RECORDING_STATUS_ERROR, RECORDING_STATUS_RECORDING, RECORDING_STATUS_STARTING } from '../shared/meeting-recording-workflow'
 import { createAssistedRecordingStop } from './assisted-recording-stop'
+import { checkCapturePermissions } from './capture-permissions'
 import { childEnv, resolveCaptureBinary } from './native-runtime'
 import { dismissMeetingPrompt, showMeetingPrompt, stopMeetingPrompts } from './meeting-notification'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow } from './meeting-recording-workflow'
-import { getRecordingState, onRecordingStateChange } from './state'
-import { logFailure } from './error-log'
+import { getRecordingState, onRecordingStateChange, setRecordingState } from './state'
+import { isExpectedError, logFailure } from './error-log'
 
 const DEBOUNCE_MS = 4_000
 const OBSERVER_RESTART_MS = 2_000
@@ -116,8 +117,10 @@ function promptForSignal(key: string): void {
   debounceTimers.delete(key)
   const signal = activeSignals.get(key)
   if (!signal) return
-  promptedKeys.add(key)
   if (!canStartRecordingStatus(getRecordingState().status)) return
+  const permissions = checkCapturePermissions()
+  if (permissions.microphone !== 'granted' || permissions.screen !== 'granted') return
+  promptedKeys.add(key)
   showMeetingPrompt({ key: signal.key, title: signal.title, onRecord: () => void recordSignal(signal) })
 }
 
@@ -126,8 +129,14 @@ async function recordSignal(signal: MeetingSignal): Promise<void> {
     const state = await startMeetingRecordingWorkflow({ fallbackTitle: signal.title })
     assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
   } catch (error) {
+    const status = getRecordingState().status
+    if (canStartRecordingStatus(status) || status === RECORDING_STATUS_STARTING) {
+      const message = error instanceof Error ? error.message : String(error)
+      setRecordingState({ status: RECORDING_STATUS_ERROR, title: signal.title, error: message })
+    }
     showApp()
-    logFailure('recording.auto-start', `Start recording for ${signal.provider} failed:`, error)
+    if (isExpectedError(error)) console.warn(`Start recording for ${signal.provider} did not start:`, error)
+    else logFailure('recording.auto-start', `Start recording for ${signal.provider} failed:`, error)
   }
 }
 

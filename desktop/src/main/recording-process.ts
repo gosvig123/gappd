@@ -3,6 +3,7 @@ import type { RecordingEvent } from '../shared/generated/contracts'
 import { ignoresStopRequest, recordingEventOutcome, RECORDING_STATUS_ERROR, RECORDING_STATUS_IDLE, RECORDING_STATUS_STOPPING } from '../shared/meeting-recording-workflow'
 import { streamCommand } from './app-protocol'
 import { requestDrains, resumeDrains } from './drain-coordinator'
+import { codedError } from './error-log'
 import { managedRuntime } from './managed-runtime/runtime'
 import { logMainProcessMemory } from './memory'
 import { getRecordingState, setRecordingState } from './state'
@@ -13,8 +14,12 @@ const LIVE_TRANSCRIPT_CHUNK_SECONDS = '120'
 const LIVE_TRANSCRIPT_CHUNK_OVERLAP_SECONDS = '10'
 let recordingChild: RecordingChild | null = null
 
+export function isRecordingProcessRunning(): boolean {
+  return recordingChild !== null
+}
+
 export async function startRecording(input: { title: string; titleSource?: 'calendar'; device: number; mode: string; language: string; speakerLabelsEnabled?: boolean; screenVideoEnabled?: boolean }, onStarted?: (meetingId: string) => void): Promise<void> {
-  if (recordingChild) throw new Error('A recording is already running')
+  if (recordingChild) throw codedError('A recording is already running', 'RECORDING_ALREADY_RUNNING', { expected: true })
   const snapshot = managedRuntime.status()
   const liveTranscript = snapshot.capabilities.transcription.readiness === 'ready'
   logMainProcessMemory('recording:start')

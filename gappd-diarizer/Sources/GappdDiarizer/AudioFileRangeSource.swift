@@ -38,16 +38,32 @@ final class AudioFileRangeSource: AudioSampleSource, @unchecked Sendable {
     }
 
     /// Gives `body` the decoded Int16 samples of the range. AVAudioFile keeps one read position, so reads are serialized.
+    /// Core Audio FLAC reads may return fewer frames than requested per call, so read in a loop until the full range is collected.
     func withSamples(offset: Int, count: Int, _ body: (UnsafePointer<Int16>) throws -> Void) throws {
         lock.lock()
         defer { lock.unlock() }
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(count)) else {
-            throw RangeSourceError.shortRead
-        }
+        var collected = [Int16](repeating: 0, count: count)
+        var filled = 0
         file.framePosition = AVAudioFramePosition(startFrame + offset)
-        try file.read(into: buffer, frameCount: AVAudioFrameCount(count))
-        guard Int(buffer.frameLength) == count, let samples = buffer.int16ChannelData?[0] else { throw RangeSourceError.shortRead }
-        try body(samples)
+        while filled < count {
+            let remaining = count - filled
+            guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(remaining)) else {
+                throw RangeSourceError.shortRead
+            }
+            try file.read(into: buffer, frameCount: AVAudioFrameCount(remaining))
+            let readFrames = Int(buffer.frameLength)
+            guard readFrames > 0, readFrames <= remaining, let samples = buffer.int16ChannelData?[0] else {
+                throw RangeSourceError.shortRead
+            }
+            collected.withUnsafeMutableBufferPointer { dst in
+                dst.baseAddress!.advanced(by: filled).update(from: samples, count: readFrames)
+            }
+            filled += readFrames
+        }
+        try collected.withUnsafeBufferPointer { ptr in
+            guard let base = ptr.baseAddress else { throw RangeSourceError.shortRead }
+            try body(base)
+        }
     }
 }
 

@@ -80,13 +80,33 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
   })
 }
 
-// An Error report keeps a code but never the message, so a lock failure carries its SQLite code.
+// An Error report keeps a code but never the message, so known backend failures carry fixed codes.
 const SQLITE_LOCK_CODES: Record<string, string> = { '5': 'SQLITE_BUSY', '6': 'SQLITE_LOCKED', '261': 'SQLITE_BUSY_RECOVERY', '517': 'SQLITE_BUSY_SNAPSHOT', '773': 'SQLITE_BUSY_TIMEOUT' }
 
+const BACKEND_ERROR_PATTERNS: Array<{ pattern: RegExp; code: string; expected?: boolean }> = [
+  { pattern: /play speaker .*: no clear audio clip available/i, code: 'SPEAKER_CLIP_NONE', expected: true },
+  { pattern: /play speaker: retained audio is unavailable/i, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
+  { pattern: /play speaker .*: open .*: no such file or directory/i, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
+  { pattern: /clip timing exceeds retained audio/i, code: 'SPEAKER_CLIP_RANGE' },
+  { pattern: /unsupported retained (?:WAV|FLAC) or invalid clip timing/i, code: 'SPEAKER_CLIP_UNSUPPORTED' },
+  { pattern: /play speaker: the audio helper is unavailable/i, code: 'SPEAKER_CLIP_NO_HELPER' },
+  { pattern: /play speaker: decode retained audio/i, code: 'SPEAKER_CLIP_DECODE' },
+]
+
 function backendError(output: string): Error {
-  const error: Error & { code?: string } = new Error(output)
+  const error: Error & { code?: string; expected?: boolean } = new Error(output)
   const sqlite = / is locked \((\d{1,4})\)/.exec(output)
-  if (sqlite) error.code = SQLITE_LOCK_CODES[sqlite[1]] ?? `SQLITE_${sqlite[1]}`
+  if (sqlite) {
+    error.code = SQLITE_LOCK_CODES[sqlite[1]] ?? `SQLITE_${sqlite[1]}`
+    return error
+  }
+  for (const entry of BACKEND_ERROR_PATTERNS) {
+    if (entry.pattern.test(output)) {
+      error.code = entry.code
+      if (entry.expected) error.expected = true
+      return error
+    }
+  }
   return error
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
-import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
+import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE, RECORDING_STATUS_STARTING } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { permissionTarget } from '../components/meeting/status'
 import { useGuardedEffect } from './use-guarded-effect'
@@ -111,7 +111,7 @@ async function startRecording(device: number, language: string, setState: SetRec
     setError(null)
     const { speakerLabelsEnabled } = await window.gappd.startup.getSettings()
     const recording = await window.gappd.recording.start({ device, language, speakerLabelsEnabled, eventSourceId, title })
-    setState((current) => ({ ...current, recording }))
+    setState((current) => recording.status === RECORDING_STATUS_STARTING && !canStartRecordingStatus(current.recording.status) ? current : { ...current, recording })
   } catch (err) {
     setError(errorMessage(err))
   }
