@@ -94,6 +94,10 @@ const SPEAKER_CLIP_ERROR_PATTERNS: Array<{ pattern: RegExp; code: string; expect
   { pattern: /^(?:Error:\s*)?play speaker "[^"]*": play speaker: decode retained audio: /, code: 'SPEAKER_CLIP_DECODE' },
 ]
 
+const DEVICES_LIST_ERROR_PATTERNS: Array<{ pattern: RegExp; code: string; expected?: boolean }> = [
+  { pattern: /^(?:Error:\s*)?no audio devices found$/, code: 'NO_INPUT_DEVICE', expected: true },
+]
+
 function backendError(id: AppRequestID, output: string): Error {
   const error: Error & { code?: string; expected?: boolean } = new Error(output)
   const sqlite = / is locked \((\d{1,4})\)/.exec(output)
@@ -101,9 +105,10 @@ function backendError(id: AppRequestID, output: string): Error {
     error.code = SQLITE_LOCK_CODES[sqlite[1]] ?? `SQLITE_${sqlite[1]}`
     return error
   }
-  if (id === 'meetings.speakerClip') {
+  const patterns = id === 'meetings.speakerClip' ? SPEAKER_CLIP_ERROR_PATTERNS : id === 'devices.list' ? DEVICES_LIST_ERROR_PATTERNS : null
+  if (patterns) {
     const firstLine = output.split('\n').map((line) => line.trim()).find(Boolean) ?? ''
-    for (const entry of SPEAKER_CLIP_ERROR_PATTERNS) {
+    for (const entry of patterns) {
       if (entry.pattern.test(firstLine)) {
         error.code = entry.code
         if (entry.expected) error.expected = true

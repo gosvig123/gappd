@@ -15,11 +15,19 @@ import { recordingCalendarContext, rememberRecordingCalendar } from './participa
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
 let startingWorkflow: Promise<RecordingState> | null = null
+let shuttingDown = false
+
+/** Prevents an in-flight start from spawning a recorder during app quit and waits for it to settle. */
+export async function stopStartingRecordingForQuit(): Promise<void> {
+  shuttingDown = true
+  await startingWorkflow?.catch(() => undefined)
+}
 
 /** fallbackTitle names the Meeting when it has no title and no Calendar event, such as "Zoom call". */
 export type RecordingWorkflowInput = StartRecordingInput & { fallbackTitle?: string; onStarted?: (meetingId: string) => void }
 
 export async function startMeetingRecordingWorkflow(input: RecordingWorkflowInput = {}): Promise<RecordingState> {
+  if (shuttingDown) throw codedError('Gappd is closing.', 'APP_SHUTTING_DOWN', { expected: true })
   if (startingWorkflow) return startingWorkflow
   const current = getRecordingState()
   if (current.status === RECORDING_STATUS_STARTING) return current
@@ -43,8 +51,10 @@ async function runStartMeetingRecordingWorkflow(input: RecordingWorkflowInput, t
     const permissionError = capturePermissionError(await requestCapturePermissions())
     if (permissionError) throw permissionError
     const calendar = await prepareCalendar(input.eventSourceId, !title)
+    if (shuttingDown) throw codedError('Gappd is closing.', 'APP_SHUTTING_DOWN', { expected: true })
     await pauseDrains('recording')
     drainsPaused = true
+    if (shuttingDown) throw codedError('Gappd is closing.', 'APP_SHUTTING_DOWN', { expected: true })
     await startRecording({ ...recordingTitle(title, calendar?.event?.title, input.fallbackTitle), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
       language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled,
       screenVideoEnabled: getStartupSettings().screenVideoEnabled },

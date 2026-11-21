@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
-import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE, RECORDING_STATUS_STARTING } from '../../shared/meeting-recording-workflow'
+import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE, RECORDING_STATUS_STARTING, RECORDING_STATUS_STOPPING } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { permissionTarget } from '../components/meeting/status'
 import { useGuardedEffect } from './use-guarded-effect'
@@ -127,7 +127,8 @@ async function stopRecording(setState: SetRecordingWorkflowState, setError: (err
   try {
     setError(null)
     const recording = await window.gappd.recording.stop()
-    setState((current) => ({ ...current, recording }))
+    // Main pushes `stopping` over recording:statusChanged before returning; ignore a late `stopping` reply so it cannot overwrite `idle` or `error`.
+    setState((current) => recording.status === RECORDING_STATUS_STOPPING ? current : { ...current, recording })
   } catch (err) {
     setError(errorMessage(err))
   }

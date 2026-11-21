@@ -77,14 +77,23 @@ func selectSpeakerClip(segments []db.Segment, key string, index int) (db.Segment
 	}
 	type fallbackCandidate struct {
 		segment db.Segment
+		usable  bool
 		overlap float64
 		quality float64
 	}
 	ranked := make([]fallbackCandidate, len(fallback))
 	for i, seg := range fallback {
-		ranked[i] = fallbackCandidate{segment: seg, overlap: clipOverlapRatio(seg, segments), quality: clipQuality(seg)}
+		ranked[i] = fallbackCandidate{
+			segment: seg,
+			usable:  seg.End-seg.Start >= 0.25,
+			overlap: clipOverlapRatio(seg, segments),
+			quality: clipQuality(seg),
+		}
 	}
 	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].usable != ranked[j].usable {
+			return ranked[i].usable
+		}
 		if ranked[i].overlap != ranked[j].overlap {
 			return ranked[i].overlap < ranked[j].overlap
 		}

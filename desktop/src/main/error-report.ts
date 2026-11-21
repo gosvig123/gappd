@@ -130,13 +130,13 @@ const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTU
 
 const MEETING_FAILURE_CODES: Record<'capture' | 'processing' | 'screen-video', Array<[RegExp, string]>> = {
   capture: [
-    [/recording was interrupted before audio was saved/i, 'STALE_NO_AUDIO'],
-    [/microphone access denied/i, 'CAPTURE_PERMISSION_MIC'],
-    [/screen & system audio recording access required/i, 'CAPTURE_PERMISSION_SCREEN'],
+    [/^Recording was interrupted before audio was saved\./, 'STALE_NO_AUDIO'],
+    [/^capture process failed to start: exit status 126: error: Microphone access denied\./, 'CAPTURE_PERMISSION_MIC'],
+    [/^capture process failed to start: exit status 126: error: Screen & System Audio Recording access required/, 'CAPTURE_PERMISSION_SCREEN'],
     [/could not start microphone capture/i, 'CAPTURE_MIC_START'],
     [/could not start system audio capture/i, 'CAPTURE_SYSTEM_START'],
     [/could not stop audio capture cleanly/i, 'CAPTURE_STOP_FAILED'],
-    [/capture process (?:failed to start|exited immediately)/i, 'CAPTURE_LAUNCH_FAILED'],
+    [/^(?:capture process (?:failed to start|exited immediately)|start capture: )/, 'CAPTURE_LAUNCH_FAILED'],
   ],
   processing: [
     [/no audio captured/i, 'NO_AUDIO_CAPTURED'],

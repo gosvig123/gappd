@@ -62,6 +62,7 @@ function recordingStateChanged(state: ReturnType<typeof getRecordingState>): voi
     if (state.status === RECORDING_STATUS_ERROR) showApp()
   }
   if (state.status !== RECORDING_STATUS_RECORDING) return
+  if (assistedStop.isTracking(state.meetingId)) return
   const signals = [...activeSignals.values()]
   const signal = signals.find((candidate) => candidate.title === state.title) ?? (signals.length === 1 ? signals[0] : null)
   if (signal) assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
@@ -123,8 +124,9 @@ function promptForSignal(key: string): void {
   debounceTimers.delete(key)
   const signal = activeSignals.get(key)
   if (!signal) return
-  if (!canStartRecordingStatus(getRecordingState().status)) {
-    promptedKeys.add(key)
+  const status = getRecordingState().status
+  if (!canStartRecordingStatus(status)) {
+    if (status !== RECORDING_STATUS_STARTING) promptedKeys.add(key)
     return
   }
   const permissions = checkCapturePermissions()
