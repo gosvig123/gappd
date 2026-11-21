@@ -14,13 +14,25 @@ import { recordingCalendarContext, rememberRecordingCalendar } from './participa
 
 const DEFAULT_CAPTURE_MODE = 'both'
 const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
+const QUIT_START_WAIT_MS = 2_000
 let startingWorkflow: Promise<RecordingState> | null = null
 let shuttingDown = false
 
-/** Prevents an in-flight start from spawning a recorder during app quit and waits for it to settle. */
+/** Marks shutdown synchronously before other quit awaits so an in-flight start cannot spawn a recorder. */
+export function beginRecordingShutdown(): void {
+  shuttingDown = true
+}
+
+/** Prevents an in-flight start from spawning a recorder during app quit and waits briefly for it to settle. */
 export async function stopStartingRecordingForQuit(): Promise<void> {
   shuttingDown = true
-  await startingWorkflow?.catch(() => undefined)
+  const pending = startingWorkflow
+  if (!pending) return
+  let timer: NodeJS.Timeout | undefined
+  await Promise.race([
+    pending.catch(() => undefined),
+    new Promise<void>((resolve) => { timer = setTimeout(resolve, QUIT_START_WAIT_MS) }),
+  ]).finally(() => { if (timer) clearTimeout(timer) })
 }
 
 /** fallbackTitle names the Meeting when it has no title and no Calendar event, such as "Zoom call". */
