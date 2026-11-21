@@ -25,6 +25,7 @@ let observer: ChildProcessWithoutNullStreams | null = null
 let observerRestartTimer: NodeJS.Timeout | null = null
 let unsubscribeRecordingState: (() => void) | null = null
 let stopping = false
+let pendingAutoStart = false
 let showApp = () => {}
 
 const assistedStop = createAssistedRecordingStop({
@@ -43,6 +44,7 @@ export function startMeetingPresence(showMainWindow: () => void): void {
 
 export function stopMeetingPresence(): void {
   stopping = true
+  pendingAutoStart = false
   observer?.kill()
   observer = null
   if (observerRestartTimer) clearTimeout(observerRestartTimer)
@@ -55,6 +57,10 @@ export function stopMeetingPresence(): void {
 
 function recordingStateChanged(state: ReturnType<typeof getRecordingState>): void {
   assistedStop.recordingStateChanged(state)
+  if (pendingAutoStart && state.status !== RECORDING_STATUS_STARTING) {
+    pendingAutoStart = false
+    if (state.status === RECORDING_STATUS_ERROR) showApp()
+  }
   if (state.status !== RECORDING_STATUS_RECORDING) return
   const signals = [...activeSignals.values()]
   const signal = signals.find((candidate) => candidate.title === state.title) ?? (signals.length === 1 ? signals[0] : null)
@@ -117,7 +123,10 @@ function promptForSignal(key: string): void {
   debounceTimers.delete(key)
   const signal = activeSignals.get(key)
   if (!signal) return
-  if (!canStartRecordingStatus(getRecordingState().status)) return
+  if (!canStartRecordingStatus(getRecordingState().status)) {
+    promptedKeys.add(key)
+    return
+  }
   const permissions = checkCapturePermissions()
   if (permissions.microphone !== 'granted' || permissions.screen !== 'granted') return
   promptedKeys.add(key)
@@ -125,10 +134,15 @@ function promptForSignal(key: string): void {
 }
 
 async function recordSignal(signal: MeetingSignal): Promise<void> {
+  if (!canStartRecordingStatus(getRecordingState().status)) return
+  pendingAutoStart = true
   try {
-    const state = await startMeetingRecordingWorkflow({ fallbackTitle: signal.title })
-    assistedStop.track({ key: signal.key, title: signal.title, meetingId: state.meetingId })
+    await startMeetingRecordingWorkflow({
+      fallbackTitle: signal.title,
+      onStarted: (meetingId) => assistedStop.track({ key: signal.key, title: signal.title, meetingId }),
+    })
   } catch (error) {
+    pendingAutoStart = false
     const status = getRecordingState().status
     if (canStartRecordingStatus(status) || status === RECORDING_STATUS_STARTING) {
       const message = error instanceof Error ? error.message : String(error)

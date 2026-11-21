@@ -50,7 +50,11 @@ final class AudioFileRangeSource: AudioSampleSource, @unchecked Sendable {
             guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: AVAudioFrameCount(remaining)) else {
                 throw RangeSourceError.shortRead
             }
-            try file.read(into: buffer, frameCount: AVAudioFrameCount(remaining))
+            do {
+                try file.read(into: buffer, frameCount: AVAudioFrameCount(remaining))
+            } catch {
+                throw RangeSourceError.shortRead
+            }
             let readFrames = Int(buffer.frameLength)
             guard readFrames > 0, readFrames <= remaining, let samples = buffer.int16ChannelData?[0] else {
                 throw RangeSourceError.shortRead

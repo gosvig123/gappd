@@ -75,14 +75,22 @@ func selectSpeakerClip(segments []db.Segment, key string, index int) (db.Segment
 	if len(fallback) == 0 {
 		return db.Segment{}, fmt.Errorf("play speaker %q: no clear audio clip available", key)
 	}
-	sort.SliceStable(fallback, func(i, j int) bool {
-		leftOverlap, rightOverlap := clipOverlapRatio(fallback[i], segments), clipOverlapRatio(fallback[j], segments)
-		if leftOverlap != rightOverlap {
-			return leftOverlap < rightOverlap
+	type fallbackCandidate struct {
+		segment db.Segment
+		overlap float64
+		quality float64
+	}
+	ranked := make([]fallbackCandidate, len(fallback))
+	for i, seg := range fallback {
+		ranked[i] = fallbackCandidate{segment: seg, overlap: clipOverlapRatio(seg, segments), quality: clipQuality(seg)}
+	}
+	sort.SliceStable(ranked, func(i, j int) bool {
+		if ranked[i].overlap != ranked[j].overlap {
+			return ranked[i].overlap < ranked[j].overlap
 		}
-		return clipQuality(fallback[i]) > clipQuality(fallback[j])
+		return ranked[i].quality > ranked[j].quality
 	})
-	return fallback[index%len(fallback)], nil
+	return ranked[index%len(ranked)].segment, nil
 }
 
 func clipQuality(segment db.Segment) float64 {
@@ -113,7 +121,8 @@ func clipOverlapRatio(clip db.Segment, segments []db.Segment) float64 {
 	if duration <= 0 {
 		return 1
 	}
-	var overlapped float64
+	type span struct{ start, end float64 }
+	var spans []span
 	for _, other := range segments {
 		if other.RawSpeaker() == clip.RawSpeaker() || segmentAudioStream(other) != stream {
 			continue
@@ -121,9 +130,24 @@ func clipOverlapRatio(clip db.Segment, segments []db.Segment) float64 {
 		start := max(clip.Start, other.Start)
 		end := min(clipEnd, other.End)
 		if end > start {
-			overlapped += end - start
+			spans = append(spans, span{start: start, end: end})
 		}
 	}
+	if len(spans) == 0 {
+		return 0
+	}
+	sort.Slice(spans, func(i, j int) bool { return spans[i].start < spans[j].start })
+	mergedStart, mergedEnd := spans[0].start, spans[0].end
+	var overlapped float64
+	for _, next := range spans[1:] {
+		if next.start <= mergedEnd {
+			mergedEnd = max(mergedEnd, next.end)
+			continue
+		}
+		overlapped += mergedEnd - mergedStart
+		mergedStart, mergedEnd = next.start, next.end
+	}
+	overlapped += mergedEnd - mergedStart
 	return min(overlapped/duration, 1)
 }
 

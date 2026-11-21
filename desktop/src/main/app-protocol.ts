@@ -44,7 +44,7 @@ function commandArgs<ID extends keyof AppCommandInput>(id: ID, input: AppCommand
 function runCommand<ID extends AppRequestID>(id: ID, args: string[], env: CommandEnv, signal?: AbortSignal): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(resolveGappdBinary(), args, { env: commandEnvFor(id, env), signal, stdio: ['ignore', 'pipe', 'pipe'] })
-    collectCommandOutput(child, resolve, reject, signal)
+    collectCommandOutput(id, child, resolve, reject, signal)
   })
 }
 
@@ -63,7 +63,7 @@ function parseCommandOutput<ID extends AppRequestID>(id: ID, output: string): Ap
   }
 }
 
-function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void, signal?: AbortSignal): void {
+function collectCommandOutput(id: AppRequestID, child: ReturnType<typeof spawn>, resolve: (stdout: string) => void, reject: (error: Error) => void, signal?: AbortSignal): void {
   let stdout = ''
   let stderr = ''
   let processError: Error | undefined
@@ -74,7 +74,7 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
   child.once('error', (error) => { processError = spawnError(error); if (!signal?.aborted) reject(processError) })
   child.once('close', (code) => {
     if (processError) return reject(processError)
-    if (code !== 0) return reject(backendError(stderr || stdout || `gappd exited with code ${code}`))
+    if (code !== 0) return reject(backendError(id, stderr || stdout || `gappd exited with code ${code}`))
     if (stderr.trim()) console.warn(stderr.trim())
     resolve(stdout)
   })
@@ -83,28 +83,32 @@ function collectCommandOutput(child: ReturnType<typeof spawn>, resolve: (stdout:
 // An Error report keeps a code but never the message, so known backend failures carry fixed codes.
 const SQLITE_LOCK_CODES: Record<string, string> = { '5': 'SQLITE_BUSY', '6': 'SQLITE_LOCKED', '261': 'SQLITE_BUSY_RECOVERY', '517': 'SQLITE_BUSY_SNAPSHOT', '773': 'SQLITE_BUSY_TIMEOUT' }
 
-const BACKEND_ERROR_PATTERNS: Array<{ pattern: RegExp; code: string; expected?: boolean }> = [
-  { pattern: /play speaker .*: no clear audio clip available/i, code: 'SPEAKER_CLIP_NONE', expected: true },
-  { pattern: /play speaker: retained audio is unavailable/i, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
-  { pattern: /play speaker .*: open .*: no such file or directory/i, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
-  { pattern: /clip timing exceeds retained audio/i, code: 'SPEAKER_CLIP_RANGE' },
-  { pattern: /unsupported retained (?:WAV|FLAC) or invalid clip timing/i, code: 'SPEAKER_CLIP_UNSUPPORTED' },
-  { pattern: /play speaker: the audio helper is unavailable/i, code: 'SPEAKER_CLIP_NO_HELPER' },
-  { pattern: /play speaker: decode retained audio/i, code: 'SPEAKER_CLIP_DECODE' },
+// Patterns are scoped by command ID and anchored to the command's fixed error line so arbitrary paths cannot spoof an expected error.
+const SPEAKER_CLIP_ERROR_PATTERNS: Array<{ pattern: RegExp; code: string; expected?: boolean }> = [
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": no clear audio clip available$/, code: 'SPEAKER_CLIP_NONE', expected: true },
+  { pattern: /^(?:Error:\s*)?play speaker: retained audio is unavailable$/, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": retained audio file is missing; choose another clip or restore retained audio$/, code: 'SPEAKER_CLIP_NO_AUDIO', expected: true },
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": clip timing exceeds retained audio; choose another clip or restore retained audio$/, code: 'SPEAKER_CLIP_RANGE' },
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": unsupported retained (?:WAV|FLAC) or invalid clip timing; choose another clip or restore retained audio$/, code: 'SPEAKER_CLIP_UNSUPPORTED' },
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": play speaker: the audio helper is unavailable; restart Gappd; choose another clip or restore retained audio$/, code: 'SPEAKER_CLIP_NO_HELPER' },
+  { pattern: /^(?:Error:\s*)?play speaker "[^"]*": play speaker: decode retained audio: /, code: 'SPEAKER_CLIP_DECODE' },
 ]
 
-function backendError(output: string): Error {
+function backendError(id: AppRequestID, output: string): Error {
   const error: Error & { code?: string; expected?: boolean } = new Error(output)
   const sqlite = / is locked \((\d{1,4})\)/.exec(output)
   if (sqlite) {
     error.code = SQLITE_LOCK_CODES[sqlite[1]] ?? `SQLITE_${sqlite[1]}`
     return error
   }
-  for (const entry of BACKEND_ERROR_PATTERNS) {
-    if (entry.pattern.test(output)) {
-      error.code = entry.code
-      if (entry.expected) error.expected = true
-      return error
+  if (id === 'meetings.speakerClip') {
+    const firstLine = output.split('\n').map((line) => line.trim()).find(Boolean) ?? ''
+    for (const entry of SPEAKER_CLIP_ERROR_PATTERNS) {
+      if (entry.pattern.test(firstLine)) {
+        error.code = entry.code
+        if (entry.expected) error.expected = true
+        return error
+      }
     }
   }
   return error

@@ -17,7 +17,7 @@ const NO_INPUT_DEVICE_ERROR = 'Connect or enable input device before recording.'
 let startingWorkflow: Promise<RecordingState> | null = null
 
 /** fallbackTitle names the Meeting when it has no title and no Calendar event, such as "Zoom call". */
-export type RecordingWorkflowInput = StartRecordingInput & { fallbackTitle?: string }
+export type RecordingWorkflowInput = StartRecordingInput & { fallbackTitle?: string; onStarted?: (meetingId: string) => void }
 
 export async function startMeetingRecordingWorkflow(input: RecordingWorkflowInput = {}): Promise<RecordingState> {
   if (startingWorkflow) return startingWorkflow
@@ -48,7 +48,10 @@ async function runStartMeetingRecordingWorkflow(input: RecordingWorkflowInput, t
     await startRecording({ ...recordingTitle(title, calendar?.event?.title, input.fallbackTitle), device: selectedDevice, mode: input.mode ?? DEFAULT_CAPTURE_MODE,
       language: recordingLanguage(input.language), speakerLabelsEnabled: input.speakerLabelsEnabled ?? getStartupSettings().speakerLabelsEnabled,
       screenVideoEnabled: getStartupSettings().screenVideoEnabled },
-    (id) => { if (calendar) void rememberRecordingCalendar(id, calendar).catch((error) => console.warn('Save recording calendar context:', error)) })
+    (id) => {
+      input.onStarted?.(id)
+      if (calendar) void rememberRecordingCalendar(id, calendar).catch((error) => console.warn('Save recording calendar context:', error))
+    })
     return getRecordingState()
   } catch (error) {
     if (drainsPaused) resumeDrains('recording')

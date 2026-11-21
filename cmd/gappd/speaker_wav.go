@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -22,6 +23,9 @@ func readSpeakerWAV(path string, start, duration float64) ([]byte, error) {
 	}
 	file, err := os.Open(path)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, errors.New("retained audio file is missing")
+		}
 		return nil, err
 	}
 	defer file.Close()
@@ -73,6 +77,9 @@ func validSpeakerWAV(h []byte) bool {
 // readSpeakerFLAC decodes a clip of compacted FLAC audio through the diarizer helper, which owns retained-audio range reads.
 func readSpeakerFLAC(path string, start, duration float64) ([]byte, error) {
 	info, err := audioartifact.ReadPCM16(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, errors.New("retained audio file is missing")
+	}
 	if err != nil || info.Channels != 1 || math.IsNaN(start) || math.IsInf(start, 0) || start < 0 || duration <= 0 || duration > speakerClipSeconds {
 		return nil, fmt.Errorf("unsupported retained FLAC or invalid clip timing")
 	}
