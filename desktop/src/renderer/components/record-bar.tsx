@@ -13,8 +13,10 @@ import { cx } from './ui'
  * Live Transcript cannot change language mid-run.
  */
 export function RecordBar({ view }: { view: AppView }) {
+  const starting = view.recording.status === 'starting'
   const live = view.recording.status === 'recording'
   const stopping = view.recording.status === 'stopping'
+  const busy = starting || live || stopping
   const elapsed = useElapsed(live ? startedAtOf(view) : null)
   const [videoEnabled, setVideoEnabled] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -34,7 +36,7 @@ export function RecordBar({ view }: { view: AppView }) {
   const language = TRANSCRIPTION_LANGUAGES.find((item) => item.code === view.language)
   const deviceName = view.devices.find((device) => device.index === view.device)?.name ?? 'No audio input'
   const chooseLanguage = (language: string) => { view.actions.setLanguage(language); speech.prepare(language) }
-  const disabled = saving || stopping || (live ? !view.canStop : !view.canStart)
+  const disabled = saving || starting || stopping || (live ? !view.canStop : !view.canStart)
   const video = view.meetings.find(meeting => meeting.id === view.recording.meetingId)?.status.video
   return (
     <div className="app-toolbar">
@@ -43,32 +45,32 @@ export function RecordBar({ view }: { view: AppView }) {
           type="button"
           className={cx('app-record-button', live && 'is-recording')}
           disabled={disabled}
-          title={view.canStart || live ? undefined : 'Connect an audio input to record'}
+          title={view.canStart || busy ? undefined : 'Connect an audio input to record'}
           onClick={() => (live || stopping ? view.actions.stop() : view.actions.start())}
         >
           {live || stopping ? <Square aria-hidden="true" /> : <span className="app-record-dot" aria-hidden="true" />}
-          {stopping ? 'Stopping…' : live ? `Stop · ${elapsed}` : 'Record'}
+          {stopping ? 'Stopping…' : starting ? 'Starting…' : live ? `Stop · ${elapsed}` : 'Record'}
         </button>
         <label className="app-record-chip" title={`Audio input: ${deviceName}`}>
           <Mic aria-hidden="true" />
           <span className="app-record-label">{deviceName}</span>
           <ChevronDown className="app-record-caret" aria-hidden="true" />
-          <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={stopping} aria-label="Audio input">
+          <select value={view.device} onChange={(event) => view.actions.setDevice(Number(event.target.value))} disabled={starting || stopping} aria-label="Audio input">
             {view.devices.map((device) => <option key={device.index} value={device.index}>{device.name}</option>)}
           </select>
         </label>
-        <label className="app-record-chip" title={live || stopping ? 'Meeting language. Locked while recording.' : 'Meeting language. Used for the transcript and notes.'}>
+        <label className="app-record-chip" title={busy ? 'Meeting language. Locked while recording.' : 'Meeting language. Used for the transcript and notes.'}>
           <Languages aria-hidden="true" />
           <span className="app-record-label">{language?.label ?? view.language}</span>
-          {live || stopping ? null : <ChevronDown className="app-record-caret" aria-hidden="true" />}
-          <select value={view.language} onChange={(event) => chooseLanguage(event.target.value)} disabled={live || stopping} aria-label="Meeting language">
+          {busy ? null : <ChevronDown className="app-record-caret" aria-hidden="true" />}
+          <select value={view.language} onChange={(event) => chooseLanguage(event.target.value)} disabled={busy} aria-label="Meeting language">
             {TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
           </select>
         </label>
-        {!live && !stopping ? <button type="button" className="app-record-chip app-record-video" aria-label="Screen video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title={videoEnabled ? 'You choose a window or display when you record. Click to record audio only.' : 'Click to also record a window or display.'}>{videoEnabled ? <Monitor aria-hidden="true" /> : <MonitorOff aria-hidden="true" />}<span className="app-record-label">{videoEnabled ? 'Screen video on' : 'No screen video'}</span></button> : null}
+        {!busy ? <button type="button" className="app-record-chip app-record-video" aria-label="Screen video" aria-pressed={videoEnabled ?? false} disabled={videoEnabled === null || saving || !view.canStart} onClick={() => void toggleVideo()} title={videoEnabled ? 'You choose a window or display when you record. Click to record audio only.' : 'Click to also record a window or display.'}>{videoEnabled ? <Monitor aria-hidden="true" /> : <MonitorOff aria-hidden="true" />}<span className="app-record-label">{videoEnabled ? 'Screen video on' : 'No screen video'}</span></button> : null}
       </div>
       <div className="app-record-hint" role="status">
-        {error || (live || stopping ? video?.state === 'selecting' ? 'Choose a window or display in the macOS picker. Audio is recording.' : video?.state === 'recording' ? `Recording ${video.sourceType === 'window' ? 'window' : video.sourceType === 'display' ? 'display' : 'screen'} and audio` : video?.state === 'ended' ? 'Screen video ended. Audio continues.' : video && ['failed', 'cancelled', 'skipped'].includes(video.state) ? 'Audio only. Screen video did not start.' : stopping ? 'Saving your recording…' : 'Recording audio' : speech.note)}
+        {error || (starting ? 'Starting recording…' : live || stopping ? video?.state === 'selecting' ? 'Choose a window or display in the macOS picker. Audio is recording.' : video?.state === 'recording' ? `Recording ${video.sourceType === 'window' ? 'window' : video.sourceType === 'display' ? 'display' : 'screen'} and audio` : video?.state === 'ended' ? 'Screen video ended. Audio continues.' : video && ['failed', 'cancelled', 'skipped'].includes(video.state) ? 'Audio only. Screen video did not start.' : stopping ? 'Saving your recording…' : 'Recording audio' : speech.note)}
       </div>
     </div>
   )

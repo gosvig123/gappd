@@ -88,5 +88,10 @@ export function createAssistedRecordingStop(dependencies: Dependencies) {
     keepUntilSignalReturns = false
   }
 
-  return { track, signalLost, signalFound, recordingStateChanged, observerUnavailable, reset }
+  function isTracking(meetingId?: string): boolean {
+    if (!tracked) return false
+    return !meetingId || !tracked.meetingId || tracked.meetingId === meetingId
+  }
+
+  return { track, isTracking, signalLost, signalFound, recordingStateChanged, observerUnavailable, reset }
 }

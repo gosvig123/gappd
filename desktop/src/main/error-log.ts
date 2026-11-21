@@ -3,10 +3,24 @@
 
 type FailureSink = (operation: string, error: unknown) => void
 
+export type CodedError = Error & { code?: string; expected?: boolean }
+
 let sink: FailureSink | null = null
 
 export function setFailureSink(next: FailureSink | null): void {
   sink = next
+}
+
+/** Creates an Error with a fixed uppercase error code. Expected user-state errors are shown locally without filing a production error report. */
+export function codedError(message: string, code: string, options?: { expected?: boolean }): CodedError {
+  const error: CodedError = new Error(message)
+  error.code = code
+  if (options?.expected) error.expected = true
+  return error
+}
+
+export function isExpectedError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { expected?: unknown }).expected === true
 }
 
 /** operation is a fixed name such as calendar.refresh; message is for the local log only. */

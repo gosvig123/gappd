@@ -9,6 +9,7 @@ import { logMainProcessMemory } from './memory'
 import { meetingUpload } from './cloud/upload-service'
 import { bootstrapManagedRuntime, managedRuntime } from './managed-runtime/runtime'
 import { startMeetingPresence, stopMeetingPresence } from './meeting-presence'
+import { beginRecordingShutdown, stopStartingRecordingForQuit } from './meeting-recording-workflow'
 import { stopActiveRecordingForQuit } from './recording-process'
 import { migrateScreenCaptureIdentity } from './screen-permission-migration'
 import { stopStaleRecordingRecovery } from './stale-recording-recovery'
@@ -155,6 +156,7 @@ function quitAfterShutdown(): void {
 
 async function shutdown(): Promise<void> {
   logMainProcessMemory('shutdown:start')
+  beginRecordingShutdown()
   stopStaleRecordingRecovery()
   stopStorageCompaction()
   stopCalendarRefresh()
@@ -165,6 +167,7 @@ async function shutdown(): Promise<void> {
   stopUsageReports()
   stopErrorReports()
   remoteAccess().stop()
+  await stopStartingRecordingForQuit()
   await stopActiveRecordingForQuit()
   await managedRuntime.close()
   logMainProcessMemory('shutdown:done')

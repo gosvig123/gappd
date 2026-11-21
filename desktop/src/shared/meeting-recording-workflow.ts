@@ -2,10 +2,11 @@ import type { RecordingEvent } from './generated/contracts'
 
 export { meetingStatusPillVisible, meetingStatusTone } from './generated/lifecycle'
 export const RECORDING_STATUS_IDLE = 'idle'
+export const RECORDING_STATUS_STARTING = 'starting'
 export const RECORDING_STATUS_RECORDING = 'recording'
 export const RECORDING_STATUS_STOPPING = 'stopping'
 export const RECORDING_STATUS_ERROR = 'error'
-const RECORDING_STATUSES = [RECORDING_STATUS_IDLE, RECORDING_STATUS_RECORDING, RECORDING_STATUS_STOPPING, RECORDING_STATUS_ERROR] as const
+const RECORDING_STATUSES = [RECORDING_STATUS_IDLE, RECORDING_STATUS_STARTING, RECORDING_STATUS_RECORDING, RECORDING_STATUS_STOPPING, RECORDING_STATUS_ERROR] as const
 type RecordingStatus = (typeof RECORDING_STATUSES)[number]
 
 export type RecordingState = { status: RecordingStatus; meetingId?: string; title?: string; error?: string }
@@ -35,7 +36,9 @@ export function canStartRecordingStatus(status: RecordingStatus): boolean {
   return status === RECORDING_STATUS_IDLE || status === RECORDING_STATUS_ERROR
 }
 export function canStopRecordingStatus(status: RecordingStatus): boolean { return status === RECORDING_STATUS_RECORDING }
-export function ignoresStopRequest(status: RecordingStatus): boolean { return status === RECORDING_STATUS_STOPPING }
+export function ignoresStopRequest(status: RecordingStatus): boolean {
+  return status === RECORDING_STATUS_STOPPING || status === RECORDING_STATUS_STARTING
+}
 export function needsRecordingRefresh(status: RecordingStatus): boolean { return status === RECORDING_STATUS_RECORDING || status === RECORDING_STATUS_STOPPING }
 export function recordingRefreshTarget(state: RecordingState): string | null | undefined {
   if (state.meetingId) return state.meetingId

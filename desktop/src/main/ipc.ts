@@ -24,7 +24,7 @@ import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeak
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
 import { errorReportStatus, reportRendererError, setErrorSharing } from './error-report'
-import { reportFailure } from './error-log'
+import { isExpectedError, reportFailure } from './error-log'
 import { ipcOperation, type RendererError } from '../shared/error-report'
 import { aiAppStatuses, connectAIApp, disconnectAIApp } from './ai-apps'
 import { isAIAppId, type AIAppId } from '../shared/ai-apps'
@@ -235,7 +235,7 @@ function reported(channel: string, handler: IpcHandler): IpcHandler {
     try {
       return await handler(event, ...args)
     } catch (error) {
-      reportFailure(operation, error)
+      if (!isExpectedError(error)) reportFailure(operation, error)
       throw error
     }
   }

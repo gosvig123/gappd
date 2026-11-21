@@ -106,22 +106,57 @@ export async function checkFailedMeetings(): Promise<void> {
 
 async function recordFailedMeetings(): Promise<void> {
   const meetings = await listMeetings()
-  const failed = meetings.flatMap((meeting) => {
+  const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
-    return [
-      capture.state === 'failed' ? `${meeting.id} capture` : '',
-      processing.state === 'failed' ? `${meeting.id} processing` : '',
-      video.state === 'failed' ? `${meeting.id} screen-video` : '',
-    ].filter(Boolean)
+    const entries: Array<{ key: string; step: 'capture' | 'processing' | 'screen-video'; code: string }> = []
+    if (capture.state === 'failed') entries.push({ key: `${meeting.id} capture`, step: 'capture', code: meetingFailureCode('capture', capture.failureMessage) })
+    if (processing.state === 'failed') entries.push({ key: `${meeting.id} processing`, step: 'processing', code: meetingFailureCode('processing', processing.failureMessage) })
+    if (video.state === 'failed') entries.push({ key: `${meeting.id} screen-video`, step: 'screen-video', code: meetingFailureCode('screen-video', video.message) })
+    return entries
   })
+  const failed = failures.map((entry) => entry.key)
   const seen = readStored().failedMeetings
   // The first check only remembers, so failures from before error reports are not sent.
   if (seen) {
-    for (const key of failed) {
-      if (!seen.includes(key)) reportError('meeting', `meeting.${key.split(' ')[1]}`, { name: 'MeetingFailed' })
+    for (const entry of failures) {
+      if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+      reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
     }
   }
   writeStored({ ...readStored(), failedMeetings: failed })
+}
+
+const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
+
+const MEETING_FAILURE_CODES: Record<'capture' | 'processing' | 'screen-video', Array<[RegExp, string]>> = {
+  capture: [
+    [/^Recording was interrupted before audio was saved\./, 'STALE_NO_AUDIO'],
+    [/^capture process failed to start: exit status 126: error: Microphone access denied\./, 'CAPTURE_PERMISSION_MIC'],
+    [/^capture process failed to start: exit status 126: error: Screen & System Audio Recording access required/, 'CAPTURE_PERMISSION_SCREEN'],
+    [/could not start microphone capture/i, 'CAPTURE_MIC_START'],
+    [/could not start system audio capture/i, 'CAPTURE_SYSTEM_START'],
+    [/could not stop audio capture cleanly/i, 'CAPTURE_STOP_FAILED'],
+    [/^(?:capture process (?:failed to start|exited immediately)|start capture: )/, 'CAPTURE_LAUNCH_FAILED'],
+  ],
+  processing: [
+    [/no audio captured/i, 'NO_AUDIO_CAPTURED'],
+    [/no transcript found/i, 'NO_TRANSCRIPT'],
+    [/inconsistent meeting artifacts/i, 'INCONSISTENT_ARTIFACTS'],
+    [/(?:encode|decode) extraction/i, 'EXTRACTION_INVALID'],
+    [/transcription failed/i, 'TRANSCRIPTION_FAILED'],
+    [/enhance failed/i, 'ENHANCE_FAILED'],
+  ],
+  'screen-video': [
+    [/screen video was interrupted/i, 'VIDEO_INTERRUPTED'],
+  ],
+}
+
+function meetingFailureCode(step: 'capture' | 'processing' | 'screen-video', message?: string | null): string {
+  if (!message) return ''
+  for (const [pattern, code] of MEETING_FAILURE_CODES[step]) {
+    if (pattern.test(message)) return code
+  }
+  return ''
 }
 
 /**
