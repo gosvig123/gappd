@@ -97,17 +97,17 @@ type CloudAccount = ReturnType<typeof useCloudAccount>
 
 /**
  * The account step shows after the sign-up screen: signed in, or still to do after the person
- * continued without an account. It has no skip. Sync stays off until Settings.
+ * continued without an account. It has no skip.
  */
 function accountRow(state: SetupStepState, cloud: CloudAccount, variant: ButtonVariant): Step {
   const base = { key: 'account', title: 'Create your free Gappd account', state }
-  if (state === 'done') return { ...base, detail: <p>Signed in as {cloud.account?.email}. Meeting sync stays off until you turn it on in Settings › Connections.</p> }
+  if (state === 'done') return { ...base, detail: <p>Signed in as {cloud.account?.email}. To use your Meetings in Claude or ChatGPT, open Settings › Connections › Connect an AI.</p> }
   if (state === 'working') return { ...base, detail: <p className="setup-step-note">Finish signing in in your browser, then come back to Gappd.</p>, actions: <Button onClick={() => void cloud.cancel()}>Cancel</Button> }
   return {
     ...base,
     detail: <>
       <p>Use your Google account or any email address. Your browser opens; it takes about a minute.</p>
-      <p className="setup-step-note">Signing in uploads nothing. Meeting sync stays off until you turn it on in Settings.</p>
+      <p className="setup-step-note">Signing in uploads nothing. Your Meetings stay on this Mac.</p>
       {cloud.error ? <p className="setup-step-warning">{cloud.error}</p> : null}
     </>,
     actions: <Button variant={variant} disabled={cloud.connecting} onClick={() => void cloud.signIn()}>Sign up or sign in</Button>,

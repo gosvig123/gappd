@@ -78,3 +78,12 @@ export class MeetingUploadPanelState {
     this.timer = setTimeout(() => { if (!this.disposed && id === this.generation) void this.refresh() }, REFRESH_MS)
   }
 }
+
+/**
+ * Settings shows Cloud Meeting sync only to users who use it now or still have cloud data
+ * from it, so they can turn it off and delete that data. Everyone else uses Connect an AI.
+ */
+export function showsMeetingSync(status: MeetingUploadStatus): boolean {
+  const { queue } = status
+  return status.consent || queue.synced > 0 || queue.entries.length > 0 || queue.deleting > 0
+}

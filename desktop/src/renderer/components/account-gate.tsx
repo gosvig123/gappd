@@ -18,7 +18,7 @@ export function AccountGate({ account }: { account: AccountRequirement }) {
       <div className="app-brand"><span className="app-mark" aria-hidden="true">G</span><span className="app-brand-name">Gappd</span></div>
       <h1 id="account-gate-title">Create your free Gappd account</h1>
       <p>Use your Google account or any email address. Your browser opens; it takes about a minute.</p>
-      <p className="account-gate-note">Signing in uploads nothing. Meeting sync stays off until you turn it on in Settings.</p>
+      <p className="account-gate-note">Signing in uploads nothing. Your Meetings stay on this Mac.</p>
       {cloud.connecting
         ? <>
           <p className="account-gate-note" role="status">Finish signing up in your browser, then come back to Gappd.</p>
