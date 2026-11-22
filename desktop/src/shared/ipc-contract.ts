@@ -18,7 +18,7 @@ export type StartRecordingInput = { title?: string; device?: number; mode?: stri
 /** Whether the Apple speech model for one language is on this Mac. message explains a failed download. */
 export type SpeechLanguageStatus = { language: string; ready: boolean; message?: string }
 export type ManagedRuntimePrepareInput = { mode: ManagedRuntimePrepareMode; model?: string }
-export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean; agendaAutoDraftEnabled: boolean }
+export type StartupSettings = { openAtLogin: boolean; supported: boolean; requiresApproval: boolean; speakerLabelsEnabled: boolean; screenVideoEnabled: boolean; agendaAutoDraftEnabled: boolean; calendarRemindersEnabled: boolean }
 export type { AgentId } from './agents'
 /** The newest install of one agent CLI on this Mac. executable is empty when it is not installed. */
 export type AgentInstall = { agent: AgentId; executable: string; version: string; signedIn: boolean }
@@ -110,6 +110,7 @@ export type IpcInvokeContract = {
     setSpeakerLabelsEnabled: OperationSpec<[enabled: boolean], StartupSettings>
     setScreenVideoEnabled: OperationSpec<[enabled: boolean], StartupSettings>
     setAgendaAutoDraftEnabled: OperationSpec<[enabled: boolean], StartupSettings>
+    setCalendarRemindersEnabled: OperationSpec<[enabled: boolean], StartupSettings>
   }
   aiApps: {
     status: OperationSpec<[], AIAppStatus[]>
@@ -178,6 +179,7 @@ export const IPC_OPERATIONS = {
     setOpenAtLogin: 'startup:setOpenAtLogin',
     setSpeakerLabelsEnabled: 'startup:setSpeakerLabelsEnabled', setScreenVideoEnabled: 'startup:setScreenVideoEnabled',
     setAgendaAutoDraftEnabled: 'startup:setAgendaAutoDraftEnabled',
+    setCalendarRemindersEnabled: 'startup:setCalendarRemindersEnabled',
   },
   aiApps: { status: 'aiApps:status', connect: 'aiApps:connect', disconnect: 'aiApps:disconnect' },
   remoteAccess: { status: 'remoteAccess:status', setEnabled: 'remoteAccess:setEnabled', addToService: 'remoteAccess:addToService' },

@@ -20,7 +20,8 @@ import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './ag
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
 import { startStaleRecordingRecovery } from './stale-recording-recovery'
-import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
+import { dismissCalendarReminder } from './calendar-reminder'
+import { getStartupSettings, setAgendaAutoDraftEnabled, setCalendarRemindersEnabled, setOpenAtLogin, setSpeakerLabelsEnabled, setScreenVideoEnabled } from './startup-settings'
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
 import { errorReportStatus, reportRendererError, setErrorSharing } from './error-report'
@@ -120,6 +121,11 @@ const IPC_HANDLERS: MainHandlers = {
     setSpeakerLabelsEnabled: (_event, enabled: boolean) => setSpeakerLabelsEnabled(enabled),
     setScreenVideoEnabled: (_event, enabled: boolean) => setScreenVideoEnabled(enabled),
     setAgendaAutoDraftEnabled: (_event, enabled: boolean) => setAgendaAutoDraftEnabled(Boolean(enabled)),
+    setCalendarRemindersEnabled: (_event, enabled: boolean) => {
+      const settings = setCalendarRemindersEnabled(Boolean(enabled))
+      if (!settings.calendarRemindersEnabled) dismissCalendarReminder()
+      return settings
+    },
   },
   aiApps: {
     status: () => aiAppStatuses(),

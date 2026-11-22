@@ -109,7 +109,9 @@ async function readLinks(): Promise<CalendarLinks> {
 }
 
 async function saveContext(document: CalendarLinks, id: string, context: ParticipantContext): Promise<void> {
-  document.meetings[id] = context
+  // A saved Meeting does not need the call link; it stays only in the Calendar cache.
+  const withoutLink = ({ joinUrl: _joinUrl, ...event }: CalendarEventSummary): CalendarEventSummary => event
+  document.meetings[id] = { ...context, event: context.event && withoutLink(context.event), candidates: context.candidates.map(withoutLink) }
   await createSecureStore<CalendarLinks>(STORE_FILE).write(document)
 }
 
