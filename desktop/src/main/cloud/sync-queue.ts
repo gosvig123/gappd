@@ -34,7 +34,13 @@ export class MeetingSyncQueue {
   enqueue(localId: string, load: (revision: number) => Promise<string | { document: string; stamp?: string }>): Promise<MeetingSyncEntry> {
     return this.serialize(async () => {
       const state = await this.load()
-      await this.queueOne(state, localId, load)
+      try {
+        await this.queueOne(state, localId, load)
+      } catch (error) {
+        // A failed fresh export means the queued document may be out of date: hold it.
+        this.verified.delete(localId)
+        throw error
+      }
       this.verified.add(localId)
       await this.persist(state)
       return entryOf(localId, state)
@@ -167,6 +173,18 @@ export class MeetingSyncQueue {
         return { localId, ...stored }
       }
       return null
+    })
+  }
+
+  /**
+   * Whether this exact work may still be sent. The sender checks it right before posting, after
+   * any discovery that ran meanwhile, so a withdrawn document is not sent.
+   */
+  sendable(localId: string, revision: number, options?: { verifiedOnly?: boolean }): Promise<boolean> {
+    return this.serialize(async () => {
+      const stored = (await this.load()).entries[localId]
+      if (!stored || stored.state !== 'pending' || stored.revision !== revision) return false
+      return !options?.verifiedOnly || (Boolean(stored.stamp) && this.verified.has(localId))
     })
   }
 

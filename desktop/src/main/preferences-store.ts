@@ -50,6 +50,8 @@ export type StoredUsageReport = {
   pendingDay?: string | null
   lastReport: UsageReport | null
   lastSentAt: string | null
+  /** Changes on every sharing change, in any process, so a report built before it is not sent. */
+  consentToken?: string
 }
 
 export type PreferencesDocument = {

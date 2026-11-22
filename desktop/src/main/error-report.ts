@@ -134,11 +134,11 @@ async function recordFailedMeetings(): Promise<void> {
       }
     }
     // Keys of Meetings that still fail are never dropped, or the next scan would report them as new.
-    // The cap trims only keys of Meetings that no longer fail, oldest first.
+    // The cap applies only to the other keys, newest kept, so a delayed older scan cannot drop a
+    // newer scan's claim for a Meeting that still fails.
     const failing = new Set(failures.map((entry) => entry.key))
     const older = [...nextSeen].filter((key) => !failing.has(key))
-    const room = Math.max(0, MAX_TRACKED_FAILED_MEETINGS - failing.size)
-    const bounded = [...older.slice(Math.max(0, older.length - room)), ...failing]
+    const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
     return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded } }
   })
   for (const entry of claimed) {

@@ -61,7 +61,9 @@ export function setUsageSharing(enabled: boolean): UsageReportStatus {
     activeSend?.abort()
     activeSend = null
   }
-  updateStored((current) => ({ ...current, sharing: enabled ? 'on' : 'off' }))
+  // A new token on every change, so a report another process is building is not sent after an off-on toggle.
+  const consentToken = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  updateStored((current) => ({ ...current, sharing: enabled ? 'on' : 'off', consentToken }))
   return usageReportStatus()
 }
 
@@ -88,6 +90,7 @@ async function reportPreviousDay(): Promise<void> {
   let claimedDay: string | null = null
   let shouldSend = false
   let installWeek = ''
+  let consentToken: string | undefined
   updateStored((stored) => {
     const today = localDay(new Date())
     const noted = !stored.day || today > stored.day
@@ -96,6 +99,7 @@ async function reportPreviousDay(): Promise<void> {
     claimedDay = noted.pendingDay ?? null
     shouldSend = noted.sharing === 'on'
     installWeek = noted.installWeek
+    consentToken = noted.consentToken
     if (!claimedDay) return noted
     // Clear it atomically under the preferences lock, so an error or a quit can never send one day twice.
     return { ...noted, pendingDay: null }
@@ -113,7 +117,8 @@ async function reportPreviousDay(): Promise<void> {
     // either lands first (nothing is sent) or after the send started (this process aborts it).
     let request: Promise<Response> | null = null
     readPreferencesLocked((current) => {
-      if (controller.signal.aborted || storedUsageFrom(current.data).sharing !== 'on') return
+      const stored = storedUsageFrom(current.data)
+      if (controller.signal.aborted || stored.sharing !== 'on' || stored.consentToken !== consentToken) return
       request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
     })

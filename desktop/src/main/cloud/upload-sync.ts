@@ -57,6 +57,8 @@ async function runPass(context: UploadContext, credential: CloudCredential, cont
 
 async function sendOne(context: UploadContext, credential: CloudCredential, controller: AbortController, work: MeetingSyncWork): Promise<boolean> {
   const signatures = await context.device.signatures('POST', '/meeting', work.document)
+  // Discovery may have withdrawn this document while it was signed. Skip it; the pass goes on.
+  if (!await context.stillSendable(work)) return true
   const outcome = await sendDocument(context.fetcher, context.resource, credential, signatures, work, controller.signal)
   if (controller.signal.aborted) return false
   if (outcome.kind === 'accepted') {

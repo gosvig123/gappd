@@ -236,6 +236,7 @@ export class MeetingUpload {
       resource: this.resource, device: this.device, queue: this.queue, fetcher: this.fetcher,
       consented: () => this.consented(),
       nextPending: () => this.queue.pending({ verifiedOnly: this.requireVerifiedStamp }),
+      stillSendable: (work) => this.queue.sendable(work.localId, work.revision, { verifiedOnly: this.requireVerifiedStamp }),
       setPending: (controller) => { this.pending = controller },
       setResult: (message) => { this.result = message },
       rememberGeneration: (generation) => this.device.rememberGeneration(generation),
