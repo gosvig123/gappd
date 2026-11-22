@@ -219,7 +219,9 @@ export class MeetingUpload {
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
     const meetings = await this.localMeetings()
-    const finished = meetings.filter((meeting) => meeting.status.state === 'completed').map((meeting) => meeting.id)
+    const finished = meetings
+      .filter((meeting) => meeting.status.state === 'completed')
+      .map((meeting) => ({ localId: meeting.id, stamp: meeting.documentStamp }))
     return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))
   }
 
@@ -289,7 +291,6 @@ export class MeetingUpload {
 
   private startRetryTimer(): void {
     if (this.retryTimer) return
-    // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
     this.retryTimer = setInterval(() => {
       void this.syncNew().catch((error) => { console.error('Automatic Meeting sync failed. Unlock this Mac and check the connection; retrying next minute.'); reportFailure('cloud-sync.automatic', error) })
     }, 60_000)

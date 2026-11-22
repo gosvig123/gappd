@@ -1,5 +1,7 @@
+import { createHash } from 'node:crypto'
 import { shell } from 'electron'
 import type { MeetingSyncDocument } from '../../shared/meeting-sync-contract'
+import type { ParticipantContext } from '../../shared/participant-contract'
 import { CloudAuth, type CloudCredential } from './auth'
 import { createSecureStore, requireEncryption } from '../electron-secure-store'
 import { MeetingDevice, type DeviceCredential } from './device'
@@ -10,7 +12,7 @@ import { MeetingSyncQueue } from './sync-queue'
 import { MeetingUpload } from './upload'
 import { cloudAuthConfig, cloudResource } from '../service-config'
 import { savedMeetingCalendarContexts } from '../participant-calendar'
-import type { MeetingDeleteResponse } from '../../shared/contracts'
+import type { MeetingDeleteResponse, MeetingListItem } from '../../shared/contracts'
 
 // The store names keep their original "development" suffix, so existing installs keep their
 // upload account, consent, queue and device key.
@@ -30,13 +32,28 @@ export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentLoader(resolveGappdBinary, meetingCalendarTitles),
-    listMeetings,
+    listMeetingsForSync,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
 }
 
+/** Folds whether a Meeting's title is masked by a saved Calendar event into its documentStamp in one store read. */
+async function listMeetingsForSync(): Promise<MeetingListItem[]> {
+  const [meetings, contexts] = await Promise.all([listMeetings(), savedMeetingCalendarContexts()])
+  return meetings.map((meeting) => {
+    if (!meeting.documentStamp) return meeting
+    const titles = calendarTitlesOf(contexts[meeting.id])
+    const masked = titles.some((title) => title.trim() === meeting.title.trim())
+    if (!masked) return meeting
+    return { ...meeting, documentStamp: createHash('sha256').update(`${meeting.documentStamp}:calendar-masked`).digest('hex') }
+  })
+}
+
 async function meetingCalendarTitles(id: string): Promise<string[]> {
-  const context = (await savedMeetingCalendarContexts())[id]
+  return calendarTitlesOf((await savedMeetingCalendarContexts())[id])
+}
+
+function calendarTitlesOf(context: ParticipantContext | undefined): string[] {
   if (!context) return []
   return [context.event, ...context.candidates].flatMap((event) => event ? [event.title] : [])
 }

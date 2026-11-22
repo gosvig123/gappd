@@ -246,6 +246,7 @@ export type MeetingListItem = {
   hasTranscript: boolean
   hasSummary: boolean
   speakers: MeetingSpeaker[]
+  documentStamp?: string
 }
 
 export type MeetingSearchInput = {

@@ -33,14 +33,16 @@ export type MeetingSyncDocument = {
   accepted: Record<string, number>
   /** Content hash of each accepted document, excluding the revision. */
   acceptedContent: Record<string, string>
+  /** Last checked source fingerprint for each accepted Meeting, so unchanged ones skip export. */
+  acceptedStamp: Record<string, string>
   /** Local Meetings deleted on this Mac whose cloud copies still need a deletion request. */
   deletions: string[]
   /** Pending work, newest revision per local Meeting. */
-  entries: Record<string, { revision: number; document: string; state: MeetingSyncState; attempts: number; updatedAt: string; error: string | null }>
+  entries: Record<string, { revision: number; document: string; state: MeetingSyncState; attempts: number; updatedAt: string; error: string | null; stamp?: string }>
 }
 
 export function emptyMeetingSyncDocument(): MeetingSyncDocument {
-  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, acceptedContent: {}, deletions: [], entries: {} }
+  return { version: MEETING_SYNC_VERSION, subject: null, accepted: {}, acceptedContent: {}, acceptedStamp: {}, deletions: [], entries: {} }
 }
 
 /**
@@ -67,6 +69,14 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
       acceptedContent[localId] = hash
     }
   }
+  const acceptedStamp: Record<string, string> = {}
+  if (candidate.acceptedStamp !== undefined) {
+    if (!candidate.acceptedStamp || typeof candidate.acceptedStamp !== 'object' || Array.isArray(candidate.acceptedStamp)) return null
+    for (const [localId, stamp] of Object.entries(candidate.acceptedStamp)) {
+      if (typeof stamp !== 'string' || !/^[a-f0-9]{64}$/.test(stamp) || accepted[localId] === undefined) return null
+      acceptedStamp[localId] = stamp
+    }
+  }
   // Queue files written before local deletion reached the cloud have no deletions.
   const deletions = candidate.deletions ?? []
   if (!Array.isArray(deletions) || deletions.some((localId) => typeof localId !== 'string' || localId.length === 0 || localId.length > 128)) return null
@@ -75,7 +85,7 @@ export function validatedMeetingSyncDocument(stored: unknown): MeetingSyncDocume
     if (!validEntry(entry)) return null
     entries[localId] = entry
   }
-  return { version: MEETING_SYNC_VERSION, subject: candidate.subject, accepted, acceptedContent, deletions: [...new Set(deletions)], entries }
+  return { version: MEETING_SYNC_VERSION, subject: candidate.subject, accepted, acceptedContent, acceptedStamp, deletions: [...new Set(deletions)], entries }
 }
 
 function revisionOf(value: unknown): value is number {
@@ -88,5 +98,6 @@ function validEntry(entry: unknown): entry is MeetingSyncDocument['entries'][str
   return revisionOf(candidate.revision) && typeof candidate.document === 'string' && candidate.document.length > 0 &&
     (candidate.state === 'pending' || candidate.state === 'failed') && Number.isInteger(candidate.attempts) &&
     candidate.attempts >= 0 && typeof candidate.updatedAt === 'string' &&
-    (candidate.error === null || typeof candidate.error === 'string')
+    (candidate.error === null || typeof candidate.error === 'string') &&
+    (candidate.stamp === undefined || (typeof candidate.stamp === 'string' && /^[a-f0-9]{64}$/.test(candidate.stamp)))
 }
