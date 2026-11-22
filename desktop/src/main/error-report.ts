@@ -135,7 +135,8 @@ async function recordFailedMeetings(): Promise<void> {
     claimed.length = 0
     if (seen) {
       for (const entry of failures) {
-        if (nextSeen.has(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+        // A key known when this scan started is never new, even if a newer scan trimmed it meanwhile.
+        if (nextSeen.has(entry.key) || knownAtStart.has(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
         claimed.push(entry)
       }
     }
@@ -195,7 +196,10 @@ function meetingFailureCode(step: 'capture' | 'processing' | 'screen-video', mes
 function reportError(source: ErrorSource, operation: string, error: unknown, claim?: { consentToken: string | undefined }): void {
   try {
     const url = reportUrl()
-    if (!url || !isOperation(operation) || readStored().sharing !== 'on') return
+    const atStart = readStored()
+    if (!url || !isOperation(operation) || atStart.sharing !== 'on') return
+    // Sent only under the consent it was claimed or first checked with, in any process.
+    const expectedToken = claim ? claim.consentToken : atStart.consentToken
     const described = describeError(error, [app.getAppPath()])
     const key = [source, operation, described.error_name, described.error_code].join(' ')
     const now = Date.now()
@@ -225,8 +229,7 @@ function reportError(source: ErrorSource, operation: string, error: unknown, cla
     let request: Promise<Response> | null = null
     readPreferencesLocked((current) => {
       const stored = storedErrorFrom(current)
-      // A claimed Meeting failure is sent only under the consent it was claimed with.
-      if (stored.sharing !== 'on' || (claim && stored.consentToken !== claim.consentToken)) return
+      if (stored.sharing !== 'on' || stored.consentToken !== expectedToken) return
       request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
     })
