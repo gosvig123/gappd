@@ -43,6 +43,11 @@ export function showMeetingPrompt(input: PromptInput): void {
   showWhenLoaded(window, promptDataUrl(input))
 }
 
+/** True while the prompt with this key is on screen (not dismissed or replaced). */
+export function meetingPromptShown(key: string): boolean {
+  return promptKey === key && !!promptWindow && !promptWindow.isDestroyed()
+}
+
 export function dismissMeetingPrompt(key: string): void {
   if (promptKey === key) stopMeetingPrompts()
 }
