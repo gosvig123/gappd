@@ -86,7 +86,8 @@ export class MeetingSyncQueue {
       const state = await this.load()
       let queued = 0
       let unreadable = 0
-      const nextVerified = new Set<string>()
+      // Discovery changes the status only of the Meetings it lists; an unlisted one keeps its status.
+      const nextVerified = new Set(this.verified)
       let dirty = false
       for (const item of items) {
         const localId = typeof item === 'string' ? item : item.localId
@@ -113,9 +114,10 @@ export class MeetingSyncQueue {
           queued += 1
         } catch {
           unreadable += 1
+          nextVerified.delete(localId)
         }
       }
-      // A Meeting missing from discovery, or whose fresh export failed, stays unsendable.
+      // A failed fresh export holds the Meeting until a later export or matching stamp releases it.
       this.verified = nextVerified
       if (queued > 0 || dirty) await this.persist(state)
       return { queued, unreadable }

@@ -41,6 +41,8 @@ export type StoredRemoteAccess = {
 export type StoredErrorReport = {
   sharing: 'on' | 'off'
   failedMeetings?: string[]
+  /** Changes on every sharing change, in any process, so a scan that started before it claims nothing. */
+  consentToken?: string
 }
 
 export type StoredUsageReport = {

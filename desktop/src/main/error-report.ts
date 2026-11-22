@@ -73,10 +73,11 @@ export function setErrorSharing(enabled: boolean): ErrorReportStatus {
     activeSend?.abort()
     activeSend = null
   }
+  const consentToken = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   updatePreferences((current) => {
-    if (!enabled) return { ...current, errorReport: { sharing: 'off' } }
+    if (!enabled) return { ...current, errorReport: { sharing: 'off', consentToken } }
     const failedMeetings = current.errorReport?.failedMeetings
-    return { ...current, errorReport: failedMeetings ? { sharing: 'on', failedMeetings } : { sharing: 'on' } }
+    return { ...current, errorReport: failedMeetings ? { sharing: 'on', failedMeetings, consentToken } : { sharing: 'on', consentToken } }
   })
   return errorReportStatus()
 }
@@ -109,6 +110,8 @@ export async function checkFailedMeetings(): Promise<void> {
 }
 
 async function recordFailedMeetings(): Promise<void> {
+  // A sharing change in any process while Meetings are listed makes this scan stale: it claims nothing.
+  const consentToken = readStored().consentToken
   const meetings = await listMeetings()
   const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
@@ -122,6 +125,7 @@ async function recordFailedMeetings(): Promise<void> {
   updatePreferences((current) => {
     if (current.errorReport?.sharing === 'off') return current
     if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
+    if (current.errorReport?.consentToken !== consentToken) return current
     const seen = current.errorReport?.failedMeetings
     // Merge monotonically under lock so two processes never claim the same failure twice and a
     // delayed older scan can never erase failures already recorded by a newer scan.
@@ -139,7 +143,7 @@ async function recordFailedMeetings(): Promise<void> {
     const failing = new Set(failures.map((entry) => entry.key))
     const older = [...nextSeen].filter((key) => !failing.has(key))
     const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
-    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded } }
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, ...(consentToken ? { consentToken } : {}) } }
   })
   for (const entry of claimed) {
     reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
