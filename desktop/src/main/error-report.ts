@@ -21,6 +21,7 @@ const MEETING_CHECK_MS = 15 * 60_000
 // The first Meeting check waits, so it does not compete with the app's launch.
 const FIRST_MEETING_CHECK_MS = 2 * 60_000
 const MAX_REPEAT_KEYS = 200
+const MAX_TRACKED_FAILED_MEETINGS = 500
 
 type Repeat = { sentAt: number; repeats: number }
 
@@ -32,6 +33,7 @@ let checkingMeetings = false
 // One send at a time: on a slow network a send holds a DNS lookup and a connection until its
 // timeout, and a burst of failures must not hold more than one.
 let sending = false
+let activeSend: AbortController | null = null
 
 /** Report main-process failures, crashed processes and failed Meetings from now on. */
 export function startErrorReports(): void {
@@ -56,6 +58,8 @@ export function stopErrorReports(): void {
   if (meetingTimer) clearInterval(meetingTimer)
   if (firstMeetingCheck) clearTimeout(firstMeetingCheck)
   meetingTimer = firstMeetingCheck = null
+  activeSend?.abort()
+  activeSend = null
 }
 
 export function errorReportStatus(): ErrorReportStatus {
@@ -65,9 +69,15 @@ export function errorReportStatus(): ErrorReportStatus {
 export function setErrorSharing(enabled: boolean): ErrorReportStatus {
   // Turning reports off forgets the failed Meetings, so turning them on again takes a new baseline
   // and never sends failures from while reports were off.
-  const next: StoredErrorReport = { ...readStored(), sharing: enabled ? 'on' : 'off' }
-  if (!enabled) delete next.failedMeetings
-  writeStored(next)
+  if (!enabled) {
+    activeSend?.abort()
+    activeSend = null
+  }
+  updatePreferences((current) => {
+    if (!enabled) return { ...current, errorReport: { sharing: 'off' } }
+    const failedMeetings = current.errorReport?.failedMeetings
+    return { ...current, errorReport: failedMeetings ? { sharing: 'on', failedMeetings } : { sharing: 'on' } }
+  })
   return errorReportStatus()
 }
 
@@ -108,20 +118,29 @@ async function recordFailedMeetings(): Promise<void> {
     if (video.state === 'failed') entries.push({ key: `${meeting.id} screen-video`, step: 'screen-video', code: meetingFailureCode('screen-video', video.message) })
     return entries
   })
-  const failed = failures.map((entry) => entry.key)
-  const seen = readStored().failedMeetings
-  // The first check only remembers, so failures from before error reports are not sent.
-  if (seen) {
-    for (const entry of failures) {
-      if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
-      reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
-    }
-  }
+  const claimed: typeof failures = []
   updatePreferences((current) => {
     if (current.errorReport?.sharing === 'off') return current
     if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
-    return { ...current, errorReport: { sharing: 'on', failedMeetings: failed } }
+    const seen = current.errorReport?.failedMeetings
+    // Merge monotonically under lock so two processes never claim the same failure twice and a
+    // delayed older scan can never erase failures already recorded by a newer scan.
+    const nextSeen = new Set(seen ?? [])
+    claimed.length = 0
+    if (seen) {
+      for (const entry of failures) {
+        if (nextSeen.has(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+        claimed.push(entry)
+      }
+    }
+    for (const entry of failures) nextSeen.add(entry.key)
+    const merged = [...nextSeen]
+    const bounded = merged.length > MAX_TRACKED_FAILED_MEETINGS ? merged.slice(-MAX_TRACKED_FAILED_MEETINGS) : merged
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded } }
   })
+  for (const entry of claimed) {
+    reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
+  }
 }
 
 const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
@@ -189,13 +208,18 @@ function reportError(source: ErrorSource, operation: string, error: unknown): vo
       ...described,
       repeats: previous?.repeats ?? 0,
     }
+    const controller = new AbortController()
+    activeSend = controller
     const request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS) })
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
     sending = true
     void request
       .then((response) => response.body?.cancel())
       .catch(() => undefined)
-      .finally(() => { sending = false })
+      .finally(() => {
+        if (activeSend === controller) activeSend = null
+        sending = false
+      })
   } catch {
     // A report must never turn into a second failure.
   }
@@ -216,8 +240,4 @@ function readStored(): StoredErrorReport {
   if (saved === undefined) return { sharing: 'on' }
   if (saved && (saved.sharing === 'on' || saved.sharing === 'off')) return saved
   return { sharing: 'off' }
-}
-
-function writeStored(next: StoredErrorReport): void {
-  updatePreferences((current) => ({ ...current, errorReport: next }))
 }

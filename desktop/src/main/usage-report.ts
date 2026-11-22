@@ -28,6 +28,7 @@ const SEND_TIMEOUT_MS = 10_000
 const ONE_DAY_MS = 86_400_000
 
 let timer: NodeJS.Timeout | null = null
+let activeSend: AbortController | null = null
 
 export function startUsageReports(): void {
   if (timer) return
@@ -46,6 +47,8 @@ export function startUsageReports(): void {
 export function stopUsageReports(): void {
   if (timer) clearTimeout(timer)
   timer = null
+  activeSend?.abort()
+  activeSend = null
 }
 
 export function usageReportStatus(): UsageReportStatus {
@@ -54,6 +57,10 @@ export function usageReportStatus(): UsageReportStatus {
 }
 
 export function setUsageSharing(enabled: boolean): UsageReportStatus {
+  if (!enabled) {
+    activeSend?.abort()
+    activeSend = null
+  }
   updateStored((current) => ({ ...current, sharing: enabled ? 'on' : 'off' }))
   return usageReportStatus()
 }
@@ -98,8 +105,19 @@ async function reportPreviousDay(): Promise<void> {
   const report = await buildReport(claimedDay, installWeek)
   // Recheck effective consent immediately before sending in case the user opted out while building the report.
   if (readStored().sharing !== 'on') return
-  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(report), signal: AbortSignal.timeout(SEND_TIMEOUT_MS) })
+  const controller = new AbortController()
+  activeSend = controller
+  let response: Response
+  try {
+    response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+  } catch (error) {
+    if (controller.signal.aborted) return
+    throw error
+  } finally {
+    if (activeSend === controller) activeSend = null
+  }
+  if (controller.signal.aborted || readStored().sharing !== 'on') return
   if (!response.ok) throw new Error(`Usage report was refused with HTTP ${response.status}; it is dropped, and tomorrow's report is sent as usual.`)
   updateStored((stored) => ({ ...stored, lastReport: report, lastSentAt: new Date().toISOString() }))
 }

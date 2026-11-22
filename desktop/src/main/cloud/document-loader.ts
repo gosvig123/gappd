@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
-import { genericMeetingTitle } from '../../shared/meeting-title.ts'
+import { genericMeetingTitle, matchesCalendarTitle } from '../../shared/meeting-title.ts'
 
 /** The cloud rejects a document above 2 MiB, so refuse one locally before reading it. */
 export const MAX_DOCUMENT_BYTES = 2 << 20
@@ -83,11 +83,10 @@ function parseEnvelope(raw: string): { stamp: string; titleSource: string; docum
  * title) uploads a generic title.
  */
 function maskDocument(document: string, calendarTitles: string[], calendarSourced: boolean): { document: string; masked: boolean } {
-  const titles = new Set(calendarTitles.map((title) => title.trim()))
-  if (!calendarSourced && !titles.size) return { document, masked: false }
+  if (!calendarSourced && calendarTitles.length === 0) return { document, masked: false }
   const parsed = JSON.parse(document) as { title?: unknown; started_at?: unknown }
   if (typeof parsed.started_at !== 'string') return { document, masked: false }
-  const matchesTitle = typeof parsed.title === 'string' && titles.has(parsed.title.trim())
+  const matchesTitle = typeof parsed.title === 'string' && matchesCalendarTitle(parsed.title, calendarTitles)
   if (!calendarSourced && !matchesTitle) return { document, masked: false }
   return { document: JSON.stringify({ ...parsed, title: genericMeetingTitle(new Date(parsed.started_at)) }), masked: true }
 }

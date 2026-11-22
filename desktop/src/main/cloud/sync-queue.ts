@@ -16,6 +16,7 @@ export class MeetingSyncQueue {
   private readonly store: SecureJsonStore<MeetingSyncDocument>
   private readonly clock: () => Date
   private document: MeetingSyncDocument | null = null
+  private heldBack = new Set<string>()
   private queue: Promise<unknown> = Promise.resolve()
 
   constructor(store: SecureJsonStore<MeetingSyncDocument>, clock: () => Date = () => new Date()) {
@@ -28,10 +29,11 @@ export class MeetingSyncQueue {
    * the document always carries the revision the queue will send it with. A loader failure
    * queues nothing.
    */
-  enqueue(localId: string, load: (revision: number) => Promise<string>): Promise<MeetingSyncEntry> {
+  enqueue(localId: string, load: (revision: number) => Promise<string | { document: string; stamp?: string }>): Promise<MeetingSyncEntry> {
     return this.serialize(async () => {
       const state = await this.load()
       await this.queueOne(state, localId, load)
+      this.heldBack.delete(localId)
       await this.persist(state)
       return entryOf(localId, state)
     })
@@ -54,6 +56,7 @@ export class MeetingSyncQueue {
         state.acceptedStamp = {}
         state.deletions = []
         state.entries = {}
+        this.heldBack.clear()
       }
       state.subject = subject
       await this.persist(state)
@@ -75,6 +78,7 @@ export class MeetingSyncQueue {
       const state = await this.load()
       let queued = 0
       let unreadable = 0
+      const nextHeldBack = new Set<string>()
       let dirty = false
       for (const item of items) {
         const localId = typeof item === 'string' ? item : item.localId
@@ -96,8 +100,10 @@ export class MeetingSyncQueue {
           queued += 1
         } catch {
           unreadable += 1
+          if (entry?.state === 'pending') nextHeldBack.add(localId)
         }
       }
+      this.heldBack = nextHeldBack
       if (queued > 0 || dirty) await this.persist(state)
       return { queued, unreadable }
     })
@@ -114,6 +120,7 @@ export class MeetingSyncQueue {
       const state = await this.load()
       if (state.accepted[localId] === undefined && !state.entries[localId]) return
       delete state.entries[localId]
+      this.heldBack.delete(localId)
       if (!state.deletions.includes(localId)) state.deletions.push(localId)
       await this.persist(state)
     })
@@ -139,13 +146,16 @@ export class MeetingSyncQueue {
     })
   }
 
-  /** Returns the oldest pending work without changing its state. */
-  pending(): Promise<MeetingSyncWork | null> {
+  /** Returns the oldest eligible pending work without changing its state. */
+  pending(options?: { requireStamp?: boolean }): Promise<MeetingSyncWork | null> {
     return this.serialize(async () => {
       const state = await this.load()
       for (const localId of Object.keys(state.entries).sort()) {
+        if (this.heldBack.has(localId)) continue
         const stored = state.entries[localId]
-        if (stored.state === 'pending') return { localId, ...stored }
+        if (stored.state !== 'pending') continue
+        if (options?.requireStamp && !stored.stamp) continue
+        return { localId, ...stored }
       }
       return null
     })
@@ -192,6 +202,7 @@ export class MeetingSyncQueue {
     return this.serialize(async () => {
       const state = await this.load()
       state.entries = {}
+      this.heldBack.clear()
       await this.persist(state)
     })
   }
@@ -242,14 +253,16 @@ export class MeetingSyncQueue {
     return true
   }
 
-  private async queueOne(state: MeetingSyncDocument, localId: string, load: (revision: number) => Promise<string>, stamp?: string): Promise<void> {
+  private async queueOne(state: MeetingSyncDocument, localId: string, load: (revision: number) => Promise<string | { document: string; stamp?: string }>, stamp?: string): Promise<void> {
     if (typeof localId !== 'string' || localId.length === 0 || typeof load !== 'function') {
       throw new Error('A Meeting and a document loader are required.')
     }
     const revision = nextRevision(state, localId)
-    const document = await load(revision)
+    const loaded = await load(revision)
+    const document = typeof loaded === 'string' ? loaded : loaded.document
+    const resolvedStamp = stamp ?? (typeof loaded === 'string' ? undefined : loaded.stamp)
     if (typeof document !== 'string' || document.length === 0) throw new Error('The Meeting document is unavailable.')
-    state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null, ...(stamp ? { stamp } : {}) }
+    state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null, ...(resolvedStamp ? { stamp: resolvedStamp } : {}) }
   }
 
   private async load(): Promise<MeetingSyncDocument> {

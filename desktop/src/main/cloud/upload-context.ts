@@ -1,4 +1,5 @@
 import type { CloudCredential } from './auth'
+import type { MeetingSyncWork } from '../../shared/meeting-sync-contract'
 import type { MeetingDevice } from './device'
 import type { MeetingSyncQueue } from './sync-queue'
 // @ts-ignore Node type stripping requires explicit TypeScript extension.
@@ -14,6 +15,7 @@ export type UploadContext = {
   queue: MeetingSyncQueue
   fetcher: typeof fetch
   consented(): Promise<CloudCredential | null>
+  nextPending(): Promise<MeetingSyncWork | null>
   setPending(controller: AbortController | null): void
   setResult(message: string | null): void
   rememberGeneration(generation: string): Promise<void>
