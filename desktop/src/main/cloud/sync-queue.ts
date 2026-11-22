@@ -16,7 +16,9 @@ export class MeetingSyncQueue {
   private readonly store: SecureJsonStore<MeetingSyncDocument>
   private readonly clock: () => Date
   private document: MeetingSyncDocument | null = null
-  private heldBack = new Set<string>()
+  // Pending entries this process exported, or matched against the current discovery stamp. It
+  // lives only in memory, so after a restart nothing old is sendable until discovery confirms it.
+  private verified = new Set<string>()
   private queue: Promise<unknown> = Promise.resolve()
 
   constructor(store: SecureJsonStore<MeetingSyncDocument>, clock: () => Date = () => new Date()) {
@@ -33,7 +35,7 @@ export class MeetingSyncQueue {
     return this.serialize(async () => {
       const state = await this.load()
       await this.queueOne(state, localId, load)
-      this.heldBack.delete(localId)
+      this.verified.add(localId)
       await this.persist(state)
       return entryOf(localId, state)
     })
@@ -56,7 +58,7 @@ export class MeetingSyncQueue {
         state.acceptedStamp = {}
         state.deletions = []
         state.entries = {}
-        this.heldBack.clear()
+        this.verified.clear()
       }
       state.subject = subject
       await this.persist(state)
@@ -78,14 +80,17 @@ export class MeetingSyncQueue {
       const state = await this.load()
       let queued = 0
       let unreadable = 0
-      const nextHeldBack = new Set<string>()
+      const nextVerified = new Set<string>()
       let dirty = false
       for (const item of items) {
         const localId = typeof item === 'string' ? item : item.localId
         const hintStamp = typeof item === 'string' ? undefined : item.stamp
         const entry = state.entries[localId]
         if (entry?.state === 'failed' || state.deletions.includes(localId)) continue
-        if (hintStamp && this.isStampCurrent(state, localId, hintStamp, entry)) continue
+        if (hintStamp && this.isStampCurrent(state, localId, hintStamp, entry)) {
+          if (entry) nextVerified.add(localId)
+          continue
+        }
         try {
           const loaded = await load(localId, nextRevision(state, localId))
           const document = typeof loaded === 'string' ? loaded : loaded.document
@@ -94,16 +99,18 @@ export class MeetingSyncQueue {
           const previous = entry ? contentHash(entry.document) : state.acceptedContent[localId]
           if (contentHash(document) === previous) {
             if (exportedStamp && this.recordStamp(state, localId, exportedStamp, entry)) dirty = true
+            if (entry) nextVerified.add(localId)
             continue
           }
           await this.queueOne(state, localId, async () => document, exportedStamp)
+          nextVerified.add(localId)
           queued += 1
         } catch {
           unreadable += 1
-          if (entry?.state === 'pending') nextHeldBack.add(localId)
         }
       }
-      this.heldBack = nextHeldBack
+      // A Meeting missing from discovery, or whose fresh export failed, stays unsendable.
+      this.verified = nextVerified
       if (queued > 0 || dirty) await this.persist(state)
       return { queued, unreadable }
     })
@@ -120,7 +127,7 @@ export class MeetingSyncQueue {
       const state = await this.load()
       if (state.accepted[localId] === undefined && !state.entries[localId]) return
       delete state.entries[localId]
-      this.heldBack.delete(localId)
+      this.verified.delete(localId)
       if (!state.deletions.includes(localId)) state.deletions.push(localId)
       await this.persist(state)
     })
@@ -146,15 +153,17 @@ export class MeetingSyncQueue {
     })
   }
 
-  /** Returns the oldest eligible pending work without changing its state. */
-  pending(options?: { requireStamp?: boolean }): Promise<MeetingSyncWork | null> {
+  /**
+   * Returns the oldest eligible pending work without changing its state. With `verifiedOnly`, only
+   * stamped work this process exported or confirmed in the latest discovery is eligible.
+   */
+  pending(options?: { verifiedOnly?: boolean }): Promise<MeetingSyncWork | null> {
     return this.serialize(async () => {
       const state = await this.load()
       for (const localId of Object.keys(state.entries).sort()) {
-        if (this.heldBack.has(localId)) continue
         const stored = state.entries[localId]
         if (stored.state !== 'pending') continue
-        if (options?.requireStamp && !stored.stamp) continue
+        if (options?.verifiedOnly && (!stored.stamp || !this.verified.has(localId))) continue
         return { localId, ...stored }
       }
       return null
@@ -202,7 +211,7 @@ export class MeetingSyncQueue {
     return this.serialize(async () => {
       const state = await this.load()
       state.entries = {}
-      this.heldBack.clear()
+      this.verified.clear()
       await this.persist(state)
     })
   }

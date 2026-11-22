@@ -103,14 +103,27 @@ async function reportPreviousDay(): Promise<void> {
   const url = reportUrl()
   if (!claimedDay || !shouldSend || !url) return
   const report = await buildReport(claimedDay, installWeek)
-  // Recheck effective consent immediately before sending in case the user opted out while building the report.
-  if (readStored().sharing !== 'on') return
   const controller = new AbortController()
   activeSend = controller
   let response: Response
   try {
-    response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+    // Read consent and start the send under the preferences lock, so an opt-out from any process
+    // either lands first (nothing is sent) or after the send started (this process aborts it).
+    let request: Promise<Response> | null = null
+    try {
+      updatePreferences((current) => {
+        if (controller.signal.aborted || storedUsageFrom(current).sharing !== 'on') return current
+        request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+        return current
+      })
+    } catch (error) {
+      controller.abort()
+      ;(request as Promise<Response> | null)?.catch(() => {})
+      throw error
+    }
+    if (!request) return
+    response = await request
   } catch (error) {
     if (controller.signal.aborted) return
     throw error

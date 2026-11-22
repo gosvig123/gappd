@@ -204,7 +204,7 @@ export class MeetingUpload {
     // Retry durable pending work even when discovery found no new Meeting. An announced refresh
     // clears the old result first, so what remains afterwards is this sync's own reason.
     const queue = await this.queue.status()
-    const sendable = await this.queue.pending({ requireStamp: this.requireVerifiedStamp })
+    const sendable = await this.queue.pending({ verifiedOnly: this.requireVerifiedStamp })
     if (queue.deleting > 0 || sendable) {
       if (announce) this.result = null
       await this.sync()
@@ -235,7 +235,7 @@ export class MeetingUpload {
     return {
       resource: this.resource, device: this.device, queue: this.queue, fetcher: this.fetcher,
       consented: () => this.consented(),
-      nextPending: () => this.queue.pending({ requireStamp: this.requireVerifiedStamp }),
+      nextPending: () => this.queue.pending({ verifiedOnly: this.requireVerifiedStamp }),
       setPending: (controller) => { this.pending = controller },
       setResult: (message) => { this.result = message },
       rememberGeneration: (generation) => this.device.rememberGeneration(generation),

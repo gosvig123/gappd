@@ -133,9 +133,12 @@ async function recordFailedMeetings(): Promise<void> {
         claimed.push(entry)
       }
     }
-    for (const entry of failures) nextSeen.add(entry.key)
-    const merged = [...nextSeen]
-    const bounded = merged.length > MAX_TRACKED_FAILED_MEETINGS ? merged.slice(-MAX_TRACKED_FAILED_MEETINGS) : merged
+    // Keys of Meetings that still fail are never dropped, or the next scan would report them as new.
+    // The cap trims only keys of Meetings that no longer fail, oldest first.
+    const failing = new Set(failures.map((entry) => entry.key))
+    const older = [...nextSeen].filter((key) => !failing.has(key))
+    const room = Math.max(0, MAX_TRACKED_FAILED_MEETINGS - failing.size)
+    const bounded = [...older.slice(Math.max(0, older.length - room)), ...failing]
     return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded } }
   })
   for (const entry of claimed) {
