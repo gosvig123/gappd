@@ -110,10 +110,12 @@ export async function checkFailedMeetings(): Promise<void> {
 }
 
 async function recordFailedMeetings(): Promise<void> {
-  // A sharing change in any process while Meetings are listed makes this scan stale: it claims nothing.
+  // The scan claims only against the state it started from. If sharing or the saved failure list
+  // changed in any process while Meetings were listed, its list is stale: it claims nothing and
+  // the next scan starts again.
   const atStart = readStored()
   const consentToken = atStart.consentToken
-  const knownAtStart = new Set(atStart.failedMeetings ?? [])
+  const baselineAtStart = baselineKey(atStart.failedMeetings)
   const meetings = await listMeetings()
   const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
@@ -129,30 +131,29 @@ async function recordFailedMeetings(): Promise<void> {
     if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
     if (current.errorReport?.consentToken !== consentToken) return current
     const seen = current.errorReport?.failedMeetings
-    // Merge monotonically under lock so two processes never claim the same failure twice and a
-    // delayed older scan can never erase failures already recorded by a newer scan.
-    const nextSeen = new Set(seen ?? [])
+    if (baselineKey(seen) !== baselineAtStart) return current
     claimed.length = 0
+    // Without a saved list, this scan takes the baseline and reports nothing.
     if (seen) {
       for (const entry of failures) {
-        // A key known when this scan started is never new, even if a newer scan trimmed it meanwhile.
-        if (nextSeen.has(entry.key) || knownAtStart.has(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+        if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
         claimed.push(entry)
       }
     }
     // Keys of Meetings that still fail are never dropped, or the next scan would report them as new.
-    // The cap trims only keys this scan knew before it listed Meetings and saw not failing, oldest
-    // first. Keys another scan added meanwhile are kept: this scan's list may predate them.
+    // Other keys are kept up to the cap, newest first.
     const failing = new Set(failures.map((entry) => entry.key))
-    const older = [...nextSeen].filter((key) => !failing.has(key))
-    const trimmable = older.filter((key) => knownAtStart.has(key))
-    const newer = older.filter((key) => !knownAtStart.has(key))
-    const bounded = [...trimmable.slice(Math.max(0, trimmable.length - MAX_TRACKED_FAILED_MEETINGS)), ...newer, ...failing]
+    const older = (seen ?? []).filter((key) => !failing.has(key))
+    const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
     return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, ...(consentToken ? { consentToken } : {}) } }
   })
   for (const entry of claimed) {
     reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code }, { consentToken })
   }
+}
+
+function baselineKey(failedMeetings: string[] | undefined): string {
+  return failedMeetings ? JSON.stringify(failedMeetings) : ''
 }
 
 const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
