@@ -111,7 +111,9 @@ export async function checkFailedMeetings(): Promise<void> {
 
 async function recordFailedMeetings(): Promise<void> {
   // A sharing change in any process while Meetings are listed makes this scan stale: it claims nothing.
-  const consentToken = readStored().consentToken
+  const atStart = readStored()
+  const consentToken = atStart.consentToken
+  const knownAtStart = new Set(atStart.failedMeetings ?? [])
   const meetings = await listMeetings()
   const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
@@ -138,15 +140,17 @@ async function recordFailedMeetings(): Promise<void> {
       }
     }
     // Keys of Meetings that still fail are never dropped, or the next scan would report them as new.
-    // The cap applies only to the other keys, newest kept, so a delayed older scan cannot drop a
-    // newer scan's claim for a Meeting that still fails.
+    // The cap trims only keys this scan knew before it listed Meetings and saw not failing, oldest
+    // first. Keys another scan added meanwhile are kept: this scan's list may predate them.
     const failing = new Set(failures.map((entry) => entry.key))
     const older = [...nextSeen].filter((key) => !failing.has(key))
-    const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
+    const trimmable = older.filter((key) => knownAtStart.has(key))
+    const newer = older.filter((key) => !knownAtStart.has(key))
+    const bounded = [...trimmable.slice(Math.max(0, trimmable.length - MAX_TRACKED_FAILED_MEETINGS)), ...newer, ...failing]
     return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, ...(consentToken ? { consentToken } : {}) } }
   })
   for (const entry of claimed) {
-    reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
+    reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code }, { consentToken })
   }
 }
 
@@ -188,7 +192,7 @@ function meetingFailureCode(step: 'capture' | 'processing' | 'screen-video', mes
  * never waits: the checks that drop a report come first, and the send is not awaited, has a
  * timeout and is never retried. While a send is open, a new report is dropped.
  */
-function reportError(source: ErrorSource, operation: string, error: unknown): void {
+function reportError(source: ErrorSource, operation: string, error: unknown, claim?: { consentToken: string | undefined }): void {
   try {
     const url = reportUrl()
     if (!url || !isOperation(operation) || readStored().sharing !== 'on') return
@@ -220,7 +224,9 @@ function reportError(source: ErrorSource, operation: string, error: unknown): vo
     // either lands first (nothing is sent) or after the send started (setErrorSharing aborts it).
     let request: Promise<Response> | null = null
     readPreferencesLocked((current) => {
-      if (storedErrorFrom(current).sharing !== 'on') return
+      const stored = storedErrorFrom(current)
+      // A claimed Meeting failure is sent only under the consent it was claimed with.
+      if (stored.sharing !== 'on' || (claim && stored.consentToken !== claim.consentToken)) return
       request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
     })
