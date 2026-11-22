@@ -19,7 +19,9 @@ export class SecureJsonStore<T> {
   async read(): Promise<T | null> {
     try {
       const encrypted = await readFile(this.filePath)
-      return JSON.parse(this.cipher.decrypt(encrypted)) as T
+      const parsed = JSON.parse(this.cipher.decrypt(encrypted)) as T
+      if (parsed === null) throw new Error('Secure local data could not be read.')
+      return parsed
     } catch (error) {
       if (isMissingFile(error)) return null
       throw new Error('Secure local data could not be read.')
