@@ -4,7 +4,6 @@ import '../components/settings/local-ai.css'
 import { type ReactNode, useEffect, useState } from 'react'
 import type { StartupSettings } from '../../shared/ipc-contract'
 import { Button, Card, cx, StatusPill } from '../components/ui'
-import { TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { AlertCircleIcon, InfoIcon, RefreshIcon } from '../components/icons'
 import { runtimeErrorView, runtimeOperationLabel, runtimeStatusTone, type ManagedRuntimeSnapshot } from '../components/settings/managed-runtime-contract'
 import { SettingsLayout } from '../components/settings/layout'
@@ -20,8 +19,6 @@ import type { GoogleCalendarController } from '../hooks/use-google-calendar'
 
 type SettingsViewProps = {
   initialCategory?: string
-  language: string
-  onLanguageChange: (language: string) => void
   theme: ThemeName
   onThemeChange: (theme: ThemeName) => void
   localAI: { status: ManagedRuntimeSnapshot | null; loading: boolean; busy: boolean; onRepair: () => void }
@@ -30,10 +27,10 @@ type SettingsViewProps = {
 }
 
 
-export function SettingsView({ language, onLanguageChange, theme, onThemeChange, localAI, calendar, developerDebugEnabled, initialCategory }: SettingsViewProps) {
+export function SettingsView({ theme, onThemeChange, localAI, calendar, developerDebugEnabled, initialCategory }: SettingsViewProps) {
   const categories = [
     { label: 'General', content: <><AppearancePanel theme={theme} onThemeChange={onThemeChange} /><StartupPanel /><UsagePanel /><ErrorReportsPanel /></> },
-    { label: 'Meeting processing', content: <><NotesProviderPanel runtime={localAI.status} onRepair={localAI.onRepair} /><AppleSpeechPanel language={language} onLanguageChange={onLanguageChange} /></> },
+    { label: 'Meeting processing', content: <NotesProviderPanel runtime={localAI.status} onRepair={localAI.onRepair} /> },
     { label: 'Connections', content: <><ConnectAIPanel /><GoogleCalendarPanel calendar={calendar} /><MeetingUploadPanel /></> },
   ]
   if (developerDebugEnabled) categories.push({ label: 'Developer Debug', content: <LocalAIDebug {...localAI} /> })
@@ -88,10 +85,6 @@ function startupNote(settings: StartupSettings | null): string {
 
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause)
-}
-
-function AppleSpeechPanel({ language, onLanguageChange }: Pick<SettingsViewProps, 'language' | 'onLanguageChange'>) {
-  return <Card className="settings-section"><SectionTitle title="Transcription" note="Apple SpeechTranscriber runs on device. This default applies to new meetings." /><div className="settings-grid"><div className="metric-card"><label className="label" htmlFor="transcription-language">Default language</label><select id="transcription-language" className="settings-select" value={language} onChange={(event) => onLanguageChange(event.target.value)}>{TRANSCRIPTION_LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></div></div><div className="status-note">Summaries use the transcript language. Apple-supported availability can vary by macOS language model.</div></Card>
 }
 
 function LocalAIDebug({ status, loading, busy, onRepair }: SettingsViewProps['localAI']) {

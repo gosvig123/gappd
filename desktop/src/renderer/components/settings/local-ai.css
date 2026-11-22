@@ -73,16 +73,6 @@
   accent-color: var(--color-accent);
 }
 
-.settings-select {
-  width: 100%;
-  min-height: 2.25rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-elevated);
-  color: var(--color-text);
-  font: inherit;
-}
-
 .settings-section-head {
   display: flex;
   align-items: start;
