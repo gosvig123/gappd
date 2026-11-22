@@ -55,7 +55,7 @@ func appDevicesCmd() *cobra.Command {
 
 func appMeetingsCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meetings", Short: "Machine-readable meeting access"}
-	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appPersonFactsCmd(), appExtractPersonFactsCmd(), appHidePersonFactCmd(), appQueuePersonFactsCmd(), appPersonSummaryCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsSetCalendarTitleCmd(), appMeetingsDeleteCmd(), appMeetingsSetLanguageCmd())
+	cmd.AddCommand(appAgendaCmd(), appVoiceTargetsCmd(), appRecognizeSpeakersCmd(), appMeetingTimesCmd(), appPeopleCmd(), appUpdatePersonCmd(), appMergePeopleCmd(), appPersonActionItemsCmd(), appPersonFactsCmd(), appExtractPersonFactsCmd(), appHidePersonFactCmd(), appQueuePersonFactsCmd(), appPersonSummaryCmd(), appImportPeopleCmd(), appAssignSpeakerCmd(), appSpeakerClipCmd(), appVideoAssetCmd(), appCompactStorageCmd(), appMeetingsListCmd(), appMeetingsSearchCmd(), appMeetingsShowCmd(), appMeetingsRetryDiarizationCmd(), appMeetingsSetCalendarTitleCmd(), appMeetingsDeleteCmd(), appMeetingsSetLanguageCmd())
 	return cmd
 }
 
@@ -139,8 +139,30 @@ func appMeetingsListCmd() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(entries)})
+		speakers, err := store.ListMeetingSpeakers()
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.MeetingsResponse{Meetings: appprotocol.BuildMeetingListViews(entries, speakers)})
 	})
+}
+
+func appMeetingsSearchCmd() *cobra.Command {
+	var query string
+	cmd := meetingJSONCommand("search", nil, func(_ []string) error {
+		_, store, err := loadStore()
+		if err != nil {
+			return err
+		}
+		defer store.Close()
+		ids, err := store.SearchMeetingIDs(query)
+		if err != nil {
+			return err
+		}
+		return writeJSON(appprotocol.MeetingSearchResponse{IDs: ids})
+	})
+	cmd.Flags().StringVar(&query, "query", "", "Search query across title, transcript, and summary")
+	return cmd
 }
 
 func appMeetingsShowCmd() *cobra.Command {

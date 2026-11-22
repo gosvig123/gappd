@@ -4,13 +4,16 @@ import type { AppView } from '../lib/app-view'
 import type { ConfirmController } from '../components/confirm'
 import { MeetingPanel } from '../components/meeting/panel'
 import { WorkspaceEvent } from '../components/meeting/workspace-event'
-import { searchMeetings } from '../lib/meeting-grouping'
+import { useRequestGate } from '../hooks/request-gate'
+import { matchingMeetingIds } from '../lib/meeting-grouping'
 import { filterWorkspaceRows, workspaceRows, type CalendarTarget, type WorkspaceRow } from '../lib/meetings-workspace'
 import { Button } from '../components/ui'
 import { WorkspaceList } from './workspace-list'
 import './meetings-workspace.css'
 
 const SEARCH_LABEL = 'Search Meetings and events'
+const SEARCH_DEBOUNCE_MS = 150
+const EMPTY_MATCHES: ReadonlySet<string> = new Set()
 
 type Props = { view: AppView; searchRef: React.RefObject<HTMLInputElement | null>; confirm: ConfirmController }
 
@@ -40,12 +43,36 @@ export function MeetingsView({ view, searchRef, confirm }: Props) {
 
 function useWorkspaceRows(view: AppView, query: string) {
   const [now, setNow] = useState(() => new Date())
+  const ftsMatches = useMeetingSearch(query, view.meetings)
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 30_000); return () => window.clearInterval(timer) }, [])
   return useMemo(() => {
     const rows = workspaceRows(view, now)
-    const matches = new Set(searchMeetings(view.meetings, view.meetingDetails, query).map(hit => hit.meeting.id))
+    const matches = new Set([...matchingMeetingIds(view.meetings, query), ...ftsMatches])
     return { upcoming: filterWorkspaceRows(rows.upcoming, query, matches), history: filterWorkspaceRows(rows.history, query, matches), now }
-  }, [view.meetings, view.meetingDetails, view.meetingEvents, view.calendar, view.agendas, query, now])
+  }, [view.meetings, view.meetingEvents, view.calendar, view.agendas, query, ftsMatches, now])
+}
+
+/** Searches transcript and summary text via SQLite FTS5 only while the user has a query. */
+function useMeetingSearch(query: string, meetings: AppView['meetings']): ReadonlySet<string> {
+  const [matches, setMatches] = useState<ReadonlySet<string>>(EMPTY_MATCHES)
+  const request = useRequestGate()
+  const trimmed = query.trim()
+  const revision = meetings.map(meeting => `${meeting.id}:${meeting.status.updatedAt}`).join('|')
+  useEffect(() => {
+    if (!trimmed) {
+      request.cancel()
+      setMatches(EMPTY_MATCHES)
+      return undefined
+    }
+    const id = request.next()
+    const timer = window.setTimeout(() => {
+      void window.gappd.meetings.search(trimmed)
+        .then((ids) => { if (request.isCurrent(id)) setMatches(new Set(ids)) })
+        .catch(() => { if (request.isCurrent(id)) setMatches(EMPTY_MATCHES) })
+    }, SEARCH_DEBOUNCE_MS)
+    return () => { window.clearTimeout(timer); request.cancel() }
+  }, [trimmed, revision])
+  return matches
 }
 
 function WorkspaceHeader({ view, query, setQuery, searchRef }: Pick<Props, 'view' | 'searchRef'> & { query: string; setQuery: (value: string) => void }) {

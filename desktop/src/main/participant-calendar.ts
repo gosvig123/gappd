@@ -117,6 +117,17 @@ export function savedMeetingCalendarContexts(): Promise<Record<string, Participa
   return serialize(async () => (await readLinks()).meetings)
 }
 
+/** Confirmed Calendar links for all Meetings in one read, with no backend spawns or disk writes. */
+export function savedMeetingCalendarLinks(): Promise<Record<string, CalendarEventSummary>> {
+  return serialize(async () => {
+    const links: Record<string, CalendarEventSummary> = {}
+    for (const [id, context] of Object.entries((await readLinks()).meetings)) {
+      if (context.event) links[id] = context.event
+    }
+    return links
+  })
+}
+
 // Hold the Calendar lock until the backend consumes the bounded constraint.
 export function withSavedCalendarContexts<T>(action: (contexts: Record<string, ParticipantContext>) => Promise<T>): Promise<T> {
   return serialize(async () => action((await readLinks()).meetings))

@@ -14,8 +14,8 @@ import { configureAgent, findAgents, providerModels, providerStatus, useLocalPro
 import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
-import { assignSpeaker, getDevices, listMeetings, listPeople, hidePersonFact, mergePeople, personActionItems, personFacts, personSummary, queuePersonFacts, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
-import { linkCalendar, participantContext } from './participant-calendar'
+import { assignSpeaker, getDevices, listMeetings, listPeople, hidePersonFact, mergePeople, personActionItems, personFacts, personSummary, queuePersonFacts, retryDiarization, searchMeetings, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
+import { linkCalendar, participantContext, savedMeetingCalendarLinks } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -48,6 +48,7 @@ const IPC_HANDLERS: MainHandlers = {
   },
   meetings: {
     list: () => listMeetings(),
+    search: (_event, query: string) => searchMeetings(String(query)),
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
     setLanguage: (_event, id: string, language: string) => setMeetingLanguage(id, language),
@@ -69,6 +70,7 @@ const IPC_HANDLERS: MainHandlers = {
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
+    calendarLinks: () => savedMeetingCalendarLinks(),
     linkCalendar: (_event, input) => linkCalendar(input),
     exportRecording: (_event, id: string) => exportRecording(id),
   },

@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react'
-import type { MeetingDetail } from '../shared/contracts'
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 import type { SavedPerson } from '../shared/participant-contract'
 import { AppShell } from './components/app-shell'
@@ -8,7 +7,6 @@ import { useAgendas } from './hooks/use-agendas'
 import { useDashboardData } from './hooks/use-dashboard-data'
 import { useGoogleCalendar } from './hooks/use-google-calendar'
 import { useManagedRuntime } from './hooks/use-managed-runtime'
-import { useMeetingDetails } from './hooks/use-meeting-details'
 import { useMeetingEvents } from './hooks/use-meeting-events'
 import { useSetupPermissions } from './hooks/use-setup-permissions'
 import { useTheme, type ThemeName } from './hooks/use-theme'
@@ -22,13 +20,12 @@ export function App() {
   const calendar = useGoogleCalendar()
   const update = useUpdateStatus()
   const [theme, setTheme] = useTheme()
-  const [meetingDetails, rememberMeetingDetail] = useMeetingDetails(dashboard.meetings, dashboard.selectedMeeting)
-  const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings, calendar.snapshot)
+  const { events: meetingEvents, linkCalendar: linkMeetingCalendar } = useMeetingEvents(dashboard.meetings)
   const [people, setPeople] = useSavedPeople()
   const agendas = useAgendas()
   const [dismissals, setDismissals] = useState<ReadonlySet<string>>(() => new Set<string>())
-  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail })
-  const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingDetails, meetingEvents, people, agendas, theme, dismissals, actions })
+  const actions = useAppActions({ dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople })
+  const view = buildView({ dashboard, permissions, calendar, update, runtime, meetingEvents, people, agendas, theme, dismissals, actions })
   return <AppShell view={view} />
 }
 
@@ -38,7 +35,6 @@ type Inputs = {
   calendar: ReturnType<typeof useGoogleCalendar>
   update: ReturnType<typeof useUpdateStatus>
   runtime: ReturnType<typeof useManagedRuntime>
-  meetingDetails: Map<string, MeetingDetail>
   meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]
   agendas: AppView['agendas']
@@ -50,7 +46,7 @@ type Inputs = {
 function buildView(input: Inputs): AppView {
   const { dashboard, permissions, calendar, update, runtime } = input
   return {
-    meetings: dashboard.meetings, meetingDetails: input.meetingDetails, meetingEvents: input.meetingEvents,
+    meetings: dashboard.meetings, meetingEvents: input.meetingEvents,
     people: input.people, agendas: input.agendas,
     selectedMeetingId: dashboard.selectedMeetingId, selectedMeeting: dashboard.selectedMeeting,
     selectedMeetingLoading: dashboard.selectedMeetingLoading, selectedMeetingError: dashboard.selectedMeetingError,
@@ -73,17 +69,16 @@ type ActionInputs = Pick<Inputs, 'dashboard' | 'permissions' | 'calendar' | 'upd
   setDismissals: (update: (current: ReadonlySet<string>) => ReadonlySet<string>) => void
   setTheme: (theme: ThemeName) => void
   setPeople: AppActions['peopleChanged']
-  rememberMeetingDetail: (meeting: MeetingDetail) => void
 }
 
 function useAppActions(input: ActionInputs): AppActions {
-  const { dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail } = input
+  const { dashboard, permissions, calendar, update, runtime, setDismissals, setTheme, linkMeetingCalendar, setPeople } = input
   return useMemo(() => ({
     openMeeting: (id) => void dashboard.actions.loadMeeting(id),
     closeMeeting: dashboard.actions.clearSelectedMeeting,
     retryDiarization: dashboard.actions.retryDiarization,
     setMeetingLanguage: dashboard.actions.setMeetingLanguage,
-    meetingUpdated: (meeting) => { rememberMeetingDetail(meeting); dashboard.actions.updateMeeting(meeting) },
+    meetingUpdated: (meeting) => dashboard.actions.updateMeeting(meeting),
     deleteMeeting: dashboard.actions.deleteMeeting,
     setDevice: dashboard.actions.setDevice,
     // Without access, Record asks through the same flow as setup, so macOS prompts once and setup shows the result.
@@ -112,12 +107,12 @@ function useAppActions(input: ActionInputs): AppActions {
     // Linking an event renames the Meeting after it, so reload the Meeting.
     linkMeetingCalendar: async (link) => {
       const context = await linkMeetingCalendar(link)
-      void window.gappd.meetings.show(link.id).then((meeting) => { rememberMeetingDetail(meeting); dashboard.actions.updateMeeting(meeting) }).catch(console.error)
+      void window.gappd.meetings.show(link.id).then((meeting) => dashboard.actions.updateMeeting(meeting)).catch(console.error)
       return context
     },
     // Renames and merges rewrite Meeting transcripts, so reload the Meetings with the People.
     peopleChanged: (people) => { setPeople(people); void dashboard.actions.refreshMeetings().catch(console.error) },
-  }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople, rememberMeetingDetail])
+  }), [dashboard.actions, permissions.request, permissions.state.status, calendar.sync, calendar.syncAll, calendar.connect, calendar.disconnect, update.downloadUpdate, update.installAndRestart, update.checkNow, update.openUpdatePage, runtime.prepare, setDismissals, setTheme, linkMeetingCalendar, setPeople])
 }
 
 function updateActions(update: Inputs['update']) {

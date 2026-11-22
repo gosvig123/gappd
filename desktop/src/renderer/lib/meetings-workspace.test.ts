@@ -107,21 +107,21 @@ test('link, relink, and unlink immediately update workspace rows with unchanged 
 
 test('a lookup started before a link change cannot overwrite its confirmed result', async () => {
   const cache = new MeetingEventCache()
-  let finish!: (value: CalendarEventSummary) => void
+  let finish!: (value: Record<string, CalendarEventSummary>) => void
   const old = cache.refresh(['recorded'], () => new Promise(resolve => { finish = resolve }))
   const updated = cache.update('recorded', event('new'))
-  finish(event('old'))
+  finish({ recorded: event('old') })
   assert.equal(await old, null)
   assert.equal(updated.get('recorded')?.title, 'new')
-  assert.equal((await cache.refresh(['recorded'], async () => event('new')))?.get('recorded')?.title, 'new')
+  assert.equal((await cache.refresh(['recorded'], async () => ({ recorded: event('new') })))?.get('recorded')?.title, 'new')
 })
 
 test('cancelled lookups never publish after the hook unmounts', async () => {
   const cache = new MeetingEventCache()
-  let finish!: (value: CalendarEventSummary) => void
+  let finish!: (value: Record<string, CalendarEventSummary>) => void
   const pending = cache.refresh(['recorded'], () => new Promise(resolve => { finish = resolve }))
   cache.cancel()
-  finish(event())
+  finish({ recorded: event() })
   assert.equal(await pending, null)
 })
 

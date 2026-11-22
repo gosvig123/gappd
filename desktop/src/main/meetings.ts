@@ -17,6 +17,12 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
   return result.meetings
 }
 
+export async function searchMeetings(query: string): Promise<string[]> {
+  if (!query.trim()) return []
+  const result = await requestCommand('meetings.search', { query })
+  return result.ids
+}
+
 export async function showMeeting(id: string): Promise<MeetingDetail> {
   const result = await requestCommand('meetings.show', { id })
   return result.meeting

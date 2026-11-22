@@ -8,14 +8,22 @@ import (
 )
 
 type MeetingListItem struct {
-	ID            string        `json:"id"`
-	Title         string        `json:"title"`
-	StartedAt     string        `json:"startedAt"`
-	EndedAt       *string       `json:"endedAt,omitempty"`
-	Status        MeetingStatus `json:"status"`
-	HasTranscript bool          `json:"hasTranscript"`
-	HasSummary    bool          `json:"hasSummary"`
-	SearchText    string        `json:"searchText,omitempty"`
+	ID            string           `json:"id"`
+	Title         string           `json:"title"`
+	StartedAt     string           `json:"startedAt"`
+	EndedAt       *string          `json:"endedAt,omitempty"`
+	Status        MeetingStatus    `json:"status"`
+	HasTranscript bool             `json:"hasTranscript"`
+	HasSummary    bool             `json:"hasSummary"`
+	Speakers      []MeetingSpeaker `json:"speakers"`
+}
+
+type MeetingSearchInput struct {
+	Query string `json:"query"`
+}
+
+type MeetingSearchResponse struct {
+	IDs []string `json:"ids"`
 }
 
 type MeetingDetail struct {
@@ -49,17 +57,27 @@ type MeetingSegment struct {
 	Text       string  `json:"text"`
 }
 
-func BuildMeetingListViews(entries []db.MeetingListEntry) []MeetingListItem {
+func BuildMeetingListViews(entries []db.MeetingListEntry, speakersByMeeting map[string][]db.MeetingSpeakerSummary) []MeetingListItem {
 	views := make([]MeetingListItem, 0, len(entries))
 	for _, entry := range entries {
-		views = append(views, BuildMeetingListView(entry))
+		views = append(views, BuildMeetingListView(entry, speakersByMeeting[entry.Meeting.ID]))
 	}
 	return views
 }
 
-func BuildMeetingListView(entry db.MeetingListEntry) MeetingListItem {
+func BuildMeetingListView(entry db.MeetingListEntry, speakers []db.MeetingSpeakerSummary) MeetingListItem {
 	meeting := entry.Meeting
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary}
+	outSpeakers := make([]MeetingSpeaker, 0, len(speakers))
+	for _, speaker := range speakers {
+		outSpeakers = append(outSpeakers, MeetingSpeaker{
+			Key:               speaker.Key,
+			Name:              speaker.Name,
+			PersonID:          speaker.PersonID,
+			IdentityOrigin:    speaker.IdentityOrigin,
+			SuggestedPersonID: speaker.SuggestedPersonID,
+		})
+	}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers}
 }
 
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {

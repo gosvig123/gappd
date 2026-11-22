@@ -245,7 +245,15 @@ export type MeetingListItem = {
   status: MeetingStatus
   hasTranscript: boolean
   hasSummary: boolean
-  searchText?: string
+  speakers: MeetingSpeaker[]
+}
+
+export type MeetingSearchInput = {
+  query: string
+}
+
+export type MeetingSearchResponse = {
+  ids: string[]
 }
 
 export type SetCalendarTitleInput = {
