@@ -18,7 +18,7 @@ export function SettingsDialog({ view, onClose, initialCategory }: { view: AppVi
           <button type="button" className="app-icon-action" aria-label="Close settings" onClick={onClose}><X aria-hidden="true" /></button>
         </header>
         <div className="app-modal-body">
-          <SettingsView initialCategory={initialCategory} language={view.language} onLanguageChange={view.actions.setLanguage}
+          <SettingsView initialCategory={initialCategory}
             theme={view.theme} onThemeChange={view.actions.setTheme as (theme: ThemeName) => void}
             localAI={{ status: view.runtime, loading: view.runtimeLoading, busy: view.runtimeBusy, onRepair: view.actions.repairRuntime }}
             calendar={view.calendarController} developerDebugEnabled={import.meta.env.DEV} />
