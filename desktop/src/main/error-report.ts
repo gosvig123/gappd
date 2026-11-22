@@ -117,7 +117,11 @@ async function recordFailedMeetings(): Promise<void> {
       reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
     }
   }
-  writeStored({ ...readStored(), failedMeetings: failed })
+  updatePreferences((current) => {
+    if (current.errorReport?.sharing === 'off') return current
+    if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: failed } }
+  })
 }
 
 const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])

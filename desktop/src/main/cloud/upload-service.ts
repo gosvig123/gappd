@@ -71,11 +71,12 @@ async function meetingCalendarTitles(id: string): Promise<string[]> {
 /** Returns null when a saved entry exists but is malformed, so it is refused for upload. */
 function readCalendarTitles(context: ParticipantContext | undefined): string[] | null {
   if (context === undefined) return []
-  if (!context || typeof context !== 'object' || !Array.isArray(context.candidates)) return null
-  const events = context.event ? [context.event, ...context.candidates] : context.candidates
+  if (!context || typeof context !== 'object' || Array.isArray(context) || !Array.isArray(context.candidates)) return null
+  const hasEvent = 'event' in context && context.event !== undefined
+  const events = hasEvent ? [context.event, ...context.candidates] : context.candidates
   const titles: string[] = []
   for (const event of events) {
-    if (!event || typeof event !== 'object' || typeof event.title !== 'string') return null
+    if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.title !== 'string') return null
     titles.push(event.title)
   }
   return titles

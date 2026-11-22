@@ -7,10 +7,15 @@ const MACOS_PLATFORM = 'darwin'
 const REQUIRES_APPROVAL_STATUS = 'requires-approval'
 
 export function initializeStartupSettings(): void {
-  if (!supportsStartup() || startupPrefs().initialized) return
+  if (!supportsStartup()) return
   try {
-    writeStartup({ initialized: true })
-    app.setLoginItemSettings({ openAtLogin: true })
+    let claimed = false
+    updatePreferences((current) => {
+      if (current.startup?.initialized) return current
+      claimed = true
+      return { ...current, startup: { ...current.startup, initialized: true } }
+    })
+    if (claimed) app.setLoginItemSettings({ openAtLogin: true })
   } catch (error) {
     logFailure('startup.open-at-login', 'Failed to enable Gappd at macOS login during first launch', error)
   }
