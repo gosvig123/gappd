@@ -1,3 +1,4 @@
+import { shell } from 'electron'
 import type { CalendarEventSummary } from '../shared/calendar-contract'
 import { reminderDueEvents, reminderKey } from '../shared/calendar-reminder'
 import { canStartRecordingStatus, RECORDING_STATUS_ERROR } from '../shared/meeting-recording-workflow'
@@ -5,6 +6,7 @@ import { isExpectedError, logFailure } from './error-log'
 import { googleCalendarSnapshot } from './google/calendar-service'
 import { dismissMeetingPrompt, showMeetingPrompt } from './meeting-notification'
 import { startMeetingRecordingWorkflow } from './meeting-recording-workflow'
+import { getStartupSettings } from './startup-settings'
 import { getRecordingState, onRecordingStateChange, setRecordingState } from './state'
 
 const TICK_MS = 20_000
@@ -32,14 +34,14 @@ export function stopCalendarReminders(): void {
 }
 
 async function check(): Promise<void> {
-  if (shown && Date.now() >= shown.end) dismissShown()
-  if (!canStartRecordingStatus(getRecordingState().status)) return
+  if (shown && (Date.now() >= shown.end || !getStartupSettings().calendarRemindersEnabled)) dismissShown()
+  if (!getStartupSettings().calendarRemindersEnabled || !canStartRecordingStatus(getRecordingState().status)) return
   const event = reminderDueEvents((await googleCalendarSnapshot()).events).find((item) => !reminded.has(reminderKey(item)))
   if (!event || !timer || !canStartRecordingStatus(getRecordingState().status)) return
   const key = reminderKey(event)
   reminded.add(key)
   shown = { key, end: Date.parse(event.end) }
-  showMeetingPrompt({ key, heading: event.title || 'Calendar event', title: startsLabel(event), onRecord: () => void record(event) })
+  showMeetingPrompt({ key, heading: event.title || 'Calendar event', title: startsLabel(event), onRecord: () => void record(event), onJoin: event.joinUrl ? () => void join(event) : undefined })
 }
 
 function startsLabel(event: CalendarEventSummary): string {
@@ -51,6 +53,11 @@ function startsLabel(event: CalendarEventSummary): string {
 function dismissShown(): void {
   if (shown) dismissMeetingPrompt(shown.key)
   shown = null
+}
+
+async function join(event: CalendarEventSummary): Promise<void> {
+  if (event.joinUrl) await shell.openExternal(event.joinUrl).catch((error) => logFailure('calendar.reminder-join', `Open the call link of "${event.title}" failed; open it from your calendar`, error))
+  await record(event)
 }
 
 async function record(event: CalendarEventSummary): Promise<void> {

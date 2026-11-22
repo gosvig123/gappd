@@ -31,6 +31,7 @@ export type StoredStartupPreferences = {
   speakerLabelsEnabled?: boolean
   screenVideoEnabled?: boolean
   agendaAutoDraftEnabled?: boolean
+  calendarRemindersEnabled?: boolean
 }
 
 export type StoredRemoteAccess = {

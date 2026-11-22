@@ -34,9 +34,10 @@ export function getStartupSettings(): StartupSettings {
   const speakerLabelsEnabled = prefs.speakerLabelsEnabled !== false
   const screenVideoEnabled = prefs.screenVideoEnabled === true
   const agendaAutoDraftEnabled = prefs.agendaAutoDraftEnabled === true
-  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled }
+  const calendarRemindersEnabled = prefs.calendarRemindersEnabled !== false
+  if (!supportsStartup()) return { openAtLogin: false, supported: false, requiresApproval: false, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled, calendarRemindersEnabled }
   const settings = app.getLoginItemSettings()
-  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled }
+  return { openAtLogin: settings.openAtLogin, supported: true, requiresApproval: settings.status === REQUIRES_APPROVAL_STATUS, speakerLabelsEnabled, screenVideoEnabled, agendaAutoDraftEnabled, calendarRemindersEnabled }
 }
 
 export function setSpeakerLabelsEnabled(enabled: boolean): StartupSettings {
@@ -52,6 +53,12 @@ export function setScreenVideoEnabled(enabled: boolean): StartupSettings {
 /** Off by default: drafting runs the notes provider for every upcoming event with other invitees. */
 export function setAgendaAutoDraftEnabled(enabled: boolean): StartupSettings {
   writeStartup({ agendaAutoDraftEnabled: enabled })
+  return getStartupSettings()
+}
+
+/** On by default: the Record prompt drops down when a Calendar event with other invitees starts. */
+export function setCalendarRemindersEnabled(enabled: boolean): StartupSettings {
+  writeStartup({ calendarRemindersEnabled: enabled })
   return getStartupSettings()
 }
 

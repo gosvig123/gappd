@@ -30,6 +30,8 @@ export type CalendarEventSummary = {
   allDay: boolean
   status: string
   location?: string
+  /** Web address of the event's video call, when it has one. */
+  joinUrl?: string
   attendees?: CalendarAttendee[]
   organizer?: CalendarParticipant
 }

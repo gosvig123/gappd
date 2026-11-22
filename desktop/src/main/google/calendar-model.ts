@@ -15,6 +15,8 @@ export type GoogleEventItem = {
   status?: string
   summary?: string
   location?: string
+  hangoutLink?: string
+  conferenceData?: { entryPoints?: Array<{ entryPointType?: string; uri?: string }> }
   start?: { date?: string; dateTime?: string }
   end?: { date?: string; dateTime?: string }
   attendees?: GoogleAttendee[]
@@ -27,6 +29,7 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
   const end = item.end?.dateTime || item.end?.date
   const allDay = Boolean(item.start?.date && !item.start?.dateTime)
   if (!start || !end || !validRange(start, end, allDay)) return null
+  const joinUrl = eventJoinUrl(item)
   return {
     connectionId, accountEmail,
     calendarId: PRIMARY_CALENDAR_ID,
@@ -37,9 +40,20 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
     start, end, allDay,
     status: item.status || CONFIRMED_STATUS,
     location: item.location?.trim() || undefined,
+    ...(joinUrl ? { joinUrl } : {}),
     attendees: item.attendees?.flatMap(mapAttendee),
     organizer: mapParticipant(item.organizer),
   }
+}
+
+/** The video call link: Google's conference entry point, the Meet link, or a web address in the location. */
+function eventJoinUrl(item: GoogleEventItem): string | undefined {
+  const video = item.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === 'video')?.uri
+  const fromLocation = item.location?.match(/https?:\/\/\S+/i)?.[0]
+  for (const candidate of [video, item.hangoutLink, fromLocation]) {
+    try { if (candidate && /^https?:$/.test(new URL(candidate).protocol)) return candidate.trim() } catch { /* not a web address */ }
+  }
+  return undefined
 }
 
 function mapParticipant(item?: GoogleParticipant): CalendarParticipant | undefined {

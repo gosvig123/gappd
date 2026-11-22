@@ -1,11 +1,12 @@
 import { BrowserWindow, screen } from 'electron'
 
 const PROMPT_WIDTH = 390
-// The countdown title and two text buttons need more room than one Record button.
-const AUTO_STOP_WIDTH = 490
+// Prompts with two text buttons (auto-stop, Join & record) need more room than one Record button.
+const WIDE_PROMPT_WIDTH = 490
 const PROMPT_HEIGHT = 76
 const PROMPT_TOP_MARGIN = 14
 const ACTION_RECORD = 'gappd-prompt://record'
+const ACTION_JOIN = 'gappd-prompt://join'
 const ACTION_DISMISS = 'gappd-prompt://dismiss'
 const ACTION_KEEP = 'gappd-auto-stop://keep'
 const ACTION_STOP = 'gappd-auto-stop://stop'
@@ -21,6 +22,8 @@ type PromptInput = {
   heading?: string
   title: string
   onRecord: () => void
+  /** Adds a Join & record button; Record becomes the secondary button. */
+  onJoin?: () => void
 }
 
 type AutoStopInput = {
@@ -32,7 +35,8 @@ type AutoStopInput = {
 
 export function showMeetingPrompt(input: PromptInput): void {
   stopMeetingPrompts()
-  const window = createPromptWindow()
+  // Two buttons need the wider prompt.
+  const window = createPromptWindow(input.onJoin ? WIDE_PROMPT_WIDTH : PROMPT_WIDTH)
   promptWindow = window
   promptKey = input.key
   handlePromptActions(window, input)
@@ -52,7 +56,7 @@ export function stopMeetingPrompts(): void {
 
 export function showAutoStopPrompt(input: AutoStopInput): void {
   dismissAutoStopPrompt()
-  const window = createPromptWindow(AUTO_STOP_WIDTH)
+  const window = createPromptWindow(WIDE_PROMPT_WIDTH)
   autoStopWindow = window
   handleAutoStopActions(window, input)
   void window.loadURL(autoStopDataUrl(input)).then(() => window.showInactive())
@@ -88,6 +92,7 @@ function handlePromptActions(window: BrowserWindow, input: PromptInput): void {
     event.preventDefault()
     stopMeetingPrompts()
     if (url === ACTION_RECORD) input.onRecord()
+    if (url === ACTION_JOIN) input.onJoin?.()
   })
   window.on('closed', () => {
     if (promptWindow !== window) return
@@ -135,7 +140,7 @@ const PROMPT_STYLE = `:root{color-scheme:dark;--card:#1a1a1c;--border:#46464c;--
 const MARK = '<svg class="logo" viewBox="0 0 32 32" role="img" aria-label="Gappd"><rect class="tile" x="2" y="2" width="28" height="28" rx="8"/><g class="wave"><path d="M8.7 13v6"/><path d="M11.2 11v10"/><path d="M13.7 9v14"/><path d="M18.3 9v14"/><path d="M20.8 11v10"/><path d="M23.3 13v6"/></g></svg>'
 
 function promptHtml(input: PromptInput): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>${PROMPT_STYLE}</style></head><body><div class="shell">${MARK}<div class="copy"><div class="title">${escapeHtml(input.heading ?? 'Meeting detected')}</div><div class="subtitle">${escapeHtml(input.title)}</div></div><a class="action record" href="${ACTION_RECORD}">Record</a><a class="action close" href="${ACTION_DISMISS}" aria-label="Dismiss">×</a></div></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>${PROMPT_STYLE}</style></head><body><div class="shell">${MARK}<div class="copy"><div class="title">${escapeHtml(input.heading ?? 'Meeting detected')}</div><div class="subtitle">${escapeHtml(input.title)}</div></div>${input.onJoin ? `<a class="action secondary" href="${ACTION_RECORD}">Record</a><a class="action record" href="${ACTION_JOIN}">Join &amp; record</a>` : `<a class="action record" href="${ACTION_RECORD}">Record</a>`}<a class="action close" href="${ACTION_DISMISS}" aria-label="Dismiss">×</a></div></body></html>`
 }
 
 function autoStopHtml(input: AutoStopInput): string {
