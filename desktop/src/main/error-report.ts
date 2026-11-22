@@ -76,7 +76,9 @@ export function setErrorSharing(enabled: boolean): ErrorReportStatus {
   const consentToken = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
   updatePreferences((current) => {
     if (!enabled) return { ...current, errorReport: { sharing: 'off', consentToken } }
-    const failedMeetings = current.errorReport?.failedMeetings
+    // Keep the list only when sharing is on now (the effective value, rollback markers included).
+    // After any off state, even a partly saved one, a new baseline is taken.
+    const failedMeetings = current.errorReport?.sharing === 'on' ? current.errorReport.failedMeetings : undefined
     return { ...current, errorReport: failedMeetings ? { sharing: 'on', failedMeetings, consentToken } : { sharing: 'on', consentToken } }
   })
   return errorReportStatus()
