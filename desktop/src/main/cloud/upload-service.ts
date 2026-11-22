@@ -1,17 +1,17 @@
-import { createHash } from 'node:crypto'
 import { shell } from 'electron'
 import type { MeetingSyncDocument } from '../../shared/meeting-sync-contract'
 import type { ParticipantContext } from '../../shared/participant-contract'
 import { CloudAuth, type CloudCredential } from './auth'
 import { createSecureStore, requireEncryption } from '../electron-secure-store'
 import { MeetingDevice, type DeviceCredential } from './device'
-import { meetingDocumentLoader } from './document-loader'
+import { foldCalendarMaskStamp, meetingDocumentWithStampLoader } from './document-loader'
+import { googleCalendarSnapshot } from '../google/calendar-service'
 import { deleteMeeting, listMeetings } from '../meetings'
 import { resolveGappdBinary } from '../native-runtime'
 import { MeetingSyncQueue } from './sync-queue'
 import { MeetingUpload } from './upload'
 import { cloudAuthConfig, cloudResource } from '../service-config'
-import { savedMeetingCalendarContexts } from '../participant-calendar'
+import { overlappingCalendarTitles, savedMeetingCalendarContexts } from '../participant-calendar'
 import type { MeetingDeleteResponse, MeetingListItem } from '../../shared/contracts'
 
 // The store names keep their original "development" suffix, so existing installs keep their
@@ -31,26 +31,44 @@ export function meetingUploadAuthorization(): CloudAuth {
 export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
-    meetingDocumentLoader(resolveGappdBinary, meetingCalendarTitles),
+    meetingDocumentWithStampLoader(resolveGappdBinary, meetingCalendarTitles),
     listMeetingsForSync,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
 }
 
-/** Folds whether a Meeting's title is masked by a saved Calendar event into its documentStamp in one store read. */
+/**
+ * Folds whether a Meeting's title is masked by a saved or overlapping Calendar event into its
+ * documentStamp in one read. If saved Calendar contexts cannot be read (e.g. damaged store),
+ * strips documentStamp instead of throwing so queued Cloud deletions still drain while per-Meeting
+ * exports refuse to run without masking context.
+ */
 async function listMeetingsForSync(): Promise<MeetingListItem[]> {
-  const [meetings, contexts] = await Promise.all([listMeetings(), savedMeetingCalendarContexts()])
+  const meetings = await listMeetings()
+  let contexts: Record<string, ParticipantContext>
+  try {
+    contexts = await savedMeetingCalendarContexts()
+  } catch {
+    return meetings.map(({ documentStamp: _unused, ...meeting }) => meeting)
+  }
+  const calendarEvents = await googleCalendarSnapshot().then((snapshot) => snapshot.events).catch(() => [])
   return meetings.map((meeting) => {
     if (!meeting.documentStamp) return meeting
-    const titles = calendarTitlesOf(contexts[meeting.id])
+    const titles = [
+      ...calendarTitlesOf(contexts[meeting.id]),
+      ...overlappingCalendarTitles(calendarEvents, meeting.startedAt, meeting.endedAt),
+    ]
     const masked = titles.some((title) => title.trim() === meeting.title.trim())
-    if (!masked) return meeting
-    return { ...meeting, documentStamp: createHash('sha256').update(`${meeting.documentStamp}:calendar-masked`).digest('hex') }
+    return { ...meeting, documentStamp: foldCalendarMaskStamp(meeting.documentStamp, masked) }
   })
 }
 
-async function meetingCalendarTitles(id: string): Promise<string[]> {
-  return calendarTitlesOf((await savedMeetingCalendarContexts())[id])
+async function meetingCalendarTitles(id: string, startedAt?: string, endedAt?: string): Promise<string[]> {
+  const context = (await savedMeetingCalendarContexts())[id]
+  const saved = calendarTitlesOf(context)
+  if (!startedAt) return saved
+  const calendarEvents = await googleCalendarSnapshot().then((snapshot) => snapshot.events).catch(() => [])
+  return [...saved, ...overlappingCalendarTitles(calendarEvents, startedAt, endedAt)]
 }
 
 function calendarTitlesOf(context: ParticipantContext | undefined): string[] {

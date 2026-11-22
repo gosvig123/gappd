@@ -81,12 +81,12 @@ func BuildMeetingListView(entry db.MeetingListEntry, speakers []db.MeetingSpeake
 			SuggestedPersonID: speaker.SuggestedPersonID,
 		})
 	}
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers, DocumentStamp: documentStamp(meeting, entry.HasSummary)}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers, DocumentStamp: DocumentStamp(meeting, entry.HasSummary)}
 }
 
-// documentStamp fingerprints the Meeting fields that feed meetingdocument.Build so cloud sync
+// DocumentStamp fingerprints the Meeting fields that feed meetingdocument.Build so cloud sync
 // skips exporting unchanged Meetings without reading segments or transcripts.
-func documentStamp(meeting db.Meeting, hasSummary bool) string {
+func DocumentStamp(meeting db.Meeting, hasSummary bool) string {
 	sum := sha256.New()
 	fmt.Fprintf(sum, "v1\x00%s\x00%s\x00%s\x00%s\x00%d\x00%d\x00%t\x00%s",
 		meeting.Title, meeting.StartedAt, stringValue(meeting.EndedAt),

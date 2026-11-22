@@ -204,13 +204,14 @@ function reportUrl(): string | null {
   return app.isPackaged ? new URL('/errors', cloudResource()).toString() : null
 }
 
-/** A missing file means the default, on. A damaged one means off, because it may hold a choice to turn reports off. */
+/** A missing file means the default, on. A damaged file or malformed errorReport value means off. */
 function readStored(): StoredErrorReport {
   const result = readPreferences()
   if (result.status === 'damaged') return { sharing: 'off' }
   const saved = result.data.errorReport
+  if (saved === undefined) return { sharing: 'on' }
   if (saved && (saved.sharing === 'on' || saved.sharing === 'off')) return saved
-  return { sharing: 'on' }
+  return { sharing: 'off' }
 }
 
 function writeStored(next: StoredErrorReport): void {

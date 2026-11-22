@@ -57,7 +57,7 @@ function useMeetingSearch(query: string, meetings: AppView['meetings']): Readonl
   const [matches, setMatches] = useState<ReadonlySet<string>>(EMPTY_MATCHES)
   const request = useRequestGate()
   const trimmed = query.trim()
-  const revision = meetings.map(meeting => `${meeting.id}:${meeting.status.updatedAt}`).join('|')
+  const revision = meetings.map(meeting => `${meeting.id}:${meeting.status.updatedAt}:${meeting.title}:${meeting.documentStamp ?? ''}`).join('|')
   useEffect(() => {
     if (!trimmed) {
       request.cancel()

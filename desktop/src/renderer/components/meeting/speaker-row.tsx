@@ -17,7 +17,7 @@ export function SpeakerRow(props: Props) {
 }
 
 function NewPersonFields(props: { name: string; email: string; busy: boolean; onName: (value: string) => void; onEmail: (value: string) => void; onSave: () => void }) {
-  return <form className="speaker-new-person" onSubmit={event => { event.preventDefault(); props.onSave() }}><input aria-label="Person name" placeholder="Name" required value={props.name} onChange={event => props.onName(event.target.value)} /><input aria-label="Person email" type="email" placeholder="Email (optional)" value={props.email} onChange={event => props.onEmail(event.target.value)} /><Button type="submit" disabled={props.busy || !props.name.trim()}>Save person</Button></form>
+  return <form className="speaker-new-person" onSubmit={event => { event.preventDefault(); props.onSave() }}><input aria-label="Person name" placeholder="Name" autoFocus required value={props.name} onChange={event => props.onName(event.target.value)} /><input aria-label="Person email" type="email" placeholder="Email (optional)" value={props.email} onChange={event => props.onEmail(event.target.value)} /><Button type="submit" disabled={props.busy || !props.name.trim()}>Save person</Button></form>
 }
 
 function useSpeakerAssignment(props: Props) {

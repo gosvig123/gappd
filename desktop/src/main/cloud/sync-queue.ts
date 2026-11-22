@@ -63,10 +63,14 @@ export class MeetingSyncQueue {
   /**
    * Queues new or changed Meeting text. Unchanged pending work keeps its revision and retry
    * count; failed work requires a manual retry. Meetings whose source stamp matches what was
-   * already accepted or queued skip calling `load`. Whole batches run under one lock, and an
-   * unreadable Meeting does not block the rest.
+   * already accepted or queued skip calling `load`. Only the stamp returned by `load` itself
+   * (from the exact exported snapshot) is persisted, never the pre-export discovery stamp.
+   * Whole batches run under one lock, and an unreadable Meeting does not block the rest.
    */
-  backfill(items: Array<string | { localId: string; stamp?: string }>, load: (localId: string, revision: number) => Promise<string>): Promise<{ queued: number; unreadable: number }> {
+  backfill(
+    items: Array<string | { localId: string; stamp?: string }>,
+    load: (localId: string, revision: number) => Promise<string | { document: string; stamp?: string }>,
+  ): Promise<{ queued: number; unreadable: number }> {
     return this.serialize(async () => {
       const state = await this.load()
       let queued = 0
@@ -74,19 +78,21 @@ export class MeetingSyncQueue {
       let dirty = false
       for (const item of items) {
         const localId = typeof item === 'string' ? item : item.localId
-        const stamp = typeof item === 'string' ? undefined : item.stamp
+        const hintStamp = typeof item === 'string' ? undefined : item.stamp
         const entry = state.entries[localId]
         if (entry?.state === 'failed' || state.deletions.includes(localId)) continue
-        if (stamp && this.isStampCurrent(state, localId, stamp, entry)) continue
+        if (hintStamp && this.isStampCurrent(state, localId, hintStamp, entry)) continue
         try {
-          const document = await load(localId, nextRevision(state, localId))
+          const loaded = await load(localId, nextRevision(state, localId))
+          const document = typeof loaded === 'string' ? loaded : loaded.document
+          const exportedStamp = typeof loaded === 'string' ? undefined : loaded.stamp
           if (!document) throw new Error('The Meeting document is unavailable.')
           const previous = entry ? contentHash(entry.document) : state.acceptedContent[localId]
           if (contentHash(document) === previous) {
-            if (stamp && this.recordStamp(state, localId, stamp, entry)) dirty = true
+            if (exportedStamp && this.recordStamp(state, localId, exportedStamp, entry)) dirty = true
             continue
           }
-          await this.queueOne(state, localId, async () => document, stamp)
+          await this.queueOne(state, localId, async () => document, exportedStamp)
           queued += 1
         } catch {
           unreadable += 1

@@ -16,8 +16,9 @@ export function PersonPicker(props: Props) {
   const items = pickerItems(props, query)
   const show = (next: string) => { setQuery(next); setActive(0); setOpen(true) }
   const close = () => { setOpen(false); setQuery('') }
-  const choose = (item: Item) => { const typed = query.trim(); close(); inputRef.current?.blur(); if (item.value !== props.value || item.value === props.newValue) props.onChoose(item.value, typed) }
+  const choose = (item: Item) => { const typed = query.trim(); close(); if (item.value !== props.value || item.value === props.newValue) props.onChoose(item.value, typed) }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) return show(query)
@@ -48,13 +49,12 @@ export function PersonPicker(props: Props) {
         disabled={props.disabled}
         autoComplete="off"
         spellCheck={false}
-        onFocus={() => show('')}
         onClick={() => { if (!open) show('') }}
         onBlur={close}
         onChange={event => show(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      {open ? <ul id={listId} className="ui-card person-picker-menu" role="listbox" aria-label={props.ariaLabel}>
+      {open ? <ul id={listId} className="ui-card person-picker-menu" role="listbox" aria-label={props.ariaLabel} onMouseDown={event => event.preventDefault()}>
         {items.map((item, index) => <li
           key={item.value}
           id={optionId(index)}

@@ -79,8 +79,20 @@ function calendarCandidates(events: CalendarEventSummary[], startedAt: string, e
   const end = endedAt ? Date.parse(endedAt) : start
   const retained = new Set(saved?.candidates.map((event) => event.sourceId))
   if (saved?.event) retained.add(saved.event.sourceId)
-  const candidates = events.filter((event) => retained.has(event.sourceId) || !event.allDay && Date.parse(event.start) <= end + EVENT_MARGIN_MS && Date.parse(event.end) >= start - EVENT_MARGIN_MS)
+  const candidates = events.filter((event) => retained.has(event.sourceId) || overlapsMeeting(event, start, end))
   return { candidates }
+}
+
+/** Titles of non-all-day Calendar events overlapping a Meeting's time window (read-only). */
+export function overlappingCalendarTitles(events: CalendarEventSummary[], startedAt: string, endedAt?: string): string[] {
+  const start = Date.parse(startedAt)
+  if (!Number.isFinite(start)) return []
+  const end = endedAt ? Date.parse(endedAt) : start
+  return events.filter((event) => overlapsMeeting(event, start, Number.isFinite(end) ? end : start)).map((event) => event.title)
+}
+
+function overlapsMeeting(event: CalendarEventSummary, start: number, end: number): boolean {
+  return !event.allDay && Date.parse(event.start) <= end + EVENT_MARGIN_MS && Date.parse(event.end) >= start - EVENT_MARGIN_MS
 }
 
 /** The one timed event with other invitees, not declined, that is on now. Two such events are ambiguous, so none is chosen. */
