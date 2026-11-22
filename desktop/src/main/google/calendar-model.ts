@@ -46,14 +46,28 @@ export function mapGoogleEvent(item: GoogleEventItem, connectionId: string, acco
   }
 }
 
-/** The video call link: Google's conference entry point, the Meet link, or a web address in the location. */
+/** Video call services whose links count as a call link when they appear in free-text location. */
+const CALL_HOSTS = /(^|\.)(meet\.google\.com|zoom\.us|teams\.microsoft\.com|teams\.live\.com|webex\.com)$/
+
+/** The video call link: Google's conference entry point, the Meet link, or a known call service's link in the location. */
 function eventJoinUrl(item: GoogleEventItem): string | undefined {
   const video = item.conferenceData?.entryPoints?.find((entry) => entry.entryPointType === 'video')?.uri
-  const fromLocation = item.location?.match(/https?:\/\/\S+/i)?.[0]
-  for (const candidate of [video, item.hangoutLink, fromLocation]) {
-    try { if (candidate && /^https?:$/.test(new URL(candidate).protocol)) return candidate.trim() } catch { /* not a web address */ }
+  for (const candidate of [video, item.hangoutLink]) {
+    const url = webUrl(candidate)
+    if (url) return url.href
   }
-  return undefined
+  // Location is free text: take the first web address without surrounding punctuation, and only for a known call service.
+  const fromLocation = webUrl(item.location?.match(/https?:\/\/[^\s<>"']+/i)?.[0].replace(/[.,;:!?)\]}]+$/, ''))
+  return fromLocation && CALL_HOSTS.test(fromLocation.hostname) ? fromLocation.href : undefined
+}
+
+function webUrl(candidate?: string): URL | undefined {
+  try {
+    const url = candidate ? new URL(candidate.trim()) : undefined
+    return url && /^https?:$/.test(url.protocol) ? url : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function mapParticipant(item?: GoogleParticipant): CalendarParticipant | undefined {

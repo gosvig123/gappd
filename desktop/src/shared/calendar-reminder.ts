@@ -11,14 +11,19 @@ export function reminderKey(event: CalendarEventSummary): string {
   return `${calendarEventKey(event)}@${event.start}`
 }
 
-/** Events to remind about now: timed, not cancelled or declined, with someone else invited, starting about now. */
+/** A reminder may stay on screen for this event: timed, not over, not cancelled or declined, with someone else invited. */
+export function reminderEligible(event: CalendarEventSummary, now = new Date()): boolean {
+  if (event.allDay || event.status === 'cancelled' || Date.parse(event.end) <= now.getTime()) return false
+  const attendees = event.attendees ?? []
+  if (attendees.some((person) => person.self && person.responseStatus === 'declined')) return false
+  const self = event.accountEmail.trim().toLowerCase()
+  return attendees.some((person) => !person.self && person.email.trim().toLowerCase() !== self)
+}
+
+/** Eligible events that start about now, earliest first. */
 export function reminderDueEvents(events: CalendarEventSummary[], now = new Date()): CalendarEventSummary[] {
   return events.filter((event) => {
     const untilStart = Date.parse(event.start) - now.getTime()
-    if (event.allDay || event.status === 'cancelled' || untilStart > REMINDER_LEAD_MS || untilStart < -REMINDER_LATE_MS) return false
-    const attendees = event.attendees ?? []
-    if (attendees.some((person) => person.self && person.responseStatus === 'declined')) return false
-    const self = event.accountEmail.trim().toLowerCase()
-    return attendees.some((person) => !person.self && person.email.trim().toLowerCase() !== self)
+    return untilStart <= REMINDER_LEAD_MS && untilStart >= -REMINDER_LATE_MS && reminderEligible(event, now)
   }).sort((a, b) => Date.parse(a.start) - Date.parse(b.start))
 }

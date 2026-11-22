@@ -40,7 +40,7 @@ export function showMeetingPrompt(input: PromptInput): void {
   promptWindow = window
   promptKey = input.key
   handlePromptActions(window, input)
-  void window.loadURL(promptDataUrl(input)).then(() => window.showInactive())
+  showWhenLoaded(window, promptDataUrl(input))
 }
 
 export function dismissMeetingPrompt(key: string): void {
@@ -59,7 +59,12 @@ export function showAutoStopPrompt(input: AutoStopInput): void {
   const window = createPromptWindow(WIDE_PROMPT_WIDTH)
   autoStopWindow = window
   handleAutoStopActions(window, input)
-  void window.loadURL(autoStopDataUrl(input)).then(() => window.showInactive())
+  showWhenLoaded(window, autoStopDataUrl(input))
+}
+
+/** A prompt can be dismissed while it loads; then its load is cancelled and it must stay hidden. */
+function showWhenLoaded(window: BrowserWindow, url: string): void {
+  window.loadURL(url).then(() => { if (!window.isDestroyed()) window.showInactive() }, () => {})
 }
 
 export function dismissAutoStopPrompt(): void {

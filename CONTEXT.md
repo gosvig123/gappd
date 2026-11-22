@@ -41,7 +41,7 @@ An AI agent CLI on this Mac (Codex, Claude Code, or Pi) that Gappd runs headless
 The editable list of points for one upcoming Calendar event, saved on this Mac by that event. AI drafts it from the notes of **Related Meetings**; the user can change, add, or remove items.
 
 **Calendar reminder**:
-The Meeting prompt that drops down from 1 minute before to 5 minutes after a Calendar event with other invitees starts (not declined, not cancelled), once per event start, while nothing records and the user has not turned it off in Settings. Record links the new **Meeting** to that event; Join & record, shown when the event has a video call link, also opens that link.
+The Meeting prompt that drops down from 1 minute before to 5 minutes after a Calendar event with other invitees starts (not declined, not cancelled), once per event start, while nothing records and the user has not turned it off in Settings. It closes when the event ends, moves, or is cancelled or declined. Record links the new **Meeting** to that event; Join & record, shown when the event has a video call link (Google's conference link, or a Meet, Zoom, Teams or Webex link in its location), also opens that link.
 
 **Related Meeting**:
 An earlier **Meeting** with notes whose linked Calendar event is in the same recurring series as an upcoming event, or whose people (linked **Calendar invitees** and labeled **Persons**) overlap that event's invitees enough. The user's own accounts never count.
