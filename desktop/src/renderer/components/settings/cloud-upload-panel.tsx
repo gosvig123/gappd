@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MeetingListItem } from '../../../shared/contracts'
 import type { MeetingUploadStatus } from '../../../shared/meeting-upload-contract'
 import { MEETING_UPLOAD_CONSENT_TEXT } from '../../../shared/meeting-upload-contract'
-import { MeetingUploadPanelState } from './cloud-upload-panel-state'
+import { MeetingUploadPanelState, showsMeetingSync } from './cloud-upload-panel-state'
 import { useConfirm, type ConfirmController } from '../confirm'
 import { Button, Card, StatusPill } from '../ui'
 
@@ -11,16 +11,20 @@ type Run = (action: (api: typeof window.gappd.meetingUpload) => Promise<MeetingU
 /** Revokes every client of the account, including clients this Mac has never seen. */
 const ALL_CLIENTS = '*'
 
+/**
+ * Hidden unless sync is on or cloud data from it remains. Once shown, it stays while Settings
+ * is open, so turning sync off does not pull the delete actions away.
+ */
 export function MeetingUploadPanel() {
-  const { status, error, meetings, clients, run } = useMeetingUploadPanel()
+  const { status, shown, error, meetings, clients, run } = useMeetingUploadPanel()
   const confirm = useConfirm()
-  if (!status) return null
+  if (!status || !shown) return null
   const { account } = status
   const busy = account.pending || status.sending
   const titles = new Map(meetings.map(meeting => [meeting.id, meeting.title || 'Untitled Meeting']))
   return <Card className="settings-section">
     <div className="settings-section-head">
-      <div><h2>Cloud Meeting sync</h2><p>Sync Meeting text to Gappd Cloud so AI clients you authorize can read it.</p></div>
+      <div><h2>Cloud Meeting sync</h2><p>Sync Meeting text to Gappd Cloud so AI clients you authorize can read it. To use your Meetings in Claude or ChatGPT without uploading them, use Connect an AI above.</p></div>
       <StatusPill tone={pillTone(status, error)}>{pillLabel(status)}</StatusPill>
     </div>
     {account.enabled
@@ -40,21 +44,27 @@ function useMeetingUploadPanel() {
   const [error, setError] = useState('')
   const [meetings, setMeetings] = useState<MeetingListItem[]>([])
   const [clients, setClients] = useState<string[]>([])
+  const [shown, setShown] = useState(false)
   const controller = useRef<MeetingUploadPanelState | null>(null)
+  if (status && !shown && showsMeetingSync(status)) setShown(true)
   useEffect(() => {
     const state = new MeetingUploadPanelState(window.gappd.meetingUpload,
       (value, message) => { if (value) setStatus(value); setError(message) })
     controller.current = state
     void state.refresh()
-    void window.gappd.meetings.list().then(setMeetings).catch(() => setMeetings([]))
-    void window.gappd.meetingUpload.knownClients().then(setClients).catch(() => setClients([]))
     return () => state.dispose()
   }, [])
+  // The Meeting and client lists serve only a shown panel; the client list asks Gappd Cloud.
+  useEffect(() => {
+    if (!shown) return
+    void window.gappd.meetings.list().then(setMeetings).catch(() => setMeetings([]))
+    void window.gappd.meetingUpload.knownClients().then(setClients).catch(() => setClients([]))
+  }, [shown])
   const run: Run = async (action) => {
     setError('')
     await controller.current?.run(action)
   }
-  return { status, error, meetings, clients, run }
+  return { status, shown, error, meetings, clients, run }
 }
 
 function renderSignedOut(status: MeetingUploadStatus, busy: boolean, run: Run) {

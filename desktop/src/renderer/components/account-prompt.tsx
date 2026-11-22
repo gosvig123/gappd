@@ -24,7 +24,7 @@ export function useAccountPromptAsk(account: ReturnType<typeof useAccountRequire
   return { asks: seen && !answered && Boolean(cloud.account) && !email && account.asks === false, answer }
 }
 
-/** The account question, then a pointer to Meeting sync after a sign-in here. */
+/** The account question, then a pointer to Connect an AI after a sign-in here. */
 export function AccountPromptCard({ view, cloud, onAnswer, onClose }: { view: AppView; cloud: ReturnType<typeof useCloudAccount>; onAnswer: () => void; onClose: () => void }) {
   const [signedIn, setSignedIn] = useState(false)
   const signingIn = useRef(false)
@@ -38,7 +38,7 @@ export function AccountPromptCard({ view, cloud, onAnswer, onClose }: { view: Ap
   if (signedIn && cloud.account?.email) return <section className="setup-checklist feature-prompt" aria-labelledby="account-prompt-title">
     <div className="setup-step-body">
       <h2 id="account-prompt-title">Signed in as {cloud.account.email}</h2>
-      <p>Turn on Meeting sync in Settings so AI clients you authorize can read your Meetings.</p>
+      <p>Add Gappd to Claude or ChatGPT in Settings › Connections › Connect an AI. Your Meetings stay on this Mac.</p>
     </div>
     <div className="setup-step-actions">
       <Button variant="primary" onClick={() => { onClose(); view.actions.openSettings('Connections') }}>Open Settings</Button>
@@ -48,8 +48,8 @@ export function AccountPromptCard({ view, cloud, onAnswer, onClose }: { view: Ap
   return <section className="setup-checklist feature-prompt" aria-labelledby="account-prompt-title">
     <div className="setup-step-body">
       <h2 id="account-prompt-title">Your notes are ready. Use them in your AI assistant.</h2>
-      <p>Create a free Gappd account so the AI assistants you connect can read the Meetings you choose to sync. Use your Google account or any email address.</p>
-      <p className="setup-step-note">Signing in uploads nothing. Meeting sync stays off until you turn it on in Settings.</p>
+      <p>Create a free Gappd account so Claude and ChatGPT can search and read your Meetings, on the web and on your phone. Use your Google account or any email address.</p>
+      <p className="setup-step-note">Signing in uploads nothing. Your Meetings stay on this Mac.</p>
       {cloud.error ? <p className="setup-step-warning">{cloud.error}</p> : null}
     </div>
     <div className="setup-step-actions">

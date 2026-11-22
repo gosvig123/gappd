@@ -1,10 +1,10 @@
 import { useSyncExternalStore } from 'react'
 import type { CloudAuthStatus } from '../../shared/cloud-auth-contract'
 
-type Snapshot = { account: CloudAuthStatus | null; connecting: boolean; error: string | null }
+type Snapshot = { account: CloudAuthStatus | null; syncOn: boolean; connecting: boolean; error: string | null }
 
 const REFRESH_MS = 3000
-let snapshot: Snapshot = { account: null, connecting: false, error: null }
+let snapshot: Snapshot = { account: null, syncOn: false, connecting: false, error: null }
 const listeners = new Set<() => void>()
 let timer: ReturnType<typeof setInterval> | undefined
 let reads = 0
@@ -19,8 +19,8 @@ function publish(next: Partial<Snapshot>): void {
 async function refresh(): Promise<void> {
   const id = ++reads
   try {
-    const account = (await window.gappd.meetingUpload.status()).account
-    if (id === reads) publish({ account })
+    const { account, consent } = await window.gappd.meetingUpload.status()
+    if (id === reads) publish({ account, syncOn: consent })
   } catch { /* the next read retries */ }
 }
 
@@ -28,7 +28,7 @@ function subscribe(listener: () => void): () => void {
   listeners.add(listener)
   if (listeners.size === 1) {
     void refresh()
-    // Settings signs in and out through its own panel, so every user of the account polls.
+    // A sign-in or sign-out in another view or panel changes the account, so every user of it polls.
     timer = setInterval(() => void refresh(), REFRESH_MS)
   }
   return () => {
@@ -69,14 +69,25 @@ async function cancel(): Promise<void> {
   } catch { /* the next read shows the result */ }
 }
 
+/** Signs out. It also turns off Cloud Meeting sync, which needs the account. */
+async function signOut(): Promise<void> {
+  reads++
+  try {
+    const { account, consent } = await window.gappd.meetingUpload.connect(false)
+    publish({ account, syncOn: consent, error: account.error })
+  } catch {
+    publish({ error: 'Gappd could not sign out. Try again.' })
+  }
+}
+
 /**
  * The Gappd account on this Mac, shared by every view that asks for one. account is null
  * while it loads. Sign-in opens the browser and resolves when it ends; it never turns on
- * Meeting sync.
+ * Cloud Meeting sync. syncOn says that sync is on, so a sign-out can say it turns it off.
  */
 export function useCloudAccount() {
   const state = useSyncExternalStore(subscribe, () => snapshot)
   // The main process reports pending only in a status read during the sign-in, so show it from here too.
   const account = state.connecting && state.account ? { ...state.account, pending: true } : state.account
-  return { account, connecting: state.connecting, error: state.error ?? state.account?.error ?? null, signIn, cancel }
+  return { account, syncOn: state.syncOn, connecting: state.connecting, error: state.error ?? state.account?.error ?? null, signIn, cancel, signOut }
 }

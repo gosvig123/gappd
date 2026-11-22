@@ -267,6 +267,7 @@ export class MeetingSyncQueue {
         pending: entries.filter((entry) => entry.state === 'pending').length,
         failed: entries.filter((entry) => entry.state === 'failed').length,
         deleting: state.deletions.length,
+        synced: Object.keys(state.accepted).length,
         entries,
       }
     })

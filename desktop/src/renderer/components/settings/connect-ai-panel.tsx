@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { AIAppState } from '../../../shared/ai-apps'
 import { REMOTE_AI_SERVICES, type RemoteAccessState, type RemoteAccessStatus, type RemoteAIServiceId } from '../../../shared/remote-access'
 import { useAIApps } from '../../hooks/use-ai-apps'
+import { useCloudAccount } from '../../hooks/use-cloud-account'
 import { errorText } from '../person-forms'
 import { Button, Card, cx } from '../ui'
 
@@ -125,12 +126,13 @@ function RemoteServices() {
             </div>
             {connected ? null : <p className="connect-ai-hint">{text.install}</p>}
             <p className="connect-ai-hint connect-ai-status" role="status">
-              {opened ? `${text.opened}${status.state === 'signed-out' ? ' Sign in under Cloud Meeting sync below first, or it cannot reach this Mac.' : ''}` : ''}
+              {opened ? `${text.opened}${status.state === 'signed-out' ? ' Sign in under Gappd account below first, or it cannot reach this Mac.' : ''}` : ''}
             </p>
           </div>
         )
       }) : null}
       {status ? <RelayRow status={status} busy={busy === 'relay'} disabled={busy !== null} onEnable={() => void setEnabled(true)} onDisable={() => void setEnabled(false)} onError={setError} onCopied={() => setError(null)} /> : null}
+      <AccountRow />
       {!status && !loadError ? <div className="status-note">Checking remote access…</div> : null}
       <div className="status-note">Meetings stay on this Mac. Claude and ChatGPT can list, search and read them, but cannot run database queries. Gappd Cloud passes each request on and stores nothing, but it can see a request and its answer while it passes them on.</div>
       {loadError || error ? <div className={cx('status-note', 'danger')} role="alert">{error ?? loadError}</div> : null}
@@ -153,6 +155,26 @@ function RelayRow({ status, busy, disabled, onEnable, onDisable, onError, onCopi
       </div>
       <p className="connect-ai-hint">Server URL, for another AI service or if a form is empty:</p>
       <CopyValue label="server URL" value={status.address} onError={onError} onCopied={onCopied} />
+    </div>
+  )
+}
+
+// Remote access needs the Gappd account, so its sign-in and sign-out live here.
+function AccountRow() {
+  const cloud = useCloudAccount()
+  const email = cloud.account?.email
+  const waiting = cloud.connecting || Boolean(cloud.account?.pending)
+  const text = email ? `Signed in as ${email}.` : waiting ? 'Waiting for browser sign-in…' : 'Claude and ChatGPT reach this Mac through your free Gappd account. Signing in uploads nothing.'
+  return (
+    <div className="connect-ai-service">
+      <div className="startup-setting ai-app-row">
+        <span className="startup-setting-copy"><strong>Gappd account</strong><span>{text}</span>{cloud.error ? <span className="danger" role="alert">{cloud.error}</span> : null}</span>
+        {email
+          ? <Button variant="secondary" onClick={() => void cloud.signOut()}>{cloud.syncOn ? 'Turn off sync and sign out' : 'Sign out'}</Button>
+          : waiting
+            ? <Button variant="secondary" onClick={() => void cloud.cancel()}>Cancel sign-in</Button>
+            : <Button disabled={!cloud.account} onClick={() => void cloud.signIn()}>Sign up or sign in</Button>}
+      </div>
     </div>
   )
 }
@@ -202,7 +224,7 @@ function timeAgo(iso: string): string {
 }
 
 function relayText(state: RemoteAccessState): string {
-  if (state === 'signed-out') return 'Needs your Gappd account. Sign in under Cloud Meeting sync below.'
+  if (state === 'signed-out') return 'Needs your Gappd account. Sign in under Gappd account below.'
   if (state === 'connecting') return 'Connecting to Gappd Cloud…'
   if (state === 'connected') return 'On. Services you added can read your Meetings while Gappd is open.'
   if (state === 'offline') return 'Cannot reach Gappd Cloud. Gappd tries again automatically.'

@@ -19,6 +19,8 @@ export type MeetingSyncStatus = {
   failed: number
   /** Meetings deleted on this Mac whose cloud copies still wait for deletion. */
   deleting: number
+  /** Meetings whose upload the cloud accepted for this queue's account. Their copies can have expired since. */
+  synced: number
   entries: MeetingSyncEntry[]
 }
 
