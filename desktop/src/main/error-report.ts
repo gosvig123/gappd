@@ -115,7 +115,7 @@ async function recordFailedMeetings(): Promise<void> {
   // the next scan starts again.
   const atStart = readStored()
   const consentToken = atStart.consentToken
-  const baselineAtStart = baselineKey(atStart.failedMeetings)
+  const versionAtStart = atStart.baselineVersion ?? 0
   const meetings = await listMeetings()
   const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
@@ -131,7 +131,8 @@ async function recordFailedMeetings(): Promise<void> {
     if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
     if (current.errorReport?.consentToken !== consentToken) return current
     const seen = current.errorReport?.failedMeetings
-    if (baselineKey(seen) !== baselineAtStart) return current
+    // A version, not the list itself: trimming at the cap can restore an earlier list exactly.
+    if ((current.errorReport?.baselineVersion ?? 0) !== versionAtStart) return current
     claimed.length = 0
     // Without a saved list, this scan takes the baseline and reports nothing.
     if (seen) {
@@ -145,15 +146,11 @@ async function recordFailedMeetings(): Promise<void> {
     const failing = new Set(failures.map((entry) => entry.key))
     const older = (seen ?? []).filter((key) => !failing.has(key))
     const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
-    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, ...(consentToken ? { consentToken } : {}) } }
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, baselineVersion: versionAtStart + 1, ...(consentToken ? { consentToken } : {}) } }
   })
   for (const entry of claimed) {
     reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code }, { consentToken })
   }
-}
-
-function baselineKey(failedMeetings: string[] | undefined): string {
-  return failedMeetings ? JSON.stringify(failedMeetings) : ''
 }
 
 const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
