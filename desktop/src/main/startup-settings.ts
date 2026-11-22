@@ -57,10 +57,10 @@ export function setAgendaAutoDraftEnabled(enabled: boolean): StartupSettings {
 
 export function setOpenAtLogin(openAtLogin: boolean): StartupSettings {
   if (!supportsStartup()) return getStartupSettings()
-  updatePreferences((current) => {
-    app.setLoginItemSettings({ openAtLogin })
-    return { ...current, startup: { ...current.startup, initialized: true } }
-  })
+  // Save the choice first: once it is saved, no first-launch default in any process can undo it.
+  // If the save fails, macOS is not changed and the error reaches the caller.
+  updatePreferences((current) => ({ ...current, startup: { ...current.startup, initialized: true } }))
+  app.setLoginItemSettings({ openAtLogin })
   return getStartupSettings()
 }
 
