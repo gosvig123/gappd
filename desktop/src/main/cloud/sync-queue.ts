@@ -19,6 +19,9 @@ export class MeetingSyncQueue {
   // Pending entries this process exported, or matched against the current discovery stamp. It
   // lives only in memory, so after a restart nothing old is sendable until discovery confirms it.
   private verified = new Set<string>()
+  // Counts withdrawals, so a discovery result read before a withdrawal cannot release that Meeting.
+  private withdrawals = 0
+  private withdrawnAt = new Map<string, number>()
   private queue: Promise<unknown> = Promise.resolve()
 
   constructor(store: SecureJsonStore<MeetingSyncDocument>, clock: () => Date = () => new Date()) {
@@ -38,7 +41,7 @@ export class MeetingSyncQueue {
         await this.queueOne(state, localId, load)
       } catch (error) {
         // A failed fresh export means the queued document may be out of date: hold it.
-        this.verified.delete(localId)
+        this.withdraw(this.verified, localId)
         throw error
       }
       this.verified.add(localId)
@@ -81,6 +84,7 @@ export class MeetingSyncQueue {
   backfill(
     items: Array<string | { localId: string; stamp?: string }>,
     load: (localId: string, revision: number) => Promise<string | { document: string; stamp?: string }>,
+    options?: { listedAt?: number },
   ): Promise<{ queued: number; unreadable: number }> {
     return this.serialize(async () => {
       const state = await this.load()
@@ -94,7 +98,9 @@ export class MeetingSyncQueue {
         const hintStamp = typeof item === 'string' ? undefined : item.stamp
         const entry = state.entries[localId]
         if (entry?.state === 'failed' || state.deletions.includes(localId)) continue
-        if (hintStamp && this.isStampCurrent(state, localId, hintStamp, entry)) {
+        // A stamp listed before this Meeting was withdrawn is stale: export it again instead.
+        const staleHint = options?.listedAt !== undefined && (this.withdrawnAt.get(localId) ?? 0) > options.listedAt
+        if (hintStamp && !staleHint && this.isStampCurrent(state, localId, hintStamp, entry)) {
           if (entry) nextVerified.add(localId)
           continue
         }
@@ -114,7 +120,7 @@ export class MeetingSyncQueue {
           queued += 1
         } catch {
           unreadable += 1
-          nextVerified.delete(localId)
+          this.withdraw(nextVerified, localId)
         }
       }
       // A failed fresh export holds the Meeting until a later export or matching stamp releases it.
@@ -264,6 +270,17 @@ export class MeetingSyncQueue {
         entries,
       }
     })
+  }
+
+  /** The withdrawal count now. Read it before listing Meetings and pass it to `backfill` as `listedAt`. */
+  withdrawalMark(): number {
+    return this.withdrawals
+  }
+
+  private withdraw(set: Set<string>, localId: string): void {
+    set.delete(localId)
+    this.withdrawals += 1
+    this.withdrawnAt.set(localId, this.withdrawals)
   }
 
   private isStampCurrent(state: MeetingSyncDocument, localId: string, stamp: string, entry: MeetingSyncDocument['entries'][string] | undefined): boolean {

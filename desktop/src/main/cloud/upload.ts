@@ -223,11 +223,12 @@ export class MeetingUpload {
    */
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
+    const listedAt = this.queue.withdrawalMark()
     const meetings = await this.localMeetings()
     const finished = meetings
       .filter((meeting) => meeting.status.state === 'completed')
       .map((meeting) => ({ localId: meeting.id, stamp: meeting.documentStamp }))
-    return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))
+    return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision), { listedAt })
   }
 
   /** Everything the wire modules need, without giving them the consent state. */
