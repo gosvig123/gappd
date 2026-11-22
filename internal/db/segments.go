@@ -199,3 +199,47 @@ func (segment Segment) RawSpeaker() string {
 	}
 	return segment.Speaker
 }
+
+type MeetingSpeakerSummary struct {
+	Key               string
+	Name              string
+	PersonID          *string
+	IdentityOrigin    string
+	SuggestedPersonID *string
+}
+
+const selectAllMeetingSpeakersSQL = `SELECT s.meeting_id, s.speaker, COALESCE(p.name, s.speaker), ms.person_id,
+	CASE WHEN ms.person_id IS NULL THEN '' ELSE COALESCE(st.origin, 'manual') END,
+	CASE WHEN ms.person_id IS NULL THEN sg.person_id ELSE NULL END
+	FROM (
+		SELECT meeting_id, speaker, MIN(start_sec) AS first_start
+		FROM segments
+		WHERE speaker <> '' AND speaker <> 'Other'
+		GROUP BY meeting_id, speaker
+	) s
+	JOIN meetings m ON m.id = s.meeting_id
+	LEFT JOIN meeting_speakers ms ON ms.meeting_id = s.meeting_id AND ms.speaker_key = s.speaker
+	LEFT JOIN speaker_identity_state st ON st.meeting_id = s.meeting_id AND st.speaker_key = s.speaker
+	LEFT JOIN people p ON p.id = ms.person_id
+	LEFT JOIN speaker_suggestions sg ON sg.meeting_id = s.meeting_id AND sg.speaker_key = s.speaker
+	WHERE NOT (m.capture_status = 'captured' AND m.processing_status = 'pending' AND m.transcript IS NULL)
+	ORDER BY s.meeting_id, s.first_start ASC`
+
+// ListMeetingSpeakers returns visible speakers and voice suggestions for every Meeting in one query.
+func (d *DB) ListMeetingSpeakers() (map[string][]MeetingSpeakerSummary, error) {
+	rows, err := d.Conn.Query(selectAllMeetingSpeakersSQL)
+	if err != nil {
+		return nil, fmt.Errorf("list meeting speakers: %w", err)
+	}
+	defer rows.Close()
+	out := map[string][]MeetingSpeakerSummary{}
+	for rows.Next() {
+		var meetingID string
+		var speaker MeetingSpeakerSummary
+		if err := rows.Scan(&meetingID, &speaker.Key, &speaker.Name, &speaker.PersonID, &speaker.IdentityOrigin, &speaker.SuggestedPersonID); err != nil {
+			return nil, fmt.Errorf("scan meeting speaker: %w", err)
+		}
+		out[meetingID] = append(out[meetingID], speaker)
+	}
+	return out, rows.Err()
+}

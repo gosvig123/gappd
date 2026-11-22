@@ -13,6 +13,20 @@ export function personOptions(people: SavedPerson[], event?: CalendarEventSummar
   return options.sort((left, right) => rank(left) - rank(right) || left.name.localeCompare(right.name))
 }
 
+// Keeps the options whose name or email holds every typed word, ignoring case and accents, in their ranked order.
+export function matchPersonOptions(options: PersonOption[], query: string): PersonOption[] {
+  const words = searchText(query).split(/\s+/).filter(Boolean)
+  if (!words.length) return options
+  return options.filter(option => {
+    const text = searchText(`${option.name} ${option.email ?? ''}`)
+    return words.every(word => text.includes(word))
+  })
+}
+
+function searchText(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+}
+
 // This Meeting's invitees first, then people the user saved, then contacts seen on other Calendar events.
 function rank(option: PersonOption): number {
   if (option.invited) return 0

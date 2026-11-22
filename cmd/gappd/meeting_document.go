@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
 
+	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetingdocument"
 	"github.com/spf13/cobra"
@@ -15,7 +18,8 @@ import (
 // only: it opens the normal local store and never contacts the network.
 func meetingDocumentCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "meeting-document", Short: "Build the cloud document for a local Meeting"}
-	cmd.AddCommand(&cobra.Command{Use: "export [meeting-id] [revision]", Args: cobra.ExactArgs(2), RunE: func(_ *cobra.Command, args []string) error {
+	var withStamp bool
+	exportCmd := &cobra.Command{Use: "export [meeting-id] [revision]", Args: cobra.ExactArgs(2), RunE: func(_ *cobra.Command, args []string) error {
 		revision, err := positiveInt(args[1])
 		if err != nil {
 			return err
@@ -25,26 +29,45 @@ func meetingDocumentCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		data, err := exportMeetingDocument(store, args[0], revision)
+		data, stamp, titleSource, err := exportMeetingDocumentWithStamp(cmdContext(), store, args[0], revision)
 		if err != nil {
+			return err
+		}
+		if withStamp {
+			envelope, err := json.Marshal(struct {
+				Stamp       string          `json:"stamp"`
+				TitleSource string          `json:"titleSource,omitempty"`
+				Document    json.RawMessage `json:"document"`
+			}{Stamp: stamp, TitleSource: titleSource, Document: json.RawMessage(data)})
+			if err != nil {
+				return fmt.Errorf("Meeting document unavailable")
+			}
+			_, err = os.Stdout.Write(envelope)
 			return err
 		}
 		_, err = os.Stdout.Write(data)
 		return err
-	}})
+	}}
+	exportCmd.Flags().BoolVar(&withStamp, "with-stamp", false, "Wrap output with the documentStamp of the exported snapshot")
+	cmd.AddCommand(exportCmd)
 	return cmd
 }
 
 func exportMeetingDocument(store *db.DB, id string, revision int) ([]byte, error) {
-	meeting, err := store.GetMeeting(id)
+	data, _, _, err := exportMeetingDocumentWithStamp(context.Background(), store, id, revision)
+	return data, err
+}
+
+func exportMeetingDocumentWithStamp(ctx context.Context, store *db.DB, id string, revision int) ([]byte, string, string, error) {
+	meeting, segments, err := store.GetMeetingWithSegments(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("Meeting document unavailable")
+		return nil, "", "", fmt.Errorf("Meeting document unavailable")
 	}
-	segments, err := store.GetSegments(id)
+	data, err := meetingdocument.Build(meeting, segments, revision)
 	if err != nil {
-		return nil, fmt.Errorf("Meeting document unavailable")
+		return nil, "", "", err
 	}
-	return meetingdocument.Build(meeting, segments, revision)
+	return data, appprotocol.DocumentStamp(*meeting), meeting.TitleSource, nil
 }
 
 func positiveInt(raw string) (int, error) {

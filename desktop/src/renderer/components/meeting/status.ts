@@ -3,6 +3,8 @@ const permissionErrorHints = [
   'microphone access denied',
   'screen recording access required',
   'screen & system audio recording access required',
+  'screen & system audio recording access denied',
+  'could not confirm microphone and screen/system audio permissions',
   'grant permission:',
   'privacy & security',
 ]

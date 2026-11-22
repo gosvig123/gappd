@@ -1,7 +1,7 @@
 import type { CalendarEventSummary } from '../../shared/calendar-contract'
 import type { LinkCalendarInput, ParticipantContext } from '../../shared/participant-contract'
 
-type EventLoader = (id: string) => Promise<CalendarEventSummary | undefined>
+type BulkEventLoader = () => Promise<Record<string, CalendarEventSummary>>
 
 /** A confirmed local link change invalidates any older asynchronous lookup. */
 export class MeetingEventCache {
@@ -17,11 +17,20 @@ export class MeetingEventCache {
     return this.events
   }
 
-  async refresh(ids: string[], load: EventLoader): Promise<Map<string, CalendarEventSummary> | null> {
+  async refresh(ids: string[], loadAll: BulkEventLoader): Promise<Map<string, CalendarEventSummary> | null> {
     const request = ++this.generation
-    const pairs = await Promise.all(ids.map(async id => [id, await load(id)] as const))
+    if (ids.length === 0) {
+      this.events = new Map()
+      return this.events
+    }
+    const links = await loadAll()
     if (request !== this.generation) return null
-    this.events = new Map(pairs.filter((pair): pair is [string, CalendarEventSummary] => Boolean(pair[1])))
+    const allowed = new Set(ids)
+    const next = new Map<string, CalendarEventSummary>()
+    for (const [id, event] of Object.entries(links)) {
+      if (allowed.has(id)) next.set(id, event)
+    }
+    this.events = next
     return this.events
   }
 

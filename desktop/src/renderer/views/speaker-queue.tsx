@@ -53,16 +53,16 @@ function QueueMeetingSpeakers({ item, view, contacts }: { item: QueueMeeting; vi
 }
 
 /** How many speakers the queue asks to name. */
-export function unnamedSpeakerCount(view: Pick<AppView, 'meetings' | 'meetingDetails'>): number {
+export function unnamedSpeakerCount(view: Pick<AppView, 'meetings'>): number {
   return speakerQueue(view).reduce((count, item) => count + item.speakers.length, 0)
 }
 
 /** Unlabeled remote speakers per recent Meeting; speakers with a voice suggestion come first. */
-function speakerQueue(view: Pick<AppView, 'meetings' | 'meetingDetails'>, now = Date.now()): QueueMeeting[] {
+function speakerQueue(view: Pick<AppView, 'meetings'>, now = Date.now()): QueueMeeting[] {
   const since = now - QUEUE_DAYS * 24 * 60 * 60 * 1000
   return view.meetings
     .filter((meeting) => new Date(meeting.startedAt).getTime() >= since)
-    .map((meeting) => ({ meeting, speakers: (view.meetingDetails.get(meeting.id)?.speakers ?? []).filter((speaker) => !speaker.personId && speaker.key !== 'You') }))
+    .map((meeting) => ({ meeting, speakers: (meeting.speakers ?? []).filter((speaker) => !speaker.personId && speaker.key !== 'You') }))
     .map((item) => ({ ...item, speakers: [...item.speakers].sort((left, right) => Number(Boolean(right.suggestedPersonId)) - Number(Boolean(left.suggestedPersonId))) }))
     .filter((item) => item.speakers.length > 0)
 }

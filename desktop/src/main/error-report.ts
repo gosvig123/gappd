@@ -1,9 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { app, type Details, type RenderProcessGoneDetails, type WebContents } from 'electron'
 import { describeError, isOperation, type ErrorReport, type ErrorReportStatus, type ErrorSource, type RendererError } from '../shared/error-report'
 import { setFailureSink } from './error-log'
 import { listMeetings } from './meetings'
+import { readPreferences, updatePreferences, type StoredErrorReport } from './preferences'
 import { cloudResource } from './service-config'
 import { resolveUpdateChannel } from './update-channel-preference'
 
@@ -11,7 +10,6 @@ import { resolveUpdateChannel } from './update-channel-preference'
 // forwards them to the team's error channel and stores nothing. They are on unless the user turns
 // them off. A failed send is dropped, never retried and never logged as a failure, so reporting
 // cannot loop.
-const STATE_FILE = 'error-report.json'
 const URL_ENV = 'GAPPD_ERROR_REPORT_URL'
 const SEND_TIMEOUT_MS = 10_000
 // The same failure is sent at most once in this window; later ones are counted into the next send.
@@ -24,8 +22,6 @@ const MEETING_CHECK_MS = 15 * 60_000
 const FIRST_MEETING_CHECK_MS = 2 * 60_000
 const MAX_REPEAT_KEYS = 200
 
-// failedMeetings holds "<Meeting id> <step>" keys; it stays on this Mac.
-type StoredErrors = { version: 1; sharing: 'on' | 'off'; failedMeetings?: string[] }
 type Repeat = { sentAt: number; repeats: number }
 
 const repeats = new Map<string, Repeat>()
@@ -36,8 +32,6 @@ let checkingMeetings = false
 // One send at a time: on a slow network a send holds a DNS lookup and a connection until its
 // timeout, and a burst of failures must not hold more than one.
 let sending = false
-// The state file is read once; this process is its only writer.
-let stored: StoredErrors | null = null
 
 /** Report main-process failures, crashed processes and failed Meetings from now on. */
 export function startErrorReports(): void {
@@ -71,7 +65,7 @@ export function errorReportStatus(): ErrorReportStatus {
 export function setErrorSharing(enabled: boolean): ErrorReportStatus {
   // Turning reports off forgets the failed Meetings, so turning them on again takes a new baseline
   // and never sends failures from while reports were off.
-  const next: StoredErrors = { ...readStored(), sharing: enabled ? 'on' : 'off' }
+  const next: StoredErrorReport = { ...readStored(), sharing: enabled ? 'on' : 'off' }
   if (!enabled) delete next.failedMeetings
   writeStored(next)
   return errorReportStatus()
@@ -106,22 +100,61 @@ export async function checkFailedMeetings(): Promise<void> {
 
 async function recordFailedMeetings(): Promise<void> {
   const meetings = await listMeetings()
-  const failed = meetings.flatMap((meeting) => {
+  const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
-    return [
-      capture.state === 'failed' ? `${meeting.id} capture` : '',
-      processing.state === 'failed' ? `${meeting.id} processing` : '',
-      video.state === 'failed' ? `${meeting.id} screen-video` : '',
-    ].filter(Boolean)
+    const entries: Array<{ key: string; step: 'capture' | 'processing' | 'screen-video'; code: string }> = []
+    if (capture.state === 'failed') entries.push({ key: `${meeting.id} capture`, step: 'capture', code: meetingFailureCode('capture', capture.failureMessage) })
+    if (processing.state === 'failed') entries.push({ key: `${meeting.id} processing`, step: 'processing', code: meetingFailureCode('processing', processing.failureMessage) })
+    if (video.state === 'failed') entries.push({ key: `${meeting.id} screen-video`, step: 'screen-video', code: meetingFailureCode('screen-video', video.message) })
+    return entries
   })
+  const failed = failures.map((entry) => entry.key)
   const seen = readStored().failedMeetings
   // The first check only remembers, so failures from before error reports are not sent.
   if (seen) {
-    for (const key of failed) {
-      if (!seen.includes(key)) reportError('meeting', `meeting.${key.split(' ')[1]}`, { name: 'MeetingFailed' })
+    for (const entry of failures) {
+      if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+      reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
     }
   }
-  writeStored({ ...readStored(), failedMeetings: failed })
+  updatePreferences((current) => {
+    if (current.errorReport?.sharing === 'off') return current
+    if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: failed } }
+  })
+}
+
+const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
+
+const MEETING_FAILURE_CODES: Record<'capture' | 'processing' | 'screen-video', Array<[RegExp, string]>> = {
+  capture: [
+    [/^Recording was interrupted before audio was saved\./, 'STALE_NO_AUDIO'],
+    [/^capture process failed to start: exit status 126: error: Microphone access denied\./, 'CAPTURE_PERMISSION_MIC'],
+    [/^capture process failed to start: exit status 126: error: Screen & System Audio Recording access required/, 'CAPTURE_PERMISSION_SCREEN'],
+    [/could not start microphone capture/i, 'CAPTURE_MIC_START'],
+    [/could not start system audio capture/i, 'CAPTURE_SYSTEM_START'],
+    [/could not stop audio capture cleanly/i, 'CAPTURE_STOP_FAILED'],
+    [/^(?:capture process (?:failed to start|exited immediately)|start capture: )/, 'CAPTURE_LAUNCH_FAILED'],
+  ],
+  processing: [
+    [/no audio captured/i, 'NO_AUDIO_CAPTURED'],
+    [/no transcript found/i, 'NO_TRANSCRIPT'],
+    [/inconsistent meeting artifacts/i, 'INCONSISTENT_ARTIFACTS'],
+    [/(?:encode|decode) extraction/i, 'EXTRACTION_INVALID'],
+    [/transcription failed/i, 'TRANSCRIPTION_FAILED'],
+    [/enhance failed/i, 'ENHANCE_FAILED'],
+  ],
+  'screen-video': [
+    [/screen video was interrupted/i, 'VIDEO_INTERRUPTED'],
+  ],
+}
+
+function meetingFailureCode(step: 'capture' | 'processing' | 'screen-video', message?: string | null): string {
+  if (!message) return ''
+  for (const [pattern, code] of MEETING_FAILURE_CODES[step]) {
+    if (pattern.test(message)) return code
+  }
+  return ''
 }
 
 /**
@@ -175,34 +208,16 @@ function reportUrl(): string | null {
   return app.isPackaged ? new URL('/errors', cloudResource()).toString() : null
 }
 
-/** A missing file means the default, on. A damaged one means off, because it may hold a choice to turn reports off. */
-function readStored(): StoredErrors {
-  stored ??= readStoredFile()
-  return stored
+/** A missing file means the default, on. A damaged file or malformed errorReport value means off. */
+function readStored(): StoredErrorReport {
+  const result = readPreferences()
+  if (result.status === 'damaged') return { sharing: 'off' }
+  const saved = result.data.errorReport
+  if (saved === undefined) return { sharing: 'on' }
+  if (saved && (saved.sharing === 'on' || saved.sharing === 'off')) return saved
+  return { sharing: 'off' }
 }
 
-function readStoredFile(): StoredErrors {
-  let text: string
-  try {
-    text = fs.readFileSync(statePath(), 'utf8')
-  } catch (error) {
-    return { version: 1, sharing: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'on' : 'off' }
-  }
-  try {
-    const stored = JSON.parse(text) as StoredErrors
-    if (stored.version === 1 && (stored.sharing === 'on' || stored.sharing === 'off')) return stored
-  } catch {
-    // Damaged: fall through to off.
-  }
-  return { version: 1, sharing: 'off' }
-}
-
-function writeStored(next: StoredErrors): void {
-  fs.mkdirSync(app.getPath('userData'), { recursive: true })
-  fs.writeFileSync(statePath(), JSON.stringify(next), { mode: 0o600 })
-  stored = next
-}
-
-function statePath(): string {
-  return path.join(app.getPath('userData'), STATE_FILE)
+function writeStored(next: StoredErrorReport): void {
+  updatePreferences((current) => ({ ...current, errorReport: next }))
 }

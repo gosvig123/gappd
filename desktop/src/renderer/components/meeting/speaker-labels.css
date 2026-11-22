@@ -6,7 +6,19 @@
 .speaker-label-row { display: grid; gap: 8px; border-top: 1px solid var(--color-border); padding-top: 12px; }
 .speaker-label-heading, .speaker-clip-actions { display: flex; align-items: center; gap: 8px; }
 .speaker-label-heading { justify-content: space-between; flex-wrap: wrap; }
-.speaker-label-row select { width: 100%; min-width: 0; }
+.person-picker { position: relative; min-width: 0; }
+.person-picker > input { width: 100%; min-width: 0; }
+.person-picker-menu {
+  position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; right: 0;
+  display: grid; gap: 2px; margin: 0; padding: 6px; list-style: none;
+  max-height: 16rem; overflow-y: auto; border: 1px solid var(--color-border-strong); box-shadow: var(--shadow-raised);
+}
+.person-picker .person-picker-option { display: flex; align-items: baseline; gap: 8px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.person-picker-option.active { background: var(--surface-accent); }
+.person-picker-option.current { font-weight: 600; }
+.person-picker-option > small { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.person-picker-option > em { margin-left: auto; color: var(--color-text-muted); font-size: 11px; font-style: normal; }
+.person-picker-option.action { color: var(--color-text-muted); }
 .speaker-suggestion { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0; font-size: 13px; }
 .speaker-new-person { display: flex; gap: 8px; flex-wrap: wrap; }
 .speaker-new-person input { flex: 1; min-width: 140px; }

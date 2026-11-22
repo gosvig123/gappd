@@ -32,8 +32,8 @@ message starts with the Railway environment name (`RAILWAY_ENVIRONMENT_NAME`, el
 ## Desktop Error reports
 
 The desktop app sends one report per failure unless the user turns them off: Settings › General ›
-Error reports › **Send anonymous error reports**. They are on by default. The choice is stored in
-`error-report.json` in the app data folder; a damaged file counts as off.
+Error reports › **Send anonymous error reports**. They are on by default. The choice is stored under
+`errorReport` in `preferences.json` in the app data folder; a damaged file counts as off.
 
 ### What a report holds
 
@@ -49,7 +49,7 @@ carry a title, a name, a path or an email address.
 | `source` | `main`, `renderer`, `process`, `meeting` | Where it failed |
 | `operation` | Fixed name, such as `calendar.refresh` or `ipc.meeting-upload.sync` | The step that failed |
 | `error_name` | `TypeError`, `Error`, `ProcessGone`, `MeetingFailed`, … | Error class name: a name that ends in `Error` or `Exception`, else `Error` |
-| `error_code` | `ENOENT`, `ERR_INVALID_ARG_TYPE`, `crashed`, `SQLITE_BUSY_SNAPSHOT` (a backend command failed on a database lock), or empty | An upper-case code constant, a number up to 4 digits, or an Electron exit reason |
+| `error_code` | `ENOENT`, `ERR_INVALID_ARG_TYPE`, `crashed`, `SQLITE_BUSY_SNAPSHOT`, `NO_AUDIO_CAPTURED`, `SPEAKER_CLIP_DECODE`, `PERMISSION_CHECK_UNKNOWN`, or empty | An upper-case code constant, a number up to 4 digits, or an Electron exit reason |
 | `stack` | Up to 10 frames, such as `connect dist-electron/main/main.js:21886:43` | Frames in Gappd's own code |
 | `repeats` | `0` to `100000` | Same failure since the last send |
 
@@ -69,12 +69,12 @@ together and raise `v` when a field changes meaning.
 | `main` | A failed IPC operation (`ipc.<group>.<operation>`), an uncaught exception or unhandled rejection in the main process, and each background step that logs through `logFailure` in `desktop/src/main/error-log.ts` |
 | `renderer` | An uncaught error (`renderer.error`) or unhandled rejection (`renderer.unhandled-rejection`) in the window |
 | `process` | The window or a helper process ended other than cleanly (`process.renderer-gone`, `process.gpu-gone`, …) |
-| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes, first 2 minutes after launch). The app keeps the failed keys (Meeting id and step) in `error-report.json`; they are never sent |
+| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes, first 2 minutes after launch). The app keeps the failed keys (Meeting id and step) under `errorReport` in `preferences.json`; they are never sent |
 
 To report a new failure, call `logFailure('area.step', 'local log message', error)`. The message
 stays in the local log; only the operation and the error's name, code and frames are sent.
 
-Work that waits is not a failure. A drain that finds its capability not ready (error code
+Work that waits or stops on an expected user state (such as denied macOS recording permissions, no audio input device, or a speaker with no retained audio) is not reported; the user still sees the message in the app. A drain that finds its capability not ready (error code
 `CAPABILITY_NOT_READY`) writes only a local warning; a failed status check is still reported as
 `processing.drain`. When Meetings wait for transcription because the
 Apple speech model is not ready, the drain retry check downloads it again at most every 5 minutes;

@@ -98,7 +98,7 @@ export function currentMeetingEvent(events: CalendarEventSummary[], now: number)
 async function readLinks(): Promise<CalendarLinks> {
   const value = await createSecureStore<CalendarLinks>(STORE_FILE).read()
   if (!value) return { version: 1, meetings: {} }
-  if (value.version !== 1 || !value.meetings || typeof value.meetings !== 'object') throw new Error('Read meeting calendar links: invalid local data. Restore the calendar store from backup.')
+  if (value.version !== 1 || !value.meetings || typeof value.meetings !== 'object' || Array.isArray(value.meetings)) throw new Error('Read meeting calendar links: invalid local data. Restore the calendar store from backup.')
   return value
 }
 
@@ -115,6 +115,17 @@ function serialize<T>(action: () => Promise<T>): Promise<T> {
 
 export function savedMeetingCalendarContexts(): Promise<Record<string, ParticipantContext>> {
   return serialize(async () => (await readLinks()).meetings)
+}
+
+/** Confirmed Calendar links for all Meetings in one read, with no backend spawns or disk writes. */
+export function savedMeetingCalendarLinks(): Promise<Record<string, CalendarEventSummary>> {
+  return serialize(async () => {
+    const links: Record<string, CalendarEventSummary> = {}
+    for (const [id, context] of Object.entries((await readLinks()).meetings)) {
+      if (context.event) links[id] = context.event
+    }
+    return links
+  })
 }
 
 // Hold the Calendar lock until the backend consumes the bounded constraint.

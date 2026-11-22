@@ -1,5 +1,5 @@
 import type { MeetingUploadStatus } from './meeting-upload-contract'
-import type { CalendarParticipant, CalendarSnapshot, GmailThread, GoogleAccess } from './calendar-contract'
+import type { CalendarEventSummary, CalendarParticipant, CalendarSnapshot, GmailThread, GoogleAccess } from './calendar-contract'
 import type { Device, MeetingDeleteResponse, MeetingDetail, MeetingListItem, RecordingState, UpdateStatus } from './contracts'
 import type { ManagedRuntimePrepareMode, ManagedRuntimeSnapshot } from './managed-runtime'
 import type { AgentId } from './agents'
@@ -39,9 +39,12 @@ export type IpcInvokeContract = {
     openPermissionsSettings: OperationSpec<[target?: CapturePermissionTarget], void>
     startStaleRecordingRecovery: OperationSpec<[], number>
     relaunch: OperationSpec<[], void>
+    /** The app theme, so windows outside the main one (Meeting prompts, native menus) match it. */
+    setTheme: OperationSpec<[theme: 'dark' | 'light'], void>
   }
   meetings: {
     list: OperationSpec<[], MeetingListItem[]>
+    search: OperationSpec<[query: string], string[]>
     show: OperationSpec<[id: string], MeetingDetail>
     retryDiarization: OperationSpec<[id: string], MeetingDetail>
     setLanguage: OperationSpec<[id: string, language: string], MeetingDetail>
@@ -58,6 +61,7 @@ export type IpcInvokeContract = {
     assignSpeaker: OperationSpec<[input: AssignSpeakerInput], MeetingDetail>
     speakerClip: OperationSpec<[input: SpeakerClipInput], SpeakerClip>
     participantContext: OperationSpec<[id: string], ParticipantContext>
+    calendarLinks: OperationSpec<[], Record<string, CalendarEventSummary>>
     linkCalendar: OperationSpec<[input: LinkCalendarInput], ParticipantContext>
     exportRecording: OperationSpec<[id: string], boolean>
   }
@@ -146,11 +150,12 @@ export const IPC_OPERATIONS = {
     openPermissionsSettings: 'system:openPermissionsSettings',
     startStaleRecordingRecovery: 'system:startStaleRecordingRecovery',
     relaunch: 'system:relaunch',
+    setTheme: 'system:setTheme',
   },
   meetings: {
-    list: 'meetings:list', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', setLanguage: 'meetings:setLanguage', delete: 'meetings:delete',
+    list: 'meetings:list', search: 'meetings:search', show: 'meetings:show', retryDiarization: 'meetings:retryDiarization', setLanguage: 'meetings:setLanguage', delete: 'meetings:delete',
     people: 'meetings:people', updatePerson: 'meetings:updatePerson', mergePeople: 'meetings:mergePeople', personActionItems: 'meetings:personActionItems', personFacts: 'meetings:personFacts', hidePersonFact: 'meetings:hidePersonFact', queuePersonFacts: 'meetings:queuePersonFacts', personSummary: 'meetings:personSummary', importGoogleContacts: 'meetings:importGoogleContacts', assignSpeaker: 'meetings:assignSpeaker', speakerClip: 'meetings:speakerClip',
-    participantContext: 'meetings:participantContext', linkCalendar: 'meetings:linkCalendar',
+    participantContext: 'meetings:participantContext', calendarLinks: 'meetings:calendarLinks', linkCalendar: 'meetings:linkCalendar',
     exportRecording: 'meetings:exportRecording',
   },
   agenda: { list: 'agenda:list', draft: 'agenda:draft', save: 'agenda:save' },

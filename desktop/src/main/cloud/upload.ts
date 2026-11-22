@@ -14,11 +14,13 @@ import { consentedCredential, grantedConsent, newStoredConsent, reconcileConsent
  * that authorization changes or sync is turned off. The queue owns the revision, the exact accepted bytes, and the account it belongs to, so
  * neither queued work nor an acceptance ever crosses accounts.
  */
+type DocumentResult = string | { document: string; stamp?: string }
+
 export class MeetingUpload {
   private readonly auth: Authorization
   private readonly resource: string
   private readonly queue: MeetingSyncQueue
-  private readonly loadDocument: (localId: string, revision: number) => Promise<string>
+  private readonly loadDocument: (localId: string, revision: number) => Promise<DocumentResult>
   private readonly localMeetings: () => Promise<MeetingListItem[]>
   private readonly device: MeetingDevice
   private readonly fetcher: typeof fetch
@@ -33,7 +35,7 @@ export class MeetingUpload {
   private restoring: Promise<void> | null = null
 
   constructor(auth: Authorization, resource: string, queue: MeetingSyncQueue,
-    loadDocument: (localId: string, revision: number) => Promise<string>, localMeetings: () => Promise<MeetingListItem[]>,
+    loadDocument: (localId: string, revision: number) => Promise<DocumentResult>, localMeetings: () => Promise<MeetingListItem[]>,
     device: MeetingDevice, fetcher: typeof fetch = fetch) {
     this.auth = auth
     this.resource = resource
@@ -97,7 +99,10 @@ export class MeetingUpload {
   /** Queues one local Meeting. It sends nothing: sync does that, and only with consent. */
   async enqueue(localId: unknown): Promise<MeetingUploadStatus> {
     if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
-    await this.queue.enqueue(localId, (revision) => this.loadDocument(localId, revision))
+    await this.queue.enqueue(localId, async (revision) => {
+      const loaded = await this.loadDocument(localId, revision)
+      return typeof loaded === 'string' ? loaded : loaded.document
+    })
     return this.status()
   }
 
@@ -219,7 +224,9 @@ export class MeetingUpload {
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
     const meetings = await this.localMeetings()
-    const finished = meetings.filter((meeting) => meeting.status.state === 'completed').map((meeting) => meeting.id)
+    const finished = meetings
+      .filter((meeting) => meeting.status.state === 'completed')
+      .map((meeting) => ({ localId: meeting.id, stamp: meeting.documentStamp }))
     return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))
   }
 
@@ -289,7 +296,6 @@ export class MeetingUpload {
 
   private startRetryTimer(): void {
     if (this.retryTimer) return
-    // ponytail: scan completed Meetings once per minute; use a change journal if history size makes exports costly.
     this.retryTimer = setInterval(() => {
       void this.syncNew().catch((error) => { console.error('Automatic Meeting sync failed. Unlock this Mac and check the connection; retrying next minute.'); reportFailure('cloud-sync.automatic', error) })
     }, 60_000)

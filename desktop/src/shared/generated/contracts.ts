@@ -240,12 +240,22 @@ export type MeetingsResponse = {
 export type MeetingListItem = {
   id: string
   title: string
+  titleSource?: string
   startedAt: string
   endedAt?: string
   status: MeetingStatus
   hasTranscript: boolean
   hasSummary: boolean
-  searchText?: string
+  speakers: MeetingSpeaker[]
+  documentStamp?: string
+}
+
+export type MeetingSearchInput = {
+  query: string
+}
+
+export type MeetingSearchResponse = {
+  ids: string[]
 }
 
 export type SetCalendarTitleInput = {

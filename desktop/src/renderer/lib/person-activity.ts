@@ -4,8 +4,8 @@ import type { SavedPerson } from '../../shared/participant-contract'
 import type { AppView } from './app-view'
 
 /** The Meetings where a speaker is labeled as this Person, newest first. */
-export function personMeetings(person: SavedPerson, view: Pick<AppView, 'meetings' | 'meetingDetails'>): MeetingListItem[] {
-  return view.meetings.filter((meeting) => view.meetingDetails.get(meeting.id)?.speakers.some((speaker) => speaker.personId === person.id || speaker.name === person.name))
+export function personMeetings(person: SavedPerson, view: Pick<AppView, 'meetings'>): MeetingListItem[] {
+  return view.meetings.filter((meeting) => (meeting.speakers ?? []).some((speaker) => speaker.personId === person.id || speaker.name === person.name))
 }
 
 /** Calendar events that have not ended and list this Person's email, soonest first. */

@@ -65,7 +65,7 @@ export function meetingItem(id: string, state: MeetingState = 'completed'): Meet
   return {
     id, title: id, startedAt: '2026-09-01T10:00:00Z',
     status: { state, updatedAt: '2026-09-01T10:05:00Z', capture: { state: capture, updatedAt: '' }, video: { state: 'off' }, processing: { state: processing, updatedAt: '' } },
-    hasTranscript: state === 'completed', hasSummary: state === 'completed',
+    hasTranscript: state === 'completed', hasSummary: state === 'completed', speakers: [],
   }
 }
 

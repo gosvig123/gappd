@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from 'react'
 import type { Device, RecordingState } from '../../shared/contracts'
-import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE } from '../../shared/meeting-recording-workflow'
+import { canStartRecordingStatus, canStopRecordingStatus, recordingRefreshTarget, RECORDING_STATUS_IDLE, RECORDING_STATUS_STARTING, RECORDING_STATUS_STOPPING } from '../../shared/meeting-recording-workflow'
 import { DEFAULT_TRANSCRIPTION_LANGUAGE, TRANSCRIPTION_LANGUAGES } from '../../shared/transcription-languages'
 import { permissionTarget } from '../components/meeting/status'
 import { useGuardedEffect } from './use-guarded-effect'
@@ -57,10 +57,15 @@ type SetRecordingWorkflowState = Dispatch<SetStateAction<RecordingWorkflowState>
 type EffectsRef = MutableRefObject<RecordingWorkflowEffects>
 
 function useRecordingLifecycle(enabled: boolean, effects: EffectsRef, setState: SetRecordingWorkflowState) {
+  const sawStatusEvent = useRef(false)
   useGuardedEffect((guard) => {
     if (!enabled) return undefined
-    const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => void handleRecordingChange(next, effects.current, setState)))
-    void loadReadyRecordingData(effects, setState).catch((err) => guard(() => effects.current.setError(errorMessage(err))))
+    sawStatusEvent.current = false
+    const dispose = window.gappd.recording.onStatusChanged((next) => guard(() => {
+      sawStatusEvent.current = true
+      void handleRecordingChange(next, effects.current, setState)
+    }))
+    void loadReadyRecordingData(effects, setState, sawStatusEvent).catch((err) => guard(() => effects.current.setError(errorMessage(err))))
     return dispose
   }, [enabled])
 }
@@ -82,9 +87,9 @@ function useDeviceRefreshLifecycle(enabled: boolean, setState: SetRecordingWorkf
   }, [enabled])
 }
 
-async function loadReadyRecordingData(effects: EffectsRef, setState: SetRecordingWorkflowState) {
+async function loadReadyRecordingData(effects: EffectsRef, setState: SetRecordingWorkflowState, sawStatusEvent: MutableRefObject<boolean>) {
   const [devices, recording] = await Promise.all([window.gappd.system.getDevices(), window.gappd.recording.getStatus()])
-  setState((current) => ({ ...reconcileDevices(current, devices), recording }))
+  setState((current) => ({ ...reconcileDevices(current, devices), recording: sawStatusEvent.current ? current.recording : recording }))
   await recoverStaleRecordings(effects, setState)
 }
 
@@ -111,7 +116,8 @@ async function startRecording(device: number, language: string, setState: SetRec
     setError(null)
     const { speakerLabelsEnabled } = await window.gappd.startup.getSettings()
     const recording = await window.gappd.recording.start({ device, language, speakerLabelsEnabled, eventSourceId, title })
-    setState((current) => ({ ...current, recording }))
+    // Main pushes `starting` over recording:statusChanged before returning; ignoring a `starting` reply prevents a late IPC response from overwriting a newer error/idle/recording event.
+    setState((current) => recording.status === RECORDING_STATUS_STARTING ? current : { ...current, recording })
   } catch (err) {
     setError(errorMessage(err))
   }
@@ -121,7 +127,8 @@ async function stopRecording(setState: SetRecordingWorkflowState, setError: (err
   try {
     setError(null)
     const recording = await window.gappd.recording.stop()
-    setState((current) => ({ ...current, recording }))
+    // Main pushes `stopping` over recording:statusChanged before returning; ignore a late `stopping` reply so it cannot overwrite `idle` or `error`.
+    setState((current) => recording.status === RECORDING_STATUS_STOPPING ? current : { ...current, recording })
   } catch (err) {
     setError(errorMessage(err))
   }

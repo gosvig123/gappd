@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -24,7 +25,7 @@ export async function requestCapturePermissions(): Promise<CapturePermissions> {
   // inherits the grant.
   const appMicStatusBefore = await ensureAppMicrophoneAccess()
   return new Promise((resolve) => {
-    const tmpFile = path.join(os.tmpdir(), `gappd-perms-${Date.now()}.json`)
+    const tmpFile = path.join(os.tmpdir(), `gappd-perms-${crypto.randomUUID()}.json`)
     const command = capturePermissionCommand(tmpFile)
     const details = { ...capturePermissionDetails(command), ...appMicStatusBefore }
     let stderr = ''

@@ -16,7 +16,6 @@ import type { ThemeName } from '../hooks/use-theme'
  */
 export type AppView = {
   meetings: MeetingListItem[]
-  meetingDetails: Map<string, MeetingDetail>
   meetingEvents: Map<string, CalendarEventSummary>
   people: SavedPerson[]
   /** Saved Agendas by Calendar event key. */

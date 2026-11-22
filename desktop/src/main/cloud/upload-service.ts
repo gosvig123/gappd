@@ -1,16 +1,17 @@
 import { shell } from 'electron'
 import type { MeetingSyncDocument } from '../../shared/meeting-sync-contract'
+import type { ParticipantContext } from '../../shared/participant-contract'
 import { CloudAuth, type CloudCredential } from './auth'
 import { createSecureStore, requireEncryption } from '../electron-secure-store'
 import { MeetingDevice, type DeviceCredential } from './device'
-import { meetingDocumentLoader } from './document-loader'
+import { foldCalendarMaskStamp, meetingDocumentWithStampLoader } from './document-loader'
 import { deleteMeeting, listMeetings } from '../meetings'
 import { resolveGappdBinary } from '../native-runtime'
 import { MeetingSyncQueue } from './sync-queue'
 import { MeetingUpload } from './upload'
 import { cloudAuthConfig, cloudResource } from '../service-config'
 import { savedMeetingCalendarContexts } from '../participant-calendar'
-import type { MeetingDeleteResponse } from '../../shared/contracts'
+import type { MeetingDeleteResponse, MeetingListItem } from '../../shared/contracts'
 
 // The store names keep their original "development" suffix, so existing installs keep their
 // upload account, consent, queue and device key.
@@ -29,16 +30,56 @@ export function meetingUploadAuthorization(): CloudAuth {
 export function meetingUpload(): MeetingUpload {
   instance ||= new MeetingUpload(meetingUploadAuthorization(), cloudResource(),
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
-    meetingDocumentLoader(resolveGappdBinary, meetingCalendarTitles),
-    listMeetings,
+    meetingDocumentWithStampLoader(resolveGappdBinary, meetingCalendarTitles),
+    listMeetingsForSync,
     new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
   return instance
 }
 
+/**
+ * Folds whether a Meeting's title is masked (via persisted `titleSource === 'calendar'` or a saved
+ * Calendar event) into its documentStamp in one read. If saved Calendar contexts cannot be read or
+ * an entry is malformed, strips documentStamp instead of throwing so queued Cloud deletions still
+ * drain while per-Meeting exports fail before spawning the CLI.
+ */
+async function listMeetingsForSync(): Promise<MeetingListItem[]> {
+  const meetings = await listMeetings()
+  let contexts: Record<string, ParticipantContext>
+  try {
+    contexts = await savedMeetingCalendarContexts()
+  } catch {
+    return meetings.map(({ documentStamp: _unused, ...meeting }) => meeting)
+  }
+  return meetings.map((meeting) => {
+    if (!meeting.documentStamp) return meeting
+    const titles = readCalendarTitles(contexts[meeting.id])
+    if (titles === null) {
+      const { documentStamp: _unused, ...withoutStamp } = meeting
+      return withoutStamp
+    }
+    const masked = meeting.titleSource === 'calendar' || titles.some((title) => title.trim() === meeting.title.trim())
+    return { ...meeting, documentStamp: foldCalendarMaskStamp(meeting.documentStamp, masked) }
+  })
+}
+
 async function meetingCalendarTitles(id: string): Promise<string[]> {
-  const context = (await savedMeetingCalendarContexts())[id]
-  if (!context) return []
-  return [context.event, ...context.candidates].flatMap((event) => event ? [event.title] : [])
+  const titles = readCalendarTitles((await savedMeetingCalendarContexts())[id])
+  if (titles === null) throw new Error('Calendar link entry is malformed.')
+  return titles
+}
+
+/** Returns null when a saved entry exists but is malformed, so it is refused for upload. */
+function readCalendarTitles(context: ParticipantContext | undefined): string[] | null {
+  if (context === undefined) return []
+  if (!context || typeof context !== 'object' || Array.isArray(context) || !Array.isArray(context.candidates)) return null
+  const hasEvent = 'event' in context && context.event !== undefined
+  const events = hasEvent ? [context.event, ...context.candidates] : context.candidates
+  const titles: string[] = []
+  for (const event of events) {
+    if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.title !== 'string') return null
+    titles.push(event.title)
+  }
+  return titles
 }
 
 /**

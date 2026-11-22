@@ -1,21 +1,34 @@
 package appprotocol
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	"github.com/gappd-dev/gappd/internal/db"
 	"github.com/gappd-dev/gappd/internal/meetinglang"
 )
 
 type MeetingListItem struct {
-	ID            string        `json:"id"`
-	Title         string        `json:"title"`
-	StartedAt     string        `json:"startedAt"`
-	EndedAt       *string       `json:"endedAt,omitempty"`
-	Status        MeetingStatus `json:"status"`
-	HasTranscript bool          `json:"hasTranscript"`
-	HasSummary    bool          `json:"hasSummary"`
-	SearchText    string        `json:"searchText,omitempty"`
+	ID            string           `json:"id"`
+	Title         string           `json:"title"`
+	TitleSource   string           `json:"titleSource,omitempty"`
+	StartedAt     string           `json:"startedAt"`
+	EndedAt       *string          `json:"endedAt,omitempty"`
+	Status        MeetingStatus    `json:"status"`
+	HasTranscript bool             `json:"hasTranscript"`
+	HasSummary    bool             `json:"hasSummary"`
+	Speakers      []MeetingSpeaker `json:"speakers"`
+	DocumentStamp string           `json:"documentStamp,omitempty"`
+}
+
+type MeetingSearchInput struct {
+	Query string `json:"query"`
+}
+
+type MeetingSearchResponse struct {
+	IDs []string `json:"ids"`
 }
 
 type MeetingDetail struct {
@@ -49,17 +62,39 @@ type MeetingSegment struct {
 	Text       string  `json:"text"`
 }
 
-func BuildMeetingListViews(entries []db.MeetingListEntry) []MeetingListItem {
+func BuildMeetingListViews(entries []db.MeetingListEntry, speakersByMeeting map[string][]db.MeetingSpeakerSummary) []MeetingListItem {
 	views := make([]MeetingListItem, 0, len(entries))
 	for _, entry := range entries {
-		views = append(views, BuildMeetingListView(entry))
+		views = append(views, BuildMeetingListView(entry, speakersByMeeting[entry.Meeting.ID]))
 	}
 	return views
 }
 
-func BuildMeetingListView(entry db.MeetingListEntry) MeetingListItem {
+func BuildMeetingListView(entry db.MeetingListEntry, speakers []db.MeetingSpeakerSummary) MeetingListItem {
 	meeting := entry.Meeting
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary}
+	outSpeakers := make([]MeetingSpeaker, 0, len(speakers))
+	for _, speaker := range speakers {
+		outSpeakers = append(outSpeakers, MeetingSpeaker{
+			Key:               speaker.Key,
+			Name:              speaker.Name,
+			PersonID:          speaker.PersonID,
+			IdentityOrigin:    speaker.IdentityOrigin,
+			SuggestedPersonID: speaker.SuggestedPersonID,
+		})
+	}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, TitleSource: meeting.TitleSource, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers, DocumentStamp: DocumentStamp(meeting)}
+}
+
+// DocumentStamp fingerprints every Meeting field that feeds meetingdocument.Build (including the
+// summary text itself and persisted title provenance) so cloud sync skips exporting unchanged
+// Meetings without missing same-second note refinements.
+func DocumentStamp(meeting db.Meeting) string {
+	sum := sha256.New()
+	fmt.Fprintf(sum, "v2\x00%s\x00%s\x00%s\x00%s\x00%s\x00%d\x00%d\x00%s\x00%s",
+		meeting.Title, meeting.TitleSource, meeting.StartedAt, stringValue(meeting.EndedAt),
+		meeting.Language, meeting.TranscriptRevision, meeting.SummaryTranscriptRevision,
+		stringValue(meeting.Summary), meeting.ProcessingStatusUpdatedAt)
+	return hex.EncodeToString(sum.Sum(nil))
 }
 
 func BuildMeetingDetail(meeting db.Meeting, segments []db.Segment) MeetingDetail {

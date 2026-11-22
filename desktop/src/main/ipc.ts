@@ -3,7 +3,7 @@ import { openPermissionsSettings } from './privacy-settings'
 import { deleteMeetingAndCloudCopy, meetingUpload } from './cloud/upload-service'
 import { addToRemoteAIService, remoteAccess } from './cloud/remote-access-service'
 import { isRemoteAIServiceId, type RemoteAIServiceId } from '../shared/remote-access'
-import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, nativeTheme, type IpcMainInvokeEvent } from 'electron'
 import { IPC_EVENTS, IPC_OPERATIONS, type CapturePermissionTarget, type AgentConfigurationInput, type AgentId, type IpcOperationArgs, type IpcOperationGroup, type IpcOperationName, type IpcOperationResult, type ManagedRuntimePrepareInput, type StartRecordingInput } from '../shared/ipc-contract'
 import { checkCapturePermissions, requestCapturePermissions } from './capture-permissions'
 import { onPersonFactsChanged, requestDrains, requestSpeakerRecognition } from './drain-coordinator'
@@ -14,8 +14,8 @@ import { configureAgent, findAgents, providerModels, providerStatus, useLocalPro
 import { connectGoogleCalendar, disconnectGoogleCalendar, gmailThreads, importGoogleContacts, googleCalendarSnapshot, onGoogleCalendarChange, openGmailThread, syncGoogleCalendar } from './google/calendar-service'
 import { collectCalendarContacts } from '../shared/calendar-contacts'
 import { parseGoogleAccess } from './google/google-access'
-import { assignSpeaker, getDevices, listMeetings, listPeople, hidePersonFact, mergePeople, personActionItems, personFacts, personSummary, queuePersonFacts, retryDiarization, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
-import { linkCalendar, participantContext } from './participant-calendar'
+import { assignSpeaker, getDevices, listMeetings, listPeople, hidePersonFact, mergePeople, personActionItems, personFacts, personSummary, queuePersonFacts, retryDiarization, searchMeetings, setMeetingLanguage, updatePerson, showMeeting, speakerClip } from './meetings'
+import { linkCalendar, participantContext, savedMeetingCalendarLinks } from './participant-calendar'
 import { draftAgenda, listAgendas, onAgendasChange, saveAgendaItems } from './agenda'
 import { startMeetingRecordingWorkflow, stopMeetingRecordingWorkflow, setPreferredRecordingLanguage } from './meeting-recording-workflow'
 import { getRecordingState, onRecordingStateChange } from './state'
@@ -24,7 +24,7 @@ import { getStartupSettings, setAgendaAutoDraftEnabled, setOpenAtLogin, setSpeak
 import { checkForUpdate, downloadUpdate, getUpdateStatus, installAndRestart, onUpdateStatusChange, openUpdatePage } from './update'
 import { setUsageSharing, usageReportStatus, usageReportView } from './usage-report'
 import { errorReportStatus, reportRendererError, setErrorSharing } from './error-report'
-import { reportFailure } from './error-log'
+import { isExpectedError, reportFailure } from './error-log'
 import { ipcOperation, type RendererError } from '../shared/error-report'
 import { aiAppStatuses, connectAIApp, disconnectAIApp } from './ai-apps'
 import { isAIAppId, type AIAppId } from '../shared/ai-apps'
@@ -43,9 +43,12 @@ const IPC_HANDLERS: MainHandlers = {
     startStaleRecordingRecovery: () => startStaleRecordingRecovery(),
     // macOS applies a new screen recording grant only to a new process. Quit runs the normal shutdown first.
     relaunch: () => { app.relaunch(); app.quit() },
+    // Prompt windows read the theme through prefers-color-scheme, which follows themeSource.
+    setTheme: (_event, theme) => { nativeTheme.themeSource = theme === 'light' ? 'light' : 'dark' },
   },
   meetings: {
     list: () => listMeetings(),
+    search: (_event, query: string) => searchMeetings(String(query)),
     show: (_event, id: string) => showMeeting(id),
     retryDiarization: (_event, id: string) => retryDiarization(id),
     setLanguage: (_event, id: string, language: string) => setMeetingLanguage(id, language),
@@ -67,6 +70,7 @@ const IPC_HANDLERS: MainHandlers = {
     assignSpeaker: (_event, input) => assignSpeaker(input),
     speakerClip: (_event, input) => speakerClip(input),
     participantContext: (_event, id) => participantContext(id),
+    calendarLinks: () => savedMeetingCalendarLinks(),
     linkCalendar: (_event, input) => linkCalendar(input),
     exportRecording: (_event, id: string) => exportRecording(id),
   },
@@ -233,7 +237,7 @@ function reported(channel: string, handler: IpcHandler): IpcHandler {
     try {
       return await handler(event, ...args)
     } catch (error) {
-      reportFailure(operation, error)
+      if (!isExpectedError(error)) reportFailure(operation, error)
       throw error
     }
   }

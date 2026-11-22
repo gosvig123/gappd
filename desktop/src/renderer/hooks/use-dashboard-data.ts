@@ -47,7 +47,11 @@ function useDashboardState() {
 
 function useDashboardActions(setState: SetDashboardState, refs: MeetingRefs, selectedRequest: RequestGate, refreshRequest: RequestGate) {
   return {
-    updateMeeting: (meeting: MeetingDetail) => { if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }; void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState)) },
+    updateMeeting: (meeting: MeetingDetail) => {
+      setState((current) => ({ ...current, meetings: current.meetings.map((item) => item.id === meeting.id ? { ...item, title: meeting.title, status: meeting.status, speakers: meeting.speakers } : item) }))
+      if (refs.selectedId.current === meeting.id) { selectedRequest.cancel(); applySelectedMeeting(meeting, setState, refs) }
+      void refreshMeetings(undefined, refs, setState, selectedRequest, refreshRequest).catch(error => setDashboardError(error, setState))
+    },
     refreshMeetings: (id?: string | null) => refreshMeetings(id, refs, setState, selectedRequest, refreshRequest),
     loadMeeting: (id: string) => { refreshRequest.cancel(); return loadMeeting(id, refs, setState, selectedRequest) },
     clearSelectedMeeting: () => { refreshRequest.cancel(); selectedRequest.cancel(); clearSelectedMeeting(refs, setState) },

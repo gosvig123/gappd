@@ -2,37 +2,13 @@ import type { MeetingListItem } from '../../shared/contracts'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-type SearchHit = { meeting: MeetingListItem; field: string; excerpt: string }
-
-type DetailLike = { summary?: string; transcriptText?: string; speakers: Array<{ name: string }> }
-
-/** Meeting search: title, People, notes, and transcript text. */
-export function searchMeetings(meetings: MeetingListItem[], details: Map<string, DetailLike>, query: string): SearchHit[] {
+/** Synchronous match on Meeting title and speaker names; full-text search uses SQLite FTS5. */
+export function matchingMeetingIds(meetings: MeetingListItem[], query: string): string[] {
   const term = query.trim().toLowerCase()
   if (!term) return []
-  return meetings.flatMap((meeting) => matchHit(meeting, details.get(meeting.id), term) ?? [])
-}
-
-function matchHit(meeting: MeetingListItem, detail: DetailLike | undefined, term: string): SearchHit | null {
-  if (meeting.title.toLowerCase().includes(term)) return { meeting, field: 'Title', excerpt: '' }
-  const person = detail?.speakers.find((speaker) => speaker.name.toLowerCase().includes(term))
-  if (person) return { meeting, field: 'Speaker', excerpt: person.name }
-  if (detail?.summary && plainText(detail.summary).toLowerCase().includes(term)) return { meeting, field: 'Notes', excerpt: excerpt(plainText(detail.summary), term, 62) }
-  if (detail?.transcriptText && plainText(detail.transcriptText).toLowerCase().includes(term)) return { meeting, field: 'Transcript', excerpt: excerpt(plainText(detail.transcriptText), term, 62) }
-  return null
-}
-
-/** Notes and transcripts are stored as prose and Markdown, so strip markers before showing an excerpt. */
-function plainText(source: string): string {
-  return source.replace(/[*_`#>]/g, '').replace(/^\s*[-•]\s*/gm, '').replace(/\s+/g, ' ').trim()
-}
-
-function excerpt(source: string, term: string, radius = 64): string {
-  const at = source.toLowerCase().indexOf(term)
-  if (at < 0) return source.slice(0, radius * 2)
-  const start = Math.max(0, at - radius)
-  const text = source.slice(start, Math.min(source.length, at + term.length + radius)).replace(/\s+/g, ' ').trim()
-  return `${start > 0 ? '…' : ''}${text}${at + term.length + radius < source.length ? '…' : ''}`
+  return meetings
+    .filter((meeting) => meeting.title.toLowerCase().includes(term) || (meeting.speakers ?? []).some((speaker) => speaker.name.toLowerCase().includes(term)))
+    .map((meeting) => meeting.id)
 }
 
 export function meetingDurationLabel(meeting: MeetingListItem): string {

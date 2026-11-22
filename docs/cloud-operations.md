@@ -83,7 +83,7 @@ Production uses the Clerk production instance of the `Gappd` application.
 | Scopes | `meetings:read` (advertised), `meetings:sync` (not advertised) |
 | Dynamic Client Registration | Off; the metadata has no registration endpoint |
 | Client ID Metadata Documents (CIMD) | On since 2026-11-06 (OAuth applications → Settings): any compatible client may start sign-in; allowed and default scopes `meetings:read`, `offline_access`. Claude (`https://claude.ai/oauth/mcp-oauth-client-metadata`) and ChatGPT (`https://chatgpt.com/oauth/client.json`) sign in this way, so users paste no Client ID. |
-| Branding | Logo and favicon are PNG renders of `gappd-site/apps/web/public/app-logo.svg` (Clerk takes no SVG). Account Portal colours follow `desktop/src/renderer/theme.css`: primary `#2F6FB5` on `#F5F6F9` (light), `#2B70BD` on `#282C33` (dark; the lighter app accent fails contrast under white button text). No Terms or Privacy links: Clerk shows them only with a required consent checkbox at sign-up. |
+| Branding | Logo (512 px) and favicon (64 px) are PNG renders of `desktop/assets/app-icon.svg`, the Graphite app icon (Clerk takes no SVG). Account Portal colours follow `desktop/src/renderer/theme.css` (Graphite): primary `#18181B` on `#FAFAFA` (light), `#71717A` on `#141415` (dark; the app's dark ink `#EDEDEF` fails under Clerk's white button text, and `#71717A` keeps it at 4.8:1). No Terms or Privacy links: Clerk shows them only with a required consent checkbox at sign-up. |
 
 Not advertising `meetings:sync` is not an authorization boundary. The server accepts writes only
 from the Desktop client, with that scope and a registered device signature.
