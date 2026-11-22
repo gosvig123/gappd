@@ -5,6 +5,10 @@ import type { UsageReport, UsageSharing } from '../shared/usage-report'
 
 export const PREFERENCES_FILE = 'preferences.json'
 
+const LOCK_FILE = `${PREFERENCES_FILE}.lock`
+const LOCK_TIMEOUT_MS = 2_000
+const LOCK_STALE_MS = 10_000
+
 const LEGACY_FILES = {
   startupInitialized: 'startup-initialized',
   speakerLabelsDisabled: 'speaker-labels-disabled',
@@ -67,12 +71,14 @@ type LegacyJsonRead =
   | { status: 'unreadable'; error: unknown }
 
 let tempSequence = 0
+const sleepBuffer = new Int32Array(new SharedArrayBuffer(4))
 
 /**
  * Single atomic JSON store for non-secret desktop preferences (`preferences.json`).
- * Reads fresh from disk on every read/update so separate writers cannot clobber each other,
- * migrates the 8 legacy per-feature files on first read without deleting unreadable files,
- * and fails closed on corruption so Error reports and Open at login never flip back on.
+ * Reads fresh from disk, serializes read-modify-write and migration via a cross-process lockfile,
+ * syncs the file and containing directory before removing migrated legacy files, preserves rollback
+ * opt-out markers (`startup-initialized` and opted-out `error-report.json`), and fails closed on
+ * corruption so Error reports and Open at login never flip back on.
  */
 export class PreferencesStore {
   private readonly dir: string
@@ -82,68 +88,99 @@ export class PreferencesStore {
   }
 
   read(): PreferencesReadResult {
-    const loaded = this.loadFromDisk()
+    const loaded = this.loadFromDisk(false)
     return loaded.status === 'unreadable' ? damagedResult() : loaded
   }
 
   update(mutate: (current: PreferencesDocument) => PreferencesDocument, _options?: { strict?: boolean }): PreferencesDocument {
-    const loaded = this.loadFromDisk()
-    if (loaded.status === 'unreadable') throw loaded.error
-    if (loaded.status === 'damaged') this.backupCorruptFile()
-    const next: PreferencesDocument = { ...mutate(loaded.data), version: 1 }
-    this.writeAtomic(next)
-    return next
+    return this.withLock(true, () => {
+      const loaded = this.loadFromDisk(true)
+      if (loaded.status === 'unreadable') throw loaded.error
+      if (loaded.status === 'damaged') this.backupCorruptFile()
+      const next: PreferencesDocument = { ...mutate(loaded.data), version: 1 }
+      this.writeAtomic(next)
+      this.syncRollbackMarkers(next)
+      return next
+    })
   }
 
   private filePath(): string {
     return path.join(this.dir, PREFERENCES_FILE)
   }
 
+  private legacyPath(name: string): string {
+    return path.join(this.dir, name)
+  }
+
   private backupCorruptFile(): void {
     const target = this.filePath()
     const backup = `${target}.damaged`
     try {
-      // Only back up a corrupt JSON file, never fail the write if backup cannot be made.
       if (fs.existsSync(target) && !fs.existsSync(backup)) fs.copyFileSync(target, backup)
     } catch { /* Best-effort preservation of corrupt preferences. */ }
   }
 
-  private loadFromDisk(): InternalReadResult {
+  private loadFromDisk(holdingLock: boolean): InternalReadResult {
     let text: string
     try {
       text = fs.readFileSync(this.filePath(), 'utf8')
     } catch (cause) {
-      if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return this.migrateLegacy()
+      if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
+        return holdingLock ? this.migrateLegacyLocked() : this.withLock(false, () => this.migrateLegacyLocked())
+      }
       return { status: 'unreadable', data: damagedResult().data, error: cause }
     }
     const parsed = parsePreferences(text)
     if (!parsed) return damagedResult()
-    return { status: 'ok', data: parsed }
+    return { status: 'ok', data: this.applyLegacyErrorOptOut(parsed) }
   }
 
-  private migrateLegacy(): InternalReadResult {
+  /**
+   * If a user manually downgraded, opted out in the old build (writing legacy `error-report.json`
+   * with sharing: off), and upgraded again, honor that opt-out instead of resuming reports.
+   */
+  private applyLegacyErrorOptOut(doc: PreferencesDocument): PreferencesDocument {
+    if (doc.errorReport?.sharing === 'off') return doc
+    const legacy = readLegacyJson(this.legacyPath(LEGACY_FILES.errorReport))
+    if (legacy.status === 'missing') return doc
+    if (legacy.status === 'ok' && isRecord(legacy.value) && legacy.value.version === 1 && legacy.value.sharing === 'on') return doc
+    return { ...doc, errorReport: { ...(doc.errorReport ?? {}), sharing: 'off' } }
+  }
+
+  private migrateLegacyLocked(): InternalReadResult {
+    // Re-check after acquiring the lock: another process may have finished migrating already.
+    try {
+      const existing = fs.readFileSync(this.filePath(), 'utf8')
+      const parsed = parsePreferences(existing)
+      return parsed ? { status: 'ok', data: this.applyLegacyErrorOptOut(parsed) } : damagedResult()
+    } catch (cause) {
+      if ((cause as NodeJS.ErrnoException).code !== 'ENOENT') {
+        return { status: 'unreadable', data: damagedResult().data, error: cause }
+      }
+    }
+
     const removable: string[] = []
     const doc: PreferencesDocument = { version: 1 }
     const startup: StoredStartupPreferences = {}
     let hasStartup = false
     let anyLegacyFound = false
 
-    const legacyPath = (name: string) => path.join(this.dir, name)
-    const takeMarker = (name: string): boolean => {
-      const target = legacyPath(name)
+    const takeMarker = (name: string, removeAfter: boolean): boolean => {
+      const target = this.legacyPath(name)
       if (!fs.existsSync(target)) return false
       anyLegacyFound = true
-      removable.push(target)
+      if (removeAfter) removable.push(target)
       return true
     }
 
-    if (takeMarker(LEGACY_FILES.startupInitialized)) { startup.initialized = true; hasStartup = true }
-    if (takeMarker(LEGACY_FILES.speakerLabelsDisabled)) { startup.speakerLabelsEnabled = false; hasStartup = true }
-    if (takeMarker(LEGACY_FILES.screenVideoEnabled)) { startup.screenVideoEnabled = true; hasStartup = true }
-    if (takeMarker(LEGACY_FILES.agendaAutoDraftEnabled)) { startup.agendaAutoDraftEnabled = true; hasStartup = true }
+    // Keep `startup-initialized` on disk so a manual rollback never re-enables Open at login.
+    if (takeMarker(LEGACY_FILES.startupInitialized, false)) { startup.initialized = true; hasStartup = true }
+    if (takeMarker(LEGACY_FILES.speakerLabelsDisabled, true)) { startup.speakerLabelsEnabled = false; hasStartup = true }
+    if (takeMarker(LEGACY_FILES.screenVideoEnabled, true)) { startup.screenVideoEnabled = true; hasStartup = true }
+    if (takeMarker(LEGACY_FILES.agendaAutoDraftEnabled, true)) { startup.agendaAutoDraftEnabled = true; hasStartup = true }
     if (hasStartup) doc.startup = startup
 
-    const updateChannelFile = legacyPath(LEGACY_FILES.updateChannel)
+    const updateChannelFile = this.legacyPath(LEGACY_FILES.updateChannel)
     const updateChannelRead = readLegacyJson(updateChannelFile)
     if (updateChannelRead.status === 'unreadable') return { status: 'unreadable', data: damagedResult().data, error: updateChannelRead.error }
     if (updateChannelRead.status !== 'missing') {
@@ -154,7 +191,7 @@ export class PreferencesStore {
       }
     }
 
-    const remoteAccessFile = legacyPath(LEGACY_FILES.remoteAccess)
+    const remoteAccessFile = this.legacyPath(LEGACY_FILES.remoteAccess)
     const remoteAccessRead = readLegacyJson(remoteAccessFile)
     if (remoteAccessRead.status === 'unreadable') return { status: 'unreadable', data: damagedResult().data, error: remoteAccessRead.error }
     if (remoteAccessRead.status !== 'missing') {
@@ -171,7 +208,7 @@ export class PreferencesStore {
       }
     }
 
-    const errorReportFile = legacyPath(LEGACY_FILES.errorReport)
+    const errorReportFile = this.legacyPath(LEGACY_FILES.errorReport)
     const errorReportRead = readLegacyJson(errorReportFile)
     if (errorReportRead.status === 'unreadable') return { status: 'unreadable', data: damagedResult().data, error: errorReportRead.error }
     if (errorReportRead.status !== 'missing') {
@@ -183,11 +220,10 @@ export class PreferencesStore {
         // A corrupt legacy error-report.json may have held an opt-out, so fail closed to off.
         doc.errorReport = { sharing: 'off' }
       }
-      // Keep an opted-out legacy error-report.json so a manual downgrade still sees sharing: off.
       if (doc.errorReport.sharing !== 'off') removable.push(errorReportFile)
     }
 
-    const usageReportFile = legacyPath(LEGACY_FILES.usageReport)
+    const usageReportFile = this.legacyPath(LEGACY_FILES.usageReport)
     const usageReportRead = readLegacyJson(usageReportFile)
     if (usageReportRead.status === 'unreadable') return { status: 'unreadable', data: damagedResult().data, error: usageReportRead.error }
     if (usageReportRead.status !== 'missing') {
@@ -208,8 +244,9 @@ export class PreferencesStore {
     if (!anyLegacyFound) return { status: 'missing', data: doc }
     try {
       this.writeAtomic(doc)
+      fsyncDir(this.dir)
       for (const file of removable) {
-        try { fs.rmSync(file, { force: true }) } catch { /* Best-effort cleanup after atomic save. */ }
+        try { fs.rmSync(file, { force: true }) } catch { /* Best-effort cleanup after durable save. */ }
       }
     } catch {
       // If disk write fails during migration, still serve migrated in-memory values without deleting legacy files.
@@ -217,18 +254,89 @@ export class PreferencesStore {
     return { status: 'ok', data: doc }
   }
 
+  /**
+   * Keeps tiny rollback-safe opt-out markers in sync: if a user opts out of Error reports and
+   * later rolls back to an older build, `error-report.json` keeps sharing off; `startup-initialized`
+   * prevents an older build from turning Open at login back on.
+   */
+  private syncRollbackMarkers(doc: PreferencesDocument): void {
+    try {
+      const errorFile = this.legacyPath(LEGACY_FILES.errorReport)
+      if (doc.errorReport?.sharing === 'off') {
+        writeAtomicFile(errorFile, JSON.stringify({ version: 1, sharing: 'off' }))
+      } else if (doc.errorReport?.sharing === 'on' && fs.existsSync(errorFile)) {
+        fs.rmSync(errorFile, { force: true })
+      }
+      if (doc.startup?.initialized) {
+        const marker = this.legacyPath(LEGACY_FILES.startupInitialized)
+        if (!fs.existsSync(marker)) fs.writeFileSync(marker, '', { flag: 'wx', mode: 0o600 })
+      }
+    } catch { /* Best-effort rollback compatibility marker. */ }
+  }
+
   private writeAtomic(document: PreferencesDocument): void {
     fs.mkdirSync(this.dir, { recursive: true })
-    const target = this.filePath()
-    const temporary = `${target}.${process.pid}.${++tempSequence}.tmp`
-    const fd = fs.openSync(temporary, 'w', 0o600)
-    try {
-      fs.writeFileSync(fd, JSON.stringify(document), 'utf8')
-      fs.fsyncSync(fd)
-    } finally {
-      fs.closeSync(fd)
+    writeAtomicFile(this.filePath(), JSON.stringify(document))
+  }
+
+  private withLock<T>(createDir: boolean, action: () => T): T {
+    if (createDir) {
+      try { fs.mkdirSync(this.dir, { recursive: true }) } catch {}
+    } else if (!fs.existsSync(this.dir)) {
+      return action()
     }
-    fs.renameSync(temporary, target)
+    const lockPath = path.join(this.dir, LOCK_FILE)
+    const deadline = Date.now() + LOCK_TIMEOUT_MS
+    let fd: number | null = null
+    while (fd === null) {
+      try {
+        fd = fs.openSync(lockPath, 'wx', 0o600)
+      } catch (cause) {
+        const code = (cause as NodeJS.ErrnoException).code
+        if (code !== 'EEXIST') {
+          // Cannot create lockfile (e.g. non-existent or read-only dir): run action directly.
+          return action()
+        }
+        try {
+          const stat = fs.statSync(lockPath)
+          if (Date.now() - stat.mtimeMs > LOCK_STALE_MS) {
+            fs.rmSync(lockPath, { force: true })
+            continue
+          }
+        } catch { continue }
+        if (Date.now() >= deadline) throw new Error('Timed out waiting for preferences lock.')
+        Atomics.wait(sleepBuffer, 0, 0, 10)
+      }
+    }
+    try {
+      return action()
+    } finally {
+      try { fs.closeSync(fd) } catch {}
+      try { fs.rmSync(lockPath, { force: true }) } catch {}
+    }
+  }
+}
+
+function writeAtomicFile(target: string, contents: string): void {
+  const temporary = `${target}.${process.pid}.${++tempSequence}.tmp`
+  const fd = fs.openSync(temporary, 'w', 0o600)
+  try {
+    fs.writeFileSync(fd, contents, 'utf8')
+    fs.fsyncSync(fd)
+  } finally {
+    fs.closeSync(fd)
+  }
+  fs.renameSync(temporary, target)
+}
+
+function fsyncDir(dir: string): void {
+  let fd: number | null = null
+  try {
+    fd = fs.openSync(dir, 'r')
+    fs.fsyncSync(fd)
+  } catch { /* Best-effort directory sync on platforms that support it. */ }
+  finally {
+    if (fd !== null) try { fs.closeSync(fd) } catch {}
   }
 }
 

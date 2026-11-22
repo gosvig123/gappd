@@ -10,7 +10,7 @@ const LOCAL_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
 const STAMP_PATTERN = /^[a-f0-9]{64}$/
 
 export type LoadedMeetingDocument = { document: string; stamp?: string }
-export type CalendarTitleLookup = (localId: string, startedAt?: string, endedAt?: string) => Promise<string[]>
+export type CalendarTitleLookup = (localId: string) => Promise<string[]>
 
 /**
  * Builds the version-1 document for one local Meeting by running the app's own CLI. The
@@ -21,23 +21,26 @@ export type CalendarTitleLookup = (localId: string, startedAt?: string, endedAt?
 export function meetingDocumentLoader(binary: () => string, calendarTitles: CalendarTitleLookup = async () => []) {
   return async (localId: string, revision: number): Promise<string> => {
     validateArgs(localId, revision)
+    const titles = await calendarTitles(localId)
     const document = await runExport(binary, ['meeting-document', 'export', localId, String(revision)])
     if (document.length === 0 || document.length > MAX_DOCUMENT_BYTES) throw new Error('Meeting document unavailable.')
-    return maskDocument(document, calendarTitles, localId).then((result) => result.document)
+    return maskDocument(document, titles, false).document
   }
 }
 
 /**
  * Exports one Meeting together with the exact source stamp of that snapshot (including whether
  * its Calendar title was masked), so the sync queue never caches a stamp from a separate read.
+ * Reads saved Calendar titles BEFORE spawning the CLI so a damaged Calendar store spawns nothing.
  */
 export function meetingDocumentWithStampLoader(binary: () => string, calendarTitles: CalendarTitleLookup = async () => []) {
   return async (localId: string, revision: number): Promise<LoadedMeetingDocument> => {
     validateArgs(localId, revision)
+    const titles = await calendarTitles(localId)
     const raw = await runExport(binary, ['meeting-document', 'export', localId, String(revision), '--with-stamp'])
     const parsed = parseEnvelope(raw)
     if (parsed.document.length === 0 || parsed.document.length > MAX_DOCUMENT_BYTES) throw new Error('Meeting document unavailable.')
-    const { document, masked } = await maskDocument(parsed.document, calendarTitles, localId)
+    const { document, masked } = maskDocument(parsed.document, titles, parsed.titleSource === 'calendar')
     return { document, stamp: foldCalendarMaskStamp(parsed.stamp, masked) }
   }
 }
@@ -61,35 +64,30 @@ function runExport(binary: () => string, args: string[]): Promise<string> {
   })
 }
 
-function parseEnvelope(raw: string): { stamp: string; document: string } {
+function parseEnvelope(raw: string): { stamp: string; titleSource: string; document: string } {
   try {
-    const parsed = JSON.parse(raw) as { stamp?: unknown; document?: unknown }
+    const parsed = JSON.parse(raw) as { stamp?: unknown; titleSource?: unknown; document?: unknown }
     if (typeof parsed.stamp !== 'string' || !STAMP_PATTERN.test(parsed.stamp) || !parsed.document || typeof parsed.document !== 'object') {
       throw new Error('invalid envelope')
     }
-    return { stamp: parsed.stamp, document: JSON.stringify(parsed.document) }
+    const titleSource = typeof parsed.titleSource === 'string' ? parsed.titleSource : ''
+    return { stamp: parsed.stamp, titleSource, document: JSON.stringify(parsed.document) }
   } catch {
     throw new Error('Meeting document unavailable.')
   }
 }
 
 /**
- * A Calendar event title is Google data, and AI clients read cloud copies, so a Meeting that is
- * still named after its Calendar event uploads a generic title.
+ * A Calendar event title is Google data, and AI clients read cloud copies, so a Meeting named
+ * from a Calendar event (either persisted `title_source='calendar'` or matching a saved event
+ * title) uploads a generic title.
  */
-async function maskDocument(document: string, calendarTitles: CalendarTitleLookup, localId: string): Promise<{ document: string; masked: boolean }> {
-  let startedAt: string | undefined
-  let endedAt: string | undefined
-  let parsed: { title?: unknown; started_at?: unknown; ended_at?: unknown } | null = null
-  try {
-    parsed = JSON.parse(document) as { title?: unknown; started_at?: unknown; ended_at?: unknown }
-    if (typeof parsed.started_at === 'string') startedAt = parsed.started_at
-    if (typeof parsed.ended_at === 'string') endedAt = parsed.ended_at
-  } catch { /* Handled below if calendar titles are present. */ }
-  const titles = new Set((await calendarTitles(localId, startedAt, endedAt)).map((title) => title.trim()))
-  if (!titles.size || !parsed) return { document, masked: false }
-  if (typeof parsed.title !== 'string' || !titles.has(parsed.title.trim()) || typeof parsed.started_at !== 'string') {
-    return { document, masked: false }
-  }
+function maskDocument(document: string, calendarTitles: string[], calendarSourced: boolean): { document: string; masked: boolean } {
+  const titles = new Set(calendarTitles.map((title) => title.trim()))
+  if (!calendarSourced && !titles.size) return { document, masked: false }
+  const parsed = JSON.parse(document) as { title?: unknown; started_at?: unknown }
+  if (typeof parsed.started_at !== 'string') return { document, masked: false }
+  const matchesTitle = typeof parsed.title === 'string' && titles.has(parsed.title.trim())
+  if (!calendarSourced && !matchesTitle) return { document, masked: false }
   return { document: JSON.stringify({ ...parsed, title: genericMeetingTitle(new Date(parsed.started_at)) }), masked: true }
 }

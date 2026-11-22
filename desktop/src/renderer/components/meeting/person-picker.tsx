@@ -14,11 +14,11 @@ export function PersonPicker(props: Props) {
   const listId = useId()
   const shown = props.value === props.newValue ? 'Someone else…' : props.options.find(option => option.value === props.value)?.name ?? ''
   const items = pickerItems(props, query)
-  const show = (next: string) => { setQuery(next); setActive(0); setOpen(true) }
+  const show = (next: string) => { if (props.disabled) return; setQuery(next); setActive(0); setOpen(true) }
   const close = () => { setOpen(false); setQuery('') }
-  const choose = (item: Item) => { const typed = query.trim(); close(); if (item.value !== props.value || item.value === props.newValue) props.onChoose(item.value, typed) }
+  const choose = (item: Item) => { if (props.disabled) return; const typed = query.trim(); close(); if (item.value !== props.value || item.value === props.newValue) props.onChoose(item.value, typed) }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.nativeEvent.isComposing) return
+    if (props.disabled || event.nativeEvent.isComposing) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) return show(query)
@@ -43,10 +43,11 @@ export function PersonPicker(props: Props) {
         aria-expanded={open}
         aria-controls={listId}
         aria-autocomplete="list"
+        aria-disabled={props.disabled || undefined}
         aria-activedescendant={open && items[active] ? optionId(active) : undefined}
         placeholder={shown ? `${shown} · type to search` : 'Choose a person…'}
         value={open ? query : shown}
-        disabled={props.disabled}
+        readOnly={props.disabled}
         autoComplete="off"
         spellCheck={false}
         onClick={() => { if (!open) show('') }}

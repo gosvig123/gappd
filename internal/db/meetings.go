@@ -1,6 +1,8 @@
 package db
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 
 	"github.com/gappd-dev/gappd/internal/meetinglang"
@@ -107,7 +109,7 @@ const selectMeetingListEntriesSQL = `SELECT id, title, started_at, ended_at, cap
 	processing_status, processing_status_updated_at, processing_failure_message,
 	processing_claim_token, processing_claim_expires_at, audio_path,
 	transcript IS NOT NULL AND trim(transcript)<>'', transcript_revision,
-	summary IS NOT NULL AND trim(summary)<>'', summary_transcript_revision, extraction_json,
+	summary, summary_transcript_revision, extraction_json,
 	diarization_state, diarization_error, diarization_json, language, tags, source, created_at, video_state, video_source_type, video_file, video_start_sec, video_end_sec, video_message, video_origin_host_sec, video_end_host_sec, mic_start_host_sec, system_start_host_sec, title_source
 	FROM meetings`
 
@@ -148,6 +150,30 @@ func (d *DB) GetMeeting(id string) (*Meeting, error) {
 		return nil, fmt.Errorf("get meeting: %w", err)
 	}
 	return &m, nil
+}
+
+// GetMeetingWithSegments reads a Meeting and its segments in a single SQLite read transaction so
+// exports and stamps cannot mix two different snapshots.
+func (d *DB) GetMeetingWithSegments(ctx context.Context, id string) (*Meeting, []Segment, error) {
+	tx, err := d.Conn.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, fmt.Errorf("begin meeting snapshot: %w", err)
+	}
+	defer tx.Rollback()
+	m, err := scanMeetingRow(tx.QueryRowContext(ctx, selectMeetingsSQL+` WHERE id=?`, id))
+	if err != nil {
+		return nil, nil, fmt.Errorf("get meeting: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, selectSegmentsSQL, id)
+	if err != nil {
+		return nil, nil, fmt.Errorf("query segments: %w", err)
+	}
+	defer rows.Close()
+	segments, err := scanSegments(rows)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &m, segments, nil
 }
 
 func (d *DB) ListMeetings(limit int) ([]Meeting, error) {

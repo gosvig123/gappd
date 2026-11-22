@@ -33,8 +33,9 @@ func (d *DB) SearchMeetingIDs(query string) ([]string, error) {
 }
 
 func ftsPrefixQuery(input string) string {
+	sanitized := strings.ReplaceAll(input, "\x00", " ")
 	var terms []string
-	for _, field := range strings.Fields(input) {
+	for _, field := range strings.Fields(sanitized) {
 		if !hasSearchableRune(field) {
 			continue
 		}

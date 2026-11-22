@@ -13,6 +13,7 @@ import (
 type MeetingListItem struct {
 	ID            string           `json:"id"`
 	Title         string           `json:"title"`
+	TitleSource   string           `json:"titleSource,omitempty"`
 	StartedAt     string           `json:"startedAt"`
 	EndedAt       *string          `json:"endedAt,omitempty"`
 	Status        MeetingStatus    `json:"status"`
@@ -81,17 +82,18 @@ func BuildMeetingListView(entry db.MeetingListEntry, speakers []db.MeetingSpeake
 			SuggestedPersonID: speaker.SuggestedPersonID,
 		})
 	}
-	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers, DocumentStamp: DocumentStamp(meeting, entry.HasSummary)}
+	return MeetingListItem{ID: meeting.ID, Title: meeting.Title, TitleSource: meeting.TitleSource, StartedAt: meeting.StartedAt, EndedAt: meeting.EndedAt, Status: MeetingStatusFor(meeting), HasTranscript: entry.HasTranscript, HasSummary: entry.HasSummary, Speakers: outSpeakers, DocumentStamp: DocumentStamp(meeting)}
 }
 
-// DocumentStamp fingerprints the Meeting fields that feed meetingdocument.Build so cloud sync
-// skips exporting unchanged Meetings without reading segments or transcripts.
-func DocumentStamp(meeting db.Meeting, hasSummary bool) string {
+// DocumentStamp fingerprints every Meeting field that feeds meetingdocument.Build (including the
+// summary text itself and persisted title provenance) so cloud sync skips exporting unchanged
+// Meetings without missing same-second note refinements.
+func DocumentStamp(meeting db.Meeting) string {
 	sum := sha256.New()
-	fmt.Fprintf(sum, "v1\x00%s\x00%s\x00%s\x00%s\x00%d\x00%d\x00%t\x00%s",
-		meeting.Title, meeting.StartedAt, stringValue(meeting.EndedAt),
+	fmt.Fprintf(sum, "v2\x00%s\x00%s\x00%s\x00%s\x00%s\x00%d\x00%d\x00%s\x00%s",
+		meeting.Title, meeting.TitleSource, meeting.StartedAt, stringValue(meeting.EndedAt),
 		meeting.Language, meeting.TranscriptRevision, meeting.SummaryTranscriptRevision,
-		hasSummary, meeting.ProcessingStatusUpdatedAt)
+		stringValue(meeting.Summary), meeting.ProcessingStatusUpdatedAt)
 	return hex.EncodeToString(sum.Sum(nil))
 }
 

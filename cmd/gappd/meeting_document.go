@@ -1,12 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/gappd-dev/gappd/internal/appprotocol"
 	"github.com/gappd-dev/gappd/internal/db"
@@ -29,15 +29,16 @@ func meetingDocumentCmd() *cobra.Command {
 			return err
 		}
 		defer store.Close()
-		data, stamp, err := exportMeetingDocumentWithStamp(store, args[0], revision)
+		data, stamp, titleSource, err := exportMeetingDocumentWithStamp(cmdContext(), store, args[0], revision)
 		if err != nil {
 			return err
 		}
 		if withStamp {
 			envelope, err := json.Marshal(struct {
-				Stamp    string          `json:"stamp"`
-				Document json.RawMessage `json:"document"`
-			}{Stamp: stamp, Document: json.RawMessage(data)})
+				Stamp       string          `json:"stamp"`
+				TitleSource string          `json:"titleSource,omitempty"`
+				Document    json.RawMessage `json:"document"`
+			}{Stamp: stamp, TitleSource: titleSource, Document: json.RawMessage(data)})
 			if err != nil {
 				return fmt.Errorf("Meeting document unavailable")
 			}
@@ -53,25 +54,20 @@ func meetingDocumentCmd() *cobra.Command {
 }
 
 func exportMeetingDocument(store *db.DB, id string, revision int) ([]byte, error) {
-	data, _, err := exportMeetingDocumentWithStamp(store, id, revision)
+	data, _, _, err := exportMeetingDocumentWithStamp(context.Background(), store, id, revision)
 	return data, err
 }
 
-func exportMeetingDocumentWithStamp(store *db.DB, id string, revision int) ([]byte, string, error) {
-	meeting, err := store.GetMeeting(id)
+func exportMeetingDocumentWithStamp(ctx context.Context, store *db.DB, id string, revision int) ([]byte, string, string, error) {
+	meeting, segments, err := store.GetMeetingWithSegments(ctx, id)
 	if err != nil {
-		return nil, "", fmt.Errorf("Meeting document unavailable")
-	}
-	segments, err := store.GetSegments(id)
-	if err != nil {
-		return nil, "", fmt.Errorf("Meeting document unavailable")
+		return nil, "", "", fmt.Errorf("Meeting document unavailable")
 	}
 	data, err := meetingdocument.Build(meeting, segments, revision)
 	if err != nil {
-		return nil, "", err
+		return nil, "", "", err
 	}
-	hasSummary := meeting.Summary != nil && strings.TrimSpace(*meeting.Summary) != ""
-	return data, appprotocol.DocumentStamp(*meeting, hasSummary), nil
+	return data, appprotocol.DocumentStamp(*meeting), meeting.TitleSource, nil
 }
 
 func positiveInt(raw string) (int, error) {

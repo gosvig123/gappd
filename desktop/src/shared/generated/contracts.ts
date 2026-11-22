@@ -240,6 +240,7 @@ export type MeetingsResponse = {
 export type MeetingListItem = {
   id: string
   title: string
+  titleSource?: string
   startedAt: string
   endedAt?: string
   status: MeetingStatus

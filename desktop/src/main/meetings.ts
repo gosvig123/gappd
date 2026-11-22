@@ -18,8 +18,9 @@ export async function listMeetings(): Promise<MeetingListItem[]> {
 }
 
 export async function searchMeetings(query: string): Promise<string[]> {
-  if (!query.trim()) return []
-  const result = await requestCommand('meetings.search', { query })
+  const cleaned = query.replace(/\0/g, ' ').trim()
+  if (!cleaned) return []
+  const result = await requestCommand('meetings.search', { query: cleaned })
   return result.ids
 }
 

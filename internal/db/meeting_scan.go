@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 func scanMeetings(rows *sql.Rows) ([]Meeting, error) {
@@ -57,7 +58,7 @@ func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
 		&entry.ID, &entry.Title, &entry.StartedAt, &entry.EndedAt, &entry.CaptureStatus, &entry.CaptureStatusUpdatedAt, &entry.CaptureFailureMessage,
 		&entry.ProcessingStatus, &entry.ProcessingStatusUpdatedAt, &entry.ProcessingFailureMessage,
 		&entry.ProcessingClaimToken, &entry.ProcessingClaimExpiresAt, &entry.AudioPath,
-		&entry.HasTranscript, &entry.TranscriptRevision, &entry.HasSummary, &entry.SummaryTranscriptRevision, &entry.ExtractionJSON,
+		&entry.HasTranscript, &entry.TranscriptRevision, &entry.Summary, &entry.SummaryTranscriptRevision, &entry.ExtractionJSON,
 		&entry.DiarizationState, &entry.DiarizationError, &entry.DiarizationJSON,
 		&entry.Language, &entry.Tags, &entry.Source, &entry.CreatedAt,
 		&entry.VideoState, &entry.VideoSourceType, &entry.VideoFile, &entry.VideoStartSec, &entry.VideoEndSec, &entry.VideoMessage, &entry.VideoOriginHostSec, &entry.VideoEndHostSec, &entry.MicStartHostSec, &entry.SystemStartHostSec, &entry.TitleSource,
@@ -65,5 +66,6 @@ func scanMeetingListEntry(rows *sql.Rows) (MeetingListEntry, error) {
 	if err != nil {
 		return MeetingListEntry{}, fmt.Errorf("scan meeting list entry: %w", err)
 	}
+	entry.HasSummary = entry.Summary != nil && strings.TrimSpace(*entry.Summary) != ""
 	return entry, nil
 }
