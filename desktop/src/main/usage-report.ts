@@ -1,14 +1,14 @@
 import fs from 'node:fs'
-import path from 'node:path'
 import { app } from 'electron'
 import type { MeetingListItem } from '../shared/contracts'
 import { isAgentId } from '../shared/agents'
-import type { UsageReport, UsageReportStatus, UsageReportView, UsageSharing } from '../shared/usage-report'
+import type { UsageReport, UsageReportStatus, UsageReportView } from '../shared/usage-report'
 import { requestCommand } from './app-protocol'
 import { meetingUpload } from './cloud/upload-service'
 import { googleCalendarSnapshot } from './google/calendar-service'
 import { isManagedLocal } from './managed-runtime/status'
 import { listMeetings } from './meetings'
+import { readPreferences, updatePreferences, type StoredUsageReport } from './preferences'
 import { cloudResource } from './service-config'
 import { getStartupSettings } from './startup-settings'
 import { resolveUpdateChannel } from './update-channel-preference'
@@ -17,7 +17,6 @@ import { logFailure } from './error-log'
 // One anonymous Usage report per day the app ran, sent only when the user shares usage counts.
 // It is built from data already on this Mac when it is sent, so Gappd keeps no usage log. A failed
 // send is dropped, not retried, so no backlog of usage history builds up.
-const STATE_FILE = 'usage-report.json'
 const URL_ENV = 'GAPPD_USAGE_REPORT_URL'
 const CHECK_INTERVAL_MS = 60 * 60_000
 // The first check waits a random 5 to 60 minutes, so the send time says nothing about the launch.
@@ -27,12 +26,6 @@ const FIRST_CHECK_SPREAD_MS = 55 * 60_000
 const PROBE_FIRST_CHECK_MS = 10_000
 const SEND_TIMEOUT_MS = 10_000
 const ONE_DAY_MS = 86_400_000
-
-// `day` is the last local day the app ran; `pendingDay` is the ended day that the next check reports.
-type StoredUsage = {
-  version: 1; sharing: UsageSharing; installWeek: string; day: string; pendingDay?: string | null
-  lastReport: UsageReport | null; lastSentAt: string | null
-}
 
 let timer: NodeJS.Timeout | null = null
 
@@ -72,7 +65,7 @@ export async function usageReportView(): Promise<UsageReportView> {
 }
 
 /** When the local day changed, the day that ended waits for the next check. Only the newest one is kept. */
-function noteToday(): StoredUsage {
+function noteToday(): StoredUsageReport {
   const stored = readStored()
   const today = localDay(new Date())
   if (stored.day === today) return stored
@@ -141,23 +134,14 @@ function reportUrl(): string | null {
   return app.isPackaged ? new URL('/usage', cloudResource()).toString() : null
 }
 
-function readStored(): StoredUsage {
-  try {
-    const stored = JSON.parse(fs.readFileSync(statePath(), 'utf8')) as StoredUsage
-    if (stored.version === 1) return stored
-  } catch {
-    // A missing or damaged file starts over: sharing stays off until the user answers again.
-  }
-  return { version: 1, sharing: 'unset', installWeek: isoWeek(firstLaunch()), day: '', lastReport: null, lastSentAt: null }
+function readStored(): StoredUsageReport {
+  const saved = readPreferences().data.usageReport
+  if (saved) return { ...saved, installWeek: saved.installWeek || isoWeek(firstLaunch()) }
+  return { sharing: 'unset', installWeek: isoWeek(firstLaunch()), day: '', lastReport: null, lastSentAt: null }
 }
 
-function writeStored(stored: StoredUsage): void {
-  fs.mkdirSync(app.getPath('userData'), { recursive: true })
-  fs.writeFileSync(statePath(), JSON.stringify(stored), { mode: 0o600 })
-}
-
-function statePath(): string {
-  return path.join(app.getPath('userData'), STATE_FILE)
+function writeStored(stored: StoredUsageReport): void {
+  updatePreferences((current) => ({ ...current, usageReport: stored }))
 }
 
 /** The app data folder is made on first launch, so its creation time is when Gappd was first used. */

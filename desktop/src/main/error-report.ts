@@ -1,9 +1,8 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { app, type Details, type RenderProcessGoneDetails, type WebContents } from 'electron'
 import { describeError, isOperation, type ErrorReport, type ErrorReportStatus, type ErrorSource, type RendererError } from '../shared/error-report'
 import { setFailureSink } from './error-log'
 import { listMeetings } from './meetings'
+import { readPreferences, updatePreferences, type StoredErrorReport } from './preferences'
 import { cloudResource } from './service-config'
 import { resolveUpdateChannel } from './update-channel-preference'
 
@@ -11,7 +10,6 @@ import { resolveUpdateChannel } from './update-channel-preference'
 // forwards them to the team's error channel and stores nothing. They are on unless the user turns
 // them off. A failed send is dropped, never retried and never logged as a failure, so reporting
 // cannot loop.
-const STATE_FILE = 'error-report.json'
 const URL_ENV = 'GAPPD_ERROR_REPORT_URL'
 const SEND_TIMEOUT_MS = 10_000
 // The same failure is sent at most once in this window; later ones are counted into the next send.
@@ -24,8 +22,6 @@ const MEETING_CHECK_MS = 15 * 60_000
 const FIRST_MEETING_CHECK_MS = 2 * 60_000
 const MAX_REPEAT_KEYS = 200
 
-// failedMeetings holds "<Meeting id> <step>" keys; it stays on this Mac.
-type StoredErrors = { version: 1; sharing: 'on' | 'off'; failedMeetings?: string[] }
 type Repeat = { sentAt: number; repeats: number }
 
 const repeats = new Map<string, Repeat>()
@@ -36,8 +32,6 @@ let checkingMeetings = false
 // One send at a time: on a slow network a send holds a DNS lookup and a connection until its
 // timeout, and a burst of failures must not hold more than one.
 let sending = false
-// The state file is read once; this process is its only writer.
-let stored: StoredErrors | null = null
 
 /** Report main-process failures, crashed processes and failed Meetings from now on. */
 export function startErrorReports(): void {
@@ -71,7 +65,7 @@ export function errorReportStatus(): ErrorReportStatus {
 export function setErrorSharing(enabled: boolean): ErrorReportStatus {
   // Turning reports off forgets the failed Meetings, so turning them on again takes a new baseline
   // and never sends failures from while reports were off.
-  const next: StoredErrors = { ...readStored(), sharing: enabled ? 'on' : 'off' }
+  const next: StoredErrorReport = { ...readStored(), sharing: enabled ? 'on' : 'off' }
   if (!enabled) delete next.failedMeetings
   writeStored(next)
   return errorReportStatus()
@@ -211,33 +205,14 @@ function reportUrl(): string | null {
 }
 
 /** A missing file means the default, on. A damaged one means off, because it may hold a choice to turn reports off. */
-function readStored(): StoredErrors {
-  stored ??= readStoredFile()
-  return stored
+function readStored(): StoredErrorReport {
+  const result = readPreferences()
+  if (result.status === 'damaged') return { sharing: 'off' }
+  const saved = result.data.errorReport
+  if (saved && (saved.sharing === 'on' || saved.sharing === 'off')) return saved
+  return { sharing: 'on' }
 }
 
-function readStoredFile(): StoredErrors {
-  let text: string
-  try {
-    text = fs.readFileSync(statePath(), 'utf8')
-  } catch (error) {
-    return { version: 1, sharing: (error as NodeJS.ErrnoException).code === 'ENOENT' ? 'on' : 'off' }
-  }
-  try {
-    const stored = JSON.parse(text) as StoredErrors
-    if (stored.version === 1 && (stored.sharing === 'on' || stored.sharing === 'off')) return stored
-  } catch {
-    // Damaged: fall through to off.
-  }
-  return { version: 1, sharing: 'off' }
-}
-
-function writeStored(next: StoredErrors): void {
-  fs.mkdirSync(app.getPath('userData'), { recursive: true })
-  fs.writeFileSync(statePath(), JSON.stringify(next), { mode: 0o600 })
-  stored = next
-}
-
-function statePath(): string {
-  return path.join(app.getPath('userData'), STATE_FILE)
+function writeStored(next: StoredErrorReport): void {
+  updatePreferences((current) => ({ ...current, errorReport: next }))
 }

@@ -32,8 +32,8 @@ message starts with the Railway environment name (`RAILWAY_ENVIRONMENT_NAME`, el
 ## Desktop Error reports
 
 The desktop app sends one report per failure unless the user turns them off: Settings › General ›
-Error reports › **Send anonymous error reports**. They are on by default. The choice is stored in
-`error-report.json` in the app data folder; a damaged file counts as off.
+Error reports › **Send anonymous error reports**. They are on by default. The choice is stored under
+`errorReport` in `preferences.json` in the app data folder; a damaged file counts as off.
 
 ### What a report holds
 
@@ -69,7 +69,7 @@ together and raise `v` when a field changes meaning.
 | `main` | A failed IPC operation (`ipc.<group>.<operation>`), an uncaught exception or unhandled rejection in the main process, and each background step that logs through `logFailure` in `desktop/src/main/error-log.ts` |
 | `renderer` | An uncaught error (`renderer.error`) or unhandled rejection (`renderer.unhandled-rejection`) in the window |
 | `process` | The window or a helper process ended other than cleanly (`process.renderer-gone`, `process.gpu-gone`, …) |
-| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes, first 2 minutes after launch). The app keeps the failed keys (Meeting id and step) in `error-report.json`; they are never sent |
+| `meeting` | A Meeting whose capture, processing or Screen video is `failed` and was not at the last check (every 15 minutes, first 2 minutes after launch). The app keeps the failed keys (Meeting id and step) under `errorReport` in `preferences.json`; they are never sent |
 
 To report a new failure, call `logFailure('area.step', 'local log message', error)`. The message
 stays in the local log; only the operation and the error's name, code and frames are sent.

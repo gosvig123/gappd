@@ -1,18 +1,11 @@
-import fs from 'node:fs'
-import path from 'node:path'
-import { app, clipboard, shell } from 'electron'
+import { clipboard, shell } from 'electron'
 import { REMOTE_AI_SERVICES, remoteAIServiceAddUrl, type RemoteAccessStatus, type RemoteAIServiceId } from '../../shared/remote-access'
 import { childEnv, resolveGappdBinary } from '../native-runtime'
+import { readPreferences, updatePreferences } from '../preferences'
 import { selectedFixtureBackendEnv } from '../selected-fixture-profile'
 import { cloudAuthConfig, cloudResource } from '../service-config'
 import { RemoteAccess, type LastUsed } from './remote-access'
 import { meetingUploadAuthorization } from './upload-service'
-
-// The setting holds no secret: whether the user turned remote access on, and when each AI service
-// last used it.
-const STATE_FILE = 'remote-access.json'
-
-type SavedState = { enabled?: unknown; lastUsed?: unknown }
 
 let instance: RemoteAccess | null = null
 
@@ -48,38 +41,26 @@ export async function addToRemoteAIService(id: RemoteAIServiceId): Promise<Remot
   return status
 }
 
-// strict: a file that exists but cannot be read throws, so a write never replaces a saved setting
-// with defaults. A file that is not valid JSON holds nothing worth keeping, so it never blocks a write.
-function readState(strict = false): SavedState {
-  try {
-    const value: unknown = JSON.parse(fs.readFileSync(statePath(), 'utf8'))
-    return value && typeof value === 'object' && !Array.isArray(value) ? value as SavedState : {}
-  } catch (cause) {
-    if (strict && !(cause instanceof SyntaxError) && (cause as NodeJS.ErrnoException).code !== 'ENOENT') throw cause
-    return {}
-  }
-}
-
 function writeState(change: { enabled?: boolean; lastUsed?: LastUsed }): void {
-  const current = readState(true)
-  const next = { enabled: current.enabled === true, lastUsed: readLastUsed(current), ...change }
-  fs.mkdirSync(app.getPath('userData'), { recursive: true })
-  // Write a new file and rename it, so a crash during the write cannot leave an empty setting.
-  const temporary = `${statePath()}.tmp`
-  fs.writeFileSync(temporary, JSON.stringify(next), { mode: 0o600 })
-  fs.renameSync(temporary, statePath())
+  updatePreferences((current) => ({
+    ...current,
+    remoteAccess: { enabled: current.remoteAccess?.enabled === true, lastUsed: sanitizeLastUsed(current.remoteAccess?.lastUsed), ...change },
+  }), { strict: true })
 }
 
 function readEnabled(): boolean {
-  return readState().enabled === true
+  return readPreferences().data.remoteAccess?.enabled === true
 }
 
 function writeEnabled(enabled: boolean): void {
   writeState({ enabled })
 }
 
-function readLastUsed(state: SavedState = readState()): LastUsed {
-  const saved = state.lastUsed
+function readLastUsed(): LastUsed {
+  return sanitizeLastUsed(readPreferences().data.remoteAccess?.lastUsed)
+}
+
+function sanitizeLastUsed(saved: unknown): LastUsed {
   if (!saved || typeof saved !== 'object') return {}
   const lastUsed: LastUsed = {}
   for (const { id } of REMOTE_AI_SERVICES) {
@@ -91,8 +72,4 @@ function readLastUsed(state: SavedState = readState()): LastUsed {
 
 function writeLastUsed(lastUsed: LastUsed): void {
   writeState({ lastUsed })
-}
-
-function statePath(): string {
-  return path.join(app.getPath('userData'), STATE_FILE)
 }
