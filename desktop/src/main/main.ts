@@ -16,6 +16,7 @@ import { stopStaleRecordingRecovery } from './stale-recording-recovery'
 import { startStorageCompaction, stopStorageCompaction } from './storage-compaction'
 import { startCalendarRefresh, stopCalendarRefresh } from './google/calendar-refresh'
 import { startAgendaAutoDraft, stopAgendaAutoDraft } from './agenda'
+import { startCalendarReminders, stopCalendarReminders } from './calendar-reminder'
 import { initializeStartupSettings, shouldStartHidden } from './startup-settings'
 import { startAutoUpdateChecks, stopAutoUpdateChecks } from './update'
 import { startUsageReports, stopUsageReports } from './usage-report'
@@ -137,6 +138,7 @@ app.whenReady().then(async () => {
   startStorageCompaction()
   startCalendarRefresh()
   startAgendaAutoDraft()
+  startCalendarReminders(showMainWindow)
   startAutoUpdateChecks()
   startUsageReports()
   remoteAccess().start()
@@ -170,6 +172,7 @@ async function shutdown(): Promise<void> {
   stopStorageCompaction()
   stopCalendarRefresh()
   stopAgendaAutoDraft()
+  stopCalendarReminders()
   await stopDrainCoordinator()
   stopMeetingPresence()
   stopAutoUpdateChecks()

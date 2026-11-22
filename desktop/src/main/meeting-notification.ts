@@ -17,6 +17,8 @@ let autoStopWindow: BrowserWindow | null = null
 
 type PromptInput = {
   key: string
+  /** Bold first line; defaults to "Meeting detected". */
+  heading?: string
   title: string
   onRecord: () => void
 }
@@ -133,7 +135,7 @@ const PROMPT_STYLE = `:root{color-scheme:dark;--card:#1a1a1c;--border:#46464c;--
 const MARK = '<svg class="logo" viewBox="0 0 32 32" role="img" aria-label="Gappd"><rect class="tile" x="2" y="2" width="28" height="28" rx="8"/><g class="wave"><path d="M8.7 13v6"/><path d="M11.2 11v10"/><path d="M13.7 9v14"/><path d="M18.3 9v14"/><path d="M20.8 11v10"/><path d="M23.3 13v6"/></g></svg>'
 
 function promptHtml(input: PromptInput): string {
-  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>${PROMPT_STYLE}</style></head><body><div class="shell">${MARK}<div class="copy"><div class="title">Meeting detected</div><div class="subtitle">${escapeHtml(input.title)}</div></div><a class="action record" href="${ACTION_RECORD}">Record</a><a class="action close" href="${ACTION_DISMISS}" aria-label="Dismiss">×</a></div></body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>${PROMPT_STYLE}</style></head><body><div class="shell">${MARK}<div class="copy"><div class="title">${escapeHtml(input.heading ?? 'Meeting detected')}</div><div class="subtitle">${escapeHtml(input.title)}</div></div><a class="action record" href="${ACTION_RECORD}">Record</a><a class="action close" href="${ACTION_DISMISS}" aria-label="Dismiss">×</a></div></body></html>`
 }
 
 function autoStopHtml(input: AutoStopInput): string {
