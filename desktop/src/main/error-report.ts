@@ -2,7 +2,7 @@ import { app, type Details, type RenderProcessGoneDetails, type WebContents } fr
 import { describeError, isOperation, type ErrorReport, type ErrorReportStatus, type ErrorSource, type RendererError } from '../shared/error-report'
 import { setFailureSink } from './error-log'
 import { listMeetings } from './meetings'
-import { readPreferences, updatePreferences, type StoredErrorReport } from './preferences'
+import { readPreferences, readPreferencesLocked, updatePreferences, type PreferencesReadResult, type StoredErrorReport } from './preferences'
 import { cloudResource } from './service-config'
 import { resolveUpdateChannel } from './update-channel-preference'
 
@@ -212,11 +212,18 @@ function reportError(source: ErrorSource, operation: string, error: unknown): vo
       repeats: previous?.repeats ?? 0,
     }
     const controller = new AbortController()
+    // Read consent and start the send under the preferences lock, so an opt-out from any process
+    // either lands first (nothing is sent) or after the send started (setErrorSharing aborts it).
+    let request: Promise<Response> | null = null
+    readPreferencesLocked((current) => {
+      if (storedErrorFrom(current).sharing !== 'on') return
+      request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+    })
+    if (!request) return
     activeSend = controller
-    const request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
     sending = true
-    void request
+    void (request as Promise<Response>)
       .then((response) => response.body?.cancel())
       .catch(() => undefined)
       .finally(() => {
@@ -237,7 +244,10 @@ function reportUrl(): string | null {
 
 /** A missing file means the default, on. A damaged file or malformed errorReport value means off. */
 function readStored(): StoredErrorReport {
-  const result = readPreferences()
+  return storedErrorFrom(readPreferences())
+}
+
+function storedErrorFrom(result: PreferencesReadResult): StoredErrorReport {
   if (result.status === 'damaged') return { sharing: 'off' }
   const saved = result.data.errorReport
   if (saved === undefined) return { sharing: 'on' }

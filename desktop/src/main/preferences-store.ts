@@ -106,6 +106,18 @@ export class PreferencesStore {
     return { status: loaded.status, data: loaded.data }
   }
 
+  /**
+   * Runs `action` on the current preferences under the cross-process lock and writes nothing. A
+   * send that must not start after an opt-out from any process starts inside `action`.
+   */
+  readLocked<T>(action: (current: PreferencesReadResult) => T): T {
+    return this.withWriteLock(() => {
+      const loaded = this.loadFromDisk(true)
+      if (loaded.status === 'unreadable') return action(this.damagedResult())
+      return action({ status: loaded.status, data: loaded.data })
+    })
+  }
+
   update(mutate: (current: PreferencesDocument) => PreferencesDocument, _options?: { strict?: boolean }): PreferencesDocument {
     return this.withWriteLock(() => {
       const loaded = this.loadFromDisk(true)

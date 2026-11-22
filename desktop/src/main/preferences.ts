@@ -19,6 +19,11 @@ export function readPreferences(): PreferencesReadResult {
   return currentStore().read()
 }
 
+/** Runs `action` on the current preferences under the cross-process lock, without writing. */
+export function readPreferencesLocked<T>(action: (current: PreferencesReadResult) => T): T {
+  return currentStore().readLocked(action)
+}
+
 export function updatePreferences(mutate: (current: PreferencesDocument) => PreferencesDocument, options?: { strict?: boolean }): PreferencesDocument {
   return currentStore().update(mutate, options)
 }

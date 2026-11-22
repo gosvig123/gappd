@@ -8,7 +8,7 @@ import { meetingUpload } from './cloud/upload-service'
 import { googleCalendarSnapshot } from './google/calendar-service'
 import { isManagedLocal } from './managed-runtime/status'
 import { listMeetings } from './meetings'
-import { readPreferences, updatePreferences, type PreferencesDocument, type StoredUsageReport } from './preferences'
+import { readPreferences, readPreferencesLocked, updatePreferences, type PreferencesDocument, type StoredUsageReport } from './preferences'
 import { cloudResource } from './service-config'
 import { getStartupSettings } from './startup-settings'
 import { resolveUpdateChannel } from './update-channel-preference'
@@ -102,26 +102,21 @@ async function reportPreviousDay(): Promise<void> {
   })
   const url = reportUrl()
   if (!claimedDay || !shouldSend || !url) return
-  const report = await buildReport(claimedDay, installWeek)
+  // Stopping reports or turning sharing off aborts this controller, while the report is built too.
   const controller = new AbortController()
   activeSend = controller
   let response: Response
+  let report: UsageReport
   try {
+    report = await buildReport(claimedDay, installWeek)
     // Read consent and start the send under the preferences lock, so an opt-out from any process
     // either lands first (nothing is sent) or after the send started (this process aborts it).
     let request: Promise<Response> | null = null
-    try {
-      updatePreferences((current) => {
-        if (controller.signal.aborted || storedUsageFrom(current).sharing !== 'on') return current
-        request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
-        return current
-      })
-    } catch (error) {
-      controller.abort()
-      ;(request as Promise<Response> | null)?.catch(() => {})
-      throw error
-    }
+    readPreferencesLocked((current) => {
+      if (controller.signal.aborted || storedUsageFrom(current.data).sharing !== 'on') return
+      request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+    })
     if (!request) return
     response = await request
   } catch (error) {
