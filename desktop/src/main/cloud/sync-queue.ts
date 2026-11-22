@@ -16,6 +16,12 @@ export class MeetingSyncQueue {
   private readonly store: SecureJsonStore<MeetingSyncDocument>
   private readonly clock: () => Date
   private document: MeetingSyncDocument | null = null
+  // Pending entries this process exported, or matched against the current discovery stamp. It
+  // lives only in memory, so after a restart nothing old is sendable until discovery confirms it.
+  private verified = new Set<string>()
+  // Counts withdrawals, so a discovery result read before a withdrawal cannot release that Meeting.
+  private withdrawals = 0
+  private withdrawnAt = new Map<string, number>()
   private queue: Promise<unknown> = Promise.resolve()
 
   constructor(store: SecureJsonStore<MeetingSyncDocument>, clock: () => Date = () => new Date()) {
@@ -28,10 +34,17 @@ export class MeetingSyncQueue {
    * the document always carries the revision the queue will send it with. A loader failure
    * queues nothing.
    */
-  enqueue(localId: string, load: (revision: number) => Promise<string>): Promise<MeetingSyncEntry> {
+  enqueue(localId: string, load: (revision: number) => Promise<string | { document: string; stamp?: string }>): Promise<MeetingSyncEntry> {
     return this.serialize(async () => {
       const state = await this.load()
-      await this.queueOne(state, localId, load)
+      try {
+        await this.queueOne(state, localId, load)
+      } catch (error) {
+        // A failed fresh export means the queued document may be out of date: hold it.
+        this.withdraw(this.verified, localId)
+        throw error
+      }
+      this.verified.add(localId)
       await this.persist(state)
       return entryOf(localId, state)
     })
@@ -54,6 +67,7 @@ export class MeetingSyncQueue {
         state.acceptedStamp = {}
         state.deletions = []
         state.entries = {}
+        this.verified.clear()
       }
       state.subject = subject
       await this.persist(state)
@@ -70,18 +84,26 @@ export class MeetingSyncQueue {
   backfill(
     items: Array<string | { localId: string; stamp?: string }>,
     load: (localId: string, revision: number) => Promise<string | { document: string; stamp?: string }>,
+    options?: { listedAt?: number },
   ): Promise<{ queued: number; unreadable: number }> {
     return this.serialize(async () => {
       const state = await this.load()
       let queued = 0
       let unreadable = 0
+      // Discovery changes the status only of the Meetings it lists; an unlisted one keeps its status.
+      const nextVerified = new Set(this.verified)
       let dirty = false
       for (const item of items) {
         const localId = typeof item === 'string' ? item : item.localId
         const hintStamp = typeof item === 'string' ? undefined : item.stamp
         const entry = state.entries[localId]
         if (entry?.state === 'failed' || state.deletions.includes(localId)) continue
-        if (hintStamp && this.isStampCurrent(state, localId, hintStamp, entry)) continue
+        // A stamp listed before this Meeting was withdrawn is stale: export it again instead.
+        const staleHint = options?.listedAt !== undefined && (this.withdrawnAt.get(localId) ?? 0) > options.listedAt
+        if (hintStamp && !staleHint && this.isStampCurrent(state, localId, hintStamp, entry)) {
+          if (entry) nextVerified.add(localId)
+          continue
+        }
         try {
           const loaded = await load(localId, nextRevision(state, localId))
           const document = typeof loaded === 'string' ? loaded : loaded.document
@@ -90,14 +112,19 @@ export class MeetingSyncQueue {
           const previous = entry ? contentHash(entry.document) : state.acceptedContent[localId]
           if (contentHash(document) === previous) {
             if (exportedStamp && this.recordStamp(state, localId, exportedStamp, entry)) dirty = true
+            if (entry) nextVerified.add(localId)
             continue
           }
           await this.queueOne(state, localId, async () => document, exportedStamp)
+          nextVerified.add(localId)
           queued += 1
         } catch {
           unreadable += 1
+          this.withdraw(nextVerified, localId)
         }
       }
+      // A failed fresh export holds the Meeting until a later export or matching stamp releases it.
+      this.verified = nextVerified
       if (queued > 0 || dirty) await this.persist(state)
       return { queued, unreadable }
     })
@@ -114,6 +141,7 @@ export class MeetingSyncQueue {
       const state = await this.load()
       if (state.accepted[localId] === undefined && !state.entries[localId]) return
       delete state.entries[localId]
+      this.verified.delete(localId)
       if (!state.deletions.includes(localId)) state.deletions.push(localId)
       await this.persist(state)
     })
@@ -139,15 +167,32 @@ export class MeetingSyncQueue {
     })
   }
 
-  /** Returns the oldest pending work without changing its state. */
-  pending(): Promise<MeetingSyncWork | null> {
+  /**
+   * Returns the oldest eligible pending work without changing its state. With `verifiedOnly`, only
+   * stamped work this process exported or confirmed in the latest discovery is eligible.
+   */
+  pending(options?: { verifiedOnly?: boolean }): Promise<MeetingSyncWork | null> {
     return this.serialize(async () => {
       const state = await this.load()
       for (const localId of Object.keys(state.entries).sort()) {
         const stored = state.entries[localId]
-        if (stored.state === 'pending') return { localId, ...stored }
+        if (stored.state !== 'pending') continue
+        if (options?.verifiedOnly && (!stored.stamp || !this.verified.has(localId))) continue
+        return { localId, ...stored }
       }
       return null
+    })
+  }
+
+  /**
+   * Whether this exact work may still be sent. The sender checks it right before posting, after
+   * any discovery that ran meanwhile, so a withdrawn document is not sent.
+   */
+  sendable(localId: string, revision: number, options?: { verifiedOnly?: boolean }): Promise<boolean> {
+    return this.serialize(async () => {
+      const stored = (await this.load()).entries[localId]
+      if (!stored || stored.state !== 'pending' || stored.revision !== revision) return false
+      return !options?.verifiedOnly || (Boolean(stored.stamp) && this.verified.has(localId))
     })
   }
 
@@ -192,6 +237,7 @@ export class MeetingSyncQueue {
     return this.serialize(async () => {
       const state = await this.load()
       state.entries = {}
+      this.verified.clear()
       await this.persist(state)
     })
   }
@@ -226,6 +272,17 @@ export class MeetingSyncQueue {
     })
   }
 
+  /** The withdrawal count now. Read it before listing Meetings and pass it to `backfill` as `listedAt`. */
+  withdrawalMark(): number {
+    return this.withdrawals
+  }
+
+  private withdraw(set: Set<string>, localId: string): void {
+    set.delete(localId)
+    this.withdrawals += 1
+    this.withdrawnAt.set(localId, this.withdrawals)
+  }
+
   private isStampCurrent(state: MeetingSyncDocument, localId: string, stamp: string, entry: MeetingSyncDocument['entries'][string] | undefined): boolean {
     if (entry) return entry.stamp === stamp
     return state.accepted[localId] !== undefined && state.acceptedContent[localId] !== undefined && state.acceptedStamp[localId] === stamp
@@ -242,14 +299,16 @@ export class MeetingSyncQueue {
     return true
   }
 
-  private async queueOne(state: MeetingSyncDocument, localId: string, load: (revision: number) => Promise<string>, stamp?: string): Promise<void> {
+  private async queueOne(state: MeetingSyncDocument, localId: string, load: (revision: number) => Promise<string | { document: string; stamp?: string }>, stamp?: string): Promise<void> {
     if (typeof localId !== 'string' || localId.length === 0 || typeof load !== 'function') {
       throw new Error('A Meeting and a document loader are required.')
     }
     const revision = nextRevision(state, localId)
-    const document = await load(revision)
+    const loaded = await load(revision)
+    const document = typeof loaded === 'string' ? loaded : loaded.document
+    const resolvedStamp = stamp ?? (typeof loaded === 'string' ? undefined : loaded.stamp)
     if (typeof document !== 'string' || document.length === 0) throw new Error('The Meeting document is unavailable.')
-    state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null, ...(stamp ? { stamp } : {}) }
+    state.entries[localId] = { revision, document, state: 'pending', attempts: 0, updatedAt: this.timestamp(), error: null, ...(resolvedStamp ? { stamp: resolvedStamp } : {}) }
   }
 
   private async load(): Promise<MeetingSyncDocument> {

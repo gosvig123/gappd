@@ -36,8 +36,8 @@ export async function syncUploads(context: UploadContext): Promise<void> {
     if (!await ensureRegistered(context, credential, controller.signal)) return
     await sendDeletions(context, credential, controller.signal)
     while (!controller.signal.aborted) {
+      if (!await context.nextPending()) return
       const remaining = (await context.queue.status()).pending
-      if (remaining === 0) return
       await runPass(context, credential, controller)
       if ((await context.queue.status()).pending >= remaining) return
     }
@@ -49,7 +49,7 @@ export async function syncUploads(context: UploadContext): Promise<void> {
 async function runPass(context: UploadContext, credential: CloudCredential, controller: AbortController): Promise<void> {
   for (let sent = 0; sent < MAX_SENDS_PER_PASS; sent++) {
     if (controller.signal.aborted) return
-    const work = await context.queue.pending()
+    const work = await context.nextPending()
     if (!work) return
     if (!await sendOne(context, credential, controller, work)) return
   }
@@ -57,6 +57,8 @@ async function runPass(context: UploadContext, credential: CloudCredential, cont
 
 async function sendOne(context: UploadContext, credential: CloudCredential, controller: AbortController, work: MeetingSyncWork): Promise<boolean> {
   const signatures = await context.device.signatures('POST', '/meeting', work.document)
+  // Discovery may have withdrawn this document while it was signed. Skip it; the pass goes on.
+  if (!await context.stillSendable(work)) return true
   const outcome = await sendDocument(context.fetcher, context.resource, credential, signatures, work, controller.signal)
   if (controller.signal.aborted) return false
   if (outcome.kind === 'accepted') {

@@ -26,6 +26,14 @@ import { logFailure, reportFailure } from './error-log'
 protocol.registerSchemesAsPrivileged([{ scheme: 'gappd-media', privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } }])
 initializeSelectedFixtureProfile()
 
+// One Gappd per profile. The upload queue, report claims and login settings assume one process; a
+// second launch only brings the open window forward. The lock is per user data folder, so a
+// fixture profile has its own. app.exit skips before-quit, so the second process never runs the
+// shutdown that would stop the first one's recording or drains.
+const isPrimaryInstance = app.requestSingleInstanceLock()
+if (!isPrimaryInstance) app.exit(0)
+app.on('second-instance', () => { if (app.isReady()) showMainWindow() })
+
 const BEFORE_QUIT_FOR_UPDATE_EVENT = 'before-quit-for-update'
 
 let mainWindow: BrowserWindow | null = null
@@ -110,6 +118,7 @@ function loadRenderer(createdWindow: BrowserWindow): void {
 }
 
 app.whenReady().then(async () => {
+  if (!isPrimaryInstance) return
   startErrorReports()
   registerMeetingMedia()
   applyDevDockIcon()

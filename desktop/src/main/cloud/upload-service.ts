@@ -1,6 +1,7 @@
 import { shell } from 'electron'
 import type { MeetingSyncDocument } from '../../shared/meeting-sync-contract'
 import type { ParticipantContext } from '../../shared/participant-contract'
+import { matchesCalendarTitle } from '../../shared/meeting-title'
 import { CloudAuth, type CloudCredential } from './auth'
 import { createSecureStore, requireEncryption } from '../electron-secure-store'
 import { MeetingDevice, type DeviceCredential } from './device'
@@ -32,7 +33,9 @@ export function meetingUpload(): MeetingUpload {
     new MeetingSyncQueue(createSecureStore<MeetingSyncDocument>('meeting-upload-development.enc')),
     meetingDocumentWithStampLoader(resolveGappdBinary, meetingCalendarTitles),
     listMeetingsForSync,
-    new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')))
+    new MeetingDevice(createSecureStore<DeviceCredential>('meeting-device-development.enc')),
+    fetch,
+    { requireVerifiedStamp: true })
   return instance
 }
 
@@ -57,7 +60,7 @@ async function listMeetingsForSync(): Promise<MeetingListItem[]> {
       const { documentStamp: _unused, ...withoutStamp } = meeting
       return withoutStamp
     }
-    const masked = meeting.titleSource === 'calendar' || titles.some((title) => title.trim() === meeting.title.trim())
+    const masked = meeting.titleSource === 'calendar' || matchesCalendarTitle(meeting.title, titles)
     return { ...meeting, documentStamp: foldCalendarMaskStamp(meeting.documentStamp, masked) }
   })
 }

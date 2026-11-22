@@ -96,10 +96,16 @@ export function currentMeetingEvent(events: CalendarEventSummary[], now: number)
 }
 
 async function readLinks(): Promise<CalendarLinks> {
-  const value = await createSecureStore<CalendarLinks>(STORE_FILE).read()
-  if (!value) return { version: 1, meetings: {} }
-  if (value.version !== 1 || !value.meetings || typeof value.meetings !== 'object' || Array.isArray(value.meetings)) throw new Error('Read meeting calendar links: invalid local data. Restore the calendar store from backup.')
-  return value
+  const value: unknown = await createSecureStore<CalendarLinks>(STORE_FILE).read()
+  if (value === null) return { version: 1, meetings: {} }
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Read meeting calendar links: invalid local data. Restore the calendar store from backup.')
+  }
+  const record = value as Record<string, unknown>
+  if (record.version !== 1 || !record.meetings || typeof record.meetings !== 'object' || Array.isArray(record.meetings)) {
+    throw new Error('Read meeting calendar links: invalid local data. Restore the calendar store from backup.')
+  }
+  return record as CalendarLinks
 }
 
 async function saveContext(document: CalendarLinks, id: string, context: ParticipantContext): Promise<void> {
@@ -122,7 +128,7 @@ export function savedMeetingCalendarLinks(): Promise<Record<string, CalendarEven
   return serialize(async () => {
     const links: Record<string, CalendarEventSummary> = {}
     for (const [id, context] of Object.entries((await readLinks()).meetings)) {
-      if (context.event) links[id] = context.event
+      if (context && typeof context === 'object' && !Array.isArray(context) && context.event) links[id] = context.event
     }
     return links
   })

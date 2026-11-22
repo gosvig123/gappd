@@ -24,6 +24,7 @@ export class MeetingUpload {
   private readonly localMeetings: () => Promise<MeetingListItem[]>
   private readonly device: MeetingDevice
   private readonly fetcher: typeof fetch
+  private readonly requireVerifiedStamp: boolean
   private generation = 0
   private readonly stored: StoredConsent = newStoredConsent()
   private pending: AbortController | null = null
@@ -36,7 +37,7 @@ export class MeetingUpload {
 
   constructor(auth: Authorization, resource: string, queue: MeetingSyncQueue,
     loadDocument: (localId: string, revision: number) => Promise<DocumentResult>, localMeetings: () => Promise<MeetingListItem[]>,
-    device: MeetingDevice, fetcher: typeof fetch = fetch) {
+    device: MeetingDevice, fetcher: typeof fetch = fetch, options?: { requireVerifiedStamp?: boolean }) {
     this.auth = auth
     this.resource = resource
     this.queue = queue
@@ -44,6 +45,7 @@ export class MeetingUpload {
     this.localMeetings = localMeetings
     this.device = device
     this.fetcher = fetcher
+    this.requireVerifiedStamp = options?.requireVerifiedStamp === true
     auth.observeAuthorization?.(() => this.revokeAll())
   }
 
@@ -99,10 +101,7 @@ export class MeetingUpload {
   /** Queues one local Meeting. It sends nothing: sync does that, and only with consent. */
   async enqueue(localId: unknown): Promise<MeetingUploadStatus> {
     if (typeof localId !== 'string' || localId.length === 0) throw new Error('A Meeting is required.')
-    await this.queue.enqueue(localId, async (revision) => {
-      const loaded = await this.loadDocument(localId, revision)
-      return typeof loaded === 'string' ? loaded : loaded.document
-    })
+    await this.queue.enqueue(localId, (revision) => this.loadDocument(localId, revision))
     return this.status()
   }
 
@@ -205,7 +204,8 @@ export class MeetingUpload {
     // Retry durable pending work even when discovery found no new Meeting. An announced refresh
     // clears the old result first, so what remains afterwards is this sync's own reason.
     const queue = await this.queue.status()
-    if (queue.pending > 0 || queue.deleting > 0) {
+    const sendable = await this.queue.pending({ verifiedOnly: this.requireVerifiedStamp })
+    if (queue.deleting > 0 || sendable) {
       if (announce) this.result = null
       await this.sync()
     }
@@ -223,11 +223,12 @@ export class MeetingUpload {
    */
   private async enqueueMissing(credential: CloudCredential): Promise<{ queued: number; unreadable: number }> {
     await this.queue.claim(credential.subject)
+    const listedAt = this.queue.withdrawalMark()
     const meetings = await this.localMeetings()
     const finished = meetings
       .filter((meeting) => meeting.status.state === 'completed')
       .map((meeting) => ({ localId: meeting.id, stamp: meeting.documentStamp }))
-    return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision))
+    return this.queue.backfill(finished, (localId, revision) => this.loadDocument(localId, revision), { listedAt })
   }
 
   /** Everything the wire modules need, without giving them the consent state. */
@@ -235,6 +236,8 @@ export class MeetingUpload {
     return {
       resource: this.resource, device: this.device, queue: this.queue, fetcher: this.fetcher,
       consented: () => this.consented(),
+      nextPending: () => this.queue.pending({ verifiedOnly: this.requireVerifiedStamp }),
+      stillSendable: (work) => this.queue.sendable(work.localId, work.revision, { verifiedOnly: this.requireVerifiedStamp }),
       setPending: (controller) => { this.pending = controller },
       setResult: (message) => { this.result = message },
       rememberGeneration: (generation) => this.device.rememberGeneration(generation),

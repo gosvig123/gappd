@@ -9,13 +9,11 @@ const REQUIRES_APPROVAL_STATUS = 'requires-approval'
 export function initializeStartupSettings(): void {
   if (!supportsStartup()) return
   try {
-    let claimed = false
     updatePreferences((current) => {
       if (current.startup?.initialized) return current
-      claimed = true
+      app.setLoginItemSettings({ openAtLogin: true })
       return { ...current, startup: { ...current.startup, initialized: true } }
     })
-    if (claimed) app.setLoginItemSettings({ openAtLogin: true })
   } catch (error) {
     logFailure('startup.open-at-login', 'Failed to enable Gappd at macOS login during first launch', error)
   }
@@ -59,6 +57,9 @@ export function setAgendaAutoDraftEnabled(enabled: boolean): StartupSettings {
 
 export function setOpenAtLogin(openAtLogin: boolean): StartupSettings {
   if (!supportsStartup()) return getStartupSettings()
+  // Save the choice first: once it is saved, no first-launch default in any process can undo it.
+  // If the save fails, macOS is not changed and the error reaches the caller.
+  updatePreferences((current) => ({ ...current, startup: { ...current.startup, initialized: true } }))
   app.setLoginItemSettings({ openAtLogin })
   return getStartupSettings()
 }

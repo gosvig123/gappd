@@ -2,7 +2,7 @@ import { app, type Details, type RenderProcessGoneDetails, type WebContents } fr
 import { describeError, isOperation, type ErrorReport, type ErrorReportStatus, type ErrorSource, type RendererError } from '../shared/error-report'
 import { setFailureSink } from './error-log'
 import { listMeetings } from './meetings'
-import { readPreferences, updatePreferences, type StoredErrorReport } from './preferences'
+import { readPreferences, readPreferencesLocked, updatePreferences, type PreferencesReadResult, type StoredErrorReport } from './preferences'
 import { cloudResource } from './service-config'
 import { resolveUpdateChannel } from './update-channel-preference'
 
@@ -21,6 +21,7 @@ const MEETING_CHECK_MS = 15 * 60_000
 // The first Meeting check waits, so it does not compete with the app's launch.
 const FIRST_MEETING_CHECK_MS = 2 * 60_000
 const MAX_REPEAT_KEYS = 200
+const MAX_TRACKED_FAILED_MEETINGS = 500
 
 type Repeat = { sentAt: number; repeats: number }
 
@@ -32,6 +33,7 @@ let checkingMeetings = false
 // One send at a time: on a slow network a send holds a DNS lookup and a connection until its
 // timeout, and a burst of failures must not hold more than one.
 let sending = false
+let activeSend: AbortController | null = null
 
 /** Report main-process failures, crashed processes and failed Meetings from now on. */
 export function startErrorReports(): void {
@@ -56,6 +58,8 @@ export function stopErrorReports(): void {
   if (meetingTimer) clearInterval(meetingTimer)
   if (firstMeetingCheck) clearTimeout(firstMeetingCheck)
   meetingTimer = firstMeetingCheck = null
+  activeSend?.abort()
+  activeSend = null
 }
 
 export function errorReportStatus(): ErrorReportStatus {
@@ -65,9 +69,18 @@ export function errorReportStatus(): ErrorReportStatus {
 export function setErrorSharing(enabled: boolean): ErrorReportStatus {
   // Turning reports off forgets the failed Meetings, so turning them on again takes a new baseline
   // and never sends failures from while reports were off.
-  const next: StoredErrorReport = { ...readStored(), sharing: enabled ? 'on' : 'off' }
-  if (!enabled) delete next.failedMeetings
-  writeStored(next)
+  if (!enabled) {
+    activeSend?.abort()
+    activeSend = null
+  }
+  const consentToken = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  updatePreferences((current) => {
+    if (!enabled) return { ...current, errorReport: { sharing: 'off', consentToken } }
+    // Keep the list only when sharing is on now (the effective value, rollback markers included).
+    // After any off state, even a partly saved one, a new baseline is taken.
+    const failedMeetings = current.errorReport?.sharing === 'on' ? current.errorReport.failedMeetings : undefined
+    return { ...current, errorReport: failedMeetings ? { sharing: 'on', failedMeetings, consentToken } : { sharing: 'on', consentToken } }
+  })
   return errorReportStatus()
 }
 
@@ -99,6 +112,12 @@ export async function checkFailedMeetings(): Promise<void> {
 }
 
 async function recordFailedMeetings(): Promise<void> {
+  // The scan claims only against the state it started from. If sharing or the saved failure list
+  // changed in any process while Meetings were listed, its list is stale: it claims nothing and
+  // the next scan starts again.
+  const atStart = readStored()
+  const consentToken = atStart.consentToken
+  const versionAtStart = atStart.baselineVersion ?? 0
   const meetings = await listMeetings()
   const failures = meetings.flatMap((meeting) => {
     const { capture, processing, video } = meeting.status
@@ -108,20 +127,32 @@ async function recordFailedMeetings(): Promise<void> {
     if (video.state === 'failed') entries.push({ key: `${meeting.id} screen-video`, step: 'screen-video', code: meetingFailureCode('screen-video', video.message) })
     return entries
   })
-  const failed = failures.map((entry) => entry.key)
-  const seen = readStored().failedMeetings
-  // The first check only remembers, so failures from before error reports are not sent.
-  if (seen) {
-    for (const entry of failures) {
-      if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
-      reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code })
-    }
-  }
+  const claimed: typeof failures = []
   updatePreferences((current) => {
     if (current.errorReport?.sharing === 'off') return current
     if (current.errorReport !== undefined && current.errorReport.sharing !== 'on') return current
-    return { ...current, errorReport: { sharing: 'on', failedMeetings: failed } }
+    if (current.errorReport?.consentToken !== consentToken) return current
+    const seen = current.errorReport?.failedMeetings
+    // A version, not the list itself: trimming at the cap can restore an earlier list exactly.
+    if ((current.errorReport?.baselineVersion ?? 0) !== versionAtStart) return current
+    claimed.length = 0
+    // Without a saved list, this scan takes the baseline and reports nothing.
+    if (seen) {
+      for (const entry of failures) {
+        if (seen.includes(entry.key) || EXPECTED_MEETING_FAILURE_CODES.has(entry.code)) continue
+        claimed.push(entry)
+      }
+    }
+    // Keys of Meetings that still fail are never dropped, or the next scan would report them as new.
+    // Other keys are kept up to the cap, newest first.
+    const failing = new Set(failures.map((entry) => entry.key))
+    const older = (seen ?? []).filter((key) => !failing.has(key))
+    const bounded = [...older.slice(Math.max(0, older.length - MAX_TRACKED_FAILED_MEETINGS)), ...failing]
+    return { ...current, errorReport: { sharing: 'on', failedMeetings: bounded, baselineVersion: versionAtStart + 1, ...(consentToken ? { consentToken } : {}) } }
   })
+  for (const entry of claimed) {
+    reportError('meeting', `meeting.${entry.step}`, { name: 'MeetingFailed', code: entry.code }, { consentToken })
+  }
 }
 
 const EXPECTED_MEETING_FAILURE_CODES = new Set(['CAPTURE_PERMISSION_MIC', 'CAPTURE_PERMISSION_SCREEN'])
@@ -162,10 +193,13 @@ function meetingFailureCode(step: 'capture' | 'processing' | 'screen-video', mes
  * never waits: the checks that drop a report come first, and the send is not awaited, has a
  * timeout and is never retried. While a send is open, a new report is dropped.
  */
-function reportError(source: ErrorSource, operation: string, error: unknown): void {
+function reportError(source: ErrorSource, operation: string, error: unknown, claim?: { consentToken: string | undefined }): void {
   try {
     const url = reportUrl()
-    if (!url || !isOperation(operation) || readStored().sharing !== 'on') return
+    const atStart = readStored()
+    if (!url || !isOperation(operation) || atStart.sharing !== 'on') return
+    // Sent only under the consent it was claimed or first checked with, in any process.
+    const expectedToken = claim ? claim.consentToken : atStart.consentToken
     const described = describeError(error, [app.getAppPath()])
     const key = [source, operation, described.error_name, described.error_code].join(' ')
     const now = Date.now()
@@ -189,13 +223,26 @@ function reportError(source: ErrorSource, operation: string, error: unknown): vo
       ...described,
       repeats: previous?.repeats ?? 0,
     }
-    const request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
-      signal: AbortSignal.timeout(SEND_TIMEOUT_MS) })
+    const controller = new AbortController()
+    // Read consent and start the send under the preferences lock, so an opt-out from any process
+    // either lands first (nothing is sent) or after the send started (setErrorSharing aborts it).
+    let request: Promise<Response> | null = null
+    readPreferencesLocked((current) => {
+      const stored = storedErrorFrom(current)
+      if (stored.sharing !== 'on' || stored.consentToken !== expectedToken) return
+      request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(report),
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+    })
+    if (!request) return
+    activeSend = controller
     sending = true
-    void request
+    void (request as Promise<Response>)
       .then((response) => response.body?.cancel())
       .catch(() => undefined)
-      .finally(() => { sending = false })
+      .finally(() => {
+        if (activeSend === controller) activeSend = null
+        sending = false
+      })
   } catch {
     // A report must never turn into a second failure.
   }
@@ -210,14 +257,13 @@ function reportUrl(): string | null {
 
 /** A missing file means the default, on. A damaged file or malformed errorReport value means off. */
 function readStored(): StoredErrorReport {
-  const result = readPreferences()
+  return storedErrorFrom(readPreferences())
+}
+
+function storedErrorFrom(result: PreferencesReadResult): StoredErrorReport {
   if (result.status === 'damaged') return { sharing: 'off' }
   const saved = result.data.errorReport
   if (saved === undefined) return { sharing: 'on' }
   if (saved && (saved.sharing === 'on' || saved.sharing === 'off')) return saved
   return { sharing: 'off' }
-}
-
-function writeStored(next: StoredErrorReport): void {
-  updatePreferences((current) => ({ ...current, errorReport: next }))
 }

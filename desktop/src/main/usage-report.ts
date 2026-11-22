@@ -8,7 +8,7 @@ import { meetingUpload } from './cloud/upload-service'
 import { googleCalendarSnapshot } from './google/calendar-service'
 import { isManagedLocal } from './managed-runtime/status'
 import { listMeetings } from './meetings'
-import { readPreferences, updatePreferences, type StoredUsageReport } from './preferences'
+import { readPreferences, readPreferencesLocked, updatePreferences, type PreferencesDocument, type StoredUsageReport } from './preferences'
 import { cloudResource } from './service-config'
 import { getStartupSettings } from './startup-settings'
 import { resolveUpdateChannel } from './update-channel-preference'
@@ -28,6 +28,7 @@ const SEND_TIMEOUT_MS = 10_000
 const ONE_DAY_MS = 86_400_000
 
 let timer: NodeJS.Timeout | null = null
+let activeSend: AbortController | null = null
 
 export function startUsageReports(): void {
   if (timer) return
@@ -46,6 +47,8 @@ export function startUsageReports(): void {
 export function stopUsageReports(): void {
   if (timer) clearTimeout(timer)
   timer = null
+  activeSend?.abort()
+  activeSend = null
 }
 
 export function usageReportStatus(): UsageReportStatus {
@@ -54,7 +57,13 @@ export function usageReportStatus(): UsageReportStatus {
 }
 
 export function setUsageSharing(enabled: boolean): UsageReportStatus {
-  writeStored({ ...readStored(), sharing: enabled ? 'on' : 'off' })
+  if (!enabled) {
+    activeSend?.abort()
+    activeSend = null
+  }
+  // A new token on every change, so a report another process is building is not sent after an off-on toggle.
+  const consentToken = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  updateStored((current) => ({ ...current, sharing: enabled ? 'on' : 'off', consentToken }))
   return usageReportStatus()
 }
 
@@ -66,28 +75,64 @@ export async function usageReportView(): Promise<UsageReportView> {
 
 /** When the local day changed, the day that ended waits for the next check. Only the newest one is kept. */
 function noteToday(): StoredUsageReport {
-  const stored = readStored()
-  const today = localDay(new Date())
-  if (stored.day === today) return stored
-  const next = { ...stored, day: today, pendingDay: stored.day || stored.pendingDay || null }
-  writeStored(next)
-  return next
+  const current = readStored()
+  const nowDay = localDay(new Date())
+  if (current.day && current.day >= nowDay) return current
+  return updateStored((stored) => {
+    const today = localDay(new Date())
+    if (stored.day && stored.day >= today) return stored
+    return { ...stored, day: today, pendingDay: stored.day || stored.pendingDay || null }
+  })
 }
 
 /** Report the day that ended, if there is one. */
 async function reportPreviousDay(): Promise<void> {
-  const stored = noteToday()
-  const day = stored.pendingDay
-  if (!day) return
-  // Clear it first, so an error or a quit can never send one day twice.
-  writeStored({ ...stored, pendingDay: null })
+  let claimedDay: string | null = null
+  let shouldSend = false
+  let installWeek = ''
+  let consentToken: string | undefined
+  updateStored((stored) => {
+    const today = localDay(new Date())
+    const noted = !stored.day || today > stored.day
+      ? { ...stored, day: today, pendingDay: stored.day || stored.pendingDay || null }
+      : stored
+    claimedDay = noted.pendingDay ?? null
+    shouldSend = noted.sharing === 'on'
+    installWeek = noted.installWeek
+    consentToken = noted.consentToken
+    if (!claimedDay) return noted
+    // Clear it atomically under the preferences lock, so an error or a quit can never send one day twice.
+    return { ...noted, pendingDay: null }
+  })
   const url = reportUrl()
-  if (stored.sharing !== 'on' || !url) return
-  const report = await buildReport(day, stored.installWeek)
-  const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(report), signal: AbortSignal.timeout(SEND_TIMEOUT_MS) })
+  if (!claimedDay || !shouldSend || !url) return
+  // Stopping reports or turning sharing off aborts this controller, while the report is built too.
+  const controller = new AbortController()
+  activeSend = controller
+  let response: Response
+  let report: UsageReport
+  try {
+    report = await buildReport(claimedDay, installWeek)
+    // Read consent and start the send under the preferences lock, so an opt-out from any process
+    // either lands first (nothing is sent) or after the send started (this process aborts it).
+    let request: Promise<Response> | null = null
+    readPreferencesLocked((current) => {
+      const stored = storedUsageFrom(current.data)
+      if (controller.signal.aborted || stored.sharing !== 'on' || stored.consentToken !== consentToken) return
+      request = fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(SEND_TIMEOUT_MS)]) })
+    })
+    if (!request) return
+    response = await request
+  } catch (error) {
+    if (controller.signal.aborted) return
+    throw error
+  } finally {
+    if (activeSend === controller) activeSend = null
+  }
+  if (controller.signal.aborted || readStored().sharing !== 'on') return
   if (!response.ok) throw new Error(`Usage report was refused with HTTP ${response.status}; it is dropped, and tomorrow's report is sent as usual.`)
-  writeStored({ ...readStored(), lastReport: report, lastSentAt: new Date().toISOString() })
+  updateStored((stored) => ({ ...stored, lastReport: report, lastSentAt: new Date().toISOString() }))
 }
 
 async function buildReport(day: string, installWeek: string): Promise<UsageReport> {
@@ -134,14 +179,23 @@ function reportUrl(): string | null {
   return app.isPackaged ? new URL('/usage', cloudResource()).toString() : null
 }
 
-function readStored(): StoredUsageReport {
-  const saved = readPreferences().data.usageReport
+function storedUsageFrom(doc: PreferencesDocument): StoredUsageReport {
+  const saved = doc.usageReport
   if (saved) return { ...saved, installWeek: saved.installWeek || isoWeek(firstLaunch()) }
   return { sharing: 'unset', installWeek: isoWeek(firstLaunch()), day: '', lastReport: null, lastSentAt: null }
 }
 
-function writeStored(stored: StoredUsageReport): void {
-  updatePreferences((current) => ({ ...current, usageReport: stored }))
+function readStored(): StoredUsageReport {
+  return storedUsageFrom(readPreferences().data)
+}
+
+function updateStored(mutate: (current: StoredUsageReport) => StoredUsageReport): StoredUsageReport {
+  let updated: StoredUsageReport | null = null
+  updatePreferences((current) => {
+    updated = mutate(storedUsageFrom(current))
+    return { ...current, usageReport: updated }
+  })
+  return updated ?? readStored()
 }
 
 /** The app data folder is made on first launch, so its creation time is when Gappd was first used. */
